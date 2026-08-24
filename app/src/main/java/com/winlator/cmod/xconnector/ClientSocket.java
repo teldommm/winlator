@@ -51,7 +51,15 @@ public class ClientSocket {
         if (bytesWritten >= 0) {
             data.position(bytesWritten);
         }
-        else Log.d("ClientSocket", "Failed to write data.");
+        else {
+            // Previously this only logged and returned normally, so a failed
+            // (or, before the SO_SNDTIMEO fix, an indefinitely blocking) write
+            // was never reported to callers. A stuck/non-draining peer must
+            // surface as a real error so the offending connection can be
+            // dropped instead of silently continuing as if nothing happened.
+            Log.d("ClientSocket", "Failed to write data (fd=" + fd + ").");
+            throw new IOException("Failed to write data (fd=" + fd + ").");
+        }
     }
 
     public int recvAncillaryMsg(ByteBuffer data) throws IOException {

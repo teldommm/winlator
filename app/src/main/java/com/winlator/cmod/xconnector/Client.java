@@ -43,6 +43,16 @@ public class Client {
         this.tag = tag;
     }
 
+    /**
+     * Forcibly drops this connection. Used when a write to this client failed
+     * (including a write that timed out via SO_SNDTIMEO because the peer
+     * stopped draining its socket) so a single non-responsive client can't
+     * keep holding up whoever is trying to notify it.
+     */
+    public void disconnect() {
+        connector.killConnection(this);
+    }
+
     protected void requestShutdown() {
         try {
             ByteBuffer data = ByteBuffer.allocateDirect(8);
