@@ -2,6 +2,7 @@
 #include <sys/epoll.h>
 #include <sys/poll.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/eventfd.h>
 #include <sys/un.h>
@@ -14,6 +15,13 @@
 #define printf(...) __android_log_print(ANDROID_LOG_DEBUG, "System.out", __VA_ARGS__);
 #define MAX_EVENTS 10
 #define MAX_FDS 32
+// Hard cap on how long a write() to a client fd is allowed to block.
+// A stuck/non-draining peer (e.g. a wine process that was killed abruptly
+// while a window-manager notification was being delivered to it) must not be
+// able to freeze the single epoll thread - and therefore every other client,
+// including a still-running game - forever. See WRITE_TIMEOUT usage below.
+#define WRITE_TIMEOUT_SEC 0
+#define WRITE_TIMEOUT_USEC 300000 // 300ms
 
 struct epoll_event events[MAX_EVENTS];
 
@@ -67,6 +75,11 @@ Java_com_winlator_cmod_xconnector_XConnectorEpoll_doEpollIndefinitely(JNIEnv *en
         if (events[i].data.fd == serverFd) {
             int clientFd = accept(serverFd, NULL, NULL);
             if (clientFd >= 0) {
+                struct timeval sndTimeout;
+                sndTimeout.tv_sec = WRITE_TIMEOUT_SEC;
+                sndTimeout.tv_usec = WRITE_TIMEOUT_USEC;
+                setsockopt(clientFd, SOL_SOCKET, SO_SNDTIMEO, &sndTimeout, sizeof(sndTimeout));
+
                 if (addClientToEpoll) {
                     struct epoll_event event;
                     event.data.fd = clientFd;
