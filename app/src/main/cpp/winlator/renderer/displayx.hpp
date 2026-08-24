@@ -83,6 +83,7 @@ class DisplayX {
         
         struct DisplayXSwapchain {
             uint8_t id;
+            int clientFd;
             Window *window;
             std::vector<std::unique_ptr<Drawable>> images;
         };

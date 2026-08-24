@@ -1,4 +1,5 @@
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -191,6 +192,10 @@ void DisplayX::networkThreadLoop() {
                 if (events[i].events & EPOLLIN) {
                     printf("Received new client connection");
                     int client_fd = accept(server_fd, nullptr, nullptr);
+                    struct timeval sndTimeout{};
+                    sndTimeout.tv_sec = 0;
+                    sndTimeout.tv_usec = 300000; // 300ms - see onCompleteCallback's write() calls
+                    setsockopt(client_fd, SOL_SOCKET, SO_SNDTIMEO, &sndTimeout, sizeof(sndTimeout));
                     struct epoll_event event{};
                     event.data.fd = client_fd;
                     event.events = EPOLLIN;
@@ -202,7 +207,18 @@ void DisplayX::networkThreadLoop() {
                     printf("Client has disconnected");
                     epoll_ctl(efd, EPOLL_CTL_DEL, events[i].data.fd, nullptr);
                     close(events[i].data.fd);
-                    clientSwapchains.erase(clientSwapchains.begin(), clientSwapchains.end());
+                    // Previously this erased every connected client's
+                    // swapchains (clientSwapchains.begin(), .end()) on any
+                    // single client's disconnect - e.g. killing a launcher
+                    // via Task Manager would drop the still-running game's
+                    // swapchain state too. Only remove entries that belong
+                    // to the client that actually disconnected.
+                    for (auto it = clientSwapchains.begin(); it != clientSwapchains.end();) {
+                        if (it->second && it->second->clientFd == events[i].data.fd)
+                            it = clientSwapchains.erase(it);
+                        else
+                            ++it;
+                    }
                     continue;
                 }
                 
@@ -231,6 +247,7 @@ void DisplayX::networkThreadLoop() {
                             
                             auto swapchain = std::make_unique<DisplayXSwapchain>();
                             swapchain->id = id;
+                            swapchain->clientFd = events[i].data.fd;
                             swapchain->window = window;
                             swapchain->images.resize(imageCount);
                                     
