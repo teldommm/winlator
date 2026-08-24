@@ -2,6 +2,7 @@ package com.winlator.cmod.xserver;
 
 import androidx.collection.ArrayMap;
 
+import com.winlator.cmod.xconnector.Client;
 import com.winlator.cmod.xconnector.XInputStream;
 import com.winlator.cmod.xconnector.XOutputStream;
 import com.winlator.cmod.xserver.events.Event;
@@ -17,13 +18,15 @@ public class XClient implements XResourceManager.OnResourceLifecycleListener {
     private int requestLength;
     private byte requestData;
     private int initialLength;
+    private final Client transportClient;
     private final XInputStream inputStream;
     private final XOutputStream outputStream;
     private final ArrayMap<Window, EventListener> eventListeners = new ArrayMap<>();
     private final ArrayList<XResource> resources = new ArrayList<>();
 
-    public XClient(XServer xServer, XInputStream inputStream, XOutputStream outputStream) {
+    public XClient(XServer xServer, Client transportClient, XInputStream inputStream, XOutputStream outputStream) {
         this.xServer = xServer;
+        this.transportClient = transportClient;
         this.inputStream = inputStream;
         this.outputStream = outputStream;
 
@@ -55,7 +58,23 @@ public class XClient implements XResourceManager.OnResourceLifecycleListener {
         }
         catch (IOException e) {
             e.printStackTrace();
+            disconnectDueToWriteFailure();
         }
+    }
+
+    /**
+     * Called when a write to this specific client failed - most commonly
+     * because its SO_SNDTIMEO-bounded write timed out (the peer stopped
+     * draining its socket, e.g. after being killed abruptly or getting stuck
+     * on the wine/wineserver side). Drops just this connection instead of
+     * letting the caller (who may be in the middle of notifying several
+     * clients about a window change) block on it indefinitely.
+     */
+    private volatile boolean disconnecting = false;
+    void disconnectDueToWriteFailure() {
+        if (disconnecting) return;
+        disconnecting = true;
+        if (transportClient != null) transportClient.disconnect();
     }
 
     public boolean isInterestedIn(int eventId, Window window) {

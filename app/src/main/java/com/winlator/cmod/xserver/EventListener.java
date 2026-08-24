@@ -26,7 +26,15 @@ public class EventListener {
             event.send(client.getSequenceNumber(), client.getOutputStream());
         }
         catch (IOException e) {
+            // The write to this listener's socket failed - most likely its
+            // SO_SNDTIMEO timed out because it stopped draining (e.g. wine
+            // side got stuck after a different process was killed). Drop
+            // just this listener's connection instead of letting it hold up
+            // the caller (window destroy/map/unmap notification fan-out)
+            // indefinitely, which previously froze the whole X server since
+            // it runs on a single thread.
             e.printStackTrace();
+            client.disconnectDueToWriteFailure();
         }
     }
 }
