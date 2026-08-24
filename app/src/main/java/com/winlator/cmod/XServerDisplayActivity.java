@@ -1981,11 +1981,31 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
                 frameRating.update();
             }
         }
-        else if (frameRatingWindowId != -1) {
+        // Only react if the window actually being destroyed/unmapped is the
+        // one the HUD is currently tracking - previously this branch reset
+        // frameRatingWindowId (and hid the HUD) whenever ANY window was
+        // destroyed, even one unrelated to the tracked window.
+        else if (frameRatingWindowId != -1 && window.id == frameRatingWindowId) {
             frameRatingWindowId = -1;
-            Log.d("XServerDisplayActivity", "Hiding hud for Window " + window.getName());
-            runOnUiThread(() -> frameRating.setVisibility(View.GONE));
-            runOnUiThread(() -> frameRating.reset());
+
+            // The tracked window (e.g. a launcher) is gone. Its replacement
+            // (e.g. the actual game, launched from within it) may already
+            // have set up its rendering context before this happened - the
+            // one-time property-change event for that would have been
+            // ignored earlier since the HUD slot was still taken. Look for
+            // an already-rendering window now instead of only waiting for a
+            // future property-change event that will never come.
+            Window replacement = xServer.windowManager.findWindowWithPropertyContaining("_MESA_DRV");
+            if (replacement != null) {
+                frameRatingWindowId = replacement.id;
+                Log.d("XServerDisplayActivity", "Showing hud for Window " + replacement.getName());
+                frameRating.update();
+            }
+            else {
+                Log.d("XServerDisplayActivity", "Hiding hud for Window " + window.getName());
+                runOnUiThread(() -> frameRating.setVisibility(View.GONE));
+                runOnUiThread(() -> frameRating.reset());
+            }
         }
     }
 
