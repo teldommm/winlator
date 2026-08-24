@@ -73,6 +73,23 @@ public class WindowManager extends XResourceManager {
         return null;
     }
 
+    /**
+     * Finds a currently-existing window that already carries a property
+     * whose name contains `substr`. Used by the FPS HUD to re-bind to an
+     * already-rendering window (e.g. a game launched from a launcher) after
+     * the window it was previously tracking is destroyed, since the
+     * property-change event that would normally trigger the binding only
+     * fires once and may have already passed while the HUD was bound
+     * elsewhere.
+     */
+    public Window findWindowWithPropertyContaining(String substr) {
+        for (int i = 0; i < windows.size(); i++) {
+            Window window = windows.valueAt(i);
+            if (window != null && window.hasPropertyContaining(substr)) return window;
+        }
+        return null;
+    }
+
     public void destroyWindow(int id) {
         Window window = getWindow(id);
         if (window != null && rootWindow.id != id) {

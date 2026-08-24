@@ -115,6 +115,21 @@ public class Window extends XResource {
         return properties.get(id);
     }
 
+    /**
+     * True if this window already has a property whose name contains
+     * `substr` (e.g. "_MESA_DRV", set once a GL/Vulkan rendering context is
+     * created for the window). Property-change notifications only fire once,
+     * on the transition to set - this lets callers check current state
+     * directly instead of only reacting to that one-time event.
+     */
+    public boolean hasPropertyContaining(String substr) {
+        for (int i = 0; i < properties.size(); i++) {
+            Property property = properties.valueAt(i);
+            if (property != null && property.nameAsString().contains(substr)) return true;
+        }
+        return false;
+    }
+
     public void addProperty(Property property) {
         properties.put(property.name, property);
     }
