@@ -40,6 +40,7 @@ import com.winlator.cmod.contents.Downloader;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.PreloaderDialog;
+import com.winlator.cmod.core.DownloadProgressDialog;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -64,8 +65,9 @@ public class ContentsFragment extends Fragment {
         manager.syncContents();
         sp = PreferenceManager.getDefaultSharedPreferences(getActivity());
 
+        // Initialize isDarkMode based on shared preferences or theme
         isDarkMode = PreferenceManager.getDefaultSharedPreferences(getContext())
-                .getBoolean("dark_mode", true);
+                .getBoolean("dark_mode", false);
     }
 
     @Override
@@ -144,6 +146,7 @@ public class ContentsFragment extends Fragment {
             typeList.add(type.toString());
         spinner.setAdapter(new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_dropdown_item, typeList));
 
+        // Set the popup background based on the theme
         spinner.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
 
         spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -213,6 +216,9 @@ public class ContentsFragment extends Fragment {
                             });
 
                         } else {
+                            if (profile.type != ContentProfile.ContentType.CONTENT_TYPE_WINE && profile.type != ContentProfile.ContentType.CONTENT_TYPE_PROTON) {
+                                manager.applyContent(profile);
+                            }
                             preloaderDialog.closeOnUiThread();
                             requireActivity().runOnUiThread(() -> {
                                 ContentDialog.alert(getContext(), R.string.content_installed_success, null);
@@ -336,13 +342,17 @@ public class ContentsFragment extends Fragment {
 
                 Intent intent = new Intent();
                 intent.setData(Uri.parse(profile.remoteUrl));
+                DownloadProgressDialog downloadDialog = new DownloadProgressDialog(requireActivity());
+                downloadDialog.show(R.string.downloading_file);
                 new Thread(() -> {
                     long timestamp = System.currentTimeMillis();
                     File output = new File(getContext().getCacheDir(), "temp_" + timestamp);
-                    if (Downloader.downloadFile(profile.remoteUrl, output)) {
+                    if (Downloader.downloadFile(profile.remoteUrl, output, progress ->
+                            requireActivity().runOnUiThread(() -> downloadDialog.setProgress(progress)))) {
                         intent.setData(Uri.parse(output.getAbsolutePath()));
                     }
                     getActivity().runOnUiThread(() -> {
+                        downloadDialog.close();
                         holder.progressBar.setVisibility(View.GONE);
                         holder.ibDownload.setVisibility(View.VISIBLE);
                         onActivityResult(MainActivity.OPEN_FILE_REQUEST_CODE, Activity.RESULT_OK, intent);

@@ -9,11 +9,12 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.PopupMenu;
 import android.widget.TextView;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.preference.PreferenceManager;
-import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -47,9 +48,8 @@ public class RepositoryManagerDialog {
         builder.setTitle("Driver Sources"); // English
 
         recyclerView = new RecyclerView(context);
+        recyclerView.setBackgroundColor(Color.BLACK);
         recyclerView.setLayoutManager(new LinearLayoutManager(context));
-        recyclerView.addItemDecoration(new DividerItemDecoration(context, DividerItemDecoration.VERTICAL));
-    
         recyclerView.setPadding(0, 10, 0, 10);
 
         adapter = new RepoAdapter();
@@ -62,6 +62,7 @@ public class RepositoryManagerDialog {
 
         dialog = builder.create();
         dialog.show();
+        if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.BLACK));
     }
 
     
@@ -70,7 +71,7 @@ public class RepositoryManagerDialog {
         builder.setTitle(repoToEdit == null ? "Add Repository" : "Edit Repository");
 
         final EditText inputName = new EditText(context);
-        inputName.setHint("Name (e.g. Kimchi Turnip)");
+        inputName.setHint("Name (e.g. Turnip Drivers)");
         if (repoToEdit != null) inputName.setText(repoToEdit.name);
         
         final EditText inputUrl = new EditText(context);
@@ -111,31 +112,40 @@ public class RepositoryManagerDialog {
     }
 
     private void loadRepos() {
+        repos.clear();
+        repos.addAll(loadDriverRepos(context, 0));
+    }
+
+    public static DriverRepo getStevenMxzRepo() {
+        return new DriverRepo("StevenMXZ Turnip Drivers", "https://api.github.com/repos/StevenMXZ/freedreno_turnip-CI/releases");
+    }
+
+    public static List<DriverRepo> loadDriverRepos(Context context, int limit) {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
         String jsonStr = prefs.getString("custom_driver_repos", "");
-        
-        repos.clear();
+        ArrayList<DriverRepo> result = new ArrayList<>();
         if (jsonStr.isEmpty()) {
-            
-            
-            
-            repos.add(new DriverRepo("K11MCH1 Turnip Drivers", "https://api.github.com/repos/K11MCH1/AdrenoToolsDrivers/releases"));     
-            repos.add(new DriverRepo("StevenMX Turnip Drivers", "https://api.github.com/repos/StevenMXZ/freedreno_turnip-CI/releases"));
-        
-            repos.add(new DriverRepo("Snapdragon Elite Drivers", "https://api.github.com/repos/StevenMXZ/Adrenotools-Drivers/releases"));
-            
-            repos.add(new DriverRepo("Weab-Chan Turnip Drivers", "https://api.github.com/repos/Weab-chan/freedreno_turnip-CI/releases"));
-
+            result.add(getStevenMxzRepo());
+            result.add(new DriverRepo("Whitebelyash Drivers", "https://api.github.com/repos/whitebelyash/AdrenoToolsDrivers/releases"));
+            result.add(new DriverRepo("Weab-Chan Turnip Drivers", "https://api.github.com/repos/Weab-chan/freedreno_turnip-CI/releases"));
         } else {
             try {
                 JSONArray array = new JSONArray(jsonStr);
                 for (int i = 0; i < array.length(); i++) {
-                    repos.add(DriverRepo.fromJson(array.getJSONObject(i)));
+                    result.add(DriverRepo.fromJson(array.getJSONObject(i)));
                 }
-            } catch (Exception e) {
-            
+            } catch (Exception ignored) { }
+        }
+        for (int i = result.size() - 1; i >= 0; i--) {
+            DriverRepo repo = result.get(i);
+            if (repo.name.toLowerCase().contains("kimchi") || repo.apiUrl.toLowerCase().contains("k11mch1")) {
+                result.remove(i);
             }
         }
+        if (limit > 0 && result.size() > limit) {
+            return new ArrayList<>(result.subList(0, limit));
+        }
+        return result;
     }
 
     private void saveRepos() {
@@ -167,7 +177,7 @@ public class RepositoryManagerDialog {
             holder.subtitle.setText(repo.apiUrl);
             
             
-            holder.actionButton.setImageResource(R.drawable.icon_settings); 
+            holder.actionButton.setImageResource(android.R.drawable.ic_menu_manage);
             
             
             holder.itemView.setOnClickListener(v -> {

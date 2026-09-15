@@ -34,6 +34,7 @@ public class PatchElf {
 
     public boolean saveElf(@NonNull File file) {
         if (file != elfFile && !file.exists()) {
+            // TODO: save elf file
             return true;
         }
         return false;
@@ -45,6 +46,7 @@ public class PatchElf {
         return saveElf(elfFile);
     }
 
+    // TODO: implement these ops.
 
     private native long createElfObject(String path);
     private native boolean destroyElfObject(long objectPtr);

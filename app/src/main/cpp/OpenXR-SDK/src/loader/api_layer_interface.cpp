@@ -1,3 +1,11 @@
+// Copyright (c) 2017-2024, The Khronos Group Inc.
+// Copyright (c) 2017-2019 Valve Corporation
+// Copyright (c) 2017-2019 LunarG, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+//
+// Initial Author: Mark Young <marky@lunarg.com>
+//
 
 #include "api_layer_interface.hpp"
 
@@ -19,6 +27,7 @@
 
 #define OPENXR_ENABLE_LAYERS_ENV_VAR "XR_ENABLE_API_LAYERS"
 
+// Add any layers defined in the loader layer environment variable.
 static void AddEnvironmentApiLayers(std::vector<std::string>& enabled_layers) {
     std::string layers = PlatformUtilsGetEnv(OPENXR_ENABLE_LAYERS_ENV_VAR);
 
@@ -26,6 +35,7 @@ static void AddEnvironmentApiLayers(std::vector<std::string>& enabled_layers) {
     std::size_t found = layers.find_first_of(PATH_SEPARATOR);
     std::string cur_search;
 
+    // Handle any path listings in the string (separated by the appropriate path separator)
     while (found != std::string::npos) {
         cur_search = layers.substr(last_found, found - last_found);
         enabled_layers.push_back(cur_search);
@@ -33,6 +43,7 @@ static void AddEnvironmentApiLayers(std::vector<std::string>& enabled_layers) {
         found = layers.find_first_of(PATH_SEPARATOR, last_found);
     }
 
+    // If there's something remaining in the string, copy it over
     if (last_found < layers.size()) {
         cur_search = layers.substr(last_found);
         enabled_layers.push_back(cur_search);
@@ -43,6 +54,7 @@ XrResult ApiLayerInterface::GetApiLayerProperties(const std::string& openxr_comm
                                                   uint32_t* outgoing_count, XrApiLayerProperties* api_layer_properties) {
     std::vector<std::unique_ptr<ApiLayerManifestFile>> manifest_files;
     uint32_t manifest_count = 0;
+    // Validate props struct before proceeding
     if (0 < incoming_count && nullptr != api_layer_properties) {
         for (uint32_t i = 0; i < incoming_count; i++) {
             if (XR_TYPE_API_LAYER_PROPERTIES != api_layer_properties[i].type) {
@@ -53,12 +65,16 @@ XrResult ApiLayerInterface::GetApiLayerProperties(const std::string& openxr_comm
         }
     }
 
+    // "Independent of elementCapacityInput or elements parameters, elementCountOutput must be a valid pointer,
+    // and the function sets elementCountOutput." - 2.11
     if (nullptr == outgoing_count) {
         return XR_ERROR_VALIDATION_FAILURE;
     }
 
+    // Find any implicit layers which we may need to report information for.
     XrResult result = ApiLayerManifestFile::FindManifestFiles(openxr_command, MANIFEST_TYPE_IMPLICIT_API_LAYER, manifest_files);
     if (XR_SUCCEEDED(result)) {
+        // Find any explicit layers which we may need to report information for.
         result = ApiLayerManifestFile::FindManifestFiles(openxr_command, MANIFEST_TYPE_EXPLICIT_API_LAYER, manifest_files);
     }
     if (XR_FAILED(result)) {
@@ -67,6 +83,7 @@ XrResult ApiLayerInterface::GetApiLayerProperties(const std::string& openxr_comm
         return result;
     }
 
+    // check for potential overflow before static_cast<uint32_t>
     if (manifest_files.size() >= UINT32_MAX) {
         LoaderLogger::LogErrorMessage(openxr_command, "ApiLayerInterface::GetApiLayerProperties - too many API layers found");
         return XR_ERROR_RUNTIME_FAILURE;
@@ -81,9 +98,11 @@ XrResult ApiLayerInterface::GetApiLayerProperties(const std::string& openxr_comm
 
     *outgoing_count = manifest_count;
     if (0 == incoming_count) {
+        // capacity check only
         return XR_SUCCESS;
     }
     if (nullptr == api_layer_properties) {
+        // incoming_count is not 0 BUT the api_layer_properties is NULL
         LoaderLogger::LogErrorMessage("xrEnumerateInstanceExtensionProperties",
                                       "VUID-xrEnumerateApiLayerProperties-properties-parameter: non-zero capacity but null array");
         return XR_ERROR_VALIDATION_FAILURE;
@@ -105,9 +124,11 @@ XrResult ApiLayerInterface::GetInstanceExtensionProperties(const std::string& op
                                                            std::vector<XrExtensionProperties>& extension_properties) {
     std::vector<std::unique_ptr<ApiLayerManifestFile>> manifest_files;
 
+    // If a layer name is supplied, only use the information out of that one layer
     if (nullptr != layer_name && 0 != strlen(layer_name)) {
         XrResult result = ApiLayerManifestFile::FindManifestFiles(openxr_command, MANIFEST_TYPE_IMPLICIT_API_LAYER, manifest_files);
         if (XR_SUCCEEDED(result)) {
+            // Find any explicit layers which we may need to report information for.
             result = ApiLayerManifestFile::FindManifestFiles(openxr_command, MANIFEST_TYPE_EXPLICIT_API_LAYER, manifest_files);
             if (XR_FAILED(result)) {
                 LoaderLogger::LogErrorMessage(
@@ -119,6 +140,7 @@ XrResult ApiLayerInterface::GetInstanceExtensionProperties(const std::string& op
             bool found = false;
             size_t num_files = manifest_files.size();
             for (size_t man_file = 0; man_file < num_files; ++man_file) {
+                // If a layer with the provided name exists, get it's instance extension information.
                 if (manifest_files[man_file]->LayerName() == layer_name) {
                     manifest_files[man_file]->GetInstanceExtensionProperties(extension_properties);
                     found = true;
@@ -126,13 +148,17 @@ XrResult ApiLayerInterface::GetInstanceExtensionProperties(const std::string& op
                 }
             }
 
+            // If nothing found, report 0
             if (!found) {
                 return XR_ERROR_API_LAYER_NOT_PRESENT;
             }
         }
+        // Otherwise, we want to add only implicit API layers and explicit API layers enabled using the environment variables
     } else {
         XrResult result = ApiLayerManifestFile::FindManifestFiles(openxr_command, MANIFEST_TYPE_IMPLICIT_API_LAYER, manifest_files);
         if (XR_SUCCEEDED(result)) {
+            // Find any environmentally enabled explicit layers.  If they're present, treat them like implicit layers
+            // since we know that they're going to be enabled.
             std::vector<std::string> env_enabled_layers;
             AddEnvironmentApiLayers(env_enabled_layers);
             if (!env_enabled_layers.empty()) {
@@ -142,6 +168,7 @@ XrResult ApiLayerInterface::GetInstanceExtensionProperties(const std::string& op
                 if (XR_SUCCEEDED(result)) {
                     for (auto& exp_layer_man_file : exp_layer_man_files) {
                         for (std::string& enabled_layer : env_enabled_layers) {
+                            // If this is an enabled layer, transfer it over to the manifest list.
                             if (enabled_layer == exp_layer_man_file->LayerName()) {
                                 manifest_files.push_back(std::move(exp_layer_man_file));
                                 break;
@@ -152,6 +179,7 @@ XrResult ApiLayerInterface::GetInstanceExtensionProperties(const std::string& op
             }
         }
 
+        // Grab the layer instance extensions information
         size_t num_files = manifest_files.size();
         for (size_t man_file = 0; man_file < num_files; ++man_file) {
             manifest_files[man_file]->GetInstanceExtensionProperties(extension_properties);
@@ -169,6 +197,7 @@ XrResult ApiLayerInterface::LoadApiLayers(const std::string& openxr_command, uin
     bool any_loaded = false;
     std::vector<std::unique_ptr<ApiLayerManifestFile>> enabled_layer_manifest_files_in_init_order = {};
 
+    // Find any implicit layers.
     XrResult result = ApiLayerManifestFile::FindManifestFiles(openxr_command, MANIFEST_TYPE_IMPLICIT_API_LAYER,
                                                               enabled_layer_manifest_files_in_init_order);
 
@@ -176,6 +205,7 @@ XrResult ApiLayerInterface::LoadApiLayers(const std::string& openxr_command, uin
         layers_already_found.insert(enabled_layer_manifest_file->LayerName());
     }
 
+    // Find any explicit layers.
     std::vector<std::unique_ptr<ApiLayerManifestFile>> explicit_layer_manifest_files = {};
 
     if (XR_SUCCEEDED(result)) {
@@ -186,6 +216,7 @@ XrResult ApiLayerInterface::LoadApiLayers(const std::string& openxr_command, uin
     bool found_all_layers = true;
 
     if (XR_SUCCEEDED(result)) {
+        // Put all explicit and then xrCreateInstance enabled layers into a string vector
 
         std::vector<std::string> enabled_explicit_api_layer_names = {};
 
@@ -205,6 +236,7 @@ XrResult ApiLayerInterface::LoadApiLayers(const std::string& openxr_command, uin
                       std::back_inserter(enabled_explicit_api_layer_names));
         }
 
+        // add explicit layers to list of layers to enable
         for (const auto& layer_name : enabled_explicit_api_layer_names) {
             bool found_this_layer = false;
 
@@ -228,6 +260,7 @@ XrResult ApiLayerInterface::LoadApiLayers(const std::string& openxr_command, uin
                 }
             }
 
+            // If even one of the layers wasn't found, we want to return an error
             if (!found_this_layer) {
                 found_all_layers = false;
                 std::string error_message = "ApiLayerInterface::LoadApiLayers - failed to find layer ";
@@ -263,10 +296,12 @@ XrResult ApiLayerInterface::LoadApiLayers(const std::string& openxr_command, uin
         }
         bool forwardedInitLoader = false;
         {
+            // If we have xrInitializeLoaderKHR exposed as an export, forward call to it.
             const auto function_name = manifest_file->GetFunctionName("xrInitializeLoaderKHR");
             auto initLoader =
                 reinterpret_cast<PFN_xrInitializeLoaderKHR>(LoaderPlatformLibraryGetProcAddr(layer_library, function_name));
             if (initLoader != nullptr) {
+                // we found the entry point one way or another.
                 LoaderLogger::LogInfoMessage(openxr_command,
                                              "ApiLayerInterface::LoadApiLayers forwarding xrInitializeLoaderKHR call to API layer "
                                              "before calling xrNegotiateLoaderApiLayerInterface.");
@@ -283,6 +318,7 @@ XrResult ApiLayerInterface::LoadApiLayers(const std::string& openxr_command, uin
         }
 #endif
 
+        // Get and settle on an layer interface version (using any provided name if required).
         std::string function_name = manifest_file->GetFunctionName("xrNegotiateLoaderApiLayerInterface");
         auto negotiate = reinterpret_cast<PFN_xrNegotiateLoaderApiLayerInterface>(
             LoaderPlatformLibraryGetProcAddr(layer_library, function_name));
@@ -297,6 +333,7 @@ XrResult ApiLayerInterface::LoadApiLayers(const std::string& openxr_command, uin
             continue;
         }
 
+        // Loader info for negotiation
         XrNegotiateLoaderInfo loader_info = {};
         loader_info.structType = XR_LOADER_INTERFACE_STRUCT_LOADER_INFO;
         loader_info.structVersion = XR_LOADER_INFO_STRUCT_VERSION;
@@ -306,12 +343,15 @@ XrResult ApiLayerInterface::LoadApiLayers(const std::string& openxr_command, uin
         loader_info.minApiVersion = XR_MAKE_VERSION(1, 0, 0);
         loader_info.maxApiVersion = XR_MAKE_VERSION(1, 0x3ff, 0xfff);  // Maximum allowed version for this major version.
 
+        // Set up the layer return structure
         XrNegotiateApiLayerRequest api_layer_info = {};
         api_layer_info.structType = XR_LOADER_INTERFACE_STRUCT_API_LAYER_REQUEST;
         api_layer_info.structVersion = XR_API_LAYER_INFO_STRUCT_VERSION;
         api_layer_info.structSize = sizeof(XrNegotiateApiLayerRequest);
 
         XrResult res = negotiate(&loader_info, manifest_file->LayerName().c_str(), &api_layer_info);
+        // If we supposedly succeeded, but got a nullptr for getInstanceProcAddr
+        // then something still went wrong, so return with an error.
         if (XR_SUCCEEDED(res) && nullptr == api_layer_info.getInstanceProcAddr) {
             std::string warning_message = "ApiLayerInterface::LoadApiLayers skipping layer ";
             warning_message += manifest_file->LayerName();
@@ -322,9 +362,11 @@ XrResult ApiLayerInterface::LoadApiLayers(const std::string& openxr_command, uin
 
 #ifdef XR_KHR_LOADER_INIT_SUPPORT
         if (XR_SUCCEEDED(res) && !forwardedInitLoader) {
+            // Forward initialize loader call, where possible and if we did not do so before.
             PFN_xrVoidFunction initializeVoid = nullptr;
             PFN_xrInitializeLoaderKHR initialize = nullptr;
 
+            // Now we may try asking xrGetInstanceProcAddr on the API layer
             if (XR_SUCCEEDED(api_layer_info.getInstanceProcAddr(XR_NULL_HANDLE, "xrInitializeLoaderKHR", &initializeVoid))) {
                 if (initializeVoid == nullptr) {
                     LoaderLogger::LogErrorMessage(openxr_command,
@@ -336,6 +378,7 @@ XrResult ApiLayerInterface::LoadApiLayers(const std::string& openxr_command, uin
                 }
             }
             if (initialize != nullptr) {
+                // we found the entry point one way or another.
                 LoaderLogger::LogInfoMessage(openxr_command,
                                              "ApiLayerInterface::LoadApiLayers forwarding xrInitializeLoaderKHR call to API layer "
                                              "after calling xrNegotiateLoaderApiLayerInterface.");
@@ -368,6 +411,8 @@ XrResult ApiLayerInterface::LoadApiLayers(const std::string& openxr_command, uin
             LoaderLogger::LogInfoMessage(openxr_command, oss.str());
         }
 
+        // Grab the list of extensions this layer supports for easy filtering after the
+        // xrCreateInstance call
         std::vector<std::string> supported_extensions;
         std::vector<XrExtensionProperties> extension_properties;
         manifest_file->GetInstanceExtensionProperties(extension_properties);
@@ -376,18 +421,22 @@ XrResult ApiLayerInterface::LoadApiLayers(const std::string& openxr_command, uin
             supported_extensions.emplace_back(ext_prop.extensionName);
         }
 
+        // Add this API layer to the vector
         api_layer_interfaces.emplace_back(new ApiLayerInterface(manifest_file->LayerName(), layer_library, supported_extensions,
                                                                 api_layer_info.getInstanceProcAddr,
                                                                 api_layer_info.createApiLayerInstance));
 
+        // If we load one, clear all errors.
         any_loaded = true;
         last_error = XR_SUCCESS;
     }
 
+    // Set error here to preserve prior error behavior
     if (!found_all_layers) {
         last_error = XR_ERROR_API_LAYER_NOT_PRESENT;
     }
 
+    // If we failed catastrophically for some reason, clean up everything.
     if (XR_FAILED(last_error)) {
         api_layer_interfaces.clear();
     }

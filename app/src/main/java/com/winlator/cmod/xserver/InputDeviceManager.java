@@ -12,6 +12,7 @@ import com.winlator.cmod.xserver.events.LeaveNotify;
 import com.winlator.cmod.xserver.events.MappingNotify;
 import com.winlator.cmod.xserver.events.MotionNotify;
 import com.winlator.cmod.xserver.events.PointerWindowEvent;
+import java.util.ArrayList;
 
 public class InputDeviceManager implements Pointer.OnPointerMotionListener, Keyboard.OnKeyboardListener, WindowManager.OnWindowModificationListener, XResourceManager.OnResourceLifecycleListener {
     private static final byte MOUSE_WHEEL_DELTA = 120;
@@ -38,7 +39,7 @@ public class InputDeviceManager implements Pointer.OnPointerMotionListener, Keyb
     }
 
     @Override
-    public void onChangeWindowZOrder(Window window) {
+    public void onChangeWindowZOrder(Window.StackMode stackMode, Window window, Window sibling) {
         updatePointWindow();
     }
 

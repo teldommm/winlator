@@ -9,17 +9,26 @@
         <attr name="textSize" format="dimension" />
     </declare-styleable>
     <declare-styleable name="SeekBar">
-        <attr name="sbMinValue" format="float" /> <!-- Defines minValue attribute -->
-        <attr name="sbMaxValue" format="float" /> <!-- Defines maxValue attribute -->
-        <attr name="sbStep" format="float" /> <!-- Defines step attribute -->
-        <attr name="sbValue" format="float" /> <!-- Defines value attribute -->
-        <attr name="suffix" format="string" /> <!-- Defines suffix attribute -->
-        <attr name="sbTextSize" format="dimension" /> <!-- Defines textSize attribute -->
-        <attr name="colorSecondary" format="color" /> <!-- Defines colorSecondary attribute -->
+        <attr name="sbMinValue" format="float" />
+        <attr name="sbMaxValue" format="float" />
+        <attr name="sbStep" format="float" />
+        <attr name="sbValue" format="float" />
+        <attr name="suffix" format="string" />
+        <attr name="sbTextSize" format="dimension" />
+        <attr name="colorSecondary" format="color" />
     </declare-styleable>
 
     <attr name="extraKeysButtonTextColor" format="reference" />
     <attr name="extraKeysButtonActiveTextColor" format="reference" />
     <attr name="extraKeysButtonBackgroundColor" format="reference" />
     <attr name="extraKeysButtonActiveBackgroundColor" format="reference" />
+
+    <attr name="ingameSidebarBackground" format="color" />
+    <attr name="ingameSidebarSurface" format="color" />
+    <attr name="ingameSidebarSurfaceVariant" format="color" />
+    <attr name="ingameSidebarOnSurface" format="color" />
+    <attr name="ingameSidebarOnSurfaceVariant" format="color" />
+    <attr name="ingameSidebarPrimary" format="color" />
+    <attr name="ingameSidebarPrimaryContainer" format="color" />
+    <attr name="ingameSidebarOutline" format="color" />
 </resources>

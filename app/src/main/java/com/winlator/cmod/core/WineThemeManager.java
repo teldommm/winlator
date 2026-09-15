@@ -19,7 +19,7 @@ import java.io.File;
 public abstract class WineThemeManager {
     public enum Theme {LIGHT, DARK}
     public enum BackgroundType {IMAGE, COLOR}
-    public static final String DEFAULT_DESKTOP_THEME = Theme.LIGHT+","+BackgroundType.IMAGE+",#0277bd";
+    public static final String DEFAULT_DESKTOP_THEME = Theme.DARK+","+BackgroundType.IMAGE+",#0277bd";
 
     public static class ThemeInfo {
         public final Theme theme;
@@ -52,6 +52,13 @@ public abstract class WineThemeManager {
                 registryEditor.setStringValue("Control Panel\\Desktop", "Wallpaper", ImageFs.CACHE_PATH+"/wallpaper.bmp");
             }
             else registryEditor.removeValue("Control Panel\\Desktop", "Wallpaper");
+
+            registryEditor.removeValue(
+                "Software\\Microsoft\\Windows\\CurrentVersion\\ThemeManager",
+                "DllName");
+            registryEditor.setStringValue(
+                "Software\\Microsoft\\Windows\\CurrentVersion\\ThemeManager",
+                "ThemeActive", "0");
 
             if (themeInfo.theme == Theme.LIGHT) {
                 registryEditor.setStringValue("Control Panel\\Colors", "ActiveBorder", "245 245 245");
@@ -128,36 +135,58 @@ public abstract class WineThemeManager {
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         Canvas canvas = new Canvas(outputBitmap);
 
+        Bitmap wallpaperBitmap = null;
         File userWallpaperFile = getUserWallpaperFile(context);
         if (userWallpaperFile.isFile()) {
-            Bitmap image = BitmapFactory.decodeFile(userWallpaperFile.getPath());
-            Rect srcRect = new Rect(0, 0, image.getWidth(), image.getHeight());
-            Rect dstRect = new Rect(0, 0, outputWidth, outputHeight);
-            canvas.drawBitmap(image, srcRect, dstRect, paint);
+            wallpaperBitmap = BitmapFactory.decodeFile(userWallpaperFile.getPath());
+            if (wallpaperBitmap == null) FileUtils.delete(userWallpaperFile);
         }
-        else {
-            BitmapFactory.Options options = new BitmapFactory.Options();
-            options.inTargetDensity = DisplayMetrics.DENSITY_HIGH;
-            Bitmap wallpaperBitmap = BitmapFactory.decodeResource(context.getResources(), R.drawable.wallpaper, options);
-            paint.setStyle(Paint.Style.FILL);
-            paint.setColor(0xff01579b);
-            canvas.drawRect(0, 0, outputWidth, outputHeight * 0.5f, paint);
-            paint.setColor(0xff0277bd);
-            canvas.drawRect(0, outputHeight * 0.5f, outputWidth, outputHeight, paint);
+        if (wallpaperBitmap == null) {
+            wallpaperBitmap = BitmapFactory.decodeResource(context.getResources(), R.drawable.wallpaper);
+        }
 
-            float targetSize = outputHeight * (320.0f / 480.0f);
-            float centerX = (outputWidth - targetSize) * 0.5f;
-            float centerY = (outputHeight - targetSize) * 0.5f;
+        if (wallpaperBitmap != null) {
             Rect srcRect = new Rect(0, 0, wallpaperBitmap.getWidth(), wallpaperBitmap.getHeight());
-            RectF dstRect = new RectF(centerX, centerY, centerX + targetSize, centerY + targetSize);
+            Rect dstRect = new Rect(0, 0, outputWidth, outputHeight);
             canvas.drawBitmap(wallpaperBitmap, srcRect, dstRect, paint);
         }
 
         ImageFs imageFs = ImageFs.find(context);
         MSBitmap.create(outputBitmap, new File(imageFs.getRootDir(), ImageFs.CACHE_PATH+"/wallpaper.bmp"));
+        if (wallpaperBitmap != null && !wallpaperBitmap.isRecycled()) wallpaperBitmap.recycle();
+        if (!outputBitmap.isRecycled()) outputBitmap.recycle();
     }
 
-    public static File getUserWallpaperFile(Context context) {
-        return new File(ImageFs.find(context).getRootDir(), ImageFs.CONFIG_PATH+"/user-wallpaper.png");
+    public static synchronized File getUserWallpaperFile(Context context) {
+        File wallpaperDir = new File(context.getFilesDir(), "wallpaper");
+        if (!wallpaperDir.isDirectory()) wallpaperDir.mkdirs();
+        File target = new File(wallpaperDir, "user-wallpaper.png");
+        migrateLegacyWallpaper(context, target);
+        return target;
+    }
+
+    private static void migrateLegacyWallpaper(Context context, File target) {
+        File rootDir = ImageFs.find(context).getRootDir();
+        File xuserAlias = new File(rootDir, "home/" + ImageFs.USER);
+        File legacy = new File(xuserAlias, ".config/user-wallpaper.png");
+        boolean aliasIsSymlink = FileUtils.isSymlink(xuserAlias);
+
+        if (!target.isFile() && legacy.isFile()) {
+            File parent = target.getParentFile();
+            if (parent != null && !parent.isDirectory()) parent.mkdirs();
+            FileUtils.copy(legacy, target);
+            Bitmap migrated = BitmapFactory.decodeFile(target.getPath());
+            if (migrated == null) {
+                FileUtils.delete(target);
+            }
+            else migrated.recycle();
+        }
+
+        if (!aliasIsSymlink && legacy.isFile()) {
+            FileUtils.delete(legacy);
+            File configDir = legacy.getParentFile();
+            if (configDir != null && configDir.isDirectory() && FileUtils.isEmpty(configDir)) configDir.delete();
+            if (xuserAlias.isDirectory() && FileUtils.isEmpty(xuserAlias)) xuserAlias.delete();
+        }
     }
 }

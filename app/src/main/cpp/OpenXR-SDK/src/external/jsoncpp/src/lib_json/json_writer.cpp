@@ -1,3 +1,7 @@
+// Copyright 2011 Baptiste Lepilleur and The JsonCpp Authors
+// Distributed under MIT license, or public domain if desired and
+// recognized in your jurisdiction.
+// See file LICENSE for detail or copy at http://jsoncpp.sourceforge.net/LICENSE
 
 #if !defined(JSON_IS_AMALGAMATION)
 #include "json_tool.h"
@@ -63,6 +67,7 @@
 #endif
 
 #if !defined(isnan)
+// IEEE standard states that NaN values will not compare to themselves
 #define isnan(x) ((x) != (x))
 #endif
 
@@ -74,6 +79,7 @@
 #endif
 
 #if defined(_MSC_VER)
+// Disable warning about strdup being deprecated.
 #pragma warning(disable : 4996)
 #endif
 
@@ -120,6 +126,9 @@ String valueToString(UInt value) { return valueToString(LargestUInt(value)); }
 namespace {
 String valueToString(double value, bool useSpecialFloats,
                      unsigned int precision, PrecisionType precisionType) {
+  // Print into the buffer. We need not request the alternative representation
+  // that always has a decimal point because JSON doesn't distinguish the
+  // concepts of reals and integers.
   if (!isfinite(value)) {
     static const char* const reps[2][3] = {{"NaN", "-Infinity", "Infinity"},
                                            {"null", "-1e+9999", "1e+9999"}};
@@ -145,10 +154,13 @@ String valueToString(double value, bool useSpecialFloats,
 
   buffer.erase(fixNumericLocale(buffer.begin(), buffer.end()), buffer.end());
 
+  // try to ensure we preserve the fact that this was given to us as a double on
+  // input
   if (buffer.find('.') == buffer.npos && buffer.find('e') == buffer.npos) {
     buffer += ".0";
   }
 
+  // strip the zero padding from the right
   if (precisionType == PrecisionType::decimalPlaces) {
     buffer.erase(fixZerosInTheEnd(buffer.begin(), buffer.end(), precision),
                  buffer.end());
@@ -188,6 +200,7 @@ static unsigned int utf8ToCodepoint(const char*& s, const char* e) {
     unsigned int calculated =
         ((firstByte & 0x1F) << 6) | (static_cast<unsigned int>(s[1]) & 0x3F);
     s += 1;
+    // oversized encoded characters are invalid
     return calculated < 0x80 ? REPLACEMENT_CHARACTER : calculated;
   }
 
@@ -199,8 +212,11 @@ static unsigned int utf8ToCodepoint(const char*& s, const char* e) {
                               ((static_cast<unsigned int>(s[1]) & 0x3F) << 6) |
                               (static_cast<unsigned int>(s[2]) & 0x3F);
     s += 2;
+    // surrogates aren't valid codepoints itself
+    // shouldn't be UTF-8 encoded
     if (calculated >= 0xD800 && calculated <= 0xDFFF)
       return REPLACEMENT_CHARACTER;
+    // oversized encoded characters are invalid
     return calculated < 0x800 ? REPLACEMENT_CHARACTER : calculated;
   }
 
@@ -213,6 +229,7 @@ static unsigned int utf8ToCodepoint(const char*& s, const char* e) {
                               ((static_cast<unsigned int>(s[2]) & 0x3F) << 6) |
                               (static_cast<unsigned int>(s[3]) & 0x3F);
     s += 3;
+    // oversized encoded characters are invalid
     return calculated < 0x10000 ? REPLACEMENT_CHARACTER : calculated;
   }
 
@@ -262,6 +279,9 @@ static String valueToQuotedStringN(const char* value, size_t length,
 
   if (!doesAnyCharRequireEscaping(value, length))
     return String("\"") + value + "\"";
+  // We have to walk value and escape any special characters.
+  // Appending to String is not efficient, but this should be rare.
+  // (Note: forward slashes are *not* rare, but I am not escaping them.)
   String::size_type maxsize = length * 2 + 3; // allescaped+quotes+NULL
   String result;
   result.reserve(maxsize); // to avoid lots of mallocs
@@ -290,6 +310,14 @@ static String valueToQuotedStringN(const char* value, size_t length,
     case '\t':
       result += "\\t";
       break;
+    // case '/':
+    // Even though \/ is considered a legal escape in JSON, a bare
+    // slash is also legal, so I see no reason to escape it.
+    // (I hope I am not misunderstanding something.)
+    // blep notes: actually escaping \/ may be useful in javascript to avoid </
+    // sequence.
+    // Should add a flag to allow this compatibility mode and prevent this
+    // sequence from occurring.
     default: {
       if (emitUTF8) {
         unsigned codepoint = static_cast<unsigned char>(*c);
@@ -305,8 +333,10 @@ static String valueToQuotedStringN(const char* value, size_t length,
         } else if (codepoint < 0x80) {
           appendRaw(result, codepoint);
         } else if (codepoint < 0x10000) {
+          // Basic Multilingual Plane
           appendHex(result, codepoint);
         } else {
+          // Extended Unicode. Encode 20 bits as a surrogate pair.
           codepoint -= 0x10000;
           appendHex(result, 0xd800 + ((codepoint >> 10) & 0x3ff));
           appendHex(result, 0xdc00 + (codepoint & 0x3ff));
@@ -323,8 +353,12 @@ String valueToQuotedString(const char* value) {
   return valueToQuotedStringN(value, strlen(value));
 }
 
+// Class Writer
+// //////////////////////////////////////////////////////////////////
 Writer::~Writer() = default;
 
+// Class FastWriter
+// //////////////////////////////////////////////////////////////////
 
 FastWriter::FastWriter()
 
@@ -360,6 +394,7 @@ void FastWriter::writeValue(const Value& value) {
     document_ += valueToString(value.asDouble());
     break;
   case stringValue: {
+    // Is NULL possible for value.string_? No.
     char const* str;
     char const* end;
     bool ok = value.getString(&str, &end);
@@ -396,6 +431,8 @@ void FastWriter::writeValue(const Value& value) {
   }
 }
 
+// Class StyledWriter
+// //////////////////////////////////////////////////////////////////
 
 StyledWriter::StyledWriter() = default;
 
@@ -425,6 +462,7 @@ void StyledWriter::writeValue(const Value& value) {
     pushValue(valueToString(value.asDouble()));
     break;
   case stringValue: {
+    // Is NULL possible for value.string_? No.
     char const* str;
     char const* end;
     bool ok = value.getString(&str, &end);
@@ -584,6 +622,7 @@ void StyledWriter::writeCommentBeforeValue(const Value& root) {
     ++iter;
   }
 
+  // Comments are stripped of trailing newlines, so add one here
   document_ += '\n';
 }
 
@@ -604,6 +643,8 @@ bool StyledWriter::hasCommentForValue(const Value& value) {
          value.hasComment(commentAfter);
 }
 
+// Class StyledStreamWriter
+// //////////////////////////////////////////////////////////////////
 
 StyledStreamWriter::StyledStreamWriter(String indentation)
     : document_(nullptr), indentation_(std::move(indentation)),
@@ -639,6 +680,7 @@ void StyledStreamWriter::writeValue(const Value& value) {
     pushValue(valueToString(value.asDouble()));
     break;
   case stringValue: {
+    // Is NULL possible for value.string_? No.
     char const* str;
     char const* end;
     bool ok = value.getString(&str, &end);
@@ -764,6 +806,10 @@ void StyledStreamWriter::pushValue(const String& value) {
 }
 
 void StyledStreamWriter::writeIndent() {
+  // blep intended this to look at the so-far-written string
+  // to determine whether we are already indented, but
+  // with a stream we cannot do that. So we rely on some saved state.
+  // The caller checks indented_.
   *document_ << '\n' << indentString_;
 }
 
@@ -792,6 +838,7 @@ void StyledStreamWriter::writeCommentBeforeValue(const Value& root) {
   while (iter != comment.end()) {
     *document_ << *iter;
     if (*iter == '\n' && ((iter + 1) != comment.end() && *(iter + 1) == '/'))
+      // writeIndent();  // would include newline
       *document_ << indentString_;
     ++iter;
   }
@@ -815,8 +862,12 @@ bool StyledStreamWriter::hasCommentForValue(const Value& value) {
          value.hasComment(commentAfter);
 }
 
+//////////////////////////
+// BuiltStyledStreamWriter
 
+/// Scoped enums are not available until C++11.
 struct CommentStyle {
+  /// Decide whether to write comments.
   enum Enum {
     None, ///< Drop all comments.
     Most, ///< Recover odd behavior of previous versions (not implemented yet).
@@ -903,6 +954,7 @@ void BuiltStyledStreamWriter::writeValue(Value const& value) {
                             precisionType_));
     break;
   case stringValue: {
+    // Is NULL is possible for value.string_? No.
     char const* str;
     char const* end;
     bool ok = value.getString(&str, &end);
@@ -1034,8 +1086,13 @@ void BuiltStyledStreamWriter::pushValue(String const& value) {
 }
 
 void BuiltStyledStreamWriter::writeIndent() {
+  // blep intended this to look at the so-far-written string
+  // to determine whether we are already indented, but
+  // with a stream we cannot do that. So we rely on some saved state.
+  // The caller checks indented_.
 
   if (!indentation_.empty()) {
+    // In this case, drop newlines too.
     *sout_ << '\n' << indentString_;
   }
 }
@@ -1067,6 +1124,7 @@ void BuiltStyledStreamWriter::writeCommentBeforeValue(Value const& root) {
   while (iter != comment.end()) {
     *sout_ << *iter;
     if (*iter == '\n' && ((iter + 1) != comment.end() && *(iter + 1) == '/'))
+      // writeIndent();  // would write extra newline
       *sout_ << indentString_;
     ++iter;
   }
@@ -1086,12 +1144,15 @@ void BuiltStyledStreamWriter::writeCommentAfterValueOnSameLine(
   }
 }
 
+// static
 bool BuiltStyledStreamWriter::hasCommentForValue(const Value& value) {
   return value.hasComment(commentBefore) ||
          value.hasComment(commentAfterOnSameLine) ||
          value.hasComment(commentAfter);
 }
 
+///////////////
+// StreamWriter
 
 StreamWriter::StreamWriter() : sout_(nullptr) {}
 StreamWriter::~StreamWriter() = default;
@@ -1167,7 +1228,9 @@ bool StreamWriterBuilder::validate(Json::Value* invalid) const {
 Value& StreamWriterBuilder::operator[](const String& key) {
   return settings_[key];
 }
+// static
 void StreamWriterBuilder::setDefaults(Json::Value* settings) {
+  //! [StreamWriterBuilderDefaults]
   (*settings)["commentStyle"] = "All";
   (*settings)["indentation"] = "\t";
   (*settings)["enableYAMLCompatibility"] = false;
@@ -1176,6 +1239,7 @@ void StreamWriterBuilder::setDefaults(Json::Value* settings) {
   (*settings)["emitUTF8"] = false;
   (*settings)["precision"] = 17;
   (*settings)["precisionType"] = "significant";
+  //! [StreamWriterBuilderDefaults]
 }
 
 String writeString(StreamWriter::Factory const& factory, Value const& root) {

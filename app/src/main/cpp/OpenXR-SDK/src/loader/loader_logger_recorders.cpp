@@ -1,3 +1,11 @@
+// Copyright (c) 2017-2024, The Khronos Group Inc.
+// Copyright (c) 2017-2019 Valve Corporation
+// Copyright (c) 2017-2019 LunarG, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+//
+// Initial Author: Mark Young <marky@lunarg.com>
+//
 
 #include "loader_logger_recorders.hpp"
 
@@ -20,6 +28,7 @@
 #include <windows.h>
 #endif
 
+// Anonymous namespace to keep these types private
 namespace {
 void OutputMessageToStream(std::ostream& os, XrLoaderLogMessageSeverityFlagBits message_severity,
                            XrLoaderLogMessageTypeFlags message_type, const XrLoaderLogMessengerCallbackData* callback_data) {
@@ -59,6 +68,8 @@ void OutputMessageToStream(std::ostream& os, XrLoaderLogMessageSeverityFlagBits 
     }
 }
 
+// With std::cerr: Standard Error logger, always on for now
+// With std::cout: Standard Output logger used with XR_LOADER_DEBUG
 class OstreamLoaderLogRecorder : public LoaderLogRecorder {
    public:
     OstreamLoaderLogRecorder(std::ostream& os, void* user_data, XrLoaderLogMessageSeverityFlags flags);
@@ -70,6 +81,7 @@ class OstreamLoaderLogRecorder : public LoaderLogRecorder {
     std::ostream& os_;
 };
 
+// Debug Utils logger used with XR_EXT_debug_utils
 class DebugUtilsLogRecorder : public LoaderLogRecorder {
    public:
     DebugUtilsLogRecorder(const XrDebugUtilsMessengerCreateInfoEXT* create_info, XrDebugUtilsMessengerEXT debug_messenger);
@@ -77,6 +89,7 @@ class DebugUtilsLogRecorder : public LoaderLogRecorder {
     bool LogMessage(XrLoaderLogMessageSeverityFlagBits message_severity, XrLoaderLogMessageTypeFlags message_type,
                     const XrLoaderLogMessengerCallbackData* callback_data) override;
 
+    // Extension-specific logging functions
     bool LogDebugUtilsMessage(XrDebugUtilsMessageSeverityFlagsEXT message_severity, XrDebugUtilsMessageTypeFlagsEXT message_type,
                               const XrDebugUtilsMessengerCallbackDataEXT* callback_data) override;
 
@@ -95,6 +108,7 @@ class LogcatLoaderLogRecorder : public LoaderLogRecorder {
 #endif
 
 #ifdef _WIN32
+// Output to debugger
 class DebuggerLoaderLogRecorder : public LoaderLogRecorder {
    public:
     DebuggerLoaderLogRecorder(void* user_data, XrLoaderLogMessageSeverityFlags flags);
@@ -104,8 +118,10 @@ class DebuggerLoaderLogRecorder : public LoaderLogRecorder {
 };
 #endif
 
+// Unified stdout/stderr logger
 OstreamLoaderLogRecorder::OstreamLoaderLogRecorder(std::ostream& os, void* user_data, XrLoaderLogMessageSeverityFlags flags)
     : LoaderLogRecorder(XR_LOADER_LOG_STDOUT, user_data, flags, 0xFFFFFFFFUL), os_(os) {
+    // Automatically start
     Start();
 }
 
@@ -116,9 +132,12 @@ bool OstreamLoaderLogRecorder::LogMessage(XrLoaderLogMessageSeverityFlagBits mes
         OutputMessageToStream(os_, message_severity, message_type, callback_data);
     }
 
+    // Return of "true" means that we should exit the application after the logged message.  We
+    // don't want to do that for our internal logging.  Only let a user return true.
     return false;
 }
 
+// A logger associated with the XR_EXT_debug_utils extension
 
 DebugUtilsLogRecorder::DebugUtilsLogRecorder(const XrDebugUtilsMessengerCreateInfoEXT* create_info,
                                              XrDebugUtilsMessengerEXT debug_messenger)
@@ -126,10 +145,12 @@ DebugUtilsLogRecorder::DebugUtilsLogRecorder(const XrDebugUtilsMessengerCreateIn
                         DebugUtilsSeveritiesToLoaderLogMessageSeverities(create_info->messageSeverities),
                         DebugUtilsMessageTypesToLoaderLogMessageTypes(create_info->messageTypes)),
       _user_callback(create_info->userCallback) {
+    // Use the debug messenger value to uniquely identify this logger with that messenger
     _unique_id = MakeHandleGeneric(debug_messenger);
     Start();
 }
 
+// Extension-specific logging functions
 bool DebugUtilsLogRecorder::LogMessage(XrLoaderLogMessageSeverityFlagBits message_severity,
                                        XrLoaderLogMessageTypeFlags message_type,
                                        const XrLoaderLogMessengerCallbackData* callback_data) {
@@ -138,6 +159,7 @@ bool DebugUtilsLogRecorder::LogMessage(XrLoaderLogMessageSeverityFlagBits messag
         XrDebugUtilsMessageSeverityFlagsEXT utils_severity = DebugUtilsSeveritiesToLoaderLogMessageSeverities(message_severity);
         XrDebugUtilsMessageTypeFlagsEXT utils_type = LoaderLogMessageTypesToDebugUtilsMessageTypes(message_type);
 
+        // Convert the loader log message into the debug utils log message information
         XrDebugUtilsMessengerCallbackDataEXT utils_callback_data{};
         utils_callback_data.type = XR_TYPE_DEBUG_UTILS_MESSENGER_CALLBACK_DATA_EXT;
         utils_callback_data.messageId = callback_data->message_id;
@@ -157,6 +179,8 @@ bool DebugUtilsLogRecorder::LogMessage(XrLoaderLogMessageSeverityFlagBits messag
         utils_callback_data.sessionLabelCount = callback_data->session_labels_count;
         utils_callback_data.sessionLabels = callback_data->session_labels;
 
+        // Call the user callback with the appropriate info
+        // Return of "true" means that we should exit the application after the logged message.
         should_exit = (_user_callback(utils_severity, utils_type, &utils_callback_data, _user_data) == XR_TRUE);
     }
 
@@ -166,6 +190,8 @@ bool DebugUtilsLogRecorder::LogMessage(XrLoaderLogMessageSeverityFlagBits messag
 bool DebugUtilsLogRecorder::LogDebugUtilsMessage(XrDebugUtilsMessageSeverityFlagsEXT message_severity,
                                                  XrDebugUtilsMessageTypeFlagsEXT message_type,
                                                  const XrDebugUtilsMessengerCallbackDataEXT* callback_data) {
+    // Call the user callback with the appropriate info
+    // Return of "true" means that we should exit the application after the logged message.
     return (_user_callback(message_severity, message_type, callback_data, _user_data) == XR_TRUE);
 }
 
@@ -189,6 +215,7 @@ LogcatLoaderLogRecorder::LogcatLoaderLogRecorder()
                         XR_LOADER_LOG_MESSAGE_SEVERITY_VERBOSE_BIT | XR_LOADER_LOG_MESSAGE_SEVERITY_INFO_BIT |
                             XR_LOADER_LOG_MESSAGE_SEVERITY_WARNING_BIT | XR_LOADER_LOG_MESSAGE_SEVERITY_ERROR_BIT,
                         0xFFFFFFFFUL) {
+    // Automatically start
     Start();
 }
 
@@ -201,13 +228,17 @@ bool LogcatLoaderLogRecorder::LogMessage(XrLoaderLogMessageSeverityFlagBits mess
         __android_log_write(LoaderToAndroidLogPriority(message_severity), "OpenXR-Loader", ss.str().c_str());
     }
 
+    // Return of "true" means that we should exit the application after the logged message.  We
+    // don't want to do that for our internal logging.  Only let a user return true.
     return false;
 }
 #endif  // __ANDROID__
 
 #ifdef _WIN32
+// Unified stdout/stderr logger
 DebuggerLoaderLogRecorder::DebuggerLoaderLogRecorder(void* user_data, XrLoaderLogMessageSeverityFlags flags)
     : LoaderLogRecorder(XR_LOADER_LOG_DEBUGGER, user_data, flags, 0xFFFFFFFFUL) {
+    // Automatically start
     Start();
 }
 
@@ -221,6 +252,8 @@ bool DebuggerLoaderLogRecorder::LogMessage(XrLoaderLogMessageSeverityFlagBits me
         OutputDebugStringA(ss.str().c_str());
     }
 
+    // Return of "true" means that we should exit the application after the logged message.  We
+    // don't want to do that for our internal logging.  Only let a user return true.
     return false;
 }
 #endif

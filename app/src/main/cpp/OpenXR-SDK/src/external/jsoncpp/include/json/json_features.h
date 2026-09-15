@@ -1,3 +1,7 @@
+// Copyright 2007-2010 Baptiste Lepilleur and The JsonCpp Authors
+// Distributed under MIT license, or public domain if desired and
+// recognized in your jurisdiction.
+// See file LICENSE for detail or copy at http://jsoncpp.sourceforge.net/LICENSE
 
 #ifndef JSON_FEATURES_H_INCLUDED
 #define JSON_FEATURES_H_INCLUDED
@@ -36,12 +40,17 @@ public:
    */
   Features();
 
+  /// \c true if comments are allowed. Default: \c true.
   bool allowComments_{true};
 
+  /// \c true if root must be either an array or an object value. Default: \c
+  /// false.
   bool strictRoot_{false};
 
+  /// \c true if dropped null placeholders are allowed. Default: \c false.
   bool allowDroppedNullPlaceholders_{false};
 
+  /// \c true if numeric object key are allowed. Default: \c false.
   bool allowNumericKeys_{false};
 };
 

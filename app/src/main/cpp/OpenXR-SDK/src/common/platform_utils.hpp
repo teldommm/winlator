@@ -1,3 +1,11 @@
+// Copyright (c) 2017-2024, The Khronos Group Inc.
+// Copyright (c) 2017-2019 Valve Corporation
+// Copyright (c) 2017-2019 LunarG, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+//
+// Initial Authors: Mark Young <marky@lunarg.com>, Dave Houlton <daveh@lunarg.com>
+//
 
 #pragma once
 
@@ -6,6 +14,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+// OpenXR paths and registry key locations
 #define OPENXR_RELATIVE_PATH "openxr/"
 #define OPENXR_IMPLICIT_API_LAYER_RELATIVE_PATH "/api_layers/implicit.d"
 #define OPENXR_EXPLICIT_API_LAYER_RELATIVE_PATH "/api_layers/explicit.d"
@@ -15,9 +24,15 @@
 #define OPENXR_EXPLICIT_API_LAYER_REGISTRY_LOCATION "\\ApiLayers\\Explicit"
 #endif
 
+// OpenXR Loader environment variables of interest
 #define OPENXR_RUNTIME_JSON_ENV_VAR "XR_RUNTIME_JSON"
 #define OPENXR_API_LAYER_PATH_ENV_VAR "XR_API_LAYER_PATH"
 
+// This is a CMake generated file with #defines for any functions/includes
+// that it found present and build-time configuration.
+// If you don't have this file, on non-Windows you'll need to define
+// one of HAVE_SECURE_GETENV or HAVE___SECURE_GETENV depending on which
+// of secure_getenv or __secure_getenv are present
 #ifdef OPENXR_HAVE_COMMON_CONFIG
 #include "common_config.h"
 #endif  // OPENXR_HAVE_COMMON_CONFIG
@@ -60,8 +75,11 @@
 #error "No architecture string known!"
 #endif
 
+// Consumers of this file must ensure this function is implemented. For example, the loader will implement this function so that it
+// can route messages through the loader's logging system.
 void LogPlatformUtilsError(const std::string& message);
 
+// Environment variables
 #if defined(XR_OS_LINUX) || defined(XR_OS_APPLE)
 
 #include <unistd.h>
@@ -79,9 +97,11 @@ static inline char* ImplGetSecureEnv(const char* name) {
 #elif defined(HAVE___SECURE_GETENV)
     return __secure_getenv(name);
 #else
+// clang-format off
 #pragma message(                                                    \
     "Warning:  Falling back to non-secure getenv for environmental" \
     "lookups!  Consider updating to a different libc.")
+    // clang-format on
 
     return ImplGetEnv(name);
 #endif
@@ -178,6 +198,7 @@ inline std::wstring utf8_to_wide(const std::string& utf8Text) {
         return {};
     }
 
+    // MultiByteToWideChar returns number of chars of the input buffer, regardless of null terminator
     wideText.resize(wideLength, 0);
     wchar_t* wideString = const_cast<wchar_t*>(wideText.data());  // mutable data() only exists in c++17
     const int length = ::MultiByteToWideChar(CP_UTF8, 0, utf8Text.data(), (int)utf8Text.size(), wideString, wideLength);
@@ -201,6 +222,7 @@ inline std::string wide_to_utf8(const std::wstring& wideText) {
         return {};
     }
 
+    // WideCharToMultiByte returns number of chars of the input buffer, regardless of null terminator
     narrowText.resize(narrowLength, 0);
     char* narrowString = const_cast<char*>(narrowText.data());  // mutable data() only exists in c++17
     const int length =
@@ -213,10 +235,13 @@ inline std::string wide_to_utf8(const std::wstring& wideText) {
     return narrowText;
 }
 
+// Returns true if the current process has an integrity level > SECURITY_MANDATORY_MEDIUM_RID.
 static inline bool IsHighIntegrityLevel() {
+    // Execute this check once and save the value as a static bool.
     static bool isHighIntegrityLevel = ([] {
         HANDLE processToken;
         if (OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY | TOKEN_QUERY_SOURCE, &processToken)) {
+            // Maximum possible size of SID_AND_ATTRIBUTES is maximum size of a SID + size of attributes DWORD.
             uint8_t mandatoryLabelBuffer[SECURITY_MAX_SID_SIZE + sizeof(DWORD)]{};
             DWORD bufferSize;
             if (GetTokenInformation(processToken, TokenIntegrityLevel, mandatoryLabelBuffer, sizeof(mandatoryLabelBuffer),
@@ -239,22 +264,34 @@ static inline bool IsHighIntegrityLevel() {
     return isHighIntegrityLevel;
 }
 
+// Returns true if the given environment variable exists.
+// The name is a case-sensitive UTF8 string.
 static inline bool PlatformUtilsGetEnvSet(const char* name) {
     const std::wstring wname = utf8_to_wide(name);
     const DWORD valSize = ::GetEnvironmentVariableW(wname.c_str(), nullptr, 0);
+    // GetEnvironmentVariable returns 0 when environment variable does not exist or there is an error.
     return 0 != valSize;
 }
 
+// Returns the environment variable value for the given name.
+// Returns an empty string if the environment variable doesn't exist or if it exists but is empty.
+// Use PlatformUtilsGetEnvSet to tell if it exists.
+// The name is a case-sensitive UTF8 string.
 static inline std::string PlatformUtilsGetEnv(const char* name) {
     const std::wstring wname = utf8_to_wide(name);
     const DWORD valSize = ::GetEnvironmentVariableW(wname.c_str(), nullptr, 0);
+    // GetEnvironmentVariable returns 0 when environment variable does not exist or there is an error.
+    // The size includes the null-terminator, so a size of 1 is means the variable was explicitly set to empty.
     if (valSize == 0 || valSize == 1) {
         return {};
     }
 
+    // GetEnvironmentVariable returns size including null terminator for "query size" call.
     std::wstring wValue(valSize, 0);
     wchar_t* wValueData = &wValue[0];
 
+    // GetEnvironmentVariable returns string length, excluding null terminator for "get value"
+    // call if there was enough capacity. Else it returns the required capacity (including null terminator).
     const DWORD length = ::GetEnvironmentVariableW(wname.c_str(), wValueData, (DWORD)wValue.size());
     if ((length == 0) || (length >= wValue.size())) {  // If error or the variable increased length between calls...
         LogPlatformUtilsError("GetEnvironmentVariable get value error: " + std::to_string(::GetLastError()));
@@ -266,9 +303,14 @@ static inline std::string PlatformUtilsGetEnv(const char* name) {
     return wide_to_utf8(wValue);
 }
 
+// Acts the same as PlatformUtilsGetEnv except returns an empty string if IsHighIntegrityLevel.
 static inline std::string PlatformUtilsGetSecureEnv(const char* name) {
+    // No secure version for Windows so the below integrity check is needed.
     const std::string envValue = PlatformUtilsGetEnv(name);
 
+    // Do not allow high integrity processes to act on data that can be controlled by medium integrity processes.
+    // Specifically, medium integrity processes can set environment variables which could then
+    // be read by high integrity processes.
     if (IsHighIntegrityLevel()) {
         if (!envValue.empty()) {
             LogPlatformUtilsError(std::string("!!! WARNING !!! Environment variable ") + name +
@@ -286,18 +328,23 @@ static inline std::string PlatformUtilsGetSecureEnv(const char* name) {
 #include <sys/system_properties.h>
 
 static inline bool PlatformUtilsGetEnvSet(const char* /* name */) {
+    // Stub func
     return false;
 }
 
 static inline std::string PlatformUtilsGetEnv(const char* /* name */) {
+    // Stub func
     return {};
 }
 
 static inline std::string PlatformUtilsGetSecureEnv(const char* /* name */) {
+    // Stub func
     return {};
 }
 
+// Intended to be only used as a fallback on Android, with a more open, "native" technique used in most cases
 static inline bool PlatformGetGlobalRuntimeFileName(uint16_t major_version, std::string& file_name) {
+    // Prefix for the runtime JSON file name
     static const char* rt_dir_prefixes[] = {"/product", "/odm", "/oem", "/vendor", "/system"};
 
     static const std::string subdir = "/etc/openxr/";
@@ -311,6 +358,8 @@ static inline bool PlatformGetGlobalRuntimeFileName(uint16_t major_version, std:
     return false;
 }
 
+// Android system properties are sufficiently different from environment variables that we are not re-using
+// PlatformUtilsGetEnv for this purpose
 static inline std::string PlatformUtilsGetAndroidSystemProperty(const char* name) {
     std::string result;
     const prop_info* pi = __system_property_find(name);
@@ -319,6 +368,7 @@ static inline std::string PlatformUtilsGetAndroidSystemProperty(const char* name
     }
 
 #if __ANDROID_API__ >= 26
+    // use callback to retrieve > 92 character sys prop values, if available
     __system_property_read_callback(
         pi,
         [](void* cookie, const char*, const char* value, uint32_t) {
@@ -327,6 +377,7 @@ static inline std::string PlatformUtilsGetAndroidSystemProperty(const char* name
         },
         reinterpret_cast<void*>(&result));
 #endif  // __ANDROID_API__ >= 26
+    // fallback to __system_property_get if no value retrieved via callback
     if (result.empty()) {
         char value[PROP_VALUE_MAX] = {};
         if (__system_property_get(name, value) != 0) {
@@ -340,18 +391,22 @@ static inline std::string PlatformUtilsGetAndroidSystemProperty(const char* name
 #else  // Not Linux, Apple, nor Windows
 
 static inline bool PlatformUtilsGetEnvSet(const char* /* name */) {
+    // Stub func
     return false;
 }
 
 static inline std::string PlatformUtilsGetEnv(const char* /* name */) {
+    // Stub func
     return {};
 }
 
 static inline std::string PlatformUtilsGetSecureEnv(const char* /* name */) {
+    // Stub func
     return {};
 }
 
 static inline bool PlatformGetGlobalRuntimeFileName(uint16_t /* major_version */, std::string const& /* file_name */) {
+    // Stub func
     return false;
 }
 

@@ -4,7 +4,8 @@
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="14dp"
+    android:background="@drawable/ui_enhanced_card">
 
     <LinearLayout
         android:id="@+id/LLTitleBar"
@@ -21,9 +22,9 @@
 
             <ImageView
                 android:id="@+id/IVIcon"
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                app:tint="@color/colorPrimary"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                app:tint="@color/ui_text_muted"
                 android:layout_marginRight="8dp"
                 android:visibility="gone" />
 
@@ -31,7 +32,7 @@
                 android:id="@+id/TVTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="@color/colorPrimary"
+                android:textColor="@color/colorAccent"
                 android:textStyle="bold"
                 android:textSize="18sp" />
         </LinearLayout>
@@ -43,7 +44,7 @@
         android:id="@+id/TVMessage"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textSize="18sp"
+        android:textSize="16sp"
         android:layout_marginBottom="8dp"
         android:visibility="gone" />
 
@@ -64,8 +65,7 @@
     <FrameLayout
         android:id="@+id/FrameLayout"
         android:layout_width="wrap_content"
-        android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_height="wrap_content"
         android:visibility="gone" />
 
     <LinearLayout
@@ -87,7 +87,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:textColor="@color/colorPrimary"
+                android:textColor="@color/colorAccent"
                 android:textStyle="bold"
                 android:visibility="gone" />
 

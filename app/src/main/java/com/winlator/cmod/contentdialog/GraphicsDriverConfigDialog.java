@@ -3,9 +3,10 @@ package com.winlator.cmod.contentdialog;
 import android.content.Context;
 import android.os.Build;
 import android.util.Log;
-import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.AdapterView;
+import android.widget.ScrollView;
 import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
 import android.widget.Spinner;
@@ -148,6 +149,17 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         setIcon(R.drawable.icon_settings);
         setTitle(anchor.getContext().getString(R.string.graphics_driver_configuration));
 
+        ScrollView scrollView = findViewById(R.id.SVContent);
+        if (scrollView != null) {
+            int screenHeight = AppUtils.getScreenHeight();
+            int screenWidth  = AppUtils.getScreenWidth();
+            if (screenWidth > screenHeight) {
+                ViewGroup.LayoutParams params = scrollView.getLayoutParams();
+                params.height = (int)(screenHeight * 0.45f);
+                scrollView.setLayoutParams(params);
+            }
+        }
+
         String graphicsDriverConfig = anchor.getTag().toString();
 
         sVersion = findViewById(R.id.SGraphicsDriverVersion);
@@ -216,14 +228,6 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
             public void onNothingSelected(AdapterView<?> parent) {
 
             }
-        });
-
-
-        sGPUName.setOnTouchListener((v, event) -> {
-            if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                AppUtils.showToast(anchor.getContext(), "Warning: it is important that you know what you are doing when changing this. Improper behavior may happen if you change the GPU name. You have been warned.");
-            }
-            return false;
         });
 
         sGPUName.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {

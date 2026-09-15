@@ -1,3 +1,14 @@
+// Copyright (c) 2017-2024, The Khronos Group Inc.
+// Copyright (c) 2017-2019 Valve Corporation
+// Copyright (c) 2017-2019 LunarG, Inc.
+// Copyright (c) 2019 Collabora, Ltd.
+//
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+//
+// Initial Authors: Mark Young <marky@lunarg.com>
+//                  Rylie Pavlik <rylie.pavlik@collabora.com>
+//                  Dave Houlton <daveh@lunarg.com>
+//
 
 #include "object_info.h"
 
@@ -25,19 +36,23 @@ std::string XrSdkLogObjectInfo::ToString() const {
 }
 
 void ObjectInfoCollection::AddObjectName(uint64_t object_handle, XrObjectType object_type, const std::string& object_name) {
+    // If name is empty, we should erase it
     if (object_name.empty()) {
         RemoveObject(object_handle, object_type);
         return;
     }
 
+    // Otherwise, add it or update the name
     XrSdkLogObjectInfo new_obj = {object_handle, object_type};
 
+    // If it already exists, update the name
     auto lookup_info = LookUpStoredObjectInfo(new_obj);
     if (lookup_info != nullptr) {
         lookup_info->name = object_name;
         return;
     }
 
+    // It doesn't exist, so add a new info block
     new_obj.name = object_name;
     object_info_.push_back(new_obj);
 }
@@ -107,6 +122,7 @@ void DebugUtilsData::LookUpSessionLabels(XrSession session, std::vector<XrDebugU
     auto session_label_iterator = session_labels_.find(session);
     if (session_label_iterator != session_labels_.end()) {
         auto& XrSdkSessionLabels = *session_label_iterator->second;
+        // Copy the debug utils labels in reverse order in the the labels vector.
         std::transform(XrSdkSessionLabels.rbegin(), XrSdkSessionLabels.rend(), std::back_inserter(labels),
                        [](XrSdkSessionLabelPtr const& label) { return label->debug_utils_label; });
     }
@@ -114,7 +130,9 @@ void DebugUtilsData::LookUpSessionLabels(XrSession session, std::vector<XrDebugU
 
 XrSdkSessionLabel::XrSdkSessionLabel(const XrDebugUtilsLabelEXT& label_info, bool individual)
     : label_name(label_info.labelName), debug_utils_label(label_info), is_individual_label(individual) {
+    // Update the c string pointer to the one we hold.
     debug_utils_label.labelName = label_name.c_str();
+    // Zero out the next pointer to avoid a dangling pointer
     debug_utils_label.next = nullptr;
 }
 
@@ -126,6 +144,8 @@ void DebugUtilsData::AddObjectName(uint64_t object_handle, XrObjectType object_t
     object_info_.AddObjectName(object_handle, object_type, object_name);
 }
 
+// We always want to remove the old individual label before we do anything else.
+// So, do that in its own method
 void DebugUtilsData::RemoveIndividualLabel(XrSdkSessionLabelList& label_vec) {
     if (!label_vec.empty() && label_vec.back()->is_individual_label) {
         label_vec.pop_back();
@@ -153,8 +173,10 @@ XrSdkSessionLabelList& DebugUtilsData::GetOrCreateSessionLabelList(XrSession ses
 void DebugUtilsData::BeginLabelRegion(XrSession session, const XrDebugUtilsLabelEXT& label_info) {
     auto& vec = GetOrCreateSessionLabelList(session);
 
+    // Individual labels do not stay around in the transition into a new label region
     RemoveIndividualLabel(vec);
 
+    // Start the new label region
     vec.emplace_back(XrSdkSessionLabel::make(label_info, false));
 }
 
@@ -164,8 +186,10 @@ void DebugUtilsData::EndLabelRegion(XrSession session) {
         return;
     }
 
+    // Individual labels do not stay around in the transition out of label region
     RemoveIndividualLabel(*vec_ptr);
 
+    // Remove the last label region
     if (!vec_ptr->empty()) {
         vec_ptr->pop_back();
     }
@@ -174,8 +198,10 @@ void DebugUtilsData::EndLabelRegion(XrSession session) {
 void DebugUtilsData::InsertLabel(XrSession session, const XrDebugUtilsLabelEXT& label_info) {
     auto& vec = GetOrCreateSessionLabelList(session);
 
+    // Remove any individual layer that might already be there
     RemoveIndividualLabel(vec);
 
+    // Insert a new individual label
     vec.emplace_back(XrSdkSessionLabel::make(label_info, true));
 }
 
@@ -196,7 +222,10 @@ void DebugUtilsData::DeleteSessionLabels(XrSession session) { session_labels_.er
 NamesAndLabels DebugUtilsData::PopulateNamesAndLabels(std::vector<XrSdkLogObjectInfo> objects) const {
     std::vector<XrDebugUtilsLabelEXT> labels;
     for (auto& obj : objects) {
+        // Check for any names that have been associated with the objects and set them up here
         object_info_.LookUpObjectName(obj);
+        // If this is a session, see if there are any labels associated with it for us to add
+        // to the callback content.
         if (XR_OBJECT_TYPE_SESSION == obj.type) {
             LookUpSessionLabels(obj.GetTypedHandle<XrSession>(), labels);
         }
@@ -207,33 +236,40 @@ NamesAndLabels DebugUtilsData::PopulateNamesAndLabels(std::vector<XrSdkLogObject
 
 void DebugUtilsData::WrapCallbackData(AugmentedCallbackData* aug_data,
                                       const XrDebugUtilsMessengerCallbackDataEXT* callback_data) const {
+    // If there's nothing to add, just return the original data as the augmented copy
     aug_data->exported_data = callback_data;
     if (object_info_.Empty() || callback_data->objectCount == 0) {
         return;
     }
 
+    // Inspect each of the callback objects
     bool name_found = false;
     for (uint32_t obj = 0; obj < callback_data->objectCount; ++obj) {
         auto& current_obj = callback_data->objects[obj];
         name_found |= (nullptr != object_info_.LookUpStoredObjectInfo(current_obj.objectHandle, current_obj.objectType));
 
+        // If this is a session, record any labels associated with it
         if (XR_OBJECT_TYPE_SESSION == current_obj.objectType) {
             XrSession session = TreatIntegerAsHandle<XrSession>(current_obj.objectHandle);
             LookUpSessionLabels(session, aug_data->labels);
         }
     }
 
+    // If we found nothing to add, return the original data
     if (!name_found && aug_data->labels.empty()) {
         return;
     }
 
+    // Found additional data - modify an internal copy and return that as the exported data
     memcpy(&aug_data->modified_data, callback_data, sizeof(XrDebugUtilsMessengerCallbackDataEXT));
     aug_data->new_objects.assign(callback_data->objects, callback_data->objects + callback_data->objectCount);
 
+    // Record (overwrite) the names of all incoming objects provided in our internal list
     for (auto& obj : aug_data->new_objects) {
         object_info_.LookUpObjectName(obj);
     }
 
+    // Update local copy & point export to it
     aug_data->modified_data.objects = aug_data->new_objects.data();
     aug_data->modified_data.sessionLabelCount = static_cast<uint32_t>(aug_data->labels.size());
     aug_data->modified_data.sessionLabels = aug_data->labels.empty() ? nullptr : aug_data->labels.data();

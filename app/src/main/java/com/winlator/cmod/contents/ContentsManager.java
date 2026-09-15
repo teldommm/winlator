@@ -31,8 +31,14 @@ public class ContentsManager {
     public static final String[] VKD3D_TRUST_FILES = {"${system32}/d3d12core.dll", "${system32}/d3d12.dll",
             "${syswow64}/d3d12core.dll", "${syswow64}/d3d12.dll"};
     public static final String[] BOX64_TRUST_FILES = {"${bindir}/box64"};
+    public static final String[] D7VK_TRUST_FILES = {"${system32}/ddraw.dll", "${syswow64}/ddraw.dll"};
     public static final String[] WOWBOX64_TRUST_FILES = {"${system32}/wowbox64.dll"};
-    public static final String[] FEXCORE_TRUST_FILES = {"${system32}/libwow64fex.dll", "${system32}/libarm64ecfex.dll"};
+    public static final String[] FEXCORE_TRUST_FILES = {
+            "${system32}/libwow64fex.dll",
+            "${system32}/libarm64ecfex.dll",
+            "${libdir}/wine/aarch64-unix/libwow64fex.so",
+            "${libdir}/wine/aarch64-unix/libarm64ecfex.so"
+    };
     private Map<String, String> dirTemplateMap;
     private Map<ContentProfile.ContentType, List<String>> trustedFilesMap;
 
@@ -70,9 +76,7 @@ public class ContentsManager {
     }
 
     private final Context context;
-
     private HashMap<ContentProfile.ContentType, List<ContentProfile>> profilesMap;
-
     private ArrayList<ContentProfile> remoteProfiles;
 
     public ContentsManager(Context context) {
@@ -86,8 +90,11 @@ public class ContentsManager {
 
     public interface OnInstallFinishedCallback {
         void onFailed(InstallFailedReason reason, Exception e);
-
         void onSucceed(ContentProfile profile);
+    }
+
+    public interface OnInstallProgressCallback {
+        void onProgress(int progress);
     }
 
     public void setRemoteProfiles(String json) {
@@ -97,8 +104,12 @@ public class ContentsManager {
             for (int i = 0; i < content.length(); i++) {
                 try {
                     JSONObject object = content.getJSONObject(i);
+                    String remoteUrl = object.getString("remoteUrl");
+                    if ("https://github.com/StevenMXZ/Winlator-Contents/releases/download/1.0/Proton.9.0-x86_64.wcp".equals(remoteUrl)
+                            || "https://github.com/StevenMXZ/Winlator-Contents/releases/download/1.0/proton-10-arm64ec.wcp.xz".equals(remoteUrl))
+                        continue;
                     ContentProfile remoteProfile = new ContentProfile();
-                    remoteProfile.remoteUrl = object.getString("remoteUrl");
+                    remoteProfile.remoteUrl = remoteUrl;
                     remoteProfile.type = ContentProfile.ContentType.getTypeByName(object.getString("type"));
                     remoteProfile.verName = object.getString("verName");
                     remoteProfile.verCode = object.getInt("verCode");
@@ -115,15 +126,10 @@ public class ContentsManager {
 
     public void syncContents() {
         profilesMap = new HashMap<>();
-
-        for (ContentProfile.ContentType type : ContentProfile.ContentType.values()) {
-            profilesMap.put(type, new LinkedList<>());
-        }
+        for (ContentProfile.ContentType type : ContentProfile.ContentType.values()) profilesMap.put(type, new LinkedList<>());
 
         for (ContentProfile.ContentType type : ContentProfile.ContentType.values()) {
             List<ContentProfile> profiles = profilesMap.get(type);
-
-
             File typeFile = getContentTypeDir(context, type);
             File[] fileList = typeFile.listFiles();
             if (fileList != null) {
@@ -134,19 +140,16 @@ public class ContentsManager {
                         if (profile != null) {
                             profiles.add(profile);
                             Log.d("ContentsManager", "Local profile loaded: " + profile.verName);
-                        } else {
-                            Log.w("ContentsManager", "Invalid local profile at: " + proFile.getAbsolutePath());
-                        }
+                        } else Log.w("ContentsManager", "Invalid local profile at: " + proFile.getAbsolutePath());
                     }
                 }
             }
-
             if (remoteProfiles != null) {
                 for (ContentProfile remote : remoteProfiles) {
                     if (remote.type == type) {
                         boolean exists = false;
                         for (ContentProfile profile : profiles) {
-                            if (profile.verName.equals(remote.verName)) {
+                            if (profile.verName.equals(remote.verName) && profile.verCode == remote.verCode) {
                                 exists = true;
                                 break;
                             }
@@ -162,76 +165,85 @@ public class ContentsManager {
     }
 
     public void extraContentFile(Uri uri, OnInstallFinishedCallback callback) {
+        extraContentFile(uri, null, callback);
+    }
+
+    public void extraContentFile(Uri uri, OnInstallProgressCallback progressCallback,
+                                 OnInstallFinishedCallback callback) {
         cleanTmpDir(context);
-
         File file = getTmpDir(context);
-
-        boolean ret;
-        ret = TarCompressorUtils.extract(TarCompressorUtils.Type.XZ, context, uri, file);
-        if (!ret)
-            ret = TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, context, uri, file);
+        TarCompressorUtils.OnExtractProgressListener listener = progressCallback == null
+                ? null : progressCallback::onProgress;
+        boolean ret = TarCompressorUtils.extract(
+                TarCompressorUtils.Type.XZ, context, uri, file, null, listener);
+        if (!ret) {
+            ret = TarCompressorUtils.extract(
+                    TarCompressorUtils.Type.ZSTD, context, uri, file, null, listener);
+        }
         if (!ret) {
             callback.onFailed(InstallFailedReason.ERROR_BADTAR, null);
             return;
         }
-
         File proFile = new File(file, PROFILE_NAME);
         if (!proFile.exists()) {
             callback.onFailed(InstallFailedReason.ERROR_NOPROFILE, null);
             return;
         }
-
         ContentProfile profile = readProfile(proFile);
         if (profile == null) {
             callback.onFailed(InstallFailedReason.ERROR_BADPROFILE, null);
             return;
         }
-
         String imagefsPath = context.getFilesDir().getAbsolutePath() + "/imagefs";
         for (ContentProfile.ContentFile contentFile : profile.fileList) {
-            File tmpFile = new File(file, contentFile.source);
-            if (!tmpFile.exists() || !tmpFile.isFile() || !isSubPath(file.getAbsolutePath(), tmpFile.getAbsolutePath())) {
+            File tmpFile = resolveContentSource(file, contentFile.source);
+            if (tmpFile == null) {
                 callback.onFailed(InstallFailedReason.ERROR_MISSINGFILES, null);
                 return;
             }
-
             String realPath = getPathFromTemplate(contentFile.target);
             if (!isSubPath(imagefsPath, realPath) || isSubPath(ContentsManager.getContentDir(context).getAbsolutePath(), realPath) || realPath.contains("dosdevices")) {
                 callback.onFailed(InstallFailedReason.ERROR_UNTRUSTPROFILE, null);
                 return;
             }
         }
-
         if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_WINE || profile.type == ContentProfile.ContentType.CONTENT_TYPE_PROTON) {
             File bin = new File(file, profile.wineBinPath);
             File lib = new File(file, profile.wineLibPath);
             File cp = new File(file, profile.winePrefixPack);
-
             if (!bin.exists() || !bin.isDirectory() || !lib.exists() || !lib.isDirectory() || !cp.exists() || !cp.isFile()) {
                 callback.onFailed(InstallFailedReason.ERROR_MISSINGFILES, null);
                 return;
             }
         }
-
         callback.onSucceed(profile);
     }
 
     public void finishInstallContent(ContentProfile profile, OnInstallFinishedCallback callback) {
         File installPath = getInstallDir(context, profile);
+        File tmpPath = getTmpDir(context);
+
         if (installPath.exists()) {
-            callback.onFailed(InstallFailedReason.ERROR_EXIST, null);
-            return;
+            File installedProfile = new File(installPath, PROFILE_NAME);
+            if (installedProfile.isFile()) {
+                cleanTmpDir(context);
+                syncContents();
+                callback.onFailed(InstallFailedReason.ERROR_EXIST, null);
+                return;
+            }
+            FileUtils.delete(installPath);
         }
 
-        if (!installPath.mkdirs()) {
+        File parent = installPath.getParentFile();
+        if ((parent != null && !parent.isDirectory() && !parent.mkdirs())
+                || !tmpPath.isDirectory()
+                || !tmpPath.renameTo(installPath)) {
+            cleanTmpDir(context);
             callback.onFailed(InstallFailedReason.ERROR_UNKNOWN, null);
             return;
         }
 
-        if (!getTmpDir(context).renameTo(installPath)) {
-            callback.onFailed(InstallFailedReason.ERROR_UNKNOWN, null);
-        }
-
+        syncContents();
         callback.onSucceed(profile);
     }
 
@@ -243,7 +255,6 @@ public class ContentsManager {
             String verName = profileJSONObject.getString(ContentProfile.MARK_VERSION_NAME);
             int verCode = profileJSONObject.getInt(ContentProfile.MARK_VERSION_CODE);
             String desc = profileJSONObject.getString(ContentProfile.MARK_DESC);
-
             JSONArray fileJSONArray = profileJSONObject.getJSONArray(ContentProfile.MARK_FILE_LIST);
             List<ContentProfile.ContentFile> fileList = new ArrayList<>();
             for (int i = 0; i < fileJSONArray.length(); i++) {
@@ -259,7 +270,6 @@ public class ContentsManager {
                 profile.wineBinPath = wineJSONObject.getString(ContentProfile.MARK_WINE_BINPATH);
                 profile.winePrefixPack = wineJSONObject.getString(ContentProfile.MARK_WINE_PREFIX_PACK);
             }
-
             profile.type = ContentProfile.ContentType.getTypeByName(typeName);
             profile.verName = verName;
             profile.verCode = verCode;
@@ -272,9 +282,16 @@ public class ContentsManager {
     }
 
     public List<ContentProfile> getProfiles(ContentProfile.ContentType type) {
-        if (profilesMap != null)
-            return profilesMap.get(type);
+        if (profilesMap != null) return profilesMap.get(type);
         return null;
+    }
+
+    public List<ContentProfile> getInstalledProfiles(ContentProfile.ContentType type) {
+        List<ContentProfile> installedProfiles = new ArrayList<>();
+        List<ContentProfile> profiles = getProfiles(type);
+        if (profiles == null) return installedProfiles;
+        for (ContentProfile profile : profiles) if (profile.remoteUrl == null) installedProfiles.add(profile);
+        return installedProfiles;
     }
 
     public static File getInstallDir(Context context, ContentProfile profile) {
@@ -307,15 +324,28 @@ public class ContentsManager {
         createTrustedFilesMap();
         List<ContentProfile.ContentFile> files = new ArrayList<>();
         for (ContentProfile.ContentFile contentFile : profile.fileList) {
-            if (!trustedFilesMap.get(profile.type).contains(
-                    Paths.get(getPathFromTemplate(contentFile.target)).toAbsolutePath().normalize().toString()))
-                files.add(contentFile);
+            if (!trustedFilesMap.get(profile.type).contains(Paths.get(getPathFromTemplate(contentFile.target)).toAbsolutePath().normalize().toString())) files.add(contentFile);
         }
         return files;
     }
 
     private boolean isSubPath(String parent, String child) {
         return Paths.get(child).toAbsolutePath().normalize().startsWith(Paths.get(parent).toAbsolutePath().normalize());
+    }
+
+    private File resolveContentSource(File root, String relativePath) {
+        try {
+            File canonicalRoot = root.getCanonicalFile();
+            File sourceFile = new File(root, relativePath).getCanonicalFile();
+            if (!sourceFile.isFile()
+                    || !isSubPath(canonicalRoot.getAbsolutePath(), sourceFile.getAbsolutePath())) {
+                return null;
+            }
+            return sourceFile;
+        } catch (Exception e) {
+            Log.e("ContentsManager", "Unable to resolve content source " + relativePath, e);
+            return null;
+        }
     }
 
     private void createDirTemplateMap() {
@@ -337,17 +367,16 @@ public class ContentsManager {
             for (ContentProfile.ContentType type : ContentProfile.ContentType.values()) {
                 List<String> pathList = new ArrayList<>();
                 trustedFilesMap.put(type, pathList);
-
                 String[] paths = switch (type) {
                     case CONTENT_TYPE_DXVK -> DXVK_TRUST_FILES;
+                    case CONTENT_TYPE_D7VK -> D7VK_TRUST_FILES;
                     case CONTENT_TYPE_VKD3D -> VKD3D_TRUST_FILES;
                     case CONTENT_TYPE_BOX64 -> BOX64_TRUST_FILES;
                     case CONTENT_TYPE_WOWBOX64 -> WOWBOX64_TRUST_FILES;
                     case CONTENT_TYPE_FEXCORE -> FEXCORE_TRUST_FILES;
                     default -> new String[0];
                 };
-                for (String path : paths)
-                    pathList.add(Paths.get(getPathFromTemplate(path)).toAbsolutePath().normalize().toString());
+                for (String path : paths) pathList.add(Paths.get(getPathFromTemplate(path)).toAbsolutePath().normalize().toString());
             }
         }
     }
@@ -355,9 +384,7 @@ public class ContentsManager {
     private String getPathFromTemplate(String path) {
         createDirTemplateMap();
         String realPath = path;
-        for (String key : dirTemplateMap.keySet()) {
-            realPath = realPath.replace(key, dirTemplateMap.get(key));
-        }
+        for (String key : dirTemplateMap.keySet()) realPath = realPath.replace(key, dirTemplateMap.get(key));
         return realPath;
     }
 
@@ -374,40 +401,84 @@ public class ContentsManager {
     }
 
     public ContentProfile getProfileByEntryName(String entryName) {
+        if (entryName == null || entryName.isEmpty() || profilesMap == null) return null;
         int firstDashIndex = entryName.indexOf('-');
-        int lastDashIndex = entryName.lastIndexOf('-');
+        if (firstDashIndex <= 0 || firstDashIndex >= entryName.length() - 1) return null;
+        ContentProfile.ContentType type = ContentProfile.ContentType.getTypeByName(entryName.substring(0, firstDashIndex));
+        if (type == null) return null;
+        List<ContentProfile> profiles = profilesMap.get(type);
+        if (profiles == null) return null;
 
-        try {
-            String typeName = entryName.substring(0, firstDashIndex);
-            String versionName = entryName.substring(firstDashIndex + 1, lastDashIndex);
-            String versionCode = entryName.substring(lastDashIndex + 1);
-
-            for (ContentProfile profile : profilesMap.get(ContentProfile.ContentType.getTypeByName(typeName))) {
-                if (versionName.equals(profile.verName) && Integer.parseInt(versionCode) == profile.verCode)
-                    return profile;
-            }
-        } catch (Exception e) {
+        for (ContentProfile profile : profiles) {
+            if (entryName.equals(getEntryName(profile))) return profile;
         }
 
-        return null;
+        if (type == ContentProfile.ContentType.CONTENT_TYPE_WINE || type == ContentProfile.ContentType.CONTENT_TYPE_PROTON) return null;
+
+        String versionName = entryName.substring(firstDashIndex + 1);
+        ContentProfile bestMatch = null;
+        for (ContentProfile profile : profiles) {
+            if (profile.remoteUrl == null && versionName.equals(profile.verName)) {
+                if (bestMatch == null || profile.verCode > bestMatch.verCode) bestMatch = profile;
+            }
+        }
+        return bestMatch;
     }
 
-    public boolean applyContent(ContentProfile profile) {
-        if (profile.type != ContentProfile.ContentType.CONTENT_TYPE_WINE || profile.type != ContentProfile.ContentType.CONTENT_TYPE_PROTON) {
-            for (ContentProfile.ContentFile contentFile : profile.fileList) {
-                File targetFile = new File(getPathFromTemplate(contentFile.target));
-                File sourceFile = new File(getInstallDir(context, profile), contentFile.source);
+    public boolean isContentApplied(ContentProfile profile) {
+        if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_WINE
+                || profile.type == ContentProfile.ContentType.CONTENT_TYPE_PROTON) {
+            return true;
+        }
 
-                targetFile.delete();
-                FileUtils.copy(sourceFile, targetFile);
-
-                if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_BOX64) {
-                    FileUtils.chmod(targetFile, 0771);
-                }
+        File installDir = getInstallDir(context, profile);
+        for (ContentProfile.ContentFile contentFile : profile.fileList) {
+            File sourceFile = resolveContentSource(installDir, contentFile.source);
+            File targetFile = new File(getPathFromTemplate(contentFile.target));
+            if (sourceFile == null || !targetFile.isFile() || targetFile.length() != sourceFile.length()) {
+                return false;
             }
-        } else {
         }
         return true;
     }
-}
 
+    public boolean applyContent(ContentProfile profile) {
+        if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_WINE
+                || profile.type == ContentProfile.ContentType.CONTENT_TYPE_PROTON) {
+            return true;
+        }
+
+        boolean success = true;
+        File installDir = getInstallDir(context, profile);
+        for (ContentProfile.ContentFile contentFile : profile.fileList) {
+            File sourceFile = resolveContentSource(installDir, contentFile.source);
+            File targetFile = new File(getPathFromTemplate(contentFile.target));
+
+            if (sourceFile == null) {
+                Log.e("ContentsManager", "Missing or unsafe content source: " + contentFile.source);
+                success = false;
+                continue;
+            }
+            if (targetFile.exists() && !targetFile.delete()) {
+                Log.e("ContentsManager", "Unable to replace content target: " + targetFile.getAbsolutePath());
+                success = false;
+                continue;
+            }
+
+            boolean copied = FileUtils.copy(sourceFile, targetFile);
+            if (!copied || !targetFile.isFile() || targetFile.length() != sourceFile.length()) {
+                Log.e("ContentsManager", "Failed to apply content: "
+                        + sourceFile.getAbsolutePath() + " -> " + targetFile.getAbsolutePath());
+                success = false;
+                continue;
+            }
+
+            if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_BOX64) {
+                FileUtils.chmod(targetFile, 0771);
+            }
+            Log.d("ContentsManager", "Applied content: "
+                    + sourceFile.getAbsolutePath() + " -> " + targetFile.getAbsolutePath());
+        }
+        return success;
+    }
+}

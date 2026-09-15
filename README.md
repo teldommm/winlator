@@ -10,7 +10,6 @@ Winlator is an Android application that lets you run Windows (x86\_64) applicati
 
 This is a fork of the **Winlator Bionic** project by [Pipetto-crypto](https://github.com/Pipetto-crypto/winlator).
 
-and backup [Ludashi-backup](https://github.com/StevenMX-backup/Ludashi-Backup).
 ## APK Build Explanations
 
 ### what is Ludashi?

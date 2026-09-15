@@ -1,3 +1,6 @@
+// Copyright 2020-2021, Collabora, Ltd.
+// SPDX-License-Identifier: BSL-1.0
+// Author: Rylie Pavlik <rylie.pavlik@collabora.com>
 
 #include "android.database.h"
 

@@ -12,7 +12,9 @@ import com.winlator.cmod.R;
 import com.winlator.cmod.container.Container;
 import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
+import com.winlator.cmod.contents.D7VKManager;
 import com.winlator.cmod.core.AppUtils;
+import com.winlator.cmod.core.UnitUtils;
 import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.KeyValueSet;
@@ -40,6 +42,7 @@ public class DXVKConfigDialog extends ContentDialog {
     private final ToggleButton swAsync;
     private boolean isARM64EC = false;
     private final ToggleButton swAsyncCache;
+    private final ToggleButton swMaxFrameLatency;
     private final View llAsync;
     private final View llAsyncCache;
     private final Context context;
@@ -58,7 +61,7 @@ public class DXVKConfigDialog extends ContentDialog {
             return null;
         }
     }
-    
+
     public static final String[] VKD3D_FEATURE_LEVEL = {"12_0", "12_1", "12_2", "11_1", "11_0", "10_1", "10_0", "9_3", "9_2", "9_1"};
 
     private static int compareVersion(String varA, String varB) {
@@ -89,6 +92,7 @@ public class DXVKConfigDialog extends ContentDialog {
         context = anchor.getContext();
         this.installHost = installHost;
         this.contentsManager = contentsManager;
+        findViewById(R.id.FrameLayout).getLayoutParams().width = Math.min(AppUtils.getPreferredDialogWidth(context), Math.round(UnitUtils.dpToPx(300)));
         setIcon(R.drawable.icon_monitor);
         setTitle("DXVK "+context.getString(R.string.configuration));
 
@@ -99,27 +103,42 @@ public class DXVKConfigDialog extends ContentDialog {
         final Spinner sDDRAWrapper = findViewById(R.id.SDDRAWrapper);
         swAsync = findViewById(R.id.SWAsync);
         swAsyncCache = findViewById(R.id.SWAsyncCache);
+        swMaxFrameLatency = findViewById(R.id.SWMaxFrameLatency);
         llAsync = findViewById(R.id.LLAsync);
         llAsyncCache = findViewById(R.id.LLAsyncCache);
 
         this.contentsManager.syncContents();
 
         KeyValueSet config = parseConfig(anchor.getTag());
+        final List<String> ddrawEntries = D7VKManager.getWrapperEntries(context);
+        List<String> ddrawLabels = new ArrayList<>();
+        for (String entry : ddrawEntries) ddrawLabels.add(D7VKManager.getWrapperLabel(entry));
+        ArrayAdapter<String> ddrawAdapter = new ArrayAdapter<>(context, R.layout.spinner_item_amoled, ddrawLabels);
+        ddrawAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item_amoled_compact);
+        sDDRAWrapper.setAdapter(ddrawAdapter);
+        configureContentSpinnerDropdown(sDDRAWrapper);
         loadDxvkVersionSpinner(this.contentsManager, sDXVKVersion, isARM64EC);
         loadVkd3dVersionSpinner(this.contentsManager, sVKD3DVersion, isARM64EC);
 
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_item, VKD3D_FEATURE_LEVEL);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(context, R.layout.spinner_item_amoled, VKD3D_FEATURE_LEVEL);
+        adapter.setDropDownViewResource(R.layout.spinner_dropdown_item_amoled_compact);
         sVKD3DFeatureLevel.setAdapter(adapter);
+        configureContentSpinnerDropdown(sVKD3DFeatureLevel);
 
         setDXVKSpinner(sDXVKVersion, config, this.contentsManager, isARM64EC);
         AppUtils.setSpinnerSelectionFromIdentifier(sFramerate, config.get("framerate"));
         AppUtils.setSpinnerSelectionFromIdentifier(sVKD3DVersion, config.get("vkd3dVersion"));
         AppUtils.setSpinnerSelectionFromIdentifier(sVKD3DFeatureLevel, config.get("vkd3dLevel"));
-        AppUtils.setSpinnerSelectionFromIdentifier(sDDRAWrapper, config.get("ddrawrapper"));
+        for (int i = 0; i < ddrawEntries.size(); i++) {
+            if (ddrawEntries.get(i).equalsIgnoreCase(config.get("ddrawrapper"))) {
+                sDDRAWrapper.setSelection(i);
+                break;
+            }
+        }
 
         swAsync.setChecked(config.get("async").equals("1"));
         swAsyncCache.setChecked(config.get("asyncCache").equals("1"));
+        swMaxFrameLatency.setChecked(config.get("maxFrameLatency").equals("1"));
 
         updateConfigVisibility(getDXVKType(sDXVKVersion.getSelectedItemPosition()));
 
@@ -153,8 +172,10 @@ public class DXVKConfigDialog extends ContentDialog {
 
                     dxvkVersions.removeAll(versions);
 
-                    ArrayAdapter<String> adapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, dxvkVersions);
+                    ArrayAdapter<String> adapter = new ArrayAdapter<>(context, R.layout.spinner_item_amoled, dxvkVersions);
+                    adapter.setDropDownViewResource(R.layout.spinner_dropdown_item_amoled);
                     sDXVKVersion.setAdapter(adapter);
+                    sDXVKVersion.setPopupBackgroundResource(R.drawable.dialog_background_dark_blue);
 
                     Integer curMajor = tryGetMajor(currentDXVKVersion);
                     AppUtils.setSpinnerSelectionFromIdentifier(
@@ -173,6 +194,7 @@ public class DXVKConfigDialog extends ContentDialog {
             public void onNothingSelected(AdapterView<?> parent) {
             }
         });
+
 
         if (installHost != null) {
             findViewById(R.id.BTDXVKInstall).setOnClickListener(v ->
@@ -214,21 +236,28 @@ public class DXVKConfigDialog extends ContentDialog {
             config.put("framerate", StringUtils.parseNumber(sFramerate.getSelectedItem()));
             config.put("async", ((swAsync.isChecked())&&(llAsync.getVisibility()==View.VISIBLE))?"1":"0");
             config.put("asyncCache", ((swAsyncCache.isChecked())&&(llAsyncCache.getVisibility()==View.VISIBLE))?"1":"0");
+            config.put("maxFrameLatency", swMaxFrameLatency.isChecked()?"1":"0");
             VKD3DVersionItem selectedItem = (VKD3DVersionItem) sVKD3DVersion.getSelectedItem();
             config.put("vkd3dVersion", selectedItem.getIdentifier());
             config.put("vkd3dLevel", sVKD3DFeatureLevel.getSelectedItem().toString());
-            config.put("ddrawrapper", StringUtils.parseIdentifier(sDDRAWrapper.getSelectedItem().toString()));
+            config.put("ddrawrapper", ddrawEntries.get(sDDRAWrapper.getSelectedItemPosition()));
             anchor.setTag(config.toString());
         });
     }
 
     private void updateConfigVisibility(int dxvkType) {
+        boolean wasAsyncVisible = llAsync.getVisibility() == View.VISIBLE;
+        boolean wasAsyncCacheVisible = llAsyncCache.getVisibility() == View.VISIBLE;
+
         if (dxvkType == DXVK_TYPE_ASYNC) {
             llAsync.setVisibility(View.VISIBLE);
             llAsyncCache.setVisibility(View.GONE);
+            if (!wasAsyncVisible) swAsync.setChecked(true);
         } else if (dxvkType == DXVK_TYPE_GPLASYNC) {
             llAsync.setVisibility(View.VISIBLE);
             llAsyncCache.setVisibility(View.VISIBLE);
+            if (!wasAsyncVisible) swAsync.setChecked(true);
+            if (!wasAsyncCacheVisible) swAsyncCache.setChecked(true);
         } else {
             llAsync.setVisibility(View.GONE);
             llAsyncCache.setVisibility(View.GONE);
@@ -260,8 +289,10 @@ public class DXVKConfigDialog extends ContentDialog {
 
             dxvkVersions.removeAll(versions);
 
-            ArrayAdapter<String> adapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, dxvkVersions);
+            ArrayAdapter<String> adapter = new ArrayAdapter<>(context, R.layout.spinner_item_amoled, dxvkVersions);
+            adapter.setDropDownViewResource(R.layout.spinner_dropdown_item_amoled_compact);
             sDXVKVersion.setAdapter(adapter);
+            configureContentSpinnerDropdown(sDXVKVersion);
 
             Integer curMajor = tryGetMajor(currentDXVKVersion);
             AppUtils.setSpinnerSelectionFromIdentifier(
@@ -289,6 +320,12 @@ public class DXVKConfigDialog extends ContentDialog {
             envVars.put("DXVK_FRAME_RATE", framerate);
         }
 
+        String maxFrameLatency = config.get("maxFrameLatency");
+        if (!maxFrameLatency.isEmpty() && !maxFrameLatency.equals("0")) {
+            if (!content.isEmpty()) content += "; ";
+            content += "dxgi.maxFrameLatency = 1";
+        }
+
         String async = config.get("async");
         if (!async.isEmpty() && !async.equals("0"))
             envVars.put("DXVK_ASYNC", "1");
@@ -313,8 +350,7 @@ public class DXVKConfigDialog extends ContentDialog {
         String[] originalItems = context.getResources().getStringArray(R.array.dxvk_version_entries);
         List<String> itemList = new ArrayList<>(Arrays.asList(originalItems));
 
-        for (ContentProfile profile : manager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_DXVK)) {
-            if (profile.remoteUrl != null) continue;
+        for (ContentProfile profile : manager.getInstalledProfiles(ContentProfile.ContentType.CONTENT_TYPE_DXVK)) {
             String entryName = ContentsManager.getEntryName(profile);
             int firstDashIndex = entryName.indexOf('-');
             itemList.add(entryName.substring(firstDashIndex + 1));
@@ -322,7 +358,10 @@ public class DXVKConfigDialog extends ContentDialog {
 
         itemList.removeIf(version -> !isVersionAllowedForArch(version, isARM64EC));
 
-        spinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, itemList));
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(context, R.layout.spinner_item_amoled, itemList);
+        adapter.setDropDownViewResource(R.layout.spinner_dropdown_item_amoled_compact);
+        spinner.setAdapter(adapter);
+        configureContentSpinnerDropdown(spinner);
         dxvkVersions = itemList;
     }
 
@@ -332,18 +371,26 @@ public class DXVKConfigDialog extends ContentDialog {
         String[] originalItems = context.getResources().getStringArray(R.array.vkd3d_version_entries);
         for (String version : originalItems) {
             if (isVersionAllowedForArch(version, isARM64EC))
-                itemList.add(new VKD3DVersionItem(version)); // For predefined versions, use 0 as verCode
+                itemList.add(new VKD3DVersionItem(version));
         }
 
-        for (ContentProfile profile : manager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_VKD3D)) {
-            if (profile.remoteUrl != null) continue;
-            String displayName = profile.verName;  // Display name for the spinner
-            int versionCode = profile.verCode;     // Unique version code if available
+        for (ContentProfile profile : manager.getInstalledProfiles(ContentProfile.ContentType.CONTENT_TYPE_VKD3D)) {
+            String displayName = profile.verName;
+            int versionCode = profile.verCode;
             if (isVersionAllowedForArch(displayName, isARM64EC))
                 itemList.add(new VKD3DVersionItem(displayName, versionCode));
         }
 
-        ArrayAdapter<VKD3DVersionItem> adapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, itemList);
+        ArrayAdapter<VKD3DVersionItem> adapter = new ArrayAdapter<>(context, R.layout.spinner_item_amoled, itemList);
+        adapter.setDropDownViewResource(R.layout.spinner_dropdown_item_amoled_compact);
         spinner.setAdapter(adapter);
+        configureContentSpinnerDropdown(spinner);
     }
+
+    private void configureContentSpinnerDropdown(Spinner spinner) {
+        spinner.setPopupBackgroundResource(R.drawable.dialog_background_dark_blue);
+        spinner.setDropDownWidth(Math.round(UnitUtils.dpToPx(240)));
+        spinner.setDropDownVerticalOffset(Math.round(UnitUtils.dpToPx(-2)));
+    }
+
 }

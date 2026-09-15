@@ -96,12 +96,14 @@ bool XrFramebufferCreateGL(struct XrFramebuffer *framebuffer, XrSession session,
     framebuffer->Width = swapchain_info.width;
     framebuffer->Height = swapchain_info.height;
 
+    // Create the color swapchain.
     swapchain_info.format = GL_RGBA8;
     swapchain_info.usageFlags = XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT;
     OXR(xrCreateSwapchain(session, &swapchain_info, &framebuffer->Handle));
     OXR(xrEnumerateSwapchainImages(framebuffer->Handle, 0, &framebuffer->SwapchainLength, NULL));
     framebuffer->SwapchainImage = malloc(framebuffer->SwapchainLength * sizeof(XrSwapchainImageOpenGLESKHR));
 
+    // Populate the swapchain image array.
     for (uint32_t i = 0; i < framebuffer->SwapchainLength; i++)
     {
         XrSwapchainImageOpenGLESKHR* swapchain = (XrSwapchainImageOpenGLESKHR*)framebuffer->SwapchainImage;
@@ -117,6 +119,7 @@ bool XrFramebufferCreateGL(struct XrFramebuffer *framebuffer, XrSession session,
     {
         GLuint color_texture = ((XrSwapchainImageOpenGLESKHR*)framebuffer->SwapchainImage)[i].image;
 
+        // Create the frame buffer.
         GL(glGenFramebuffers(1, &framebuffer->GLFrameBuffers[i]));
         GL(glBindFramebuffer(GL_FRAMEBUFFER, framebuffer->GLFrameBuffers[i]));
         GL(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,

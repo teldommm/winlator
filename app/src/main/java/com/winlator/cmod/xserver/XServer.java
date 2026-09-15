@@ -1,20 +1,22 @@
 package com.winlator.cmod.xserver;
 
-import android.graphics.Rect;
-import android.util.Log;
+import android.hardware.HardwareBuffer;
 import android.util.SparseArray;
 
-import com.winlator.cmod.math.Mathf;
-import com.winlator.cmod.renderer.VulkanRenderer;
+import com.winlator.cmod.core.CursorLocker;
+import com.winlator.cmod.core.KeyValueSet;
+import com.winlator.cmod.widget.XServerRendererView;
 import com.winlator.cmod.winhandler.WinHandler;
 import com.winlator.cmod.xserver.extensions.BigReqExtension;
 import com.winlator.cmod.xserver.extensions.DRI3Extension;
 import com.winlator.cmod.xserver.extensions.Extension;
+import com.winlator.cmod.xserver.extensions.GLXExtension;
 import com.winlator.cmod.xserver.extensions.MITSHMExtension;
 import com.winlator.cmod.xserver.extensions.PresentExtension;
+import com.winlator.cmod.xserver.extensions.RandrExtension;
 import com.winlator.cmod.xserver.extensions.SyncExtension;
-import com.winlator.cmod.xserver.extensions.XInput2Extension;
 
+import com.winlator.cmod.xserver.extensions.XCompositeExtension;
 import java.nio.charset.Charset;
 import java.util.EnumMap;
 import java.util.concurrent.locks.ReentrantLock;
@@ -37,18 +39,31 @@ public class XServer {
     public final Pointer pointer = new Pointer(this);
     public final InputDeviceManager inputDeviceManager;
     public final GrabManager grabManager;
-    private boolean isGrabbed = false;
-    private XClient grabbingClient = null;
+    public final CursorLocker cursorLocker;
+    private String displayDriver;
     private SHMSegmentManager shmSegmentManager;
-    private VulkanRenderer renderer;
     private WinHandler winHandler;
     private final EnumMap<Lockable, ReentrantLock> locks = new EnumMap<>(Lockable.class);
     private boolean relativeMouseMovement = false;
     private boolean simulateTouchScreen = false;
+    private boolean disableMouse = false;
+    private boolean isGrabbed = false;
+    private int surfaceFormat = Drawable.HAL_PIXEL_FORMAT_BGRA_8888;
+    private XServerRendererView xServerView;
+    private XClient grabbingClient = null;
 
-    public XServer(ScreenInfo screenInfo) {
-        Log.d("XServer", "Creating xServer " + screenInfo);
+    public XServer(ScreenInfo screenInfo, String displayDriver, KeyValueSet displayxConfig) {
         this.screenInfo = screenInfo;
+        this.displayDriver = displayDriver;
+        if (displayxConfig != null) {
+            String surfaceFormat = displayxConfig.get("surfaceFormat");
+            if (surfaceFormat.equals("rgba8"))
+                this.surfaceFormat = HardwareBuffer.RGBA_8888;
+            else 
+                this.surfaceFormat = Drawable.HAL_PIXEL_FORMAT_BGRA_8888;        
+        }    
+            
+        cursorLocker = new CursorLocker(this);
         for (Lockable lockable : Lockable.values()) locks.put(lockable, new ReentrantLock());
 
         pixmapManager = new PixmapManager();
@@ -62,12 +77,29 @@ public class XServer {
         DesktopHelper.attachTo(this);
         setupExtensions();
     }
+    
+    public String getDisplayDriver() {
+        return this.displayDriver;
+    }
+    
+    public void setDisplayDriver(String displayDriver) {
+        this.displayDriver = displayDriver;
+    }
+   
+    public int getSurfaceFormat() {
+        return this.surfaceFormat;
+    }
+    
+    public boolean isDisplayX() {
+        return this.displayDriver.toLowerCase().equals("displayx");
+    }
 
     public boolean isRelativeMouseMovement() {
         return relativeMouseMovement;
     }
 
     public void setRelativeMouseMovement(boolean relativeMouseMovement) {
+        cursorLocker.setEnabled(!relativeMouseMovement);
         this.relativeMouseMovement = relativeMouseMovement;
     }
 
@@ -76,13 +108,22 @@ public class XServer {
     public void setSimulateTouchScreen(boolean simulateTouchScreen) {
         this.simulateTouchScreen = simulateTouchScreen;
     }
-
-    public VulkanRenderer getRenderer() {
-        return renderer;
+    
+    public void setXServerView(XServerRendererView view) {
+        this.xServerView = view;
     }
-
-    public void setRenderer(VulkanRenderer renderer) {
-        this.renderer = renderer;
+    
+    public XServerRendererView getXServerView() {
+        return this.xServerView;
+    }
+    
+    public void setMouseDisabled(boolean mouseDisabled) {
+        this.disableMouse = mouseDisabled;
+        xServerView.setCursorVisible(!mouseDisabled);
+    }
+    
+    public boolean isMouseDisabled() {
+        return this.disableMouse;
     }
 
     public WinHandler getWinHandler() {
@@ -159,69 +200,19 @@ public class XServer {
 
     public void injectPointerMoveDelta(int dx, int dy) {
         try (XLock lock = lock(Lockable.WINDOW_MANAGER, Lockable.INPUT_DEVICE)) {
-            int minX = 0, minY = 0;
-            int maxX = screenInfo.width - 1, maxY = screenInfo.height - 1;
-            short clampedX = 0, clampedY = 0;
-
-            Rect confinement = grabManager.getConfinementBounds();
-            if (confinement != null) {
-                minX = Math.max(minX, confinement.left);
-                minY = Math.max(minY, confinement.top);
-                maxX = Math.min(maxX, confinement.right - 1);
-                maxY = Math.min(maxY, confinement.bottom - 1);
-
-                clampedX = (short) Mathf.clamp(pointer.getX() + dx, minX, maxX);
-                clampedY = (short) Mathf.clamp(pointer.getY() + dy, minY, maxY);
-
-                pointer.setPosition(clampedX, clampedY);
-            } else {
-                short softMarginX = (short)(screenInfo.width * 0.05f);
-                short softMarginY = (short)(screenInfo.height * 0.05f);
-                short x = (short)Mathf.clamp(pointer.getX() + dx, -softMarginX, screenInfo.width - 1 + softMarginX);
-                short y = (short)Mathf.clamp(pointer.getY() + dy, -softMarginY, screenInfo.height - 1 + softMarginY);
-
-                pointer.setPosition(x, y);
-
-                clampedX = x;
-                clampedY = y;
-
-                if (x < 0) {
-                    clampedX = 0;
-                }
-                else if (x > screenInfo.width - 1) {
-                    clampedX = (short) (screenInfo.width - 1);
-                }
-                if (y < 0) {
-                    clampedY = 0;
-                }
-                else if (y > screenInfo.height - 1) {
-                    clampedY = (short) (screenInfo.height - 1);
-                }
-
-                pointer.setX(clampedX);
-                pointer.setY(clampedY);
-            }
-
-            XInput2Extension xi = getExtension(XInput2Extension.MAJOR_OPCODE);
-            xi.emitRawMotion(2, dx, dy);
+            pointer.setPosition(pointer.getX() + dx, pointer.getY() + dy);
         }
     }
 
     public void injectPointerButtonPress(Pointer.Button buttonCode) {
         try (XLock lock = lock(Lockable.WINDOW_MANAGER, Lockable.INPUT_DEVICE)) {
             pointer.setButton(buttonCode, true);
-
-            XInput2Extension xi = getExtension(XInput2Extension.MAJOR_OPCODE);
-            xi.emitRawButton(2, buttonCode.code(), true);
         }
     }
 
     public void injectPointerButtonRelease(Pointer.Button buttonCode) {
         try (XLock lock = lock(Lockable.WINDOW_MANAGER, Lockable.INPUT_DEVICE)) {
             pointer.setButton(buttonCode, false);
-
-            XInput2Extension xi = getExtension(XInput2Extension.MAJOR_OPCODE);
-            xi.emitRawButton(2, buttonCode.code(), false);
         }
     }
 
@@ -241,32 +232,15 @@ public class XServer {
         }
     }
 
-    public void setRenderingEnabled(boolean enabled) {
-        windowManager.setRenderingEnabled(enabled);
-    }
-
-    private void registerExtension(Extension ext, int[] nextEventId, int[] nextErrorId) {
-        if (ext.getNumEvents() > 0) {
-            ext.setFirstEventId((byte) nextEventId[0]);
-            nextEventId[0] += ext.getNumEvents();
-        }
-        if (ext.getNumErrors() > 0) {
-            ext.setFirstErrorId((byte) nextErrorId[0]);
-            nextErrorId[0] += ext.getNumErrors();
-        }
-        extensions.put(ext.getMajorOpcode(), ext);
-    }
-
     private void setupExtensions() {
-        int[] nextEventId = {64};
-        int[] nextErrorId = {128};
-
-        registerExtension(new BigReqExtension(),    nextEventId, nextErrorId);
-        registerExtension(new MITSHMExtension(),    nextEventId, nextErrorId);
-        registerExtension(new DRI3Extension(),      nextEventId, nextErrorId);
-        registerExtension(new PresentExtension(),   nextEventId, nextErrorId);
-        registerExtension(new SyncExtension(),      nextEventId, nextErrorId);
-        registerExtension(new XInput2Extension(),   nextEventId, nextErrorId);
+        extensions.put(BigReqExtension.MAJOR_OPCODE, new BigReqExtension());
+        extensions.put(MITSHMExtension.MAJOR_OPCODE, new MITSHMExtension());
+        extensions.put(DRI3Extension.MAJOR_OPCODE, new DRI3Extension(this));
+        extensions.put(PresentExtension.MAJOR_OPCODE, new PresentExtension(this));
+        extensions.put(RandrExtension.MAJOR_OPCODE, new RandrExtension(screenInfo));
+        extensions.put(SyncExtension.MAJOR_OPCODE, new SyncExtension(this));
+        extensions.put(GLXExtension.MAJOR_OPCODE, new GLXExtension(this));
+        extensions.put(XCompositeExtension.MAJOR_OPCODE, new XCompositeExtension(this));
     }
 
     public <T extends Extension> T getExtension(int opcode) {
@@ -279,10 +253,6 @@ public class XServer {
     }
 
     public synchronized boolean isGrabbedBy(XClient client) {
-        if (this.isGrabbed) {
-            return this.grabbingClient == client;
-        }
-        return false;
+        return isGrabbed && grabbingClient == client;
     }
-
 }

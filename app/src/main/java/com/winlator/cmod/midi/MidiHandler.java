@@ -88,10 +88,13 @@ public class MidiHandler {
                 }
                 break;
             case RequestCodes.MIDI_LONG:
+                // FIXME: not implemented.
                 break;
             case RequestCodes.MIDI_PREPARE:
+                // stub
                 break;
             case RequestCodes.MIDI_UNPREPARE:
+                // stub
                 break;
             case RequestCodes.MIDI_OPEN:
                 if (synth == null || recv == null) {
@@ -108,6 +111,7 @@ public class MidiHandler {
                     scheduler.shutdown();
                 break;
             case RequestCodes.MIDI_RESET:
+                // stub
                 break;
         }
     }
@@ -139,6 +143,7 @@ public class MidiHandler {
     }
 
     private void sendAllOff() {
+        // FIXME: A bad implement.
         if (recv != null) {
             try {
                 ShortMessage msg = new ShortMessage();
@@ -155,6 +160,8 @@ public class MidiHandler {
     }
 
     public void startMidiDataChecking() {
+        // FIXME: A bad implement.
+        //  Since this synth doesn't supported 0xB0 0x7B 0x00 as ALL_NOTES_OFF
         if (scheduler != null)
             scheduler.shutdown();
 

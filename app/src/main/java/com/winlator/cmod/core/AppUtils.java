@@ -337,8 +337,10 @@ public abstract class AppUtils {
             return;
         }
 
+        // Create a Timer to schedule the task
         Timer timer = new Timer();
 
+        // Schedule the task with the specified delay
         timer.schedule(new TimerTask() {
             @Override
             public void run() {

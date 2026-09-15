@@ -296,6 +296,7 @@ public class WinlatorFilesProvider extends DocumentsProvider {
         }
         if (file.getParentFile().canWrite()) flags |= Document.FLAG_SUPPORTS_DELETE;
 
+        // Add support for renaming files and directories
         if (file.canWrite()) {
             flags |= Document.FLAG_SUPPORTS_RENAME;
         }

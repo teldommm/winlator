@@ -1,3 +1,7 @@
+// Copyright 2007-2010 Baptiste Lepilleur and The JsonCpp Authors
+// Distributed under MIT license, or public domain if desired and
+// recognized in your jurisdiction.
+// See file LICENSE for detail or copy at http://jsoncpp.sourceforge.net/LICENSE
 
 #ifndef LIB_JSONCPP_JSON_TOOL_H_INCLUDED
 #define LIB_JSONCPP_JSON_TOOL_H_INCLUDED
@@ -6,6 +10,7 @@
 #include <json/config.h>
 #endif
 
+// Also support old flag NO_LOCALE_SUPPORT
 #ifdef NO_LOCALE_SUPPORT
 #define JSONCPP_NO_LOCALE_SUPPORT
 #endif
@@ -30,9 +35,11 @@ static inline char getDecimalPoint() {
 #endif
 }
 
+/// Converts a unicode code-point to UTF-8.
 static inline String codePointToUTF8(unsigned int cp) {
   String result;
 
+  // based on description from http://en.wikipedia.org/wiki/UTF-8
 
   if (cp <= 0x7f) {
     result.resize(1);
@@ -58,9 +65,12 @@ static inline String codePointToUTF8(unsigned int cp) {
 }
 
 enum {
+  /// Constant that specify the size of the buffer that must be passed to
+  /// uintToString.
   uintToStringBufferSize = 3 * sizeof(LargestUInt) + 1
 };
 
+// Defines a char buffer for use with uintToString().
 using UIntToStringBuffer = char[uintToStringBufferSize];
 
 /** Converts an unsigned integer to string.
@@ -112,6 +122,7 @@ Iter fixZerosInTheEnd(Iter begin, Iter end, unsigned int precision) {
     if (*(end - 1) != '0') {
       return end;
     }
+    // Don't delete the last zero before the decimal point.
     if (begin != (end - 1) && begin != (end - 2) && *(end - 2) == '.') {
       if (precision) {
         return end;

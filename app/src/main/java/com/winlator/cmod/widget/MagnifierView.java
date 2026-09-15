@@ -76,11 +76,11 @@ public class MagnifierView extends FrameLayout {
         });
 
         contentView.findViewById(R.id.BTZoomPlus).setOnClickListener((v) -> {
-            if (zoomButtonCallback != null) zoomButtonCallback.call(0.05f);
+            if (zoomButtonCallback != null) zoomButtonCallback.call(0.25f);
         });
 
         contentView.findViewById(R.id.BTZoomMinus).setOnClickListener((v) -> {
-            if (zoomButtonCallback != null) zoomButtonCallback.call(-0.05f);
+            if (zoomButtonCallback != null) zoomButtonCallback.call(-0.25f);
         });
 
         contentView.findViewById(R.id.BTHide).setOnClickListener((v) -> {
@@ -148,7 +148,4 @@ public class MagnifierView extends FrameLayout {
     public void setHideButtonCallback(Runnable hideButtonCallback) {
         this.hideButtonCallback = hideButtonCallback;
     }
-
 }
-
-

@@ -98,18 +98,15 @@ public class Keyboard {
 
         int action = event.getAction();
         int keyCode = event.getKeyCode();
-
-        if (keyCode < 0 || keyCode >= keycodeMap.length) {
-            return false; // Ignore unmapped key codes
-        }
+        if (keyCode < 0 || keyCode >= keycodeMap.length) return false;
 
         if (keyCode == KeyEvent.KEYCODE_TAB || keyCode == KeyEvent.KEYCODE_ESCAPE) {
             if (action == KeyEvent.ACTION_DOWN) {
                 xServer.injectKeyPress(keycodeMap[keyCode]);
-                return true; // Consume the event to prevent default focus change
+                return true;
             } else if (action == KeyEvent.ACTION_UP) {
                 xServer.injectKeyRelease(keycodeMap[keyCode]);
-                return true; // Consume the event to prevent default focus change
+                return true;
             }
         } else if (action == KeyEvent.ACTION_DOWN || action == KeyEvent.ACTION_UP) {
             XKeycode xKeycode = keycodeMap[keyCode];
@@ -368,5 +365,4 @@ public class Keyboard {
     public static boolean isModifierSticky(byte keycode) {
         return keycode == XKeycode.KEY_CAPS_LOCK.id || keycode == XKeycode.KEY_NUM_LOCK.id;
     }
-
 }

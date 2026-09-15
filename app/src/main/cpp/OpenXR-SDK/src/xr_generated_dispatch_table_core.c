@@ -1,6 +1,33 @@
+// Copyright (c) 2017-2024, The Khronos Group Inc.
+// Copyright (c) 2017-2019, Valve Corporation
+// Copyright (c) 2017-2019, LunarG, Inc.
 
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 
+// *********** THIS FILE IS GENERATED - DO NOT EDIT ***********
+//     See utility_source_generator.py for modifications
+// ************************************************************
 
+// Copyright (c) 2017-2024, The Khronos Group Inc.
+// Copyright (c) 2017-2019 Valve Corporation
+// Copyright (c) 2017-2019 LunarG, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+// Author: Mark Young <marky@lunarg.com>
+//
 
 #include "xr_generated_dispatch_table_core.h"
 
@@ -9,10 +36,12 @@
 #ifdef __cplusplus
 extern "C" { 
 #endif
+// Helper function to populate an instance dispatch table
 void GeneratedXrPopulateDispatchTable(struct XrGeneratedDispatchTable *table,
                                       XrInstance instance,
                                       PFN_xrGetInstanceProcAddr get_inst_proc_addr) {
 
+    // ---- Core 1.0 commands
     table->GetInstanceProcAddr = get_inst_proc_addr;
     (get_inst_proc_addr(instance, "xrCreateInstance", (PFN_xrVoidFunction*)&table->CreateInstance));
     (get_inst_proc_addr(instance, "xrDestroyInstance", (PFN_xrVoidFunction*)&table->DestroyInstance));
@@ -67,8 +96,10 @@ void GeneratedXrPopulateDispatchTable(struct XrGeneratedDispatchTable *table,
     (get_inst_proc_addr(instance, "xrApplyHapticFeedback", (PFN_xrVoidFunction*)&table->ApplyHapticFeedback));
     (get_inst_proc_addr(instance, "xrStopHapticFeedback", (PFN_xrVoidFunction*)&table->StopHapticFeedback));
 
+    // ---- Core 1.1 commands
     (get_inst_proc_addr(instance, "xrLocateSpaces", (PFN_xrVoidFunction*)&table->LocateSpaces));
 
+    // ---- XR_EXT_debug_utils extension commands
     (get_inst_proc_addr(instance, "xrSetDebugUtilsObjectNameEXT", (PFN_xrVoidFunction*)&table->SetDebugUtilsObjectNameEXT));
     (get_inst_proc_addr(instance, "xrCreateDebugUtilsMessengerEXT", (PFN_xrVoidFunction*)&table->CreateDebugUtilsMessengerEXT));
     (get_inst_proc_addr(instance, "xrDestroyDebugUtilsMessengerEXT", (PFN_xrVoidFunction*)&table->DestroyDebugUtilsMessengerEXT));

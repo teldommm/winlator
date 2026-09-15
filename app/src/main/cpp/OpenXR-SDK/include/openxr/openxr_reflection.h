@@ -1622,6 +1622,7 @@ XR_ENUM_STR(XrResult);
 #define XR_LIST_BITS_XrPlaneDetectorFlagsEXT(_) \
     _(XR_PLANE_DETECTOR_ENABLE_CONTOUR_BIT_EXT, 0x00000001) \
 
+/// Calls your macro with the name of each member of XrApiLayerProperties, in order.
 #define XR_LIST_STRUCT_XrApiLayerProperties(_) \
     _(type) \
     _(next) \
@@ -1630,12 +1631,14 @@ XR_ENUM_STR(XrResult);
     _(layerVersion) \
     _(description) \
 
+/// Calls your macro with the name of each member of XrExtensionProperties, in order.
 #define XR_LIST_STRUCT_XrExtensionProperties(_) \
     _(type) \
     _(next) \
     _(extensionName) \
     _(extensionVersion) \
 
+/// Calls your macro with the name of each member of XrApplicationInfo, in order.
 #define XR_LIST_STRUCT_XrApplicationInfo(_) \
     _(applicationName) \
     _(applicationVersion) \
@@ -1643,6 +1646,7 @@ XR_ENUM_STR(XrResult);
     _(engineVersion) \
     _(apiVersion) \
 
+/// Calls your macro with the name of each member of XrInstanceCreateInfo, in order.
 #define XR_LIST_STRUCT_XrInstanceCreateInfo(_) \
     _(type) \
     _(next) \
@@ -1653,31 +1657,37 @@ XR_ENUM_STR(XrResult);
     _(enabledExtensionCount) \
     _(enabledExtensionNames) \
 
+/// Calls your macro with the name of each member of XrInstanceProperties, in order.
 #define XR_LIST_STRUCT_XrInstanceProperties(_) \
     _(type) \
     _(next) \
     _(runtimeVersion) \
     _(runtimeName) \
 
+/// Calls your macro with the name of each member of XrEventDataBuffer, in order.
 #define XR_LIST_STRUCT_XrEventDataBuffer(_) \
     _(type) \
     _(next) \
     _(varying) \
 
+/// Calls your macro with the name of each member of XrSystemGetInfo, in order.
 #define XR_LIST_STRUCT_XrSystemGetInfo(_) \
     _(type) \
     _(next) \
     _(formFactor) \
 
+/// Calls your macro with the name of each member of XrSystemGraphicsProperties, in order.
 #define XR_LIST_STRUCT_XrSystemGraphicsProperties(_) \
     _(maxSwapchainImageHeight) \
     _(maxSwapchainImageWidth) \
     _(maxLayerCount) \
 
+/// Calls your macro with the name of each member of XrSystemTrackingProperties, in order.
 #define XR_LIST_STRUCT_XrSystemTrackingProperties(_) \
     _(orientationTracking) \
     _(positionTracking) \
 
+/// Calls your macro with the name of each member of XrSystemProperties, in order.
 #define XR_LIST_STRUCT_XrSystemProperties(_) \
     _(type) \
     _(next) \
@@ -1687,17 +1697,20 @@ XR_ENUM_STR(XrResult);
     _(graphicsProperties) \
     _(trackingProperties) \
 
+/// Calls your macro with the name of each member of XrSessionCreateInfo, in order.
 #define XR_LIST_STRUCT_XrSessionCreateInfo(_) \
     _(type) \
     _(next) \
     _(createFlags) \
     _(systemId) \
 
+/// Calls your macro with the name of each member of XrVector3f, in order.
 #define XR_LIST_STRUCT_XrVector3f(_) \
     _(x) \
     _(y) \
     _(z) \
 
+/// Calls your macro with the name of each member of XrSpaceVelocity, in order.
 #define XR_LIST_STRUCT_XrSpaceVelocity(_) \
     _(type) \
     _(next) \
@@ -1705,26 +1718,31 @@ XR_ENUM_STR(XrResult);
     _(linearVelocity) \
     _(angularVelocity) \
 
+/// Calls your macro with the name of each member of XrQuaternionf, in order.
 #define XR_LIST_STRUCT_XrQuaternionf(_) \
     _(x) \
     _(y) \
     _(z) \
     _(w) \
 
+/// Calls your macro with the name of each member of XrPosef, in order.
 #define XR_LIST_STRUCT_XrPosef(_) \
     _(orientation) \
     _(position) \
 
+/// Calls your macro with the name of each member of XrReferenceSpaceCreateInfo, in order.
 #define XR_LIST_STRUCT_XrReferenceSpaceCreateInfo(_) \
     _(type) \
     _(next) \
     _(referenceSpaceType) \
     _(poseInReferenceSpace) \
 
+/// Calls your macro with the name of each member of XrExtent2Df, in order.
 #define XR_LIST_STRUCT_XrExtent2Df(_) \
     _(width) \
     _(height) \
 
+/// Calls your macro with the name of each member of XrActionSpaceCreateInfo, in order.
 #define XR_LIST_STRUCT_XrActionSpaceCreateInfo(_) \
     _(type) \
     _(next) \
@@ -1732,18 +1750,21 @@ XR_ENUM_STR(XrResult);
     _(subactionPath) \
     _(poseInActionSpace) \
 
+/// Calls your macro with the name of each member of XrSpaceLocation, in order.
 #define XR_LIST_STRUCT_XrSpaceLocation(_) \
     _(type) \
     _(next) \
     _(locationFlags) \
     _(pose) \
 
+/// Calls your macro with the name of each member of XrViewConfigurationProperties, in order.
 #define XR_LIST_STRUCT_XrViewConfigurationProperties(_) \
     _(type) \
     _(next) \
     _(viewConfigurationType) \
     _(fovMutable) \
 
+/// Calls your macro with the name of each member of XrViewConfigurationView, in order.
 #define XR_LIST_STRUCT_XrViewConfigurationView(_) \
     _(type) \
     _(next) \
@@ -1754,6 +1775,7 @@ XR_ENUM_STR(XrResult);
     _(recommendedSwapchainSampleCount) \
     _(maxSwapchainSampleCount) \
 
+/// Calls your macro with the name of each member of XrSwapchainCreateInfo, in order.
 #define XR_LIST_STRUCT_XrSwapchainCreateInfo(_) \
     _(type) \
     _(next) \
@@ -1767,32 +1789,39 @@ XR_ENUM_STR(XrResult);
     _(arraySize) \
     _(mipCount) \
 
+/// Calls your macro with the name of each member of XrSwapchainImageBaseHeader, in order.
 #define XR_LIST_STRUCT_XrSwapchainImageBaseHeader(_) \
     _(type) \
     _(next) \
 
+/// Calls your macro with the name of each member of XrSwapchainImageAcquireInfo, in order.
 #define XR_LIST_STRUCT_XrSwapchainImageAcquireInfo(_) \
     _(type) \
     _(next) \
 
+/// Calls your macro with the name of each member of XrSwapchainImageWaitInfo, in order.
 #define XR_LIST_STRUCT_XrSwapchainImageWaitInfo(_) \
     _(type) \
     _(next) \
     _(timeout) \
 
+/// Calls your macro with the name of each member of XrSwapchainImageReleaseInfo, in order.
 #define XR_LIST_STRUCT_XrSwapchainImageReleaseInfo(_) \
     _(type) \
     _(next) \
 
+/// Calls your macro with the name of each member of XrSessionBeginInfo, in order.
 #define XR_LIST_STRUCT_XrSessionBeginInfo(_) \
     _(type) \
     _(next) \
     _(primaryViewConfigurationType) \
 
+/// Calls your macro with the name of each member of XrFrameWaitInfo, in order.
 #define XR_LIST_STRUCT_XrFrameWaitInfo(_) \
     _(type) \
     _(next) \
 
+/// Calls your macro with the name of each member of XrFrameState, in order.
 #define XR_LIST_STRUCT_XrFrameState(_) \
     _(type) \
     _(next) \
@@ -1800,16 +1829,19 @@ XR_ENUM_STR(XrResult);
     _(predictedDisplayPeriod) \
     _(shouldRender) \
 
+/// Calls your macro with the name of each member of XrFrameBeginInfo, in order.
 #define XR_LIST_STRUCT_XrFrameBeginInfo(_) \
     _(type) \
     _(next) \
 
+/// Calls your macro with the name of each member of XrCompositionLayerBaseHeader, in order.
 #define XR_LIST_STRUCT_XrCompositionLayerBaseHeader(_) \
     _(type) \
     _(next) \
     _(layerFlags) \
     _(space) \
 
+/// Calls your macro with the name of each member of XrFrameEndInfo, in order.
 #define XR_LIST_STRUCT_XrFrameEndInfo(_) \
     _(type) \
     _(next) \
@@ -1818,6 +1850,7 @@ XR_ENUM_STR(XrResult);
     _(layerCount) \
     _(layers) \
 
+/// Calls your macro with the name of each member of XrViewLocateInfo, in order.
 #define XR_LIST_STRUCT_XrViewLocateInfo(_) \
     _(type) \
     _(next) \
@@ -1825,23 +1858,27 @@ XR_ENUM_STR(XrResult);
     _(displayTime) \
     _(space) \
 
+/// Calls your macro with the name of each member of XrViewState, in order.
 #define XR_LIST_STRUCT_XrViewState(_) \
     _(type) \
     _(next) \
     _(viewStateFlags) \
 
+/// Calls your macro with the name of each member of XrFovf, in order.
 #define XR_LIST_STRUCT_XrFovf(_) \
     _(angleLeft) \
     _(angleRight) \
     _(angleUp) \
     _(angleDown) \
 
+/// Calls your macro with the name of each member of XrView, in order.
 #define XR_LIST_STRUCT_XrView(_) \
     _(type) \
     _(next) \
     _(pose) \
     _(fov) \
 
+/// Calls your macro with the name of each member of XrActionSetCreateInfo, in order.
 #define XR_LIST_STRUCT_XrActionSetCreateInfo(_) \
     _(type) \
     _(next) \
@@ -1849,6 +1886,7 @@ XR_ENUM_STR(XrResult);
     _(localizedActionSetName) \
     _(priority) \
 
+/// Calls your macro with the name of each member of XrActionCreateInfo, in order.
 #define XR_LIST_STRUCT_XrActionCreateInfo(_) \
     _(type) \
     _(next) \
@@ -1858,10 +1896,12 @@ XR_ENUM_STR(XrResult);
     _(subactionPaths) \
     _(localizedActionName) \
 
+/// Calls your macro with the name of each member of XrActionSuggestedBinding, in order.
 #define XR_LIST_STRUCT_XrActionSuggestedBinding(_) \
     _(action) \
     _(binding) \
 
+/// Calls your macro with the name of each member of XrInteractionProfileSuggestedBinding, in order.
 #define XR_LIST_STRUCT_XrInteractionProfileSuggestedBinding(_) \
     _(type) \
     _(next) \
@@ -1869,23 +1909,27 @@ XR_ENUM_STR(XrResult);
     _(countSuggestedBindings) \
     _(suggestedBindings) \
 
+/// Calls your macro with the name of each member of XrSessionActionSetsAttachInfo, in order.
 #define XR_LIST_STRUCT_XrSessionActionSetsAttachInfo(_) \
     _(type) \
     _(next) \
     _(countActionSets) \
     _(actionSets) \
 
+/// Calls your macro with the name of each member of XrInteractionProfileState, in order.
 #define XR_LIST_STRUCT_XrInteractionProfileState(_) \
     _(type) \
     _(next) \
     _(interactionProfile) \
 
+/// Calls your macro with the name of each member of XrActionStateGetInfo, in order.
 #define XR_LIST_STRUCT_XrActionStateGetInfo(_) \
     _(type) \
     _(next) \
     _(action) \
     _(subactionPath) \
 
+/// Calls your macro with the name of each member of XrActionStateBoolean, in order.
 #define XR_LIST_STRUCT_XrActionStateBoolean(_) \
     _(type) \
     _(next) \
@@ -1894,6 +1938,7 @@ XR_ENUM_STR(XrResult);
     _(lastChangeTime) \
     _(isActive) \
 
+/// Calls your macro with the name of each member of XrActionStateFloat, in order.
 #define XR_LIST_STRUCT_XrActionStateFloat(_) \
     _(type) \
     _(next) \
@@ -1902,10 +1947,12 @@ XR_ENUM_STR(XrResult);
     _(lastChangeTime) \
     _(isActive) \
 
+/// Calls your macro with the name of each member of XrVector2f, in order.
 #define XR_LIST_STRUCT_XrVector2f(_) \
     _(x) \
     _(y) \
 
+/// Calls your macro with the name of each member of XrActionStateVector2f, in order.
 #define XR_LIST_STRUCT_XrActionStateVector2f(_) \
     _(type) \
     _(next) \
@@ -1914,67 +1961,81 @@ XR_ENUM_STR(XrResult);
     _(lastChangeTime) \
     _(isActive) \
 
+/// Calls your macro with the name of each member of XrActionStatePose, in order.
 #define XR_LIST_STRUCT_XrActionStatePose(_) \
     _(type) \
     _(next) \
     _(isActive) \
 
+/// Calls your macro with the name of each member of XrActiveActionSet, in order.
 #define XR_LIST_STRUCT_XrActiveActionSet(_) \
     _(actionSet) \
     _(subactionPath) \
 
+/// Calls your macro with the name of each member of XrActionsSyncInfo, in order.
 #define XR_LIST_STRUCT_XrActionsSyncInfo(_) \
     _(type) \
     _(next) \
     _(countActiveActionSets) \
     _(activeActionSets) \
 
+/// Calls your macro with the name of each member of XrBoundSourcesForActionEnumerateInfo, in order.
 #define XR_LIST_STRUCT_XrBoundSourcesForActionEnumerateInfo(_) \
     _(type) \
     _(next) \
     _(action) \
 
+/// Calls your macro with the name of each member of XrInputSourceLocalizedNameGetInfo, in order.
 #define XR_LIST_STRUCT_XrInputSourceLocalizedNameGetInfo(_) \
     _(type) \
     _(next) \
     _(sourcePath) \
     _(whichComponents) \
 
+/// Calls your macro with the name of each member of XrHapticActionInfo, in order.
 #define XR_LIST_STRUCT_XrHapticActionInfo(_) \
     _(type) \
     _(next) \
     _(action) \
     _(subactionPath) \
 
+/// Calls your macro with the name of each member of XrHapticBaseHeader, in order.
 #define XR_LIST_STRUCT_XrHapticBaseHeader(_) \
     _(type) \
     _(next) \
 
+/// Calls your macro with the name of each member of XrBaseInStructure, in order.
 #define XR_LIST_STRUCT_XrBaseInStructure(_) \
     _(type) \
     _(next) \
 
+/// Calls your macro with the name of each member of XrBaseOutStructure, in order.
 #define XR_LIST_STRUCT_XrBaseOutStructure(_) \
     _(type) \
     _(next) \
 
+/// Calls your macro with the name of each member of XrOffset2Di, in order.
 #define XR_LIST_STRUCT_XrOffset2Di(_) \
     _(x) \
     _(y) \
 
+/// Calls your macro with the name of each member of XrExtent2Di, in order.
 #define XR_LIST_STRUCT_XrExtent2Di(_) \
     _(width) \
     _(height) \
 
+/// Calls your macro with the name of each member of XrRect2Di, in order.
 #define XR_LIST_STRUCT_XrRect2Di(_) \
     _(offset) \
     _(extent) \
 
+/// Calls your macro with the name of each member of XrSwapchainSubImage, in order.
 #define XR_LIST_STRUCT_XrSwapchainSubImage(_) \
     _(swapchain) \
     _(imageRect) \
     _(imageArrayIndex) \
 
+/// Calls your macro with the name of each member of XrCompositionLayerProjectionView, in order.
 #define XR_LIST_STRUCT_XrCompositionLayerProjectionView(_) \
     _(type) \
     _(next) \
@@ -1982,6 +2043,7 @@ XR_ENUM_STR(XrResult);
     _(fov) \
     _(subImage) \
 
+/// Calls your macro with the name of each member of XrCompositionLayerProjection, in order.
 #define XR_LIST_STRUCT_XrCompositionLayerProjection(_) \
     _(type) \
     _(next) \
@@ -1990,6 +2052,7 @@ XR_ENUM_STR(XrResult);
     _(viewCount) \
     _(views) \
 
+/// Calls your macro with the name of each member of XrCompositionLayerQuad, in order.
 #define XR_LIST_STRUCT_XrCompositionLayerQuad(_) \
     _(type) \
     _(next) \
@@ -2000,20 +2063,24 @@ XR_ENUM_STR(XrResult);
     _(pose) \
     _(size) \
 
+/// Calls your macro with the name of each member of XrEventDataBaseHeader, in order.
 #define XR_LIST_STRUCT_XrEventDataBaseHeader(_) \
     _(type) \
     _(next) \
 
+/// Calls your macro with the name of each member of XrEventDataEventsLost, in order.
 #define XR_LIST_STRUCT_XrEventDataEventsLost(_) \
     _(type) \
     _(next) \
     _(lostEventCount) \
 
+/// Calls your macro with the name of each member of XrEventDataInstanceLossPending, in order.
 #define XR_LIST_STRUCT_XrEventDataInstanceLossPending(_) \
     _(type) \
     _(next) \
     _(lossTime) \
 
+/// Calls your macro with the name of each member of XrEventDataSessionStateChanged, in order.
 #define XR_LIST_STRUCT_XrEventDataSessionStateChanged(_) \
     _(type) \
     _(next) \
@@ -2021,6 +2088,7 @@ XR_ENUM_STR(XrResult);
     _(state) \
     _(time) \
 
+/// Calls your macro with the name of each member of XrEventDataReferenceSpaceChangePending, in order.
 #define XR_LIST_STRUCT_XrEventDataReferenceSpaceChangePending(_) \
     _(type) \
     _(next) \
@@ -2030,11 +2098,13 @@ XR_ENUM_STR(XrResult);
     _(poseValid) \
     _(poseInPreviousSpace) \
 
+/// Calls your macro with the name of each member of XrEventDataInteractionProfileChanged, in order.
 #define XR_LIST_STRUCT_XrEventDataInteractionProfileChanged(_) \
     _(type) \
     _(next) \
     _(session) \
 
+/// Calls your macro with the name of each member of XrHapticVibration, in order.
 #define XR_LIST_STRUCT_XrHapticVibration(_) \
     _(type) \
     _(next) \
@@ -2042,26 +2112,31 @@ XR_ENUM_STR(XrResult);
     _(frequency) \
     _(amplitude) \
 
+/// Calls your macro with the name of each member of XrOffset2Df, in order.
 #define XR_LIST_STRUCT_XrOffset2Df(_) \
     _(x) \
     _(y) \
 
+/// Calls your macro with the name of each member of XrRect2Df, in order.
 #define XR_LIST_STRUCT_XrRect2Df(_) \
     _(offset) \
     _(extent) \
 
+/// Calls your macro with the name of each member of XrVector4f, in order.
 #define XR_LIST_STRUCT_XrVector4f(_) \
     _(x) \
     _(y) \
     _(z) \
     _(w) \
 
+/// Calls your macro with the name of each member of XrColor4f, in order.
 #define XR_LIST_STRUCT_XrColor4f(_) \
     _(r) \
     _(g) \
     _(b) \
     _(a) \
 
+/// Calls your macro with the name of each member of XrApiLayerNextInfo, in order.
 #define XR_LIST_STRUCT_XrApiLayerNextInfo(_) \
     _(structType) \
     _(structVersion) \
@@ -2071,6 +2146,7 @@ XR_ENUM_STR(XrResult);
     _(nextCreateApiLayerInstance) \
     _(next) \
 
+/// Calls your macro with the name of each member of XrApiLayerCreateInfo, in order.
 #define XR_LIST_STRUCT_XrApiLayerCreateInfo(_) \
     _(structType) \
     _(structVersion) \
@@ -2079,6 +2155,7 @@ XR_ENUM_STR(XrResult);
     _(settings_file_location) \
     _(nextInfo) \
 
+/// Calls your macro with the name of each member of XrNegotiateLoaderInfo, in order.
 #define XR_LIST_STRUCT_XrNegotiateLoaderInfo(_) \
     _(structType) \
     _(structVersion) \
@@ -2088,6 +2165,7 @@ XR_ENUM_STR(XrResult);
     _(minApiVersion) \
     _(maxApiVersion) \
 
+/// Calls your macro with the name of each member of XrNegotiateRuntimeRequest, in order.
 #define XR_LIST_STRUCT_XrNegotiateRuntimeRequest(_) \
     _(structType) \
     _(structVersion) \
@@ -2096,6 +2174,7 @@ XR_ENUM_STR(XrResult);
     _(runtimeApiVersion) \
     _(getInstanceProcAddr) \
 
+/// Calls your macro with the name of each member of XrNegotiateApiLayerRequest, in order.
 #define XR_LIST_STRUCT_XrNegotiateApiLayerRequest(_) \
     _(structType) \
     _(structVersion) \
@@ -2105,33 +2184,40 @@ XR_ENUM_STR(XrResult);
     _(getInstanceProcAddr) \
     _(createApiLayerInstance) \
 
+/// Calls your macro with the name of each member of XrColor3f, in order.
 #define XR_LIST_STRUCT_XrColor3f(_) \
     _(r) \
     _(g) \
     _(b) \
 
+/// Calls your macro with the name of each member of XrExtent3Df, in order.
 #define XR_LIST_STRUCT_XrExtent3Df(_) \
     _(width) \
     _(height) \
     _(depth) \
 
+/// Calls your macro with the name of each member of XrSpheref, in order.
 #define XR_LIST_STRUCT_XrSpheref(_) \
     _(center) \
     _(radius) \
 
+/// Calls your macro with the name of each member of XrBoxf, in order.
 #define XR_LIST_STRUCT_XrBoxf(_) \
     _(center) \
     _(extents) \
 
+/// Calls your macro with the name of each member of XrFrustumf, in order.
 #define XR_LIST_STRUCT_XrFrustumf(_) \
     _(pose) \
     _(fov) \
     _(nearZ) \
     _(farZ) \
 
+/// Calls your macro with the name of each member of XrUuid, in order.
 #define XR_LIST_STRUCT_XrUuid(_) \
     _(data) \
 
+/// Calls your macro with the name of each member of XrSpacesLocateInfo, in order.
 #define XR_LIST_STRUCT_XrSpacesLocateInfo(_) \
     _(type) \
     _(next) \
@@ -2140,27 +2226,32 @@ XR_ENUM_STR(XrResult);
     _(spaceCount) \
     _(spaces) \
 
+/// Calls your macro with the name of each member of XrSpaceLocationData, in order.
 #define XR_LIST_STRUCT_XrSpaceLocationData(_) \
     _(locationFlags) \
     _(pose) \
 
+/// Calls your macro with the name of each member of XrSpaceLocations, in order.
 #define XR_LIST_STRUCT_XrSpaceLocations(_) \
     _(type) \
     _(next) \
     _(locationCount) \
     _(locations) \
 
+/// Calls your macro with the name of each member of XrSpaceVelocityData, in order.
 #define XR_LIST_STRUCT_XrSpaceVelocityData(_) \
     _(velocityFlags) \
     _(linearVelocity) \
     _(angularVelocity) \
 
+/// Calls your macro with the name of each member of XrSpaceVelocities, in order.
 #define XR_LIST_STRUCT_XrSpaceVelocities(_) \
     _(type) \
     _(next) \
     _(velocityCount) \
     _(velocities) \
 
+/// Calls your macro with the name of each member of XrCompositionLayerCubeKHR, in order.
 #define XR_LIST_STRUCT_XrCompositionLayerCubeKHR(_) \
     _(type) \
     _(next) \
@@ -2171,12 +2262,14 @@ XR_ENUM_STR(XrResult);
     _(imageArrayIndex) \
     _(orientation) \
 
+/// Calls your macro with the name of each member of XrInstanceCreateInfoAndroidKHR, in order.
 #define XR_LIST_STRUCT_XrInstanceCreateInfoAndroidKHR(_) \
     _(type) \
     _(next) \
     _(applicationVM) \
     _(applicationActivity) \
 
+/// Calls your macro with the name of each member of XrCompositionLayerDepthInfoKHR, in order.
 #define XR_LIST_STRUCT_XrCompositionLayerDepthInfoKHR(_) \
     _(type) \
     _(next) \
@@ -2186,12 +2279,14 @@ XR_ENUM_STR(XrResult);
     _(nearZ) \
     _(farZ) \
 
+/// Calls your macro with the name of each member of XrVulkanSwapchainFormatListCreateInfoKHR, in order.
 #define XR_LIST_STRUCT_XrVulkanSwapchainFormatListCreateInfoKHR(_) \
     _(type) \
     _(next) \
     _(viewFormatCount) \
     _(viewFormats) \
 
+/// Calls your macro with the name of each member of XrCompositionLayerCylinderKHR, in order.
 #define XR_LIST_STRUCT_XrCompositionLayerCylinderKHR(_) \
     _(type) \
     _(next) \
@@ -2204,6 +2299,7 @@ XR_ENUM_STR(XrResult);
     _(centralAngle) \
     _(aspectRatio) \
 
+/// Calls your macro with the name of each member of XrCompositionLayerEquirectKHR, in order.
 #define XR_LIST_STRUCT_XrCompositionLayerEquirectKHR(_) \
     _(type) \
     _(next) \
@@ -2216,12 +2312,14 @@ XR_ENUM_STR(XrResult);
     _(scale) \
     _(bias) \
 
+/// Calls your macro with the name of each member of XrGraphicsBindingOpenGLWin32KHR, in order.
 #define XR_LIST_STRUCT_XrGraphicsBindingOpenGLWin32KHR(_) \
     _(type) \
     _(next) \
     _(hDC) \
     _(hGLRC) \
 
+/// Calls your macro with the name of each member of XrGraphicsBindingOpenGLXlibKHR, in order.
 #define XR_LIST_STRUCT_XrGraphicsBindingOpenGLXlibKHR(_) \
     _(type) \
     _(next) \
@@ -2231,6 +2329,7 @@ XR_ENUM_STR(XrResult);
     _(glxDrawable) \
     _(glxContext) \
 
+/// Calls your macro with the name of each member of XrGraphicsBindingOpenGLXcbKHR, in order.
 #define XR_LIST_STRUCT_XrGraphicsBindingOpenGLXcbKHR(_) \
     _(type) \
     _(next) \
@@ -2241,22 +2340,26 @@ XR_ENUM_STR(XrResult);
     _(glxDrawable) \
     _(glxContext) \
 
+/// Calls your macro with the name of each member of XrGraphicsBindingOpenGLWaylandKHR, in order.
 #define XR_LIST_STRUCT_XrGraphicsBindingOpenGLWaylandKHR(_) \
     _(type) \
     _(next) \
     _(display) \
 
+/// Calls your macro with the name of each member of XrSwapchainImageOpenGLKHR, in order.
 #define XR_LIST_STRUCT_XrSwapchainImageOpenGLKHR(_) \
     _(type) \
     _(next) \
     _(image) \
 
+/// Calls your macro with the name of each member of XrGraphicsRequirementsOpenGLKHR, in order.
 #define XR_LIST_STRUCT_XrGraphicsRequirementsOpenGLKHR(_) \
     _(type) \
     _(next) \
     _(minApiVersionSupported) \
     _(maxApiVersionSupported) \
 
+/// Calls your macro with the name of each member of XrGraphicsBindingOpenGLESAndroidKHR, in order.
 #define XR_LIST_STRUCT_XrGraphicsBindingOpenGLESAndroidKHR(_) \
     _(type) \
     _(next) \
@@ -2264,17 +2367,20 @@ XR_ENUM_STR(XrResult);
     _(config) \
     _(context) \
 
+/// Calls your macro with the name of each member of XrSwapchainImageOpenGLESKHR, in order.
 #define XR_LIST_STRUCT_XrSwapchainImageOpenGLESKHR(_) \
     _(type) \
     _(next) \
     _(image) \
 
+/// Calls your macro with the name of each member of XrGraphicsRequirementsOpenGLESKHR, in order.
 #define XR_LIST_STRUCT_XrGraphicsRequirementsOpenGLESKHR(_) \
     _(type) \
     _(next) \
     _(minApiVersionSupported) \
     _(maxApiVersionSupported) \
 
+/// Calls your macro with the name of each member of XrGraphicsBindingVulkanKHR, in order.
 #define XR_LIST_STRUCT_XrGraphicsBindingVulkanKHR(_) \
     _(type) \
     _(next) \
@@ -2284,50 +2390,59 @@ XR_ENUM_STR(XrResult);
     _(queueFamilyIndex) \
     _(queueIndex) \
 
+/// Calls your macro with the name of each member of XrSwapchainImageVulkanKHR, in order.
 #define XR_LIST_STRUCT_XrSwapchainImageVulkanKHR(_) \
     _(type) \
     _(next) \
     _(image) \
 
+/// Calls your macro with the name of each member of XrGraphicsRequirementsVulkanKHR, in order.
 #define XR_LIST_STRUCT_XrGraphicsRequirementsVulkanKHR(_) \
     _(type) \
     _(next) \
     _(minApiVersionSupported) \
     _(maxApiVersionSupported) \
 
+/// Calls your macro with the name of each member of XrGraphicsBindingD3D11KHR, in order.
 #define XR_LIST_STRUCT_XrGraphicsBindingD3D11KHR(_) \
     _(type) \
     _(next) \
     _(device) \
 
+/// Calls your macro with the name of each member of XrSwapchainImageD3D11KHR, in order.
 #define XR_LIST_STRUCT_XrSwapchainImageD3D11KHR(_) \
     _(type) \
     _(next) \
     _(texture) \
 
+/// Calls your macro with the name of each member of XrGraphicsRequirementsD3D11KHR, in order.
 #define XR_LIST_STRUCT_XrGraphicsRequirementsD3D11KHR(_) \
     _(type) \
     _(next) \
     _(adapterLuid) \
     _(minFeatureLevel) \
 
+/// Calls your macro with the name of each member of XrGraphicsBindingD3D12KHR, in order.
 #define XR_LIST_STRUCT_XrGraphicsBindingD3D12KHR(_) \
     _(type) \
     _(next) \
     _(device) \
     _(queue) \
 
+/// Calls your macro with the name of each member of XrSwapchainImageD3D12KHR, in order.
 #define XR_LIST_STRUCT_XrSwapchainImageD3D12KHR(_) \
     _(type) \
     _(next) \
     _(texture) \
 
+/// Calls your macro with the name of each member of XrGraphicsRequirementsD3D12KHR, in order.
 #define XR_LIST_STRUCT_XrGraphicsRequirementsD3D12KHR(_) \
     _(type) \
     _(next) \
     _(adapterLuid) \
     _(minFeatureLevel) \
 
+/// Calls your macro with the name of each member of XrVisibilityMaskKHR, in order.
 #define XR_LIST_STRUCT_XrVisibilityMaskKHR(_) \
     _(type) \
     _(next) \
@@ -2338,6 +2453,7 @@ XR_ENUM_STR(XrResult);
     _(indexCountOutput) \
     _(indices) \
 
+/// Calls your macro with the name of each member of XrEventDataVisibilityMaskChangedKHR, in order.
 #define XR_LIST_STRUCT_XrEventDataVisibilityMaskChangedKHR(_) \
     _(type) \
     _(next) \
@@ -2345,22 +2461,26 @@ XR_ENUM_STR(XrResult);
     _(viewConfigurationType) \
     _(viewIndex) \
 
+/// Calls your macro with the name of each member of XrCompositionLayerColorScaleBiasKHR, in order.
 #define XR_LIST_STRUCT_XrCompositionLayerColorScaleBiasKHR(_) \
     _(type) \
     _(next) \
     _(colorScale) \
     _(colorBias) \
 
+/// Calls your macro with the name of each member of XrLoaderInitInfoBaseHeaderKHR, in order.
 #define XR_LIST_STRUCT_XrLoaderInitInfoBaseHeaderKHR(_) \
     _(type) \
     _(next) \
 
+/// Calls your macro with the name of each member of XrLoaderInitInfoAndroidKHR, in order.
 #define XR_LIST_STRUCT_XrLoaderInitInfoAndroidKHR(_) \
     _(type) \
     _(next) \
     _(applicationVM) \
     _(applicationContext) \
 
+/// Calls your macro with the name of each member of XrVulkanInstanceCreateInfoKHR, in order.
 #define XR_LIST_STRUCT_XrVulkanInstanceCreateInfoKHR(_) \
     _(type) \
     _(next) \
@@ -2370,6 +2490,7 @@ XR_ENUM_STR(XrResult);
     _(vulkanCreateInfo) \
     _(vulkanAllocator) \
 
+/// Calls your macro with the name of each member of XrVulkanDeviceCreateInfoKHR, in order.
 #define XR_LIST_STRUCT_XrVulkanDeviceCreateInfoKHR(_) \
     _(type) \
     _(next) \
@@ -2380,12 +2501,14 @@ XR_ENUM_STR(XrResult);
     _(vulkanCreateInfo) \
     _(vulkanAllocator) \
 
+/// Calls your macro with the name of each member of XrVulkanGraphicsDeviceGetInfoKHR, in order.
 #define XR_LIST_STRUCT_XrVulkanGraphicsDeviceGetInfoKHR(_) \
     _(type) \
     _(next) \
     _(systemId) \
     _(vulkanInstance) \
 
+/// Calls your macro with the name of each member of XrCompositionLayerEquirect2KHR, in order.
 #define XR_LIST_STRUCT_XrCompositionLayerEquirect2KHR(_) \
     _(type) \
     _(next) \
@@ -2399,16 +2522,19 @@ XR_ENUM_STR(XrResult);
     _(upperVerticalAngle) \
     _(lowerVerticalAngle) \
 
+/// Calls your macro with the name of each member of XrBindingModificationBaseHeaderKHR, in order.
 #define XR_LIST_STRUCT_XrBindingModificationBaseHeaderKHR(_) \
     _(type) \
     _(next) \
 
+/// Calls your macro with the name of each member of XrBindingModificationsKHR, in order.
 #define XR_LIST_STRUCT_XrBindingModificationsKHR(_) \
     _(type) \
     _(next) \
     _(bindingModificationCount) \
     _(bindingModifications) \
 
+/// Calls your macro with the name of each member of XrEventDataPerfSettingsEXT, in order.
 #define XR_LIST_STRUCT_XrEventDataPerfSettingsEXT(_) \
     _(type) \
     _(next) \
@@ -2417,6 +2543,7 @@ XR_ENUM_STR(XrResult);
     _(fromLevel) \
     _(toLevel) \
 
+/// Calls your macro with the name of each member of XrDebugUtilsObjectNameInfoEXT, in order.
 #define XR_LIST_STRUCT_XrDebugUtilsObjectNameInfoEXT(_) \
     _(type) \
     _(next) \
@@ -2424,11 +2551,13 @@ XR_ENUM_STR(XrResult);
     _(objectHandle) \
     _(objectName) \
 
+/// Calls your macro with the name of each member of XrDebugUtilsLabelEXT, in order.
 #define XR_LIST_STRUCT_XrDebugUtilsLabelEXT(_) \
     _(type) \
     _(next) \
     _(labelName) \
 
+/// Calls your macro with the name of each member of XrDebugUtilsMessengerCallbackDataEXT, in order.
 #define XR_LIST_STRUCT_XrDebugUtilsMessengerCallbackDataEXT(_) \
     _(type) \
     _(next) \
@@ -2440,6 +2569,7 @@ XR_ENUM_STR(XrResult);
     _(sessionLabelCount) \
     _(sessionLabels) \
 
+/// Calls your macro with the name of each member of XrDebugUtilsMessengerCreateInfoEXT, in order.
 #define XR_LIST_STRUCT_XrDebugUtilsMessengerCreateInfoEXT(_) \
     _(type) \
     _(next) \
@@ -2448,28 +2578,33 @@ XR_ENUM_STR(XrResult);
     _(userCallback) \
     _(userData) \
 
+/// Calls your macro with the name of each member of XrSystemEyeGazeInteractionPropertiesEXT, in order.
 #define XR_LIST_STRUCT_XrSystemEyeGazeInteractionPropertiesEXT(_) \
     _(type) \
     _(next) \
     _(supportsEyeGazeInteraction) \
 
+/// Calls your macro with the name of each member of XrEyeGazeSampleTimeEXT, in order.
 #define XR_LIST_STRUCT_XrEyeGazeSampleTimeEXT(_) \
     _(type) \
     _(next) \
     _(time) \
 
+/// Calls your macro with the name of each member of XrSessionCreateInfoOverlayEXTX, in order.
 #define XR_LIST_STRUCT_XrSessionCreateInfoOverlayEXTX(_) \
     _(type) \
     _(next) \
     _(createFlags) \
     _(sessionLayersPlacement) \
 
+/// Calls your macro with the name of each member of XrEventDataMainSessionVisibilityChangedEXTX, in order.
 #define XR_LIST_STRUCT_XrEventDataMainSessionVisibilityChangedEXTX(_) \
     _(type) \
     _(next) \
     _(visible) \
     _(flags) \
 
+/// Calls your macro with the name of each member of XrSpatialAnchorCreateInfoMSFT, in order.
 #define XR_LIST_STRUCT_XrSpatialAnchorCreateInfoMSFT(_) \
     _(type) \
     _(next) \
@@ -2477,17 +2612,20 @@ XR_ENUM_STR(XrResult);
     _(pose) \
     _(time) \
 
+/// Calls your macro with the name of each member of XrSpatialAnchorSpaceCreateInfoMSFT, in order.
 #define XR_LIST_STRUCT_XrSpatialAnchorSpaceCreateInfoMSFT(_) \
     _(type) \
     _(next) \
     _(anchor) \
     _(poseInAnchorSpace) \
 
+/// Calls your macro with the name of each member of XrCompositionLayerImageLayoutFB, in order.
 #define XR_LIST_STRUCT_XrCompositionLayerImageLayoutFB(_) \
     _(type) \
     _(next) \
     _(flags) \
 
+/// Calls your macro with the name of each member of XrCompositionLayerAlphaBlendFB, in order.
 #define XR_LIST_STRUCT_XrCompositionLayerAlphaBlendFB(_) \
     _(type) \
     _(next) \
@@ -2496,6 +2634,7 @@ XR_ENUM_STR(XrResult);
     _(srcFactorAlpha) \
     _(dstFactorAlpha) \
 
+/// Calls your macro with the name of each member of XrViewConfigurationDepthRangeEXT, in order.
 #define XR_LIST_STRUCT_XrViewConfigurationDepthRangeEXT(_) \
     _(type) \
     _(next) \
@@ -2504,6 +2643,7 @@ XR_ENUM_STR(XrResult);
     _(recommendedFarZ) \
     _(maxFarZ) \
 
+/// Calls your macro with the name of each member of XrGraphicsBindingEGLMNDX, in order.
 #define XR_LIST_STRUCT_XrGraphicsBindingEGLMNDX(_) \
     _(type) \
     _(next) \
@@ -2512,6 +2652,7 @@ XR_ENUM_STR(XrResult);
     _(config) \
     _(context) \
 
+/// Calls your macro with the name of each member of XrSpatialGraphNodeSpaceCreateInfoMSFT, in order.
 #define XR_LIST_STRUCT_XrSpatialGraphNodeSpaceCreateInfoMSFT(_) \
     _(type) \
     _(next) \
@@ -2519,6 +2660,7 @@ XR_ENUM_STR(XrResult);
     _(nodeId) \
     _(pose) \
 
+/// Calls your macro with the name of each member of XrSpatialGraphStaticNodeBindingCreateInfoMSFT, in order.
 #define XR_LIST_STRUCT_XrSpatialGraphStaticNodeBindingCreateInfoMSFT(_) \
     _(type) \
     _(next) \
@@ -2526,43 +2668,51 @@ XR_ENUM_STR(XrResult);
     _(poseInSpace) \
     _(time) \
 
+/// Calls your macro with the name of each member of XrSpatialGraphNodeBindingPropertiesGetInfoMSFT, in order.
 #define XR_LIST_STRUCT_XrSpatialGraphNodeBindingPropertiesGetInfoMSFT(_) \
     _(type) \
     _(next) \
 
+/// Calls your macro with the name of each member of XrSpatialGraphNodeBindingPropertiesMSFT, in order.
 #define XR_LIST_STRUCT_XrSpatialGraphNodeBindingPropertiesMSFT(_) \
     _(type) \
     _(next) \
     _(nodeId) \
     _(poseInNodeSpace) \
 
+/// Calls your macro with the name of each member of XrSystemHandTrackingPropertiesEXT, in order.
 #define XR_LIST_STRUCT_XrSystemHandTrackingPropertiesEXT(_) \
     _(type) \
     _(next) \
     _(supportsHandTracking) \
 
+/// Calls your macro with the name of each member of XrHandTrackerCreateInfoEXT, in order.
 #define XR_LIST_STRUCT_XrHandTrackerCreateInfoEXT(_) \
     _(type) \
     _(next) \
     _(hand) \
     _(handJointSet) \
 
+/// Calls your macro with the name of each member of XrHandJointsLocateInfoEXT, in order.
 #define XR_LIST_STRUCT_XrHandJointsLocateInfoEXT(_) \
     _(type) \
     _(next) \
     _(baseSpace) \
     _(time) \
 
+/// Calls your macro with the name of each member of XrHandJointLocationEXT, in order.
 #define XR_LIST_STRUCT_XrHandJointLocationEXT(_) \
     _(locationFlags) \
     _(pose) \
     _(radius) \
 
+/// Calls your macro with the name of each member of XrHandJointVelocityEXT, in order.
 #define XR_LIST_STRUCT_XrHandJointVelocityEXT(_) \
     _(velocityFlags) \
     _(linearVelocity) \
     _(angularVelocity) \
 
+/// Calls your macro with the name of each member of XrHandJointLocationsEXT, in order.
 #define XR_LIST_STRUCT_XrHandJointLocationsEXT(_) \
     _(type) \
     _(next) \
@@ -2570,12 +2720,14 @@ XR_ENUM_STR(XrResult);
     _(jointCount) \
     _(jointLocations) \
 
+/// Calls your macro with the name of each member of XrHandJointVelocitiesEXT, in order.
 #define XR_LIST_STRUCT_XrHandJointVelocitiesEXT(_) \
     _(type) \
     _(next) \
     _(jointCount) \
     _(jointVelocities) \
 
+/// Calls your macro with the name of each member of XrSystemHandTrackingMeshPropertiesMSFT, in order.
 #define XR_LIST_STRUCT_XrSystemHandTrackingMeshPropertiesMSFT(_) \
     _(type) \
     _(next) \
@@ -2583,34 +2735,40 @@ XR_ENUM_STR(XrResult);
     _(maxHandMeshIndexCount) \
     _(maxHandMeshVertexCount) \
 
+/// Calls your macro with the name of each member of XrHandMeshSpaceCreateInfoMSFT, in order.
 #define XR_LIST_STRUCT_XrHandMeshSpaceCreateInfoMSFT(_) \
     _(type) \
     _(next) \
     _(handPoseType) \
     _(poseInHandMeshSpace) \
 
+/// Calls your macro with the name of each member of XrHandMeshUpdateInfoMSFT, in order.
 #define XR_LIST_STRUCT_XrHandMeshUpdateInfoMSFT(_) \
     _(type) \
     _(next) \
     _(time) \
     _(handPoseType) \
 
+/// Calls your macro with the name of each member of XrHandMeshIndexBufferMSFT, in order.
 #define XR_LIST_STRUCT_XrHandMeshIndexBufferMSFT(_) \
     _(indexBufferKey) \
     _(indexCapacityInput) \
     _(indexCountOutput) \
     _(indices) \
 
+/// Calls your macro with the name of each member of XrHandMeshVertexMSFT, in order.
 #define XR_LIST_STRUCT_XrHandMeshVertexMSFT(_) \
     _(position) \
     _(normal) \
 
+/// Calls your macro with the name of each member of XrHandMeshVertexBufferMSFT, in order.
 #define XR_LIST_STRUCT_XrHandMeshVertexBufferMSFT(_) \
     _(vertexUpdateTime) \
     _(vertexCapacityInput) \
     _(vertexCountOutput) \
     _(vertices) \
 
+/// Calls your macro with the name of each member of XrHandMeshMSFT, in order.
 #define XR_LIST_STRUCT_XrHandMeshMSFT(_) \
     _(type) \
     _(next) \
@@ -2620,29 +2778,34 @@ XR_ENUM_STR(XrResult);
     _(indexBuffer) \
     _(vertexBuffer) \
 
+/// Calls your macro with the name of each member of XrHandPoseTypeInfoMSFT, in order.
 #define XR_LIST_STRUCT_XrHandPoseTypeInfoMSFT(_) \
     _(type) \
     _(next) \
     _(handPoseType) \
 
+/// Calls your macro with the name of each member of XrSecondaryViewConfigurationSessionBeginInfoMSFT, in order.
 #define XR_LIST_STRUCT_XrSecondaryViewConfigurationSessionBeginInfoMSFT(_) \
     _(type) \
     _(next) \
     _(viewConfigurationCount) \
     _(enabledViewConfigurationTypes) \
 
+/// Calls your macro with the name of each member of XrSecondaryViewConfigurationStateMSFT, in order.
 #define XR_LIST_STRUCT_XrSecondaryViewConfigurationStateMSFT(_) \
     _(type) \
     _(next) \
     _(viewConfigurationType) \
     _(active) \
 
+/// Calls your macro with the name of each member of XrSecondaryViewConfigurationFrameStateMSFT, in order.
 #define XR_LIST_STRUCT_XrSecondaryViewConfigurationFrameStateMSFT(_) \
     _(type) \
     _(next) \
     _(viewConfigurationCount) \
     _(viewConfigurationStates) \
 
+/// Calls your macro with the name of each member of XrSecondaryViewConfigurationLayerInfoMSFT, in order.
 #define XR_LIST_STRUCT_XrSecondaryViewConfigurationLayerInfoMSFT(_) \
     _(type) \
     _(next) \
@@ -2651,28 +2814,33 @@ XR_ENUM_STR(XrResult);
     _(layerCount) \
     _(layers) \
 
+/// Calls your macro with the name of each member of XrSecondaryViewConfigurationFrameEndInfoMSFT, in order.
 #define XR_LIST_STRUCT_XrSecondaryViewConfigurationFrameEndInfoMSFT(_) \
     _(type) \
     _(next) \
     _(viewConfigurationCount) \
     _(viewConfigurationLayersInfo) \
 
+/// Calls your macro with the name of each member of XrSecondaryViewConfigurationSwapchainCreateInfoMSFT, in order.
 #define XR_LIST_STRUCT_XrSecondaryViewConfigurationSwapchainCreateInfoMSFT(_) \
     _(type) \
     _(next) \
     _(viewConfigurationType) \
 
+/// Calls your macro with the name of each member of XrControllerModelKeyStateMSFT, in order.
 #define XR_LIST_STRUCT_XrControllerModelKeyStateMSFT(_) \
     _(type) \
     _(next) \
     _(modelKey) \
 
+/// Calls your macro with the name of each member of XrControllerModelNodePropertiesMSFT, in order.
 #define XR_LIST_STRUCT_XrControllerModelNodePropertiesMSFT(_) \
     _(type) \
     _(next) \
     _(parentNodeName) \
     _(nodeName) \
 
+/// Calls your macro with the name of each member of XrControllerModelPropertiesMSFT, in order.
 #define XR_LIST_STRUCT_XrControllerModelPropertiesMSFT(_) \
     _(type) \
     _(next) \
@@ -2680,11 +2848,13 @@ XR_ENUM_STR(XrResult);
     _(nodeCountOutput) \
     _(nodeProperties) \
 
+/// Calls your macro with the name of each member of XrControllerModelNodeStateMSFT, in order.
 #define XR_LIST_STRUCT_XrControllerModelNodeStateMSFT(_) \
     _(type) \
     _(next) \
     _(nodePose) \
 
+/// Calls your macro with the name of each member of XrControllerModelStateMSFT, in order.
 #define XR_LIST_STRUCT_XrControllerModelStateMSFT(_) \
     _(type) \
     _(next) \
@@ -2692,23 +2862,27 @@ XR_ENUM_STR(XrResult);
     _(nodeCountOutput) \
     _(nodeStates) \
 
+/// Calls your macro with the name of each member of XrViewConfigurationViewFovEPIC, in order.
 #define XR_LIST_STRUCT_XrViewConfigurationViewFovEPIC(_) \
     _(type) \
     _(next) \
     _(recommendedFov) \
     _(maxMutableFov) \
 
+/// Calls your macro with the name of each member of XrHolographicWindowAttachmentMSFT, in order.
 #define XR_LIST_STRUCT_XrHolographicWindowAttachmentMSFT(_) \
     _(type) \
     _(next) \
     _(holographicSpace) \
     _(coreWindow) \
 
+/// Calls your macro with the name of each member of XrCompositionLayerReprojectionInfoMSFT, in order.
 #define XR_LIST_STRUCT_XrCompositionLayerReprojectionInfoMSFT(_) \
     _(type) \
     _(next) \
     _(reprojectionMode) \
 
+/// Calls your macro with the name of each member of XrCompositionLayerReprojectionPlaneOverrideMSFT, in order.
 #define XR_LIST_STRUCT_XrCompositionLayerReprojectionPlaneOverrideMSFT(_) \
     _(type) \
     _(next) \
@@ -2716,51 +2890,61 @@ XR_ENUM_STR(XrResult);
     _(normal) \
     _(velocity) \
 
+/// Calls your macro with the name of each member of XrAndroidSurfaceSwapchainCreateInfoFB, in order.
 #define XR_LIST_STRUCT_XrAndroidSurfaceSwapchainCreateInfoFB(_) \
     _(type) \
     _(next) \
     _(createFlags) \
 
+/// Calls your macro with the name of each member of XrSwapchainStateBaseHeaderFB, in order.
 #define XR_LIST_STRUCT_XrSwapchainStateBaseHeaderFB(_) \
     _(type) \
     _(next) \
 
+/// Calls your macro with the name of each member of XrCompositionLayerSecureContentFB, in order.
 #define XR_LIST_STRUCT_XrCompositionLayerSecureContentFB(_) \
     _(type) \
     _(next) \
     _(flags) \
 
+/// Calls your macro with the name of each member of XrBodyJointLocationFB, in order.
 #define XR_LIST_STRUCT_XrBodyJointLocationFB(_) \
     _(locationFlags) \
     _(pose) \
 
+/// Calls your macro with the name of each member of XrSystemBodyTrackingPropertiesFB, in order.
 #define XR_LIST_STRUCT_XrSystemBodyTrackingPropertiesFB(_) \
     _(type) \
     _(next) \
     _(supportsBodyTracking) \
 
+/// Calls your macro with the name of each member of XrBodyTrackerCreateInfoFB, in order.
 #define XR_LIST_STRUCT_XrBodyTrackerCreateInfoFB(_) \
     _(type) \
     _(next) \
     _(bodyJointSet) \
 
+/// Calls your macro with the name of each member of XrBodySkeletonJointFB, in order.
 #define XR_LIST_STRUCT_XrBodySkeletonJointFB(_) \
     _(joint) \
     _(parentJoint) \
     _(pose) \
 
+/// Calls your macro with the name of each member of XrBodySkeletonFB, in order.
 #define XR_LIST_STRUCT_XrBodySkeletonFB(_) \
     _(type) \
     _(next) \
     _(jointCount) \
     _(joints) \
 
+/// Calls your macro with the name of each member of XrBodyJointsLocateInfoFB, in order.
 #define XR_LIST_STRUCT_XrBodyJointsLocateInfoFB(_) \
     _(type) \
     _(next) \
     _(baseSpace) \
     _(time) \
 
+/// Calls your macro with the name of each member of XrBodyJointLocationsFB, in order.
 #define XR_LIST_STRUCT_XrBodyJointLocationsFB(_) \
     _(type) \
     _(next) \
@@ -2771,6 +2955,7 @@ XR_ENUM_STR(XrResult);
     _(skeletonChangedCount) \
     _(time) \
 
+/// Calls your macro with the name of each member of XrInteractionProfileDpadBindingEXT, in order.
 #define XR_LIST_STRUCT_XrInteractionProfileDpadBindingEXT(_) \
     _(type) \
     _(next) \
@@ -2784,6 +2969,7 @@ XR_ENUM_STR(XrResult);
     _(onHaptic) \
     _(offHaptic) \
 
+/// Calls your macro with the name of each member of XrInteractionProfileAnalogThresholdVALVE, in order.
 #define XR_LIST_STRUCT_XrInteractionProfileAnalogThresholdVALVE(_) \
     _(type) \
     _(next) \
@@ -2794,35 +2980,43 @@ XR_ENUM_STR(XrResult);
     _(onHaptic) \
     _(offHaptic) \
 
+/// Calls your macro with the name of each member of XrHandJointsMotionRangeInfoEXT, in order.
 #define XR_LIST_STRUCT_XrHandJointsMotionRangeInfoEXT(_) \
     _(type) \
     _(next) \
     _(handJointsMotionRange) \
 
+/// Calls your macro with the name of each member of XrUuidMSFT, in order.
 #define XR_LIST_STRUCT_XrUuidMSFT(_) \
     _(bytes) \
 
+/// Calls your macro with the name of each member of XrSceneObserverCreateInfoMSFT, in order.
 #define XR_LIST_STRUCT_XrSceneObserverCreateInfoMSFT(_) \
     _(type) \
     _(next) \
 
+/// Calls your macro with the name of each member of XrSceneCreateInfoMSFT, in order.
 #define XR_LIST_STRUCT_XrSceneCreateInfoMSFT(_) \
     _(type) \
     _(next) \
 
+/// Calls your macro with the name of each member of XrSceneSphereBoundMSFT, in order.
 #define XR_LIST_STRUCT_XrSceneSphereBoundMSFT(_) \
     _(center) \
     _(radius) \
 
+/// Calls your macro with the name of each member of XrSceneOrientedBoxBoundMSFT, in order.
 #define XR_LIST_STRUCT_XrSceneOrientedBoxBoundMSFT(_) \
     _(pose) \
     _(extents) \
 
+/// Calls your macro with the name of each member of XrSceneFrustumBoundMSFT, in order.
 #define XR_LIST_STRUCT_XrSceneFrustumBoundMSFT(_) \
     _(pose) \
     _(fov) \
     _(farDistance) \
 
+/// Calls your macro with the name of each member of XrSceneBoundsMSFT, in order.
 #define XR_LIST_STRUCT_XrSceneBoundsMSFT(_) \
     _(space) \
     _(time) \
@@ -2833,6 +3027,7 @@ XR_ENUM_STR(XrResult);
     _(frustumCount) \
     _(frustums) \
 
+/// Calls your macro with the name of each member of XrNewSceneComputeInfoMSFT, in order.
 #define XR_LIST_STRUCT_XrNewSceneComputeInfoMSFT(_) \
     _(type) \
     _(next) \
@@ -2841,17 +3036,20 @@ XR_ENUM_STR(XrResult);
     _(consistency) \
     _(bounds) \
 
+/// Calls your macro with the name of each member of XrVisualMeshComputeLodInfoMSFT, in order.
 #define XR_LIST_STRUCT_XrVisualMeshComputeLodInfoMSFT(_) \
     _(type) \
     _(next) \
     _(lod) \
 
+/// Calls your macro with the name of each member of XrSceneComponentMSFT, in order.
 #define XR_LIST_STRUCT_XrSceneComponentMSFT(_) \
     _(componentType) \
     _(id) \
     _(parentId) \
     _(updateTime) \
 
+/// Calls your macro with the name of each member of XrSceneComponentsMSFT, in order.
 #define XR_LIST_STRUCT_XrSceneComponentsMSFT(_) \
     _(type) \
     _(next) \
@@ -2859,21 +3057,25 @@ XR_ENUM_STR(XrResult);
     _(componentCountOutput) \
     _(components) \
 
+/// Calls your macro with the name of each member of XrSceneComponentsGetInfoMSFT, in order.
 #define XR_LIST_STRUCT_XrSceneComponentsGetInfoMSFT(_) \
     _(type) \
     _(next) \
     _(componentType) \
 
+/// Calls your macro with the name of each member of XrSceneComponentLocationMSFT, in order.
 #define XR_LIST_STRUCT_XrSceneComponentLocationMSFT(_) \
     _(flags) \
     _(pose) \
 
+/// Calls your macro with the name of each member of XrSceneComponentLocationsMSFT, in order.
 #define XR_LIST_STRUCT_XrSceneComponentLocationsMSFT(_) \
     _(type) \
     _(next) \
     _(locationCount) \
     _(locations) \
 
+/// Calls your macro with the name of each member of XrSceneComponentsLocateInfoMSFT, in order.
 #define XR_LIST_STRUCT_XrSceneComponentsLocateInfoMSFT(_) \
     _(type) \
     _(next) \
@@ -2882,63 +3084,75 @@ XR_ENUM_STR(XrResult);
     _(componentIdCount) \
     _(componentIds) \
 
+/// Calls your macro with the name of each member of XrSceneObjectMSFT, in order.
 #define XR_LIST_STRUCT_XrSceneObjectMSFT(_) \
     _(objectType) \
 
+/// Calls your macro with the name of each member of XrSceneObjectsMSFT, in order.
 #define XR_LIST_STRUCT_XrSceneObjectsMSFT(_) \
     _(type) \
     _(next) \
     _(sceneObjectCount) \
     _(sceneObjects) \
 
+/// Calls your macro with the name of each member of XrSceneComponentParentFilterInfoMSFT, in order.
 #define XR_LIST_STRUCT_XrSceneComponentParentFilterInfoMSFT(_) \
     _(type) \
     _(next) \
     _(parentId) \
 
+/// Calls your macro with the name of each member of XrSceneObjectTypesFilterInfoMSFT, in order.
 #define XR_LIST_STRUCT_XrSceneObjectTypesFilterInfoMSFT(_) \
     _(type) \
     _(next) \
     _(objectTypeCount) \
     _(objectTypes) \
 
+/// Calls your macro with the name of each member of XrScenePlaneMSFT, in order.
 #define XR_LIST_STRUCT_XrScenePlaneMSFT(_) \
     _(alignment) \
     _(size) \
     _(meshBufferId) \
     _(supportsIndicesUint16) \
 
+/// Calls your macro with the name of each member of XrScenePlanesMSFT, in order.
 #define XR_LIST_STRUCT_XrScenePlanesMSFT(_) \
     _(type) \
     _(next) \
     _(scenePlaneCount) \
     _(scenePlanes) \
 
+/// Calls your macro with the name of each member of XrScenePlaneAlignmentFilterInfoMSFT, in order.
 #define XR_LIST_STRUCT_XrScenePlaneAlignmentFilterInfoMSFT(_) \
     _(type) \
     _(next) \
     _(alignmentCount) \
     _(alignments) \
 
+/// Calls your macro with the name of each member of XrSceneMeshMSFT, in order.
 #define XR_LIST_STRUCT_XrSceneMeshMSFT(_) \
     _(meshBufferId) \
     _(supportsIndicesUint16) \
 
+/// Calls your macro with the name of each member of XrSceneMeshesMSFT, in order.
 #define XR_LIST_STRUCT_XrSceneMeshesMSFT(_) \
     _(type) \
     _(next) \
     _(sceneMeshCount) \
     _(sceneMeshes) \
 
+/// Calls your macro with the name of each member of XrSceneMeshBuffersGetInfoMSFT, in order.
 #define XR_LIST_STRUCT_XrSceneMeshBuffersGetInfoMSFT(_) \
     _(type) \
     _(next) \
     _(meshBufferId) \
 
+/// Calls your macro with the name of each member of XrSceneMeshBuffersMSFT, in order.
 #define XR_LIST_STRUCT_XrSceneMeshBuffersMSFT(_) \
     _(type) \
     _(next) \
 
+/// Calls your macro with the name of each member of XrSceneMeshVertexBufferMSFT, in order.
 #define XR_LIST_STRUCT_XrSceneMeshVertexBufferMSFT(_) \
     _(type) \
     _(next) \
@@ -2946,6 +3160,7 @@ XR_ENUM_STR(XrResult);
     _(vertexCountOutput) \
     _(vertices) \
 
+/// Calls your macro with the name of each member of XrSceneMeshIndicesUint32MSFT, in order.
 #define XR_LIST_STRUCT_XrSceneMeshIndicesUint32MSFT(_) \
     _(type) \
     _(next) \
@@ -2953,6 +3168,7 @@ XR_ENUM_STR(XrResult);
     _(indexCountOutput) \
     _(indices) \
 
+/// Calls your macro with the name of each member of XrSceneMeshIndicesUint16MSFT, in order.
 #define XR_LIST_STRUCT_XrSceneMeshIndicesUint16MSFT(_) \
     _(type) \
     _(next) \
@@ -2960,44 +3176,52 @@ XR_ENUM_STR(XrResult);
     _(indexCountOutput) \
     _(indices) \
 
+/// Calls your macro with the name of each member of XrSerializedSceneFragmentDataGetInfoMSFT, in order.
 #define XR_LIST_STRUCT_XrSerializedSceneFragmentDataGetInfoMSFT(_) \
     _(type) \
     _(next) \
     _(sceneFragmentId) \
 
+/// Calls your macro with the name of each member of XrDeserializeSceneFragmentMSFT, in order.
 #define XR_LIST_STRUCT_XrDeserializeSceneFragmentMSFT(_) \
     _(bufferSize) \
     _(buffer) \
 
+/// Calls your macro with the name of each member of XrSceneDeserializeInfoMSFT, in order.
 #define XR_LIST_STRUCT_XrSceneDeserializeInfoMSFT(_) \
     _(type) \
     _(next) \
     _(fragmentCount) \
     _(fragments) \
 
+/// Calls your macro with the name of each member of XrEventDataDisplayRefreshRateChangedFB, in order.
 #define XR_LIST_STRUCT_XrEventDataDisplayRefreshRateChangedFB(_) \
     _(type) \
     _(next) \
     _(fromDisplayRefreshRate) \
     _(toDisplayRefreshRate) \
 
+/// Calls your macro with the name of each member of XrViveTrackerPathsHTCX, in order.
 #define XR_LIST_STRUCT_XrViveTrackerPathsHTCX(_) \
     _(type) \
     _(next) \
     _(persistentPath) \
     _(rolePath) \
 
+/// Calls your macro with the name of each member of XrEventDataViveTrackerConnectedHTCX, in order.
 #define XR_LIST_STRUCT_XrEventDataViveTrackerConnectedHTCX(_) \
     _(type) \
     _(next) \
     _(paths) \
 
+/// Calls your macro with the name of each member of XrSystemFacialTrackingPropertiesHTC, in order.
 #define XR_LIST_STRUCT_XrSystemFacialTrackingPropertiesHTC(_) \
     _(type) \
     _(next) \
     _(supportEyeFacialTracking) \
     _(supportLipFacialTracking) \
 
+/// Calls your macro with the name of each member of XrFacialExpressionsHTC, in order.
 #define XR_LIST_STRUCT_XrFacialExpressionsHTC(_) \
     _(type) \
     _(next) \
@@ -3006,22 +3230,26 @@ XR_ENUM_STR(XrResult);
     _(expressionCount) \
     _(expressionWeightings) \
 
+/// Calls your macro with the name of each member of XrFacialTrackerCreateInfoHTC, in order.
 #define XR_LIST_STRUCT_XrFacialTrackerCreateInfoHTC(_) \
     _(type) \
     _(next) \
     _(facialTrackingType) \
 
+/// Calls your macro with the name of each member of XrSystemColorSpacePropertiesFB, in order.
 #define XR_LIST_STRUCT_XrSystemColorSpacePropertiesFB(_) \
     _(type) \
     _(next) \
     _(colorSpace) \
 
+/// Calls your macro with the name of each member of XrVector4sFB, in order.
 #define XR_LIST_STRUCT_XrVector4sFB(_) \
     _(x) \
     _(y) \
     _(z) \
     _(w) \
 
+/// Calls your macro with the name of each member of XrHandTrackingMeshFB, in order.
 #define XR_LIST_STRUCT_XrHandTrackingMeshFB(_) \
     _(type) \
     _(next) \
@@ -3041,6 +3269,7 @@ XR_ENUM_STR(XrResult);
     _(indexCountOutput) \
     _(indices) \
 
+/// Calls your macro with the name of each member of XrHandTrackingScaleFB, in order.
 #define XR_LIST_STRUCT_XrHandTrackingScaleFB(_) \
     _(type) \
     _(next) \
@@ -3049,6 +3278,7 @@ XR_ENUM_STR(XrResult);
     _(overrideHandScale) \
     _(overrideValueInput) \
 
+/// Calls your macro with the name of each member of XrHandTrackingAimStateFB, in order.
 #define XR_LIST_STRUCT_XrHandTrackingAimStateFB(_) \
     _(type) \
     _(next) \
@@ -3059,21 +3289,25 @@ XR_ENUM_STR(XrResult);
     _(pinchStrengthRing) \
     _(pinchStrengthLittle) \
 
+/// Calls your macro with the name of each member of XrHandCapsuleFB, in order.
 #define XR_LIST_STRUCT_XrHandCapsuleFB(_) \
     _(points) \
     _(radius) \
     _(joint) \
 
+/// Calls your macro with the name of each member of XrHandTrackingCapsulesStateFB, in order.
 #define XR_LIST_STRUCT_XrHandTrackingCapsulesStateFB(_) \
     _(type) \
     _(next) \
     _(capsules) \
 
+/// Calls your macro with the name of each member of XrSystemSpatialEntityPropertiesFB, in order.
 #define XR_LIST_STRUCT_XrSystemSpatialEntityPropertiesFB(_) \
     _(type) \
     _(next) \
     _(supportsSpatialEntity) \
 
+/// Calls your macro with the name of each member of XrSpatialAnchorCreateInfoFB, in order.
 #define XR_LIST_STRUCT_XrSpatialAnchorCreateInfoFB(_) \
     _(type) \
     _(next) \
@@ -3081,6 +3315,7 @@ XR_ENUM_STR(XrResult);
     _(poseInSpace) \
     _(time) \
 
+/// Calls your macro with the name of each member of XrSpaceComponentStatusSetInfoFB, in order.
 #define XR_LIST_STRUCT_XrSpaceComponentStatusSetInfoFB(_) \
     _(type) \
     _(next) \
@@ -3088,12 +3323,14 @@ XR_ENUM_STR(XrResult);
     _(enabled) \
     _(timeout) \
 
+/// Calls your macro with the name of each member of XrSpaceComponentStatusFB, in order.
 #define XR_LIST_STRUCT_XrSpaceComponentStatusFB(_) \
     _(type) \
     _(next) \
     _(enabled) \
     _(changePending) \
 
+/// Calls your macro with the name of each member of XrEventDataSpatialAnchorCreateCompleteFB, in order.
 #define XR_LIST_STRUCT_XrEventDataSpatialAnchorCreateCompleteFB(_) \
     _(type) \
     _(next) \
@@ -3102,6 +3339,7 @@ XR_ENUM_STR(XrResult);
     _(space) \
     _(uuid) \
 
+/// Calls your macro with the name of each member of XrEventDataSpaceSetStatusCompleteFB, in order.
 #define XR_LIST_STRUCT_XrEventDataSpaceSetStatusCompleteFB(_) \
     _(type) \
     _(next) \
@@ -3112,21 +3350,25 @@ XR_ENUM_STR(XrResult);
     _(componentType) \
     _(enabled) \
 
+/// Calls your macro with the name of each member of XrFoveationProfileCreateInfoFB, in order.
 #define XR_LIST_STRUCT_XrFoveationProfileCreateInfoFB(_) \
     _(type) \
     _(next) \
 
+/// Calls your macro with the name of each member of XrSwapchainCreateInfoFoveationFB, in order.
 #define XR_LIST_STRUCT_XrSwapchainCreateInfoFoveationFB(_) \
     _(type) \
     _(next) \
     _(flags) \
 
+/// Calls your macro with the name of each member of XrSwapchainStateFoveationFB, in order.
 #define XR_LIST_STRUCT_XrSwapchainStateFoveationFB(_) \
     _(type) \
     _(next) \
     _(flags) \
     _(profile) \
 
+/// Calls your macro with the name of each member of XrFoveationLevelProfileCreateInfoFB, in order.
 #define XR_LIST_STRUCT_XrFoveationLevelProfileCreateInfoFB(_) \
     _(type) \
     _(next) \
@@ -3134,27 +3376,32 @@ XR_ENUM_STR(XrResult);
     _(verticalOffset) \
     _(dynamic) \
 
+/// Calls your macro with the name of each member of XrSystemKeyboardTrackingPropertiesFB, in order.
 #define XR_LIST_STRUCT_XrSystemKeyboardTrackingPropertiesFB(_) \
     _(type) \
     _(next) \
     _(supportsKeyboardTracking) \
 
+/// Calls your macro with the name of each member of XrKeyboardTrackingDescriptionFB, in order.
 #define XR_LIST_STRUCT_XrKeyboardTrackingDescriptionFB(_) \
     _(trackedKeyboardId) \
     _(size) \
     _(flags) \
     _(name) \
 
+/// Calls your macro with the name of each member of XrKeyboardSpaceCreateInfoFB, in order.
 #define XR_LIST_STRUCT_XrKeyboardSpaceCreateInfoFB(_) \
     _(type) \
     _(next) \
     _(trackedKeyboardId) \
 
+/// Calls your macro with the name of each member of XrKeyboardTrackingQueryFB, in order.
 #define XR_LIST_STRUCT_XrKeyboardTrackingQueryFB(_) \
     _(type) \
     _(next) \
     _(flags) \
 
+/// Calls your macro with the name of each member of XrTriangleMeshCreateInfoFB, in order.
 #define XR_LIST_STRUCT_XrTriangleMeshCreateInfoFB(_) \
     _(type) \
     _(next) \
@@ -3165,21 +3412,25 @@ XR_ENUM_STR(XrResult);
     _(triangleCount) \
     _(indexBuffer) \
 
+/// Calls your macro with the name of each member of XrSystemPassthroughPropertiesFB, in order.
 #define XR_LIST_STRUCT_XrSystemPassthroughPropertiesFB(_) \
     _(type) \
     _(next) \
     _(supportsPassthrough) \
 
+/// Calls your macro with the name of each member of XrSystemPassthroughProperties2FB, in order.
 #define XR_LIST_STRUCT_XrSystemPassthroughProperties2FB(_) \
     _(type) \
     _(next) \
     _(capabilities) \
 
+/// Calls your macro with the name of each member of XrPassthroughCreateInfoFB, in order.
 #define XR_LIST_STRUCT_XrPassthroughCreateInfoFB(_) \
     _(type) \
     _(next) \
     _(flags) \
 
+/// Calls your macro with the name of each member of XrPassthroughLayerCreateInfoFB, in order.
 #define XR_LIST_STRUCT_XrPassthroughLayerCreateInfoFB(_) \
     _(type) \
     _(next) \
@@ -3187,6 +3438,7 @@ XR_ENUM_STR(XrResult);
     _(flags) \
     _(purpose) \
 
+/// Calls your macro with the name of each member of XrCompositionLayerPassthroughFB, in order.
 #define XR_LIST_STRUCT_XrCompositionLayerPassthroughFB(_) \
     _(type) \
     _(next) \
@@ -3194,6 +3446,7 @@ XR_ENUM_STR(XrResult);
     _(space) \
     _(layerHandle) \
 
+/// Calls your macro with the name of each member of XrGeometryInstanceCreateInfoFB, in order.
 #define XR_LIST_STRUCT_XrGeometryInstanceCreateInfoFB(_) \
     _(type) \
     _(next) \
@@ -3203,6 +3456,7 @@ XR_ENUM_STR(XrResult);
     _(pose) \
     _(scale) \
 
+/// Calls your macro with the name of each member of XrGeometryInstanceTransformFB, in order.
 #define XR_LIST_STRUCT_XrGeometryInstanceTransformFB(_) \
     _(type) \
     _(next) \
@@ -3211,22 +3465,26 @@ XR_ENUM_STR(XrResult);
     _(pose) \
     _(scale) \
 
+/// Calls your macro with the name of each member of XrPassthroughStyleFB, in order.
 #define XR_LIST_STRUCT_XrPassthroughStyleFB(_) \
     _(type) \
     _(next) \
     _(textureOpacityFactor) \
     _(edgeColor) \
 
+/// Calls your macro with the name of each member of XrPassthroughColorMapMonoToRgbaFB, in order.
 #define XR_LIST_STRUCT_XrPassthroughColorMapMonoToRgbaFB(_) \
     _(type) \
     _(next) \
     _(textureColorMap) \
 
+/// Calls your macro with the name of each member of XrPassthroughColorMapMonoToMonoFB, in order.
 #define XR_LIST_STRUCT_XrPassthroughColorMapMonoToMonoFB(_) \
     _(type) \
     _(next) \
     _(textureColorMap) \
 
+/// Calls your macro with the name of each member of XrPassthroughBrightnessContrastSaturationFB, in order.
 #define XR_LIST_STRUCT_XrPassthroughBrightnessContrastSaturationFB(_) \
     _(type) \
     _(next) \
@@ -3234,16 +3492,19 @@ XR_ENUM_STR(XrResult);
     _(contrast) \
     _(saturation) \
 
+/// Calls your macro with the name of each member of XrEventDataPassthroughStateChangedFB, in order.
 #define XR_LIST_STRUCT_XrEventDataPassthroughStateChangedFB(_) \
     _(type) \
     _(next) \
     _(flags) \
 
+/// Calls your macro with the name of each member of XrRenderModelPathInfoFB, in order.
 #define XR_LIST_STRUCT_XrRenderModelPathInfoFB(_) \
     _(type) \
     _(next) \
     _(path) \
 
+/// Calls your macro with the name of each member of XrRenderModelPropertiesFB, in order.
 #define XR_LIST_STRUCT_XrRenderModelPropertiesFB(_) \
     _(type) \
     _(next) \
@@ -3253,6 +3514,7 @@ XR_ENUM_STR(XrResult);
     _(modelVersion) \
     _(flags) \
 
+/// Calls your macro with the name of each member of XrRenderModelBufferFB, in order.
 #define XR_LIST_STRUCT_XrRenderModelBufferFB(_) \
     _(type) \
     _(next) \
@@ -3260,47 +3522,56 @@ XR_ENUM_STR(XrResult);
     _(bufferCountOutput) \
     _(buffer) \
 
+/// Calls your macro with the name of each member of XrRenderModelLoadInfoFB, in order.
 #define XR_LIST_STRUCT_XrRenderModelLoadInfoFB(_) \
     _(type) \
     _(next) \
     _(modelKey) \
 
+/// Calls your macro with the name of each member of XrSystemRenderModelPropertiesFB, in order.
 #define XR_LIST_STRUCT_XrSystemRenderModelPropertiesFB(_) \
     _(type) \
     _(next) \
     _(supportsRenderModelLoading) \
 
+/// Calls your macro with the name of each member of XrRenderModelCapabilitiesRequestFB, in order.
 #define XR_LIST_STRUCT_XrRenderModelCapabilitiesRequestFB(_) \
     _(type) \
     _(next) \
     _(flags) \
 
+/// Calls your macro with the name of each member of XrViewLocateFoveatedRenderingVARJO, in order.
 #define XR_LIST_STRUCT_XrViewLocateFoveatedRenderingVARJO(_) \
     _(type) \
     _(next) \
     _(foveatedRenderingActive) \
 
+/// Calls your macro with the name of each member of XrFoveatedViewConfigurationViewVARJO, in order.
 #define XR_LIST_STRUCT_XrFoveatedViewConfigurationViewVARJO(_) \
     _(type) \
     _(next) \
     _(foveatedRenderingActive) \
 
+/// Calls your macro with the name of each member of XrSystemFoveatedRenderingPropertiesVARJO, in order.
 #define XR_LIST_STRUCT_XrSystemFoveatedRenderingPropertiesVARJO(_) \
     _(type) \
     _(next) \
     _(supportsFoveatedRendering) \
 
+/// Calls your macro with the name of each member of XrCompositionLayerDepthTestVARJO, in order.
 #define XR_LIST_STRUCT_XrCompositionLayerDepthTestVARJO(_) \
     _(type) \
     _(next) \
     _(depthTestRangeNearZ) \
     _(depthTestRangeFarZ) \
 
+/// Calls your macro with the name of each member of XrSystemMarkerTrackingPropertiesVARJO, in order.
 #define XR_LIST_STRUCT_XrSystemMarkerTrackingPropertiesVARJO(_) \
     _(type) \
     _(next) \
     _(supportsMarkerTracking) \
 
+/// Calls your macro with the name of each member of XrEventDataMarkerTrackingUpdateVARJO, in order.
 #define XR_LIST_STRUCT_XrEventDataMarkerTrackingUpdateVARJO(_) \
     _(type) \
     _(next) \
@@ -3309,56 +3580,66 @@ XR_ENUM_STR(XrResult);
     _(isPredicted) \
     _(time) \
 
+/// Calls your macro with the name of each member of XrMarkerSpaceCreateInfoVARJO, in order.
 #define XR_LIST_STRUCT_XrMarkerSpaceCreateInfoVARJO(_) \
     _(type) \
     _(next) \
     _(markerId) \
     _(poseInMarkerSpace) \
 
+/// Calls your macro with the name of each member of XrFrameEndInfoML, in order.
 #define XR_LIST_STRUCT_XrFrameEndInfoML(_) \
     _(type) \
     _(next) \
     _(focusDistance) \
     _(flags) \
 
+/// Calls your macro with the name of each member of XrGlobalDimmerFrameEndInfoML, in order.
 #define XR_LIST_STRUCT_XrGlobalDimmerFrameEndInfoML(_) \
     _(type) \
     _(next) \
     _(dimmerValue) \
     _(flags) \
 
+/// Calls your macro with the name of each member of XrCoordinateSpaceCreateInfoML, in order.
 #define XR_LIST_STRUCT_XrCoordinateSpaceCreateInfoML(_) \
     _(type) \
     _(next) \
     _(cfuid) \
     _(poseInCoordinateSpace) \
 
+/// Calls your macro with the name of each member of XrSystemMarkerUnderstandingPropertiesML, in order.
 #define XR_LIST_STRUCT_XrSystemMarkerUnderstandingPropertiesML(_) \
     _(type) \
     _(next) \
     _(supportsMarkerUnderstanding) \
 
+/// Calls your macro with the name of each member of XrMarkerDetectorCreateInfoML, in order.
 #define XR_LIST_STRUCT_XrMarkerDetectorCreateInfoML(_) \
     _(type) \
     _(next) \
     _(profile) \
     _(markerType) \
 
+/// Calls your macro with the name of each member of XrMarkerDetectorArucoInfoML, in order.
 #define XR_LIST_STRUCT_XrMarkerDetectorArucoInfoML(_) \
     _(type) \
     _(next) \
     _(arucoDict) \
 
+/// Calls your macro with the name of each member of XrMarkerDetectorSizeInfoML, in order.
 #define XR_LIST_STRUCT_XrMarkerDetectorSizeInfoML(_) \
     _(type) \
     _(next) \
     _(markerLength) \
 
+/// Calls your macro with the name of each member of XrMarkerDetectorAprilTagInfoML, in order.
 #define XR_LIST_STRUCT_XrMarkerDetectorAprilTagInfoML(_) \
     _(type) \
     _(next) \
     _(aprilTagDict) \
 
+/// Calls your macro with the name of each member of XrMarkerDetectorCustomProfileInfoML, in order.
 #define XR_LIST_STRUCT_XrMarkerDetectorCustomProfileInfoML(_) \
     _(type) \
     _(next) \
@@ -3369,15 +3650,18 @@ XR_ENUM_STR(XrResult);
     _(useEdgeRefinement) \
     _(fullAnalysisIntervalHint) \
 
+/// Calls your macro with the name of each member of XrMarkerDetectorSnapshotInfoML, in order.
 #define XR_LIST_STRUCT_XrMarkerDetectorSnapshotInfoML(_) \
     _(type) \
     _(next) \
 
+/// Calls your macro with the name of each member of XrMarkerDetectorStateML, in order.
 #define XR_LIST_STRUCT_XrMarkerDetectorStateML(_) \
     _(type) \
     _(next) \
     _(state) \
 
+/// Calls your macro with the name of each member of XrMarkerSpaceCreateInfoML, in order.
 #define XR_LIST_STRUCT_XrMarkerSpaceCreateInfoML(_) \
     _(type) \
     _(next) \
@@ -3385,6 +3669,7 @@ XR_ENUM_STR(XrResult);
     _(marker) \
     _(poseInMarkerSpace) \
 
+/// Calls your macro with the name of each member of XrLocalizationMapML, in order.
 #define XR_LIST_STRUCT_XrLocalizationMapML(_) \
     _(type) \
     _(next) \
@@ -3392,6 +3677,7 @@ XR_ENUM_STR(XrResult);
     _(mapUuid) \
     _(mapType) \
 
+/// Calls your macro with the name of each member of XrEventDataLocalizationChangedML, in order.
 #define XR_LIST_STRUCT_XrEventDataLocalizationChangedML(_) \
     _(type) \
     _(next) \
@@ -3401,77 +3687,92 @@ XR_ENUM_STR(XrResult);
     _(confidence) \
     _(errorFlags) \
 
+/// Calls your macro with the name of each member of XrLocalizationMapQueryInfoBaseHeaderML, in order.
 #define XR_LIST_STRUCT_XrLocalizationMapQueryInfoBaseHeaderML(_) \
     _(type) \
     _(next) \
 
+/// Calls your macro with the name of each member of XrMapLocalizationRequestInfoML, in order.
 #define XR_LIST_STRUCT_XrMapLocalizationRequestInfoML(_) \
     _(type) \
     _(next) \
     _(mapUuid) \
 
+/// Calls your macro with the name of each member of XrLocalizationMapImportInfoML, in order.
 #define XR_LIST_STRUCT_XrLocalizationMapImportInfoML(_) \
     _(type) \
     _(next) \
     _(size) \
     _(data) \
 
+/// Calls your macro with the name of each member of XrLocalizationEnableEventsInfoML, in order.
 #define XR_LIST_STRUCT_XrLocalizationEnableEventsInfoML(_) \
     _(type) \
     _(next) \
     _(enabled) \
 
+/// Calls your macro with the name of each member of XrSpatialAnchorPersistenceNameMSFT, in order.
 #define XR_LIST_STRUCT_XrSpatialAnchorPersistenceNameMSFT(_) \
     _(name) \
 
+/// Calls your macro with the name of each member of XrSpatialAnchorPersistenceInfoMSFT, in order.
 #define XR_LIST_STRUCT_XrSpatialAnchorPersistenceInfoMSFT(_) \
     _(type) \
     _(next) \
     _(spatialAnchorPersistenceName) \
     _(spatialAnchor) \
 
+/// Calls your macro with the name of each member of XrSpatialAnchorFromPersistedAnchorCreateInfoMSFT, in order.
 #define XR_LIST_STRUCT_XrSpatialAnchorFromPersistedAnchorCreateInfoMSFT(_) \
     _(type) \
     _(next) \
     _(spatialAnchorStore) \
     _(spatialAnchorPersistenceName) \
 
+/// Calls your macro with the name of each member of XrSceneMarkerMSFT, in order.
 #define XR_LIST_STRUCT_XrSceneMarkerMSFT(_) \
     _(markerType) \
     _(lastSeenTime) \
     _(center) \
     _(size) \
 
+/// Calls your macro with the name of each member of XrSceneMarkersMSFT, in order.
 #define XR_LIST_STRUCT_XrSceneMarkersMSFT(_) \
     _(type) \
     _(next) \
     _(sceneMarkerCapacityInput) \
     _(sceneMarkers) \
 
+/// Calls your macro with the name of each member of XrSceneMarkerTypeFilterMSFT, in order.
 #define XR_LIST_STRUCT_XrSceneMarkerTypeFilterMSFT(_) \
     _(type) \
     _(next) \
     _(markerTypeCount) \
     _(markerTypes) \
 
+/// Calls your macro with the name of each member of XrSceneMarkerQRCodeMSFT, in order.
 #define XR_LIST_STRUCT_XrSceneMarkerQRCodeMSFT(_) \
     _(symbolType) \
     _(version) \
 
+/// Calls your macro with the name of each member of XrSceneMarkerQRCodesMSFT, in order.
 #define XR_LIST_STRUCT_XrSceneMarkerQRCodesMSFT(_) \
     _(type) \
     _(next) \
     _(qrCodeCapacityInput) \
     _(qrCodes) \
 
+/// Calls your macro with the name of each member of XrSpaceQueryInfoBaseHeaderFB, in order.
 #define XR_LIST_STRUCT_XrSpaceQueryInfoBaseHeaderFB(_) \
     _(type) \
     _(next) \
 
+/// Calls your macro with the name of each member of XrSpaceFilterInfoBaseHeaderFB, in order.
 #define XR_LIST_STRUCT_XrSpaceFilterInfoBaseHeaderFB(_) \
     _(type) \
     _(next) \
 
+/// Calls your macro with the name of each member of XrSpaceQueryInfoFB, in order.
 #define XR_LIST_STRUCT_XrSpaceQueryInfoFB(_) \
     _(type) \
     _(next) \
@@ -3481,26 +3782,31 @@ XR_ENUM_STR(XrResult);
     _(filter) \
     _(excludeFilter) \
 
+/// Calls your macro with the name of each member of XrSpaceStorageLocationFilterInfoFB, in order.
 #define XR_LIST_STRUCT_XrSpaceStorageLocationFilterInfoFB(_) \
     _(type) \
     _(next) \
     _(location) \
 
+/// Calls your macro with the name of each member of XrSpaceUuidFilterInfoFB, in order.
 #define XR_LIST_STRUCT_XrSpaceUuidFilterInfoFB(_) \
     _(type) \
     _(next) \
     _(uuidCount) \
     _(uuids) \
 
+/// Calls your macro with the name of each member of XrSpaceComponentFilterInfoFB, in order.
 #define XR_LIST_STRUCT_XrSpaceComponentFilterInfoFB(_) \
     _(type) \
     _(next) \
     _(componentType) \
 
+/// Calls your macro with the name of each member of XrSpaceQueryResultFB, in order.
 #define XR_LIST_STRUCT_XrSpaceQueryResultFB(_) \
     _(space) \
     _(uuid) \
 
+/// Calls your macro with the name of each member of XrSpaceQueryResultsFB, in order.
 #define XR_LIST_STRUCT_XrSpaceQueryResultsFB(_) \
     _(type) \
     _(next) \
@@ -3508,17 +3814,20 @@ XR_ENUM_STR(XrResult);
     _(resultCountOutput) \
     _(results) \
 
+/// Calls your macro with the name of each member of XrEventDataSpaceQueryResultsAvailableFB, in order.
 #define XR_LIST_STRUCT_XrEventDataSpaceQueryResultsAvailableFB(_) \
     _(type) \
     _(next) \
     _(requestId) \
 
+/// Calls your macro with the name of each member of XrEventDataSpaceQueryCompleteFB, in order.
 #define XR_LIST_STRUCT_XrEventDataSpaceQueryCompleteFB(_) \
     _(type) \
     _(next) \
     _(requestId) \
     _(result) \
 
+/// Calls your macro with the name of each member of XrSpaceSaveInfoFB, in order.
 #define XR_LIST_STRUCT_XrSpaceSaveInfoFB(_) \
     _(type) \
     _(next) \
@@ -3526,12 +3835,14 @@ XR_ENUM_STR(XrResult);
     _(location) \
     _(persistenceMode) \
 
+/// Calls your macro with the name of each member of XrSpaceEraseInfoFB, in order.
 #define XR_LIST_STRUCT_XrSpaceEraseInfoFB(_) \
     _(type) \
     _(next) \
     _(space) \
     _(location) \
 
+/// Calls your macro with the name of each member of XrEventDataSpaceSaveCompleteFB, in order.
 #define XR_LIST_STRUCT_XrEventDataSpaceSaveCompleteFB(_) \
     _(type) \
     _(next) \
@@ -3541,6 +3852,7 @@ XR_ENUM_STR(XrResult);
     _(uuid) \
     _(location) \
 
+/// Calls your macro with the name of each member of XrEventDataSpaceEraseCompleteFB, in order.
 #define XR_LIST_STRUCT_XrEventDataSpaceEraseCompleteFB(_) \
     _(type) \
     _(next) \
@@ -3550,6 +3862,7 @@ XR_ENUM_STR(XrResult);
     _(uuid) \
     _(location) \
 
+/// Calls your macro with the name of each member of XrSwapchainImageFoveationVulkanFB, in order.
 #define XR_LIST_STRUCT_XrSwapchainImageFoveationVulkanFB(_) \
     _(type) \
     _(next) \
@@ -3557,12 +3870,14 @@ XR_ENUM_STR(XrResult);
     _(width) \
     _(height) \
 
+/// Calls your macro with the name of each member of XrSwapchainStateAndroidSurfaceDimensionsFB, in order.
 #define XR_LIST_STRUCT_XrSwapchainStateAndroidSurfaceDimensionsFB(_) \
     _(type) \
     _(next) \
     _(width) \
     _(height) \
 
+/// Calls your macro with the name of each member of XrSwapchainStateSamplerOpenGLESFB, in order.
 #define XR_LIST_STRUCT_XrSwapchainStateSamplerOpenGLESFB(_) \
     _(type) \
     _(next) \
@@ -3577,6 +3892,7 @@ XR_ENUM_STR(XrResult);
     _(maxAnisotropy) \
     _(borderColor) \
 
+/// Calls your macro with the name of each member of XrSwapchainStateSamplerVulkanFB, in order.
 #define XR_LIST_STRUCT_XrSwapchainStateSamplerVulkanFB(_) \
     _(type) \
     _(next) \
@@ -3592,6 +3908,7 @@ XR_ENUM_STR(XrResult);
     _(maxAnisotropy) \
     _(borderColor) \
 
+/// Calls your macro with the name of each member of XrSpaceShareInfoFB, in order.
 #define XR_LIST_STRUCT_XrSpaceShareInfoFB(_) \
     _(type) \
     _(next) \
@@ -3600,12 +3917,14 @@ XR_ENUM_STR(XrResult);
     _(userCount) \
     _(users) \
 
+/// Calls your macro with the name of each member of XrEventDataSpaceShareCompleteFB, in order.
 #define XR_LIST_STRUCT_XrEventDataSpaceShareCompleteFB(_) \
     _(type) \
     _(next) \
     _(requestId) \
     _(result) \
 
+/// Calls your macro with the name of each member of XrCompositionLayerSpaceWarpInfoFB, in order.
 #define XR_LIST_STRUCT_XrCompositionLayerSpaceWarpInfoFB(_) \
     _(type) \
     _(next) \
@@ -3618,12 +3937,14 @@ XR_ENUM_STR(XrResult);
     _(nearZ) \
     _(farZ) \
 
+/// Calls your macro with the name of each member of XrSystemSpaceWarpPropertiesFB, in order.
 #define XR_LIST_STRUCT_XrSystemSpaceWarpPropertiesFB(_) \
     _(type) \
     _(next) \
     _(recommendedMotionVectorImageRectWidth) \
     _(recommendedMotionVectorImageRectHeight) \
 
+/// Calls your macro with the name of each member of XrHapticAmplitudeEnvelopeVibrationFB, in order.
 #define XR_LIST_STRUCT_XrHapticAmplitudeEnvelopeVibrationFB(_) \
     _(type) \
     _(next) \
@@ -3631,15 +3952,18 @@ XR_ENUM_STR(XrResult);
     _(amplitudeCount) \
     _(amplitudes) \
 
+/// Calls your macro with the name of each member of XrOffset3DfFB, in order.
 #define XR_LIST_STRUCT_XrOffset3DfFB(_) \
     _(x) \
     _(y) \
     _(z) \
 
+/// Calls your macro with the name of each member of XrRect3DfFB, in order.
 #define XR_LIST_STRUCT_XrRect3DfFB(_) \
     _(offset) \
     _(extent) \
 
+/// Calls your macro with the name of each member of XrSemanticLabelsFB, in order.
 #define XR_LIST_STRUCT_XrSemanticLabelsFB(_) \
     _(type) \
     _(next) \
@@ -3647,6 +3971,7 @@ XR_ENUM_STR(XrResult);
     _(bufferCountOutput) \
     _(buffer) \
 
+/// Calls your macro with the name of each member of XrRoomLayoutFB, in order.
 #define XR_LIST_STRUCT_XrRoomLayoutFB(_) \
     _(type) \
     _(next) \
@@ -3656,6 +3981,7 @@ XR_ENUM_STR(XrResult);
     _(wallUuidCountOutput) \
     _(wallUuids) \
 
+/// Calls your macro with the name of each member of XrBoundary2DFB, in order.
 #define XR_LIST_STRUCT_XrBoundary2DFB(_) \
     _(type) \
     _(next) \
@@ -3663,29 +3989,34 @@ XR_ENUM_STR(XrResult);
     _(vertexCountOutput) \
     _(vertices) \
 
+/// Calls your macro with the name of each member of XrSemanticLabelsSupportInfoFB, in order.
 #define XR_LIST_STRUCT_XrSemanticLabelsSupportInfoFB(_) \
     _(type) \
     _(next) \
     _(flags) \
     _(recognizedLabels) \
 
+/// Calls your macro with the name of each member of XrDigitalLensControlALMALENCE, in order.
 #define XR_LIST_STRUCT_XrDigitalLensControlALMALENCE(_) \
     _(type) \
     _(next) \
     _(flags) \
 
+/// Calls your macro with the name of each member of XrEventDataSceneCaptureCompleteFB, in order.
 #define XR_LIST_STRUCT_XrEventDataSceneCaptureCompleteFB(_) \
     _(type) \
     _(next) \
     _(requestId) \
     _(result) \
 
+/// Calls your macro with the name of each member of XrSceneCaptureRequestInfoFB, in order.
 #define XR_LIST_STRUCT_XrSceneCaptureRequestInfoFB(_) \
     _(type) \
     _(next) \
     _(requestByteCount) \
     _(request) \
 
+/// Calls your macro with the name of each member of XrSpaceContainerFB, in order.
 #define XR_LIST_STRUCT_XrSpaceContainerFB(_) \
     _(type) \
     _(next) \
@@ -3693,41 +4024,49 @@ XR_ENUM_STR(XrResult);
     _(uuidCountOutput) \
     _(uuids) \
 
+/// Calls your macro with the name of each member of XrFoveationEyeTrackedProfileCreateInfoMETA, in order.
 #define XR_LIST_STRUCT_XrFoveationEyeTrackedProfileCreateInfoMETA(_) \
     _(type) \
     _(next) \
     _(flags) \
 
+/// Calls your macro with the name of each member of XrFoveationEyeTrackedStateMETA, in order.
 #define XR_LIST_STRUCT_XrFoveationEyeTrackedStateMETA(_) \
     _(type) \
     _(next) \
     _(foveationCenter) \
     _(flags) \
 
+/// Calls your macro with the name of each member of XrSystemFoveationEyeTrackedPropertiesMETA, in order.
 #define XR_LIST_STRUCT_XrSystemFoveationEyeTrackedPropertiesMETA(_) \
     _(type) \
     _(next) \
     _(supportsFoveationEyeTracked) \
 
+/// Calls your macro with the name of each member of XrSystemFaceTrackingPropertiesFB, in order.
 #define XR_LIST_STRUCT_XrSystemFaceTrackingPropertiesFB(_) \
     _(type) \
     _(next) \
     _(supportsFaceTracking) \
 
+/// Calls your macro with the name of each member of XrFaceTrackerCreateInfoFB, in order.
 #define XR_LIST_STRUCT_XrFaceTrackerCreateInfoFB(_) \
     _(type) \
     _(next) \
     _(faceExpressionSet) \
 
+/// Calls your macro with the name of each member of XrFaceExpressionInfoFB, in order.
 #define XR_LIST_STRUCT_XrFaceExpressionInfoFB(_) \
     _(type) \
     _(next) \
     _(time) \
 
+/// Calls your macro with the name of each member of XrFaceExpressionStatusFB, in order.
 #define XR_LIST_STRUCT_XrFaceExpressionStatusFB(_) \
     _(isValid) \
     _(isEyeFollowingBlendshapesValid) \
 
+/// Calls your macro with the name of each member of XrFaceExpressionWeightsFB, in order.
 #define XR_LIST_STRUCT_XrFaceExpressionWeightsFB(_) \
     _(type) \
     _(next) \
@@ -3738,43 +4077,51 @@ XR_ENUM_STR(XrResult);
     _(status) \
     _(time) \
 
+/// Calls your macro with the name of each member of XrEyeGazeFB, in order.
 #define XR_LIST_STRUCT_XrEyeGazeFB(_) \
     _(isValid) \
     _(gazePose) \
     _(gazeConfidence) \
 
+/// Calls your macro with the name of each member of XrEyeTrackerCreateInfoFB, in order.
 #define XR_LIST_STRUCT_XrEyeTrackerCreateInfoFB(_) \
     _(type) \
     _(next) \
 
+/// Calls your macro with the name of each member of XrEyeGazesInfoFB, in order.
 #define XR_LIST_STRUCT_XrEyeGazesInfoFB(_) \
     _(type) \
     _(next) \
     _(baseSpace) \
     _(time) \
 
+/// Calls your macro with the name of each member of XrSystemEyeTrackingPropertiesFB, in order.
 #define XR_LIST_STRUCT_XrSystemEyeTrackingPropertiesFB(_) \
     _(type) \
     _(next) \
     _(supportsEyeTracking) \
 
+/// Calls your macro with the name of each member of XrEyeGazesFB, in order.
 #define XR_LIST_STRUCT_XrEyeGazesFB(_) \
     _(type) \
     _(next) \
     _(gaze) \
     _(time) \
 
+/// Calls your macro with the name of each member of XrPassthroughKeyboardHandsIntensityFB, in order.
 #define XR_LIST_STRUCT_XrPassthroughKeyboardHandsIntensityFB(_) \
     _(type) \
     _(next) \
     _(leftHandIntensity) \
     _(rightHandIntensity) \
 
+/// Calls your macro with the name of each member of XrCompositionLayerSettingsFB, in order.
 #define XR_LIST_STRUCT_XrCompositionLayerSettingsFB(_) \
     _(type) \
     _(next) \
     _(layerFlags) \
 
+/// Calls your macro with the name of each member of XrHapticPcmVibrationFB, in order.
 #define XR_LIST_STRUCT_XrHapticPcmVibrationFB(_) \
     _(type) \
     _(next) \
@@ -3784,36 +4131,43 @@ XR_ENUM_STR(XrResult);
     _(append) \
     _(samplesConsumed) \
 
+/// Calls your macro with the name of each member of XrDevicePcmSampleRateStateFB, in order.
 #define XR_LIST_STRUCT_XrDevicePcmSampleRateStateFB(_) \
     _(type) \
     _(next) \
     _(sampleRate) \
 
+/// Calls your macro with the name of each member of XrCompositionLayerDepthTestFB, in order.
 #define XR_LIST_STRUCT_XrCompositionLayerDepthTestFB(_) \
     _(type) \
     _(next) \
     _(depthMask) \
     _(compareOp) \
 
+/// Calls your macro with the name of each member of XrLocalDimmingFrameEndInfoMETA, in order.
 #define XR_LIST_STRUCT_XrLocalDimmingFrameEndInfoMETA(_) \
     _(type) \
     _(next) \
     _(localDimmingMode) \
 
+/// Calls your macro with the name of each member of XrPassthroughPreferencesMETA, in order.
 #define XR_LIST_STRUCT_XrPassthroughPreferencesMETA(_) \
     _(type) \
     _(next) \
     _(flags) \
 
+/// Calls your macro with the name of each member of XrSystemVirtualKeyboardPropertiesMETA, in order.
 #define XR_LIST_STRUCT_XrSystemVirtualKeyboardPropertiesMETA(_) \
     _(type) \
     _(next) \
     _(supportsVirtualKeyboard) \
 
+/// Calls your macro with the name of each member of XrVirtualKeyboardCreateInfoMETA, in order.
 #define XR_LIST_STRUCT_XrVirtualKeyboardCreateInfoMETA(_) \
     _(type) \
     _(next) \
 
+/// Calls your macro with the name of each member of XrVirtualKeyboardSpaceCreateInfoMETA, in order.
 #define XR_LIST_STRUCT_XrVirtualKeyboardSpaceCreateInfoMETA(_) \
     _(type) \
     _(next) \
@@ -3821,6 +4175,7 @@ XR_ENUM_STR(XrResult);
     _(space) \
     _(poseInSpace) \
 
+/// Calls your macro with the name of each member of XrVirtualKeyboardLocationInfoMETA, in order.
 #define XR_LIST_STRUCT_XrVirtualKeyboardLocationInfoMETA(_) \
     _(type) \
     _(next) \
@@ -3829,17 +4184,20 @@ XR_ENUM_STR(XrResult);
     _(poseInSpace) \
     _(scale) \
 
+/// Calls your macro with the name of each member of XrVirtualKeyboardModelVisibilitySetInfoMETA, in order.
 #define XR_LIST_STRUCT_XrVirtualKeyboardModelVisibilitySetInfoMETA(_) \
     _(type) \
     _(next) \
     _(visible) \
 
+/// Calls your macro with the name of each member of XrVirtualKeyboardAnimationStateMETA, in order.
 #define XR_LIST_STRUCT_XrVirtualKeyboardAnimationStateMETA(_) \
     _(type) \
     _(next) \
     _(animationIndex) \
     _(fraction) \
 
+/// Calls your macro with the name of each member of XrVirtualKeyboardModelAnimationStatesMETA, in order.
 #define XR_LIST_STRUCT_XrVirtualKeyboardModelAnimationStatesMETA(_) \
     _(type) \
     _(next) \
@@ -3847,6 +4205,7 @@ XR_ENUM_STR(XrResult);
     _(stateCountOutput) \
     _(states) \
 
+/// Calls your macro with the name of each member of XrVirtualKeyboardTextureDataMETA, in order.
 #define XR_LIST_STRUCT_XrVirtualKeyboardTextureDataMETA(_) \
     _(type) \
     _(next) \
@@ -3856,6 +4215,7 @@ XR_ENUM_STR(XrResult);
     _(bufferCountOutput) \
     _(buffer) \
 
+/// Calls your macro with the name of each member of XrVirtualKeyboardInputInfoMETA, in order.
 #define XR_LIST_STRUCT_XrVirtualKeyboardInputInfoMETA(_) \
     _(type) \
     _(next) \
@@ -3864,37 +4224,44 @@ XR_ENUM_STR(XrResult);
     _(inputPoseInSpace) \
     _(inputState) \
 
+/// Calls your macro with the name of each member of XrVirtualKeyboardTextContextChangeInfoMETA, in order.
 #define XR_LIST_STRUCT_XrVirtualKeyboardTextContextChangeInfoMETA(_) \
     _(type) \
     _(next) \
     _(textContext) \
 
+/// Calls your macro with the name of each member of XrEventDataVirtualKeyboardCommitTextMETA, in order.
 #define XR_LIST_STRUCT_XrEventDataVirtualKeyboardCommitTextMETA(_) \
     _(type) \
     _(next) \
     _(keyboard) \
     _(text) \
 
+/// Calls your macro with the name of each member of XrEventDataVirtualKeyboardBackspaceMETA, in order.
 #define XR_LIST_STRUCT_XrEventDataVirtualKeyboardBackspaceMETA(_) \
     _(type) \
     _(next) \
     _(keyboard) \
 
+/// Calls your macro with the name of each member of XrEventDataVirtualKeyboardEnterMETA, in order.
 #define XR_LIST_STRUCT_XrEventDataVirtualKeyboardEnterMETA(_) \
     _(type) \
     _(next) \
     _(keyboard) \
 
+/// Calls your macro with the name of each member of XrEventDataVirtualKeyboardShownMETA, in order.
 #define XR_LIST_STRUCT_XrEventDataVirtualKeyboardShownMETA(_) \
     _(type) \
     _(next) \
     _(keyboard) \
 
+/// Calls your macro with the name of each member of XrEventDataVirtualKeyboardHiddenMETA, in order.
 #define XR_LIST_STRUCT_XrEventDataVirtualKeyboardHiddenMETA(_) \
     _(type) \
     _(next) \
     _(keyboard) \
 
+/// Calls your macro with the name of each member of XrExternalCameraIntrinsicsOCULUS, in order.
 #define XR_LIST_STRUCT_XrExternalCameraIntrinsicsOCULUS(_) \
     _(lastChangeTime) \
     _(fov) \
@@ -3902,12 +4269,14 @@ XR_ENUM_STR(XrResult);
     _(virtualFarPlaneDistance) \
     _(imageSensorPixelResolution) \
 
+/// Calls your macro with the name of each member of XrExternalCameraExtrinsicsOCULUS, in order.
 #define XR_LIST_STRUCT_XrExternalCameraExtrinsicsOCULUS(_) \
     _(lastChangeTime) \
     _(cameraStatusFlags) \
     _(attachedToDevice) \
     _(relativePose) \
 
+/// Calls your macro with the name of each member of XrExternalCameraOCULUS, in order.
 #define XR_LIST_STRUCT_XrExternalCameraOCULUS(_) \
     _(type) \
     _(next) \
@@ -3915,17 +4284,20 @@ XR_ENUM_STR(XrResult);
     _(intrinsics) \
     _(extrinsics) \
 
+/// Calls your macro with the name of each member of XrVulkanSwapchainCreateInfoMETA, in order.
 #define XR_LIST_STRUCT_XrVulkanSwapchainCreateInfoMETA(_) \
     _(type) \
     _(next) \
     _(additionalCreateFlags) \
     _(additionalUsageFlags) \
 
+/// Calls your macro with the name of each member of XrPerformanceMetricsStateMETA, in order.
 #define XR_LIST_STRUCT_XrPerformanceMetricsStateMETA(_) \
     _(type) \
     _(next) \
     _(enabled) \
 
+/// Calls your macro with the name of each member of XrPerformanceMetricsCounterMETA, in order.
 #define XR_LIST_STRUCT_XrPerformanceMetricsCounterMETA(_) \
     _(type) \
     _(next) \
@@ -3934,6 +4306,7 @@ XR_ENUM_STR(XrResult);
     _(uintValue) \
     _(floatValue) \
 
+/// Calls your macro with the name of each member of XrSpaceListSaveInfoFB, in order.
 #define XR_LIST_STRUCT_XrSpaceListSaveInfoFB(_) \
     _(type) \
     _(next) \
@@ -3941,38 +4314,45 @@ XR_ENUM_STR(XrResult);
     _(spaces) \
     _(location) \
 
+/// Calls your macro with the name of each member of XrEventDataSpaceListSaveCompleteFB, in order.
 #define XR_LIST_STRUCT_XrEventDataSpaceListSaveCompleteFB(_) \
     _(type) \
     _(next) \
     _(requestId) \
     _(result) \
 
+/// Calls your macro with the name of each member of XrSpaceUserCreateInfoFB, in order.
 #define XR_LIST_STRUCT_XrSpaceUserCreateInfoFB(_) \
     _(type) \
     _(next) \
     _(userId) \
 
+/// Calls your macro with the name of each member of XrSystemHeadsetIdPropertiesMETA, in order.
 #define XR_LIST_STRUCT_XrSystemHeadsetIdPropertiesMETA(_) \
     _(type) \
     _(next) \
     _(id) \
 
+/// Calls your macro with the name of each member of XrRecommendedLayerResolutionMETA, in order.
 #define XR_LIST_STRUCT_XrRecommendedLayerResolutionMETA(_) \
     _(type) \
     _(next) \
     _(recommendedImageDimensions) \
     _(isValid) \
 
+/// Calls your macro with the name of each member of XrRecommendedLayerResolutionGetInfoMETA, in order.
 #define XR_LIST_STRUCT_XrRecommendedLayerResolutionGetInfoMETA(_) \
     _(type) \
     _(next) \
     _(layer) \
     _(predictedDisplayTime) \
 
+/// Calls your macro with the name of each member of XrPassthroughColorLutDataMETA, in order.
 #define XR_LIST_STRUCT_XrPassthroughColorLutDataMETA(_) \
     _(bufferSize) \
     _(buffer) \
 
+/// Calls your macro with the name of each member of XrPassthroughColorLutCreateInfoMETA, in order.
 #define XR_LIST_STRUCT_XrPassthroughColorLutCreateInfoMETA(_) \
     _(type) \
     _(next) \
@@ -3980,17 +4360,20 @@ XR_ENUM_STR(XrResult);
     _(resolution) \
     _(data) \
 
+/// Calls your macro with the name of each member of XrPassthroughColorLutUpdateInfoMETA, in order.
 #define XR_LIST_STRUCT_XrPassthroughColorLutUpdateInfoMETA(_) \
     _(type) \
     _(next) \
     _(data) \
 
+/// Calls your macro with the name of each member of XrPassthroughColorMapLutMETA, in order.
 #define XR_LIST_STRUCT_XrPassthroughColorMapLutMETA(_) \
     _(type) \
     _(next) \
     _(colorLut) \
     _(weight) \
 
+/// Calls your macro with the name of each member of XrPassthroughColorMapInterpolatedLutMETA, in order.
 #define XR_LIST_STRUCT_XrPassthroughColorMapInterpolatedLutMETA(_) \
     _(type) \
     _(next) \
@@ -3998,15 +4381,18 @@ XR_ENUM_STR(XrResult);
     _(targetColorLut) \
     _(weight) \
 
+/// Calls your macro with the name of each member of XrSystemPassthroughColorLutPropertiesMETA, in order.
 #define XR_LIST_STRUCT_XrSystemPassthroughColorLutPropertiesMETA(_) \
     _(type) \
     _(next) \
     _(maxColorLutResolution) \
 
+/// Calls your macro with the name of each member of XrSpaceTriangleMeshGetInfoMETA, in order.
 #define XR_LIST_STRUCT_XrSpaceTriangleMeshGetInfoMETA(_) \
     _(type) \
     _(next) \
 
+/// Calls your macro with the name of each member of XrSpaceTriangleMeshMETA, in order.
 #define XR_LIST_STRUCT_XrSpaceTriangleMeshMETA(_) \
     _(type) \
     _(next) \
@@ -4017,12 +4403,14 @@ XR_ENUM_STR(XrResult);
     _(indexCountOutput) \
     _(indices) \
 
+/// Calls your macro with the name of each member of XrSystemFaceTrackingProperties2FB, in order.
 #define XR_LIST_STRUCT_XrSystemFaceTrackingProperties2FB(_) \
     _(type) \
     _(next) \
     _(supportsVisualFaceTracking) \
     _(supportsAudioFaceTracking) \
 
+/// Calls your macro with the name of each member of XrFaceTrackerCreateInfo2FB, in order.
 #define XR_LIST_STRUCT_XrFaceTrackerCreateInfo2FB(_) \
     _(type) \
     _(next) \
@@ -4030,11 +4418,13 @@ XR_ENUM_STR(XrResult);
     _(requestedDataSourceCount) \
     _(requestedDataSources) \
 
+/// Calls your macro with the name of each member of XrFaceExpressionInfo2FB, in order.
 #define XR_LIST_STRUCT_XrFaceExpressionInfo2FB(_) \
     _(type) \
     _(next) \
     _(time) \
 
+/// Calls your macro with the name of each member of XrFaceExpressionWeights2FB, in order.
 #define XR_LIST_STRUCT_XrFaceExpressionWeights2FB(_) \
     _(type) \
     _(next) \
@@ -4047,34 +4437,40 @@ XR_ENUM_STR(XrResult);
     _(dataSource) \
     _(time) \
 
+/// Calls your macro with the name of each member of XrEnvironmentDepthProviderCreateInfoMETA, in order.
 #define XR_LIST_STRUCT_XrEnvironmentDepthProviderCreateInfoMETA(_) \
     _(type) \
     _(next) \
     _(createFlags) \
 
+/// Calls your macro with the name of each member of XrEnvironmentDepthSwapchainCreateInfoMETA, in order.
 #define XR_LIST_STRUCT_XrEnvironmentDepthSwapchainCreateInfoMETA(_) \
     _(type) \
     _(next) \
     _(createFlags) \
 
+/// Calls your macro with the name of each member of XrEnvironmentDepthSwapchainStateMETA, in order.
 #define XR_LIST_STRUCT_XrEnvironmentDepthSwapchainStateMETA(_) \
     _(type) \
     _(next) \
     _(width) \
     _(height) \
 
+/// Calls your macro with the name of each member of XrEnvironmentDepthImageAcquireInfoMETA, in order.
 #define XR_LIST_STRUCT_XrEnvironmentDepthImageAcquireInfoMETA(_) \
     _(type) \
     _(next) \
     _(space) \
     _(displayTime) \
 
+/// Calls your macro with the name of each member of XrEnvironmentDepthImageViewMETA, in order.
 #define XR_LIST_STRUCT_XrEnvironmentDepthImageViewMETA(_) \
     _(type) \
     _(next) \
     _(fov) \
     _(pose) \
 
+/// Calls your macro with the name of each member of XrEnvironmentDepthImageMETA, in order.
 #define XR_LIST_STRUCT_XrEnvironmentDepthImageMETA(_) \
     _(type) \
     _(next) \
@@ -4083,27 +4479,32 @@ XR_ENUM_STR(XrResult);
     _(farZ) \
     _(views) \
 
+/// Calls your macro with the name of each member of XrEnvironmentDepthHandRemovalSetInfoMETA, in order.
 #define XR_LIST_STRUCT_XrEnvironmentDepthHandRemovalSetInfoMETA(_) \
     _(type) \
     _(next) \
     _(enabled) \
 
+/// Calls your macro with the name of each member of XrSystemEnvironmentDepthPropertiesMETA, in order.
 #define XR_LIST_STRUCT_XrSystemEnvironmentDepthPropertiesMETA(_) \
     _(type) \
     _(next) \
     _(supportsEnvironmentDepth) \
     _(supportsHandRemoval) \
 
+/// Calls your macro with the name of each member of XrPassthroughCreateInfoHTC, in order.
 #define XR_LIST_STRUCT_XrPassthroughCreateInfoHTC(_) \
     _(type) \
     _(next) \
     _(form) \
 
+/// Calls your macro with the name of each member of XrPassthroughColorHTC, in order.
 #define XR_LIST_STRUCT_XrPassthroughColorHTC(_) \
     _(type) \
     _(next) \
     _(alpha) \
 
+/// Calls your macro with the name of each member of XrPassthroughMeshTransformInfoHTC, in order.
 #define XR_LIST_STRUCT_XrPassthroughMeshTransformInfoHTC(_) \
     _(type) \
     _(next) \
@@ -4116,6 +4517,7 @@ XR_ENUM_STR(XrResult);
     _(pose) \
     _(scale) \
 
+/// Calls your macro with the name of each member of XrCompositionLayerPassthroughHTC, in order.
 #define XR_LIST_STRUCT_XrCompositionLayerPassthroughHTC(_) \
     _(type) \
     _(next) \
@@ -4124,6 +4526,7 @@ XR_ENUM_STR(XrResult);
     _(passthrough) \
     _(color) \
 
+/// Calls your macro with the name of each member of XrFoveationApplyInfoHTC, in order.
 #define XR_LIST_STRUCT_XrFoveationApplyInfoHTC(_) \
     _(type) \
     _(next) \
@@ -4131,30 +4534,36 @@ XR_ENUM_STR(XrResult);
     _(subImageCount) \
     _(subImages) \
 
+/// Calls your macro with the name of each member of XrFoveationConfigurationHTC, in order.
 #define XR_LIST_STRUCT_XrFoveationConfigurationHTC(_) \
     _(level) \
     _(clearFovDegree) \
     _(focalCenterOffset) \
 
+/// Calls your macro with the name of each member of XrFoveationDynamicModeInfoHTC, in order.
 #define XR_LIST_STRUCT_XrFoveationDynamicModeInfoHTC(_) \
     _(type) \
     _(next) \
     _(dynamicFlags) \
 
+/// Calls your macro with the name of each member of XrFoveationCustomModeInfoHTC, in order.
 #define XR_LIST_STRUCT_XrFoveationCustomModeInfoHTC(_) \
     _(type) \
     _(next) \
     _(configCount) \
     _(configs) \
 
+/// Calls your macro with the name of each member of XrSystemAnchorPropertiesHTC, in order.
 #define XR_LIST_STRUCT_XrSystemAnchorPropertiesHTC(_) \
     _(type) \
     _(next) \
     _(supportsAnchor) \
 
+/// Calls your macro with the name of each member of XrSpatialAnchorNameHTC, in order.
 #define XR_LIST_STRUCT_XrSpatialAnchorNameHTC(_) \
     _(name) \
 
+/// Calls your macro with the name of each member of XrSpatialAnchorCreateInfoHTC, in order.
 #define XR_LIST_STRUCT_XrSpatialAnchorCreateInfoHTC(_) \
     _(type) \
     _(next) \
@@ -4162,53 +4571,63 @@ XR_ENUM_STR(XrResult);
     _(poseInSpace) \
     _(name) \
 
+/// Calls your macro with the name of each member of XrActiveActionSetPriorityEXT, in order.
 #define XR_LIST_STRUCT_XrActiveActionSetPriorityEXT(_) \
     _(actionSet) \
     _(priorityOverride) \
 
+/// Calls your macro with the name of each member of XrActiveActionSetPrioritiesEXT, in order.
 #define XR_LIST_STRUCT_XrActiveActionSetPrioritiesEXT(_) \
     _(type) \
     _(next) \
     _(actionSetPriorityCount) \
     _(actionSetPriorities) \
 
+/// Calls your macro with the name of each member of XrSystemForceFeedbackCurlPropertiesMNDX, in order.
 #define XR_LIST_STRUCT_XrSystemForceFeedbackCurlPropertiesMNDX(_) \
     _(type) \
     _(next) \
     _(supportsForceFeedbackCurl) \
 
+/// Calls your macro with the name of each member of XrForceFeedbackCurlApplyLocationMNDX, in order.
 #define XR_LIST_STRUCT_XrForceFeedbackCurlApplyLocationMNDX(_) \
     _(location) \
     _(value) \
 
+/// Calls your macro with the name of each member of XrForceFeedbackCurlApplyLocationsMNDX, in order.
 #define XR_LIST_STRUCT_XrForceFeedbackCurlApplyLocationsMNDX(_) \
     _(type) \
     _(next) \
     _(locationCount) \
     _(locations) \
 
+/// Calls your macro with the name of each member of XrHandTrackingDataSourceInfoEXT, in order.
 #define XR_LIST_STRUCT_XrHandTrackingDataSourceInfoEXT(_) \
     _(type) \
     _(next) \
     _(requestedDataSourceCount) \
     _(requestedDataSources) \
 
+/// Calls your macro with the name of each member of XrHandTrackingDataSourceStateEXT, in order.
 #define XR_LIST_STRUCT_XrHandTrackingDataSourceStateEXT(_) \
     _(type) \
     _(next) \
     _(isActive) \
     _(dataSource) \
 
+/// Calls your macro with the name of each member of XrSystemPlaneDetectionPropertiesEXT, in order.
 #define XR_LIST_STRUCT_XrSystemPlaneDetectionPropertiesEXT(_) \
     _(type) \
     _(next) \
     _(supportedFeatures) \
 
+/// Calls your macro with the name of each member of XrPlaneDetectorCreateInfoEXT, in order.
 #define XR_LIST_STRUCT_XrPlaneDetectorCreateInfoEXT(_) \
     _(type) \
     _(next) \
     _(flags) \
 
+/// Calls your macro with the name of each member of XrPlaneDetectorBeginInfoEXT, in order.
 #define XR_LIST_STRUCT_XrPlaneDetectorBeginInfoEXT(_) \
     _(type) \
     _(next) \
@@ -4223,12 +4642,14 @@ XR_ENUM_STR(XrResult);
     _(boundingBoxPose) \
     _(boundingBoxExtent) \
 
+/// Calls your macro with the name of each member of XrPlaneDetectorGetInfoEXT, in order.
 #define XR_LIST_STRUCT_XrPlaneDetectorGetInfoEXT(_) \
     _(type) \
     _(next) \
     _(baseSpace) \
     _(time) \
 
+/// Calls your macro with the name of each member of XrPlaneDetectorLocationEXT, in order.
 #define XR_LIST_STRUCT_XrPlaneDetectorLocationEXT(_) \
     _(type) \
     _(next) \
@@ -4240,6 +4661,7 @@ XR_ENUM_STR(XrResult);
     _(semanticType) \
     _(polygonBufferCount) \
 
+/// Calls your macro with the name of each member of XrPlaneDetectorLocationsEXT, in order.
 #define XR_LIST_STRUCT_XrPlaneDetectorLocationsEXT(_) \
     _(type) \
     _(next) \
@@ -4247,6 +4669,7 @@ XR_ENUM_STR(XrResult);
     _(planeLocationCountOutput) \
     _(planeLocations) \
 
+/// Calls your macro with the name of each member of XrPlaneDetectorPolygonBufferEXT, in order.
 #define XR_LIST_STRUCT_XrPlaneDetectorPolygonBufferEXT(_) \
     _(type) \
     _(next) \
@@ -4254,53 +4677,63 @@ XR_ENUM_STR(XrResult);
     _(vertexCountOutput) \
     _(vertices) \
 
+/// Calls your macro with the name of each member of XrFutureCancelInfoEXT, in order.
 #define XR_LIST_STRUCT_XrFutureCancelInfoEXT(_) \
     _(type) \
     _(next) \
     _(future) \
 
+/// Calls your macro with the name of each member of XrFuturePollInfoEXT, in order.
 #define XR_LIST_STRUCT_XrFuturePollInfoEXT(_) \
     _(type) \
     _(next) \
     _(future) \
 
+/// Calls your macro with the name of each member of XrFutureCompletionBaseHeaderEXT, in order.
 #define XR_LIST_STRUCT_XrFutureCompletionBaseHeaderEXT(_) \
     _(type) \
     _(next) \
     _(futureResult) \
 
+/// Calls your macro with the name of each member of XrFutureCompletionEXT, in order.
 #define XR_LIST_STRUCT_XrFutureCompletionEXT(_) \
     _(type) \
     _(next) \
     _(futureResult) \
 
+/// Calls your macro with the name of each member of XrFuturePollResultEXT, in order.
 #define XR_LIST_STRUCT_XrFuturePollResultEXT(_) \
     _(type) \
     _(next) \
     _(state) \
 
+/// Calls your macro with the name of each member of XrEventDataUserPresenceChangedEXT, in order.
 #define XR_LIST_STRUCT_XrEventDataUserPresenceChangedEXT(_) \
     _(type) \
     _(next) \
     _(session) \
     _(isUserPresent) \
 
+/// Calls your macro with the name of each member of XrSystemUserPresencePropertiesEXT, in order.
 #define XR_LIST_STRUCT_XrSystemUserPresencePropertiesEXT(_) \
     _(type) \
     _(next) \
     _(supportsUserPresence) \
 
+/// Calls your macro with the name of each member of XrEventDataHeadsetFitChangedML, in order.
 #define XR_LIST_STRUCT_XrEventDataHeadsetFitChangedML(_) \
     _(type) \
     _(next) \
     _(status) \
     _(time) \
 
+/// Calls your macro with the name of each member of XrEventDataEyeCalibrationChangedML, in order.
 #define XR_LIST_STRUCT_XrEventDataEyeCalibrationChangedML(_) \
     _(type) \
     _(next) \
     _(status) \
 
+/// Calls your macro with the name of each member of XrUserCalibrationEnableEventsInfoML, in order.
 #define XR_LIST_STRUCT_XrUserCalibrationEnableEventsInfoML(_) \
     _(type) \
     _(next) \
@@ -4308,6 +4741,8 @@ XR_ENUM_STR(XrResult);
 
 
 
+/// Calls your macro with the structure type name and the XrStructureType constant for
+/// each known/available structure type, excluding those unavailable due to preprocessor definitions.
 #define XR_LIST_STRUCTURE_TYPES(_) \
     XR_LIST_STRUCTURE_TYPES_CORE(_) \
     XR_LIST_STRUCTURE_TYPES_XR_USE_GRAPHICS_API_D3D11(_) \
@@ -4326,6 +4761,7 @@ XR_ENUM_STR(XrResult);
     XR_LIST_STRUCTURE_TYPES_XR_USE_PLATFORM_WIN32(_) \
 
 
+/// Implementation detail of XR_LIST_STRUCTURE_TYPES() - structure types available without any preprocessor definitions
 #define XR_LIST_STRUCTURE_TYPES_CORE(_) \
     _(XrApiLayerProperties, XR_TYPE_API_LAYER_PROPERTIES) \
     _(XrExtensionProperties, XR_TYPE_EXTENSION_PROPERTIES) \
@@ -4649,6 +5085,8 @@ XR_ENUM_STR(XrResult);
 
 
 #if defined(XR_USE_GRAPHICS_API_D3D11)
+/// Implementation detail of XR_LIST_STRUCTURE_TYPES()
+/// Structure types available only when XR_USE_GRAPHICS_API_D3D11 is defined
 #define XR_LIST_STRUCTURE_TYPES_XR_USE_GRAPHICS_API_D3D11(_) \
     _(XrGraphicsBindingD3D11KHR, XR_TYPE_GRAPHICS_BINDING_D3D11_KHR) \
     _(XrSwapchainImageD3D11KHR, XR_TYPE_SWAPCHAIN_IMAGE_D3D11_KHR) \
@@ -4659,6 +5097,8 @@ XR_ENUM_STR(XrResult);
 #endif
 
 #if defined(XR_USE_GRAPHICS_API_D3D12)
+/// Implementation detail of XR_LIST_STRUCTURE_TYPES()
+/// Structure types available only when XR_USE_GRAPHICS_API_D3D12 is defined
 #define XR_LIST_STRUCTURE_TYPES_XR_USE_GRAPHICS_API_D3D12(_) \
     _(XrGraphicsBindingD3D12KHR, XR_TYPE_GRAPHICS_BINDING_D3D12_KHR) \
     _(XrSwapchainImageD3D12KHR, XR_TYPE_SWAPCHAIN_IMAGE_D3D12_KHR) \
@@ -4669,6 +5109,8 @@ XR_ENUM_STR(XrResult);
 #endif
 
 #if defined(XR_USE_GRAPHICS_API_OPENGL)
+/// Implementation detail of XR_LIST_STRUCTURE_TYPES()
+/// Structure types available only when XR_USE_GRAPHICS_API_OPENGL is defined
 #define XR_LIST_STRUCTURE_TYPES_XR_USE_GRAPHICS_API_OPENGL(_) \
     _(XrSwapchainImageOpenGLKHR, XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR) \
     _(XrGraphicsRequirementsOpenGLKHR, XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR) \
@@ -4678,6 +5120,8 @@ XR_ENUM_STR(XrResult);
 #endif
 
 #if defined(XR_USE_GRAPHICS_API_OPENGL) && defined(XR_USE_PLATFORM_WAYLAND)
+/// Implementation detail of XR_LIST_STRUCTURE_TYPES()
+/// Structure types available only when XR_USE_GRAPHICS_API_OPENGL and XR_USE_PLATFORM_WAYLAND are defined
 #define XR_LIST_STRUCTURE_TYPES_XR_USE_GRAPHICS_API_OPENGL_XR_USE_PLATFORM_WAYLAND(_) \
     _(XrGraphicsBindingOpenGLWaylandKHR, XR_TYPE_GRAPHICS_BINDING_OPENGL_WAYLAND_KHR) \
 
@@ -4686,6 +5130,8 @@ XR_ENUM_STR(XrResult);
 #endif
 
 #if defined(XR_USE_GRAPHICS_API_OPENGL) && defined(XR_USE_PLATFORM_WIN32)
+/// Implementation detail of XR_LIST_STRUCTURE_TYPES()
+/// Structure types available only when XR_USE_GRAPHICS_API_OPENGL and XR_USE_PLATFORM_WIN32 are defined
 #define XR_LIST_STRUCTURE_TYPES_XR_USE_GRAPHICS_API_OPENGL_XR_USE_PLATFORM_WIN32(_) \
     _(XrGraphicsBindingOpenGLWin32KHR, XR_TYPE_GRAPHICS_BINDING_OPENGL_WIN32_KHR) \
 
@@ -4694,6 +5140,8 @@ XR_ENUM_STR(XrResult);
 #endif
 
 #if defined(XR_USE_GRAPHICS_API_OPENGL) && defined(XR_USE_PLATFORM_XCB)
+/// Implementation detail of XR_LIST_STRUCTURE_TYPES()
+/// Structure types available only when XR_USE_GRAPHICS_API_OPENGL and XR_USE_PLATFORM_XCB are defined
 #define XR_LIST_STRUCTURE_TYPES_XR_USE_GRAPHICS_API_OPENGL_XR_USE_PLATFORM_XCB(_) \
     _(XrGraphicsBindingOpenGLXcbKHR, XR_TYPE_GRAPHICS_BINDING_OPENGL_XCB_KHR) \
 
@@ -4702,6 +5150,8 @@ XR_ENUM_STR(XrResult);
 #endif
 
 #if defined(XR_USE_GRAPHICS_API_OPENGL) && defined(XR_USE_PLATFORM_XLIB)
+/// Implementation detail of XR_LIST_STRUCTURE_TYPES()
+/// Structure types available only when XR_USE_GRAPHICS_API_OPENGL and XR_USE_PLATFORM_XLIB are defined
 #define XR_LIST_STRUCTURE_TYPES_XR_USE_GRAPHICS_API_OPENGL_XR_USE_PLATFORM_XLIB(_) \
     _(XrGraphicsBindingOpenGLXlibKHR, XR_TYPE_GRAPHICS_BINDING_OPENGL_XLIB_KHR) \
 
@@ -4710,6 +5160,8 @@ XR_ENUM_STR(XrResult);
 #endif
 
 #if defined(XR_USE_GRAPHICS_API_OPENGL_ES)
+/// Implementation detail of XR_LIST_STRUCTURE_TYPES()
+/// Structure types available only when XR_USE_GRAPHICS_API_OPENGL_ES is defined
 #define XR_LIST_STRUCTURE_TYPES_XR_USE_GRAPHICS_API_OPENGL_ES(_) \
     _(XrSwapchainImageOpenGLESKHR, XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_ES_KHR) \
     _(XrGraphicsRequirementsOpenGLESKHR, XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_ES_KHR) \
@@ -4720,6 +5172,8 @@ XR_ENUM_STR(XrResult);
 #endif
 
 #if defined(XR_USE_GRAPHICS_API_OPENGL_ES) && defined(XR_USE_PLATFORM_ANDROID)
+/// Implementation detail of XR_LIST_STRUCTURE_TYPES()
+/// Structure types available only when XR_USE_GRAPHICS_API_OPENGL_ES and XR_USE_PLATFORM_ANDROID are defined
 #define XR_LIST_STRUCTURE_TYPES_XR_USE_GRAPHICS_API_OPENGL_ES_XR_USE_PLATFORM_ANDROID(_) \
     _(XrGraphicsBindingOpenGLESAndroidKHR, XR_TYPE_GRAPHICS_BINDING_OPENGL_ES_ANDROID_KHR) \
 
@@ -4728,6 +5182,8 @@ XR_ENUM_STR(XrResult);
 #endif
 
 #if defined(XR_USE_GRAPHICS_API_VULKAN)
+/// Implementation detail of XR_LIST_STRUCTURE_TYPES()
+/// Structure types available only when XR_USE_GRAPHICS_API_VULKAN is defined
 #define XR_LIST_STRUCTURE_TYPES_XR_USE_GRAPHICS_API_VULKAN(_) \
     _(XrVulkanSwapchainFormatListCreateInfoKHR, XR_TYPE_VULKAN_SWAPCHAIN_FORMAT_LIST_CREATE_INFO_KHR) \
     _(XrGraphicsBindingVulkanKHR, XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR) \
@@ -4745,6 +5201,8 @@ XR_ENUM_STR(XrResult);
 #endif
 
 #if defined(XR_USE_PLATFORM_ANDROID)
+/// Implementation detail of XR_LIST_STRUCTURE_TYPES()
+/// Structure types available only when XR_USE_PLATFORM_ANDROID is defined
 #define XR_LIST_STRUCTURE_TYPES_XR_USE_PLATFORM_ANDROID(_) \
     _(XrInstanceCreateInfoAndroidKHR, XR_TYPE_INSTANCE_CREATE_INFO_ANDROID_KHR) \
     _(XrLoaderInitInfoAndroidKHR, XR_TYPE_LOADER_INIT_INFO_ANDROID_KHR) \
@@ -4756,6 +5214,8 @@ XR_ENUM_STR(XrResult);
 #endif
 
 #if defined(XR_USE_PLATFORM_EGL)
+/// Implementation detail of XR_LIST_STRUCTURE_TYPES()
+/// Structure types available only when XR_USE_PLATFORM_EGL is defined
 #define XR_LIST_STRUCTURE_TYPES_XR_USE_PLATFORM_EGL(_) \
     _(XrGraphicsBindingEGLMNDX, XR_TYPE_GRAPHICS_BINDING_EGL_MNDX) \
 
@@ -4764,6 +5224,8 @@ XR_ENUM_STR(XrResult);
 #endif
 
 #if defined(XR_USE_PLATFORM_ML)
+/// Implementation detail of XR_LIST_STRUCTURE_TYPES()
+/// Structure types available only when XR_USE_PLATFORM_ML is defined
 #define XR_LIST_STRUCTURE_TYPES_XR_USE_PLATFORM_ML(_) \
     _(XrCoordinateSpaceCreateInfoML, XR_TYPE_COORDINATE_SPACE_CREATE_INFO_ML) \
 
@@ -4772,6 +5234,8 @@ XR_ENUM_STR(XrResult);
 #endif
 
 #if defined(XR_USE_PLATFORM_WIN32)
+/// Implementation detail of XR_LIST_STRUCTURE_TYPES()
+/// Structure types available only when XR_USE_PLATFORM_WIN32 is defined
 #define XR_LIST_STRUCTURE_TYPES_XR_USE_PLATFORM_WIN32(_) \
     _(XrHolographicWindowAttachmentMSFT, XR_TYPE_HOLOGRAPHIC_WINDOW_ATTACHMENT_MSFT) \
 
@@ -4781,6 +5245,8 @@ XR_ENUM_STR(XrResult);
 
 
 
+/// Calls your macro with the name and extension number of all known
+/// extensions in this version of the spec.
 #define XR_LIST_EXTENSIONS(_) \
     _(XR_KHR_android_thread_settings, 4) \
     _(XR_KHR_android_surface_swapchain, 5) \
@@ -4941,6 +5407,10 @@ XR_ENUM_STR(XrResult);
 
 
 
+/// For every function defined by XR_VERSION_1_0 in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_VERSION_1_0(_) \
     _(GetInstanceProcAddr, VERSION_1_0) \
     _(EnumerateApiLayerProperties, VERSION_1_0) \
@@ -4999,32 +5469,60 @@ XR_ENUM_STR(XrResult);
     _(StopHapticFeedback, VERSION_1_0) \
 
 
+/// For every function defined by XR_LOADER_VERSION_1_0 in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_LOADER_VERSION_1_0(_) \
     _(CreateApiLayerInstance, LOADER_VERSION_1_0) \
     _(NegotiateLoaderRuntimeInterface, LOADER_VERSION_1_0) \
     _(NegotiateLoaderApiLayerInterface, LOADER_VERSION_1_0) \
 
 
+/// For every function defined by XR_VERSION_1_1 in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_VERSION_1_1(_) \
     _(LocateSpaces, VERSION_1_1) \
 
 
+/// For every function defined by XR_KHR_android_thread_settings in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_KHR_android_thread_settings(_) \
     _(SetAndroidApplicationThreadKHR, KHR_android_thread_settings) \
 
 
+/// For every function defined by XR_KHR_android_surface_swapchain in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_KHR_android_surface_swapchain(_) \
     _(CreateSwapchainAndroidSurfaceKHR, KHR_android_surface_swapchain) \
 
 
+/// For every function defined by XR_KHR_opengl_enable in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_KHR_opengl_enable(_) \
     _(GetOpenGLGraphicsRequirementsKHR, KHR_opengl_enable) \
 
 
+/// For every function defined by XR_KHR_opengl_es_enable in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_KHR_opengl_es_enable(_) \
     _(GetOpenGLESGraphicsRequirementsKHR, KHR_opengl_es_enable) \
 
 
+/// For every function defined by XR_KHR_vulkan_enable in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_KHR_vulkan_enable(_) \
     _(GetVulkanInstanceExtensionsKHR, KHR_vulkan_enable) \
     _(GetVulkanDeviceExtensionsKHR, KHR_vulkan_enable) \
@@ -5032,46 +5530,86 @@ XR_ENUM_STR(XrResult);
     _(GetVulkanGraphicsRequirementsKHR, KHR_vulkan_enable) \
 
 
+/// For every function defined by XR_KHR_D3D11_enable in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_KHR_D3D11_enable(_) \
     _(GetD3D11GraphicsRequirementsKHR, KHR_D3D11_enable) \
 
 
+/// For every function defined by XR_KHR_D3D12_enable in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_KHR_D3D12_enable(_) \
     _(GetD3D12GraphicsRequirementsKHR, KHR_D3D12_enable) \
 
 
+/// For every function defined by XR_KHR_visibility_mask in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_KHR_visibility_mask(_) \
     _(GetVisibilityMaskKHR, KHR_visibility_mask) \
 
 
+/// For every function defined by XR_KHR_win32_convert_performance_counter_time in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_KHR_win32_convert_performance_counter_time(_) \
     _(ConvertWin32PerformanceCounterToTimeKHR, KHR_win32_convert_performance_counter_time) \
     _(ConvertTimeToWin32PerformanceCounterKHR, KHR_win32_convert_performance_counter_time) \
 
 
+/// For every function defined by XR_KHR_convert_timespec_time in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_KHR_convert_timespec_time(_) \
     _(ConvertTimespecTimeToTimeKHR, KHR_convert_timespec_time) \
     _(ConvertTimeToTimespecTimeKHR, KHR_convert_timespec_time) \
 
 
+/// For every function defined by XR_KHR_loader_init in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_KHR_loader_init(_) \
     _(InitializeLoaderKHR, KHR_loader_init) \
 
 
+/// For every function defined by XR_KHR_vulkan_enable2 in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_KHR_vulkan_enable2(_) \
     _(CreateVulkanInstanceKHR, KHR_vulkan_enable2) \
     _(CreateVulkanDeviceKHR, KHR_vulkan_enable2) \
     _(GetVulkanGraphicsDevice2KHR, KHR_vulkan_enable2) \
 
 
+/// For every function defined by XR_EXT_performance_settings in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_EXT_performance_settings(_) \
     _(PerfSettingsSetPerformanceLevelEXT, EXT_performance_settings) \
 
 
+/// For every function defined by XR_EXT_thermal_query in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_EXT_thermal_query(_) \
     _(ThermalGetTemperatureTrendEXT, EXT_thermal_query) \
 
 
+/// For every function defined by XR_EXT_debug_utils in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_EXT_debug_utils(_) \
     _(SetDebugUtilsObjectNameEXT, EXT_debug_utils) \
     _(CreateDebugUtilsMessengerEXT, EXT_debug_utils) \
@@ -5082,12 +5620,20 @@ XR_ENUM_STR(XrResult);
     _(SessionInsertDebugUtilsLabelEXT, EXT_debug_utils) \
 
 
+/// For every function defined by XR_MSFT_spatial_anchor in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_MSFT_spatial_anchor(_) \
     _(CreateSpatialAnchorMSFT, MSFT_spatial_anchor) \
     _(CreateSpatialAnchorSpaceMSFT, MSFT_spatial_anchor) \
     _(DestroySpatialAnchorMSFT, MSFT_spatial_anchor) \
 
 
+/// For every function defined by XR_EXT_conformance_automation in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_EXT_conformance_automation(_) \
     _(SetInputDeviceActiveEXT, EXT_conformance_automation) \
     _(SetInputDeviceStateBoolEXT, EXT_conformance_automation) \
@@ -5096,6 +5642,10 @@ XR_ENUM_STR(XrResult);
     _(SetInputDeviceLocationEXT, EXT_conformance_automation) \
 
 
+/// For every function defined by XR_MSFT_spatial_graph_bridge in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_MSFT_spatial_graph_bridge(_) \
     _(CreateSpatialGraphNodeSpaceMSFT, MSFT_spatial_graph_bridge) \
     _(TryCreateSpatialGraphStaticNodeBindingMSFT, MSFT_spatial_graph_bridge) \
@@ -5103,17 +5653,29 @@ XR_ENUM_STR(XrResult);
     _(GetSpatialGraphNodeBindingPropertiesMSFT, MSFT_spatial_graph_bridge) \
 
 
+/// For every function defined by XR_EXT_hand_tracking in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_EXT_hand_tracking(_) \
     _(CreateHandTrackerEXT, EXT_hand_tracking) \
     _(DestroyHandTrackerEXT, EXT_hand_tracking) \
     _(LocateHandJointsEXT, EXT_hand_tracking) \
 
 
+/// For every function defined by XR_MSFT_hand_tracking_mesh in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_MSFT_hand_tracking_mesh(_) \
     _(CreateHandMeshSpaceMSFT, MSFT_hand_tracking_mesh) \
     _(UpdateHandMeshMSFT, MSFT_hand_tracking_mesh) \
 
 
+/// For every function defined by XR_MSFT_controller_model in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_MSFT_controller_model(_) \
     _(GetControllerModelKeyMSFT, MSFT_controller_model) \
     _(LoadControllerModelMSFT, MSFT_controller_model) \
@@ -5121,20 +5683,36 @@ XR_ENUM_STR(XrResult);
     _(GetControllerModelStateMSFT, MSFT_controller_model) \
 
 
+/// For every function defined by XR_MSFT_perception_anchor_interop in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_MSFT_perception_anchor_interop(_) \
     _(CreateSpatialAnchorFromPerceptionAnchorMSFT, MSFT_perception_anchor_interop) \
     _(TryGetPerceptionAnchorFromSpatialAnchorMSFT, MSFT_perception_anchor_interop) \
 
 
+/// For every function defined by XR_MSFT_composition_layer_reprojection in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_MSFT_composition_layer_reprojection(_) \
     _(EnumerateReprojectionModesMSFT, MSFT_composition_layer_reprojection) \
 
 
+/// For every function defined by XR_FB_swapchain_update_state in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_FB_swapchain_update_state(_) \
     _(UpdateSwapchainFB, FB_swapchain_update_state) \
     _(GetSwapchainStateFB, FB_swapchain_update_state) \
 
 
+/// For every function defined by XR_FB_body_tracking in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_FB_body_tracking(_) \
     _(CreateBodyTrackerFB, FB_body_tracking) \
     _(DestroyBodyTrackerFB, FB_body_tracking) \
@@ -5142,6 +5720,10 @@ XR_ENUM_STR(XrResult);
     _(GetBodySkeletonFB, FB_body_tracking) \
 
 
+/// For every function defined by XR_MSFT_scene_understanding in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_MSFT_scene_understanding(_) \
     _(EnumerateSceneComputeFeaturesMSFT, MSFT_scene_understanding) \
     _(CreateSceneObserverMSFT, MSFT_scene_understanding) \
@@ -5155,36 +5737,64 @@ XR_ENUM_STR(XrResult);
     _(GetSceneMeshBuffersMSFT, MSFT_scene_understanding) \
 
 
+/// For every function defined by XR_MSFT_scene_understanding_serialization in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_MSFT_scene_understanding_serialization(_) \
     _(DeserializeSceneMSFT, MSFT_scene_understanding_serialization) \
     _(GetSerializedSceneFragmentDataMSFT, MSFT_scene_understanding_serialization) \
 
 
+/// For every function defined by XR_FB_display_refresh_rate in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_FB_display_refresh_rate(_) \
     _(EnumerateDisplayRefreshRatesFB, FB_display_refresh_rate) \
     _(GetDisplayRefreshRateFB, FB_display_refresh_rate) \
     _(RequestDisplayRefreshRateFB, FB_display_refresh_rate) \
 
 
+/// For every function defined by XR_HTCX_vive_tracker_interaction in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_HTCX_vive_tracker_interaction(_) \
     _(EnumerateViveTrackerPathsHTCX, HTCX_vive_tracker_interaction) \
 
 
+/// For every function defined by XR_HTC_facial_tracking in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_HTC_facial_tracking(_) \
     _(CreateFacialTrackerHTC, HTC_facial_tracking) \
     _(DestroyFacialTrackerHTC, HTC_facial_tracking) \
     _(GetFacialExpressionsHTC, HTC_facial_tracking) \
 
 
+/// For every function defined by XR_FB_color_space in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_FB_color_space(_) \
     _(EnumerateColorSpacesFB, FB_color_space) \
     _(SetColorSpaceFB, FB_color_space) \
 
 
+/// For every function defined by XR_FB_hand_tracking_mesh in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_FB_hand_tracking_mesh(_) \
     _(GetHandMeshFB, FB_hand_tracking_mesh) \
 
 
+/// For every function defined by XR_FB_spatial_entity in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_FB_spatial_entity(_) \
     _(CreateSpatialAnchorFB, FB_spatial_entity) \
     _(GetSpaceUuidFB, FB_spatial_entity) \
@@ -5193,16 +5803,28 @@ XR_ENUM_STR(XrResult);
     _(GetSpaceComponentStatusFB, FB_spatial_entity) \
 
 
+/// For every function defined by XR_FB_foveation in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_FB_foveation(_) \
     _(CreateFoveationProfileFB, FB_foveation) \
     _(DestroyFoveationProfileFB, FB_foveation) \
 
 
+/// For every function defined by XR_FB_keyboard_tracking in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_FB_keyboard_tracking(_) \
     _(QuerySystemTrackedKeyboardFB, FB_keyboard_tracking) \
     _(CreateKeyboardSpaceFB, FB_keyboard_tracking) \
 
 
+/// For every function defined by XR_FB_triangle_mesh in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_FB_triangle_mesh(_) \
     _(CreateTriangleMeshFB, FB_triangle_mesh) \
     _(DestroyTriangleMeshFB, FB_triangle_mesh) \
@@ -5214,6 +5836,10 @@ XR_ENUM_STR(XrResult);
     _(TriangleMeshEndVertexBufferUpdateFB, FB_triangle_mesh) \
 
 
+/// For every function defined by XR_FB_passthrough in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_FB_passthrough(_) \
     _(CreatePassthroughFB, FB_passthrough) \
     _(DestroyPassthroughFB, FB_passthrough) \
@@ -5229,16 +5855,28 @@ XR_ENUM_STR(XrResult);
     _(GeometryInstanceSetTransformFB, FB_passthrough) \
 
 
+/// For every function defined by XR_FB_render_model in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_FB_render_model(_) \
     _(EnumerateRenderModelPathsFB, FB_render_model) \
     _(GetRenderModelPropertiesFB, FB_render_model) \
     _(LoadRenderModelFB, FB_render_model) \
 
 
+/// For every function defined by XR_VARJO_environment_depth_estimation in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_VARJO_environment_depth_estimation(_) \
     _(SetEnvironmentDepthEstimationVARJO, VARJO_environment_depth_estimation) \
 
 
+/// For every function defined by XR_VARJO_marker_tracking in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_VARJO_marker_tracking(_) \
     _(SetMarkerTrackingVARJO, VARJO_marker_tracking) \
     _(SetMarkerTrackingTimeoutVARJO, VARJO_marker_tracking) \
@@ -5247,14 +5885,26 @@ XR_ENUM_STR(XrResult);
     _(CreateMarkerSpaceVARJO, VARJO_marker_tracking) \
 
 
+/// For every function defined by XR_VARJO_view_offset in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_VARJO_view_offset(_) \
     _(SetViewOffsetVARJO, VARJO_view_offset) \
 
 
+/// For every function defined by XR_ML_compat in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_ML_compat(_) \
     _(CreateSpaceFromCoordinateFrameUIDML, ML_compat) \
 
 
+/// For every function defined by XR_ML_marker_understanding in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_ML_marker_understanding(_) \
     _(CreateMarkerDetectorML, ML_marker_understanding) \
     _(DestroyMarkerDetectorML, ML_marker_understanding) \
@@ -5268,6 +5918,10 @@ XR_ENUM_STR(XrResult);
     _(CreateMarkerSpaceML, ML_marker_understanding) \
 
 
+/// For every function defined by XR_ML_localization_map in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_ML_localization_map(_) \
     _(EnableLocalizationEventsML, ML_localization_map) \
     _(QueryLocalizationMapsML, ML_localization_map) \
@@ -5278,6 +5932,10 @@ XR_ENUM_STR(XrResult);
     _(GetExportedLocalizationMapDataML, ML_localization_map) \
 
 
+/// For every function defined by XR_MSFT_spatial_anchor_persistence in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_MSFT_spatial_anchor_persistence(_) \
     _(CreateSpatialAnchorStoreConnectionMSFT, MSFT_spatial_anchor_persistence) \
     _(DestroySpatialAnchorStoreConnectionMSFT, MSFT_spatial_anchor_persistence) \
@@ -5288,30 +5946,54 @@ XR_ENUM_STR(XrResult);
     _(ClearSpatialAnchorStoreMSFT, MSFT_spatial_anchor_persistence) \
 
 
+/// For every function defined by XR_MSFT_scene_marker in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_MSFT_scene_marker(_) \
     _(GetSceneMarkerRawDataMSFT, MSFT_scene_marker) \
     _(GetSceneMarkerDecodedStringMSFT, MSFT_scene_marker) \
 
 
+/// For every function defined by XR_FB_spatial_entity_query in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_FB_spatial_entity_query(_) \
     _(QuerySpacesFB, FB_spatial_entity_query) \
     _(RetrieveSpaceQueryResultsFB, FB_spatial_entity_query) \
 
 
+/// For every function defined by XR_FB_spatial_entity_storage in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_FB_spatial_entity_storage(_) \
     _(SaveSpaceFB, FB_spatial_entity_storage) \
     _(EraseSpaceFB, FB_spatial_entity_storage) \
 
 
+/// For every function defined by XR_OCULUS_audio_device_guid in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_OCULUS_audio_device_guid(_) \
     _(GetAudioOutputDeviceGuidOculus, OCULUS_audio_device_guid) \
     _(GetAudioInputDeviceGuidOculus, OCULUS_audio_device_guid) \
 
 
+/// For every function defined by XR_FB_spatial_entity_sharing in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_FB_spatial_entity_sharing(_) \
     _(ShareSpacesFB, FB_spatial_entity_sharing) \
 
 
+/// For every function defined by XR_FB_scene in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_FB_scene(_) \
     _(GetSpaceBoundingBox2DFB, FB_scene) \
     _(GetSpaceBoundingBox3DFB, FB_scene) \
@@ -5320,46 +6002,86 @@ XR_ENUM_STR(XrResult);
     _(GetSpaceRoomLayoutFB, FB_scene) \
 
 
+/// For every function defined by XR_ALMALENCE_digital_lens_control in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_ALMALENCE_digital_lens_control(_) \
     _(SetDigitalLensControlALMALENCE, ALMALENCE_digital_lens_control) \
 
 
+/// For every function defined by XR_FB_scene_capture in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_FB_scene_capture(_) \
     _(RequestSceneCaptureFB, FB_scene_capture) \
 
 
+/// For every function defined by XR_FB_spatial_entity_container in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_FB_spatial_entity_container(_) \
     _(GetSpaceContainerFB, FB_spatial_entity_container) \
 
 
+/// For every function defined by XR_META_foveation_eye_tracked in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_META_foveation_eye_tracked(_) \
     _(GetFoveationEyeTrackedStateMETA, META_foveation_eye_tracked) \
 
 
+/// For every function defined by XR_FB_face_tracking in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_FB_face_tracking(_) \
     _(CreateFaceTrackerFB, FB_face_tracking) \
     _(DestroyFaceTrackerFB, FB_face_tracking) \
     _(GetFaceExpressionWeightsFB, FB_face_tracking) \
 
 
+/// For every function defined by XR_FB_eye_tracking_social in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_FB_eye_tracking_social(_) \
     _(CreateEyeTrackerFB, FB_eye_tracking_social) \
     _(DestroyEyeTrackerFB, FB_eye_tracking_social) \
     _(GetEyeGazesFB, FB_eye_tracking_social) \
 
 
+/// For every function defined by XR_FB_passthrough_keyboard_hands in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_FB_passthrough_keyboard_hands(_) \
     _(PassthroughLayerSetKeyboardHandsIntensityFB, FB_passthrough_keyboard_hands) \
 
 
+/// For every function defined by XR_FB_haptic_pcm in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_FB_haptic_pcm(_) \
     _(GetDeviceSampleRateFB, FB_haptic_pcm) \
 
 
+/// For every function defined by XR_META_passthrough_preferences in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_META_passthrough_preferences(_) \
     _(GetPassthroughPreferencesMETA, META_passthrough_preferences) \
 
 
+/// For every function defined by XR_META_virtual_keyboard in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_META_virtual_keyboard(_) \
     _(CreateVirtualKeyboardMETA, META_virtual_keyboard) \
     _(DestroyVirtualKeyboardMETA, META_virtual_keyboard) \
@@ -5374,10 +6096,18 @@ XR_ENUM_STR(XrResult);
     _(ChangeVirtualKeyboardTextContextMETA, META_virtual_keyboard) \
 
 
+/// For every function defined by XR_OCULUS_external_camera in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_OCULUS_external_camera(_) \
     _(EnumerateExternalCamerasOCULUS, OCULUS_external_camera) \
 
 
+/// For every function defined by XR_META_performance_metrics in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_META_performance_metrics(_) \
     _(EnumeratePerformanceMetricsCounterPathsMETA, META_performance_metrics) \
     _(SetPerformanceMetricsStateMETA, META_performance_metrics) \
@@ -5385,36 +6115,64 @@ XR_ENUM_STR(XrResult);
     _(QueryPerformanceMetricsCounterMETA, META_performance_metrics) \
 
 
+/// For every function defined by XR_FB_spatial_entity_storage_batch in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_FB_spatial_entity_storage_batch(_) \
     _(SaveSpaceListFB, FB_spatial_entity_storage_batch) \
 
 
+/// For every function defined by XR_FB_spatial_entity_user in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_FB_spatial_entity_user(_) \
     _(CreateSpaceUserFB, FB_spatial_entity_user) \
     _(GetSpaceUserIdFB, FB_spatial_entity_user) \
     _(DestroySpaceUserFB, FB_spatial_entity_user) \
 
 
+/// For every function defined by XR_META_recommended_layer_resolution in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_META_recommended_layer_resolution(_) \
     _(GetRecommendedLayerResolutionMETA, META_recommended_layer_resolution) \
 
 
+/// For every function defined by XR_META_passthrough_color_lut in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_META_passthrough_color_lut(_) \
     _(CreatePassthroughColorLutMETA, META_passthrough_color_lut) \
     _(DestroyPassthroughColorLutMETA, META_passthrough_color_lut) \
     _(UpdatePassthroughColorLutMETA, META_passthrough_color_lut) \
 
 
+/// For every function defined by XR_META_spatial_entity_mesh in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_META_spatial_entity_mesh(_) \
     _(GetSpaceTriangleMeshMETA, META_spatial_entity_mesh) \
 
 
+/// For every function defined by XR_FB_face_tracking2 in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_FB_face_tracking2(_) \
     _(CreateFaceTracker2FB, FB_face_tracking2) \
     _(DestroyFaceTracker2FB, FB_face_tracking2) \
     _(GetFaceExpressionWeights2FB, FB_face_tracking2) \
 
 
+/// For every function defined by XR_META_environment_depth in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_META_environment_depth(_) \
     _(CreateEnvironmentDepthProviderMETA, META_environment_depth) \
     _(DestroyEnvironmentDepthProviderMETA, META_environment_depth) \
@@ -5428,28 +6186,52 @@ XR_ENUM_STR(XrResult);
     _(SetEnvironmentDepthHandRemovalMETA, META_environment_depth) \
 
 
+/// For every function defined by XR_QCOM_tracking_optimization_settings in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_QCOM_tracking_optimization_settings(_) \
     _(SetTrackingOptimizationSettingsHintQCOM, QCOM_tracking_optimization_settings) \
 
 
+/// For every function defined by XR_HTC_passthrough in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_HTC_passthrough(_) \
     _(CreatePassthroughHTC, HTC_passthrough) \
     _(DestroyPassthroughHTC, HTC_passthrough) \
 
 
+/// For every function defined by XR_HTC_foveation in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_HTC_foveation(_) \
     _(ApplyFoveationHTC, HTC_foveation) \
 
 
+/// For every function defined by XR_HTC_anchor in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_HTC_anchor(_) \
     _(CreateSpatialAnchorHTC, HTC_anchor) \
     _(GetSpatialAnchorNameHTC, HTC_anchor) \
 
 
+/// For every function defined by XR_MNDX_force_feedback_curl in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_MNDX_force_feedback_curl(_) \
     _(ApplyForceFeedbackCurlMNDX, MNDX_force_feedback_curl) \
 
 
+/// For every function defined by XR_EXT_plane_detection in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_EXT_plane_detection(_) \
     _(CreatePlaneDetectorEXT, EXT_plane_detection) \
     _(DestroyPlaneDetectorEXT, EXT_plane_detection) \
@@ -5459,11 +6241,19 @@ XR_ENUM_STR(XrResult);
     _(GetPlanePolygonBufferEXT, EXT_plane_detection) \
 
 
+/// For every function defined by XR_EXT_future in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_EXT_future(_) \
     _(PollFutureEXT, EXT_future) \
     _(CancelFutureEXT, EXT_future) \
 
 
+/// For every function defined by XR_ML_user_calibration in this version of the spec,
+/// calls your macro with the function name and extension name.
+/// Trims the leading `xr` from the function name and the leading `XR_` from the feature name,
+/// because it is easy to add back but impossible to remove with the preprocessor.
 #define XR_LIST_FUNCTIONS_XR_ML_user_calibration(_) \
     _(EnableUserCalibrationEventsML, ML_user_calibration) \
 

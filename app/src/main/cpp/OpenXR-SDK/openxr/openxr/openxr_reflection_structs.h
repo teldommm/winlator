@@ -20,6 +20,9 @@ This file contains expansion macros (X Macros) for OpenXR structures.
 
 
 
+/// Calls one of your macros with the structure type name and the XrStructureType constant for
+/// each known structure type. The first macro (_avail) is called for those that are available,
+/// while the second macro (_unavail) is called for those unavailable due to preprocessor definitions.
 #define XR_LIST_ALL_STRUCTURE_TYPES(_avail, _unavail) \
     _impl_XR_LIST_ALL_STRUCTURE_TYPES_CORE(_avail, _unavail) \
     _impl_XR_LIST_ALL_STRUCTURE_TYPES_XR_USE_GRAPHICS_API_D3D11(_avail, _unavail) \
@@ -38,6 +41,7 @@ This file contains expansion macros (X Macros) for OpenXR structures.
     _impl_XR_LIST_ALL_STRUCTURE_TYPES_XR_USE_PLATFORM_WIN32(_avail, _unavail) \
 
 
+// Implementation detail of XR_LIST_ALL_STRUCTURE_TYPES()
 #define _impl_XR_LIST_ALL_STRUCTURE_TYPES_CORE(_avail, _unavail) \
     _avail(XrApiLayerProperties, XR_TYPE_API_LAYER_PROPERTIES) \
     _avail(XrExtensionProperties, XR_TYPE_EXTENSION_PROPERTIES) \

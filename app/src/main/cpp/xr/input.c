@@ -10,6 +10,7 @@ void XrInputInit(struct XrEngine* engine, struct XrInput* input)
         return;
     memset(input, 0, sizeof(input));
 
+    // Actions
     input->ActionSet = XrInputCreateActionSet(engine->Instance, "running_action_set", "Actionset");
     input->IndexLeft = XrInputCreateAction(input->ActionSet, XR_ACTION_TYPE_BOOLEAN_INPUT, "index_left", "Index left", 0, NULL);
     input->IndexRight = XrInputCreateAction(input->ActionSet, XR_ACTION_TYPE_BOOLEAN_INPUT, "index_right","Index right", 0, NULL);
@@ -42,6 +43,7 @@ void XrInputInit(struct XrEngine* engine, struct XrInput* input)
         OXR(xrStringToPath(engine->Instance, "/interaction_profiles/pico/neo3_controller",&interactionProfilePath));
     }
 
+    // Map bindings
     XrInstance instance = engine->Instance;
     XrActionSuggestedBinding bindings[32];  // large enough for all profiles
     int curr = 0;
@@ -82,6 +84,7 @@ void XrInputInit(struct XrEngine* engine, struct XrInput* input)
     suggested_bindings.countSuggestedBindings = curr;
     OXR(xrSuggestInteractionProfileBindings(engine->Instance, &suggested_bindings));
 
+    // Attach actions
     XrSessionActionSetsAttachInfo attach_info = {};
     attach_info.type = XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO;
     attach_info.next = NULL;
@@ -89,6 +92,7 @@ void XrInputInit(struct XrEngine* engine, struct XrInput* input)
     attach_info.actionSets = &input->ActionSet;
     OXR(xrAttachSessionActionSets(engine->Session, &attach_info));
 
+    // Enumerate actions
     char string_buffer[256];
     XrPath action_paths_buffer[32];
     XrAction actions_to_enumerate[] = {input->IndexLeft,
@@ -115,6 +119,7 @@ void XrInputInit(struct XrEngine* engine, struct XrInput* input)
         e.next = NULL;
         e.action = actions_to_enumerate[i];
 
+        // Get Count
         uint32_t count_output = 0;
         OXR(xrEnumerateBoundSourcesForAction(engine->Session, &e, 0, &count_output, NULL));
 
@@ -175,6 +180,7 @@ XrPosef XrInputGetPose(struct XrInput* input, int controller)
 
 void XrInputUpdate(struct XrEngine* engine, struct XrInput* input)
 {
+    // sync action data
     XrActiveActionSet activeActionSet = {};
     activeActionSet.actionSet = input->ActionSet;
     activeActionSet.subactionPath = XR_NULL_PATH;
@@ -186,6 +192,7 @@ void XrInputUpdate(struct XrEngine* engine, struct XrInput* input)
     sync_info.activeActionSets = &activeActionSet;
     OXR(xrSyncActions(engine->Session, &sync_info));
 
+    // query input action states
     XrActionStateGetInfo get_info = {};
     get_info.type = XR_TYPE_ACTION_STATE_GET_INFO;
     get_info.next = NULL;
@@ -203,6 +210,7 @@ void XrInputUpdate(struct XrEngine* engine, struct XrInput* input)
         input->RightControllerSpace = XrInputCreateActionSpace(session, input->HandPoseRight, input->RightHandPath);
     }
 
+    // button mapping
     input->ButtonsLeft = 0;
     if (XrInputGetActionStateBoolean(session, input->ButtonMenu).currentState)
         input->ButtonsLeft |= (int)Enter;
@@ -228,6 +236,7 @@ void XrInputUpdate(struct XrEngine* engine, struct XrInput* input)
     if (XrInputGetActionStateBoolean(session, input->ThumbRight).currentState)
         input->ButtonsRight |= (int)RThumb;
 
+    // thumbstick
     input->JoystickState[0] = XrInputGetActionStateVector2(session, input->JoystickLeft);
     input->JoystickState[1] = XrInputGetActionStateVector2(session, input->JoystickRight);
     if (input->JoystickState[0].currentState.x > 0.5)
@@ -247,6 +256,7 @@ void XrInputUpdate(struct XrEngine* engine, struct XrInput* input)
     if (input->JoystickState[1].currentState.y < -0.5)
         input->ButtonsRight |= (int)Down;
 
+    // pose
     for (int i = 0; i < 2; i++)
     {
         memset(&input->ControllerPose[i], 0, sizeof(input->ControllerPose[i]));
@@ -396,6 +406,7 @@ void XrInputProcessHaptics(struct XrInput* input, XrSession session)
     {
         if (input->VibrationChannelDuration[i] > 0.0f || input->VibrationChannelDuration[i] == -1.0f)
         {
+            // fire haptics using output action
             XrHapticVibration vibration = {};
             vibration.type = XR_TYPE_HAPTIC_VIBRATION;
             vibration.next = NULL;
@@ -421,6 +432,7 @@ void XrInputProcessHaptics(struct XrInput* input, XrSession session)
         }
         else
         {
+            // Stop haptics
             XrHapticActionInfo haptic_info = {};
             haptic_info.type = XR_TYPE_HAPTIC_ACTION_INFO;
             haptic_info.next = NULL;

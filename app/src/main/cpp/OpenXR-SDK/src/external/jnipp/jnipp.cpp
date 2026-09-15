@@ -1,23 +1,29 @@
 #ifdef _WIN32
 # define WIN32_LEAN_AND_MEAN 1
 
+  // Windows Dependencies
 # include <windows.h>
 #else
+  // UNIX Dependencies
 # include <dlfcn.h>
 # include <unistd.h>
 # include <tuple>
 #endif
 
+// External Dependencies
 #include <jni.h>
 
+// Standard Dependencies
 #include <atomic>
 #include <string>
 #include <vector>
 
+// Local Dependencies
 #include "jnipp.h"
 
 namespace jni
 {
+    // Static Variables
     static std::atomic_bool isVm(false);
     static JavaVM* javaVm = nullptr;
 
@@ -42,6 +48,7 @@ namespace jni
         JNIEnv* get() const noexcept { return _env; }
 
     private:
+        // Instance Variables
         JavaVM* _vm;
         JNIEnv* _env;
         bool    _attached;    ///< Manually attached, as opposed to already attached.
@@ -104,10 +111,12 @@ namespace jni
         {
             wchar_t ch = str[i];
 
+            // Check for a two-segment character.
             if (ch >= wchar_t(0xD800) && ch <= wchar_t(0xDBFF)) {
                 if (i + 1 >= length)
                     break;
 
+                // Create a single, 32-bit character.
                 ch = (ch - wchar_t(0xD800)) << 10;
                 ch += str[i++] - wchar_t(0x1DC00);
             }
@@ -131,9 +140,11 @@ namespace jni
         {
             wchar_t ch = str[i];
 
+            // Check for multi-byte UTF-16 character.
             if (ch > wchar_t(0xFFFF)) {
                 ch -= uint32_t(0x10000);
 
+                // Add the first of the two-segment character.
                 result.push_back(jchar(0xD800 + (ch >> 10)));
                 ch = wchar_t(0xDC00) + (ch & 0x03FF);
             }
@@ -152,6 +163,8 @@ namespace jni
 
         if (env.get() != nullptr && !isAttached(javaVm))
         {
+            // we got detached, so clear it.
+            // will be re-populated from static javaVm below.
             env = ScopedEnv{};
         }
 
@@ -309,11 +322,13 @@ namespace jni
         {
             JNIEnv* env = jni::env();
 
+            // Ditch the old reference.
             if (_isGlobal)
                 env->DeleteGlobalRef(_handle);
             if (_class != nullptr)
                 env->DeleteGlobalRef(_class);
 
+            // Assign the new reference.
             if ((_isGlobal = !other.isNull()) != false)
                 _handle = env->NewGlobalRef(other._handle);
 
@@ -334,11 +349,13 @@ namespace jni
         {
             JNIEnv* env = jni::env();
 
+            // Ditch the old reference.
             if (_isGlobal)
                 env->DeleteGlobalRef(_handle);
             if (_class != nullptr)
                 env->DeleteGlobalRef(_class);
 
+            // Assign the new reference.
             _handle   = other._handle;
             _isGlobal = other._isGlobal;
             _class    = other._class;
@@ -1341,6 +1358,7 @@ namespace jni
         DWORD size = sizeof(buffer);
         HKEY versionKey;
 
+        // Search via registry entries.
         if (::RegOpenKeyA(HKEY_LOCAL_MACHINE, "Software\\JavaSoft\\Java Runtime Environment\\", &versionKey) == ERROR_SUCCESS)
         {
             if (::RegQueryValueEx(versionKey, "CurrentVersion", NULL, NULL, buffer, &size) == ERROR_SUCCESS)
@@ -1367,10 +1385,12 @@ namespace jni
 
         if (result.length() == 0)
         {
+            // Could not locate via registry. Try the JAVA_HOME environment variable.
             if ((size = ::GetEnvironmentVariableA("JAVA_HOME", (LPSTR) buffer, sizeof(buffer))) != 0)
             {
                 std::string javaHome((const char*) buffer, size);
 
+                // Different installers put in different relative locations.
                 std::string options[] = {
                     javaHome + "\\jre\\bin\\client\\jvm.dll",
                     javaHome + "\\jre\\bin\\server\\jvm.dll",
@@ -1397,6 +1417,7 @@ namespace jni
         } else {
             std::string path = readlink_deep("/usr/bin/java");
             if (!path.empty()) {
+                // drop bin and java
                 auto javaHome = drop_path_components(path, 2);
                 if (!javaHome.empty()) {
                     std::string options[] = {
@@ -1416,6 +1437,7 @@ namespace jni
                     }
                 }
             }
+            // Best guess so far.
             result = "/usr/lib/jvm/default-java/jre/lib/amd64/server/libjvm.so";
         }
 
@@ -1497,6 +1519,7 @@ namespace jni
         isVm.store(false);
     }
 
+    // Forward Declarations
     JNIEnv* env();
 
 #ifndef _WIN32
@@ -1505,6 +1528,7 @@ namespace jni
 
     namespace internal
     {
+        // Base Type Conversions
         void valueArg(value_t* v, bool a)                   { ((jvalue*) v)->z = jboolean(a); }
         void valueArg(value_t* v, byte_t a)                 { ((jvalue*) v)->b = a; }
         void valueArg(value_t* v, wchar_t a)                { ((jvalue*) v)->c = jchar(a); }    // Note: Possible truncation.
@@ -1528,6 +1552,7 @@ namespace jni
 
             std::string name = Class(obj->getClass(), Object::Temporary).getName();
 
+            // Change from "java.lang.Object" format to "java/lang/Object";
             for (size_t i = 0; i < name.length(); ++i)
                 if (name[i] == '.')
                     name[i] = '/';

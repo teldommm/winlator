@@ -69,6 +69,37 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
     public Container getContainer() { return this.container; }
     public void setContainer(Container container) { this.container = container; }
 
+    private ContentProfile resolveInstalledRuntimeProfile(ContentProfile.ContentType type, String version) {
+        ContentProfile exact = contentsManager.getProfileByEntryName(type + "-" + version);
+        if (exact != null && exact.remoteUrl == null) return exact;
+
+        ContentProfile bestMatch = null;
+        for (ContentProfile profile : contentsManager.getInstalledProfiles(type)) {
+            String entryName = ContentsManager.getEntryName(profile);
+            int separator = entryName.indexOf('-');
+            String versionId = separator >= 0 ? entryName.substring(separator + 1) : profile.verName;
+            if (version.equals(versionId) || version.equals(profile.verName)) {
+                if (bestMatch == null || profile.verCode > bestMatch.verCode) bestMatch = profile;
+            }
+        }
+        return bestMatch;
+    }
+
+    private boolean applyRuntimeContent(
+            ContentProfile.ContentType type,
+            String version,
+            Context context,
+            String bundledAsset,
+            File destination) {
+        ContentProfile profile = resolveInstalledRuntimeProfile(type, version);
+        if (profile != null) return contentsManager.applyContent(profile);
+        return TarCompressorUtils.extract(
+                TarCompressorUtils.Type.ZSTD,
+                context,
+                bundledAsset,
+                destination);
+    }
+
     private void extractBox64Files() {
         ImageFs imageFs = environment.getImageFs();
         Context context = environment.getContext();
@@ -83,13 +114,18 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         File rootDir = imageFs.getRootDir();
 
         if (!box64Version.equals(container.getExtra("box64Version"))) {
-            ContentProfile profile = contentsManager.getProfileByEntryName("box64-" + box64Version);
-            if (profile != null)
-                contentsManager.applyContent(profile);
-            else
-                TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, context, "box64/box64-" + box64Version + ".tzst", rootDir);
-            container.putExtra("box64Version", box64Version);
-            container.saveData();
+            boolean applied = applyRuntimeContent(
+                    ContentProfile.ContentType.CONTENT_TYPE_BOX64,
+                    box64Version,
+                    context,
+                    "box64/box64-" + box64Version + ".tzst",
+                    rootDir);
+            if (applied) {
+                container.putExtra("box64Version", box64Version);
+                container.saveData();
+            } else {
+                Log.e("GuestProgramLauncherComponent", "Unable to apply Box64 version " + box64Version);
+            }
         }
 
         File box64File = new File(rootDir, "/usr/bin/box64");
@@ -109,29 +145,48 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
 
         if (shortcut != null) {
             wowbox64Version = shortcut.getExtra("box64Version", shortcut.container.getBox64Version());
+            fexcoreVersion = shortcut.getExtra("fexcoreVersion", shortcut.container.getFEXCoreVersion());
         }
 
         Log.d("GuestProgramLauncherComponent", "box64Version in use: " + wowbox64Version);
         Log.d("GuestProgramLauncherComponent", "fexcoreVersion in use: " + fexcoreVersion);
 
         if (!wowbox64Version.equals(container.getExtra("box64Version"))) {
-            ContentProfile profile = contentsManager.getProfileByEntryName("wowbox64-" + wowbox64Version);
-            if (profile != null)
-                contentsManager.applyContent(profile);
-            else
-                TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, environment.getContext(), "wowbox64/wowbox64-" + wowbox64Version + ".tzst", system32dir);
-            container.putExtra("box64Version", wowbox64Version);
-            containerDataChanged = true;
+            boolean applied = applyRuntimeContent(
+                    ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64,
+                    wowbox64Version,
+                    context,
+                    "wowbox64/wowbox64-" + wowbox64Version + ".tzst",
+                    system32dir);
+            if (applied) {
+                container.putExtra("box64Version", wowbox64Version);
+                containerDataChanged = true;
+            } else {
+                Log.e("GuestProgramLauncherComponent", "Unable to apply WOWBox64 version " + wowbox64Version);
+            }
         }
 
-        if (!fexcoreVersion.equals(container.getExtra("fexcoreVersion"))) {
-            ContentProfile profile = contentsManager.getProfileByEntryName("fexcore-" + fexcoreVersion);
-            if (profile != null)
-                contentsManager.applyContent(profile);
-            else
-                TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, environment.getContext(), "fexcore/fexcore-" + fexcoreVersion + ".tzst", system32dir);
-            container.putExtra("fexcoreVersion", fexcoreVersion);
-            containerDataChanged = true;
+        ContentProfile fexcoreProfile = resolveInstalledRuntimeProfile(
+                ContentProfile.ContentType.CONTENT_TYPE_FEXCORE, fexcoreVersion);
+        boolean fexcoreFilesMissing = fexcoreProfile != null
+                && !contentsManager.isContentApplied(fexcoreProfile);
+        if (!fexcoreVersion.equals(container.getExtra("fexcoreVersion")) || fexcoreFilesMissing) {
+            if (fexcoreFilesMissing) {
+                Log.w("GuestProgramLauncherComponent",
+                        "FEXCore files are missing or incomplete; reapplying " + fexcoreVersion);
+            }
+            boolean applied = applyRuntimeContent(
+                    ContentProfile.ContentType.CONTENT_TYPE_FEXCORE,
+                    fexcoreVersion,
+                    context,
+                    "fexcore/fexcore-" + fexcoreVersion + ".tzst",
+                    system32dir);
+            if (applied) {
+                container.putExtra("fexcoreVersion", fexcoreVersion);
+                containerDataChanged = true;
+            } else {
+                Log.e("GuestProgramLauncherComponent", "Unable to apply FEXCore version " + fexcoreVersion);
+            }
         }
         if (containerDataChanged) container.saveData();
     }
@@ -153,7 +208,6 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             pid = execGuestProgram();
         }
     }
-
 
     private String checkDependencies() {
         String curlPath = environment.getImageFs().getRootDir().getPath() + "/usr/lib/libXau.so";
@@ -179,10 +233,9 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             output.append("Error running ldd: ").append(e.getMessage());
         }
 
-        Log.d("CurlDeps", output.toString()); // Log the full dependency output
+        Log.d("CurlDeps", output.toString()); 
         return output.toString();
     }
-
 
     @Override
     public void stop() {
@@ -193,6 +246,27 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             }
         }
     }
+
+    private static String mergePreloadValue(String baseValue, String overrideValue) {
+        if (overrideValue == null || overrideValue.isEmpty()) {
+            return baseValue == null ? "" : baseValue;
+        }
+        if (baseValue == null || baseValue.isEmpty()) {
+            return overrideValue;
+        }
+        if (overrideValue.equals(baseValue)) {
+            return baseValue;
+        }
+        return baseValue + ":" + overrideValue;
+    }
+    private static String appendFirstExistingPreload(String ldPreload, File[] candidates) {
+        for (File candidate : candidates) {
+            if (candidate.exists()) {
+                return mergePreloadValue(ldPreload, candidate.getAbsolutePath());
+            }
+        }
+        return ldPreload;
+   }
 
     public Callback<Integer> getTerminationCallback() {
         return terminationCallback;
@@ -247,64 +321,63 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         boolean shareAndroidClipboard = preferences.getBoolean("share_android_clipboard", false);
 
         if (openWithAndroidBrowser)
-            envVars.put("WINE_OPEN_WITH_ANDROID_BROWSER", "1");
+            this.envVars.put("WINE_OPEN_WITH_ANDROID_BROWSER", "1");
         if (shareAndroidClipboard) {
-            envVars.put("WINE_FROM_ANDROID_CLIPBOARD", "1");
-            envVars.put("WINE_TO_ANDROID_CLIPBOARD", "1");
+            this.envVars.put("WINE_FROM_ANDROID_CLIPBOARD", "1");
+            this.envVars.put("WINE_TO_ANDROID_CLIPBOARD", "1");
         }
 
-        EnvVars envVars = new EnvVars();
+        EnvVars execEnvVars = new EnvVars();
 
-        addBox64EnvVars(envVars, enableBox64Logs);
-        envVars.putAll(FEXCorePresetManager.getEnvVars(context, fexcorePreset));
+        addBox64EnvVars(execEnvVars, enableBox64Logs);
+        execEnvVars.putAll(FEXCorePresetManager.getEnvVars(context, fexcorePreset));
 
         String renderer = GPUInformation.getRenderer(null, null);
 
-        if (renderer.contains("Mali")) //Mali Cope HAHAHAHAHAHA
-            envVars.put("BOX64_MMAP32", "0");
+        if (renderer.contains("Mali")) 
+            execEnvVars.put("BOX64_MMAP32", "0");
 
-        if (envVars.get("BOX64_MMAP32").equals("1") && !wineInfo.isArm64EC()) {
+        if (execEnvVars.get("BOX64_MMAP32").equals("1") && !wineInfo.isArm64EC()) {
             Log.d("GuestProgramLauncherComponent", "Disabling map memory placed");
-            envVars.put("WRAPPER_DISABLE_PLACED", "1");
+            execEnvVars.put("WRAPPER_DISABLE_PLACED", "1");
         }
 
-        envVars.put("HOME", imageFs.home_path);
-        envVars.put("USER", ImageFs.USER);
-        envVars.put("TMPDIR", rootDir.getPath() + "/usr/tmp");
-        envVars.put("XDG_DATA_DIRS", rootDir.getPath() + "/usr/share");
-        envVars.put("LD_LIBRARY_PATH", rootDir.getPath() + "/usr/lib" + ":" + "/system/lib64");
-        envVars.put("XDG_CONFIG_DIRS", rootDir.getPath() + "/usr/etc/xdg");
-        envVars.put("GST_PLUGIN_PATH", rootDir.getPath() + "/usr/lib/gstreamer-1.0");
-        envVars.put("FONTCONFIG_PATH", rootDir.getPath() + "/usr/etc/fonts");
-        envVars.put("VK_LAYER_PATH", rootDir.getPath() + "/usr/share/vulkan/implicit_layer.d" + ":" + rootDir.getPath() + "/usr/share/vulkan/explicit_layer.d");
-        envVars.put("WRAPPER_LAYER_PATH", rootDir.getPath() + "/usr/lib");
-        envVars.put("WRAPPER_CACHE_PATH", rootDir.getPath() + "/usr/var/cache");
-        envVars.put("WINE_NO_DUPLICATE_EXPLORER", "1");
-        envVars.put("PREFIX", rootDir.getPath() + "/usr");
-        envVars.put("DISPLAY", ":0");
-        envVars.put("WINE_DISABLE_FULLSCREEN_HACK", "1");
-        envVars.put("GST_PLUGIN_FEATURE_RANK", "ximagesink:3000");
-        envVars.put("ALSA_CONFIG_PATH", rootDir.getPath() + "/usr/share/alsa/alsa.conf" + ":" + rootDir.getPath() + "/usr/etc/alsa/conf.d/android_aserver.conf");
-        envVars.put("ALSA_PLUGIN_DIR", rootDir.getPath() + "/usr/lib/alsa-lib");
-        envVars.put("OPENSSL_CONF", rootDir.getPath() + "/usr/etc/tls/openssl.cnf");
-        envVars.put("SSL_CERT_FILE", rootDir.getPath() + "/usr/etc/tls/cert.pem");
-        envVars.put("SSL_CERT_DIR", rootDir.getPath() + "/usr/etc/tls/certs");
-        envVars.put("WINE_X11FORCEGLX", "1");
-        envVars.put("WINE_GST_NO_GL", "1");
-        envVars.put("SteamGameId", "0");
-        envVars.put("PROTON_AUDIO_CONVERT", "0");
-        envVars.put("PROTON_VIDEO_CONVERT", "0");
-        envVars.put("PROTON_DEMUX", "0");
+        execEnvVars.put("HOME", imageFs.home_path);
+        execEnvVars.put("USER", ImageFs.USER);
+        execEnvVars.put("TMPDIR", rootDir.getPath() + "/usr/tmp");
+        execEnvVars.put("XDG_DATA_DIRS", rootDir.getPath() + "/usr/share");
+        execEnvVars.put("LD_LIBRARY_PATH", rootDir.getPath() + "/usr/lib" + ":" + "/system/lib64");
+        execEnvVars.put("XDG_CONFIG_DIRS", rootDir.getPath() + "/usr/etc/xdg");
+        execEnvVars.put("GST_PLUGIN_PATH", rootDir.getPath() + "/usr/lib/gstreamer-1.0");
+        execEnvVars.put("FONTCONFIG_PATH", rootDir.getPath() + "/usr/etc/fonts");
+        execEnvVars.put("VK_LAYER_PATH", rootDir.getPath() + "/usr/share/vulkan/implicit_layer.d" + ":" + rootDir.getPath() + "/usr/share/vulkan/explicit_layer.d");
+        execEnvVars.put("WRAPPER_LAYER_PATH", rootDir.getPath() + "/usr/lib");
+        execEnvVars.put("WRAPPER_CACHE_PATH", rootDir.getPath() + "/usr/var/cache");
+        execEnvVars.put("WINE_NO_DUPLICATE_EXPLORER", "1");
+        execEnvVars.put("PREFIX", rootDir.getPath() + "/usr");
+        execEnvVars.put("DISPLAY", ":0");
+        execEnvVars.put("WINE_DISABLE_FULLSCREEN_HACK", "1");
+        execEnvVars.put("GST_PLUGIN_FEATURE_RANK", "ximagesink:3000");
+        execEnvVars.put("ALSA_CONFIG_PATH", rootDir.getPath() + "/usr/share/alsa/alsa.conf" + ":" + rootDir.getPath() + "/usr/etc/alsa/conf.d/android_aserver.conf");
+        execEnvVars.put("ALSA_PLUGIN_DIR", rootDir.getPath() + "/usr/lib/alsa-lib");
+        execEnvVars.put("OPENSSL_CONF", rootDir.getPath() + "/usr/etc/tls/openssl.cnf");
+        execEnvVars.put("SSL_CERT_FILE", rootDir.getPath() + "/usr/etc/tls/cert.pem");
+        execEnvVars.put("SSL_CERT_DIR", rootDir.getPath() + "/usr/etc/tls/certs");
+        execEnvVars.put("WINE_X11FORCEGLX", "1");
+        execEnvVars.put("WINE_GST_NO_GL", "1");
+        execEnvVars.put("SteamGameId", "0");
+        execEnvVars.put("PROTON_AUDIO_CONVERT", "0");
+        execEnvVars.put("PROTON_VIDEO_CONVERT", "0");
+        execEnvVars.put("PROTON_DEMUX", "0");
 
         String winePath = imageFs.getWinePath() + "/bin";
 
         Log.d("GuestProgramLauncherComponent", "WinePath is " + winePath);
 
-        envVars.put("PATH", winePath + ":" +
+        execEnvVars.put("PATH", winePath + ":" +
                 rootDir.getPath() + "/usr/bin");
 
- 
-        envVars.put("ANDROID_SYSVSHM_SERVER", rootDir.getPath() + UnixSocketConfig.SYSVSHM_SERVER_PATH);
+        execEnvVars.put("ANDROID_SYSVSHM_SERVER", rootDir.getPath() + UnixSocketConfig.SYSVSHM_SERVER_PATH);
 
         String primaryDNS = "8.8.4.4";
         ConnectivityManager connectivityManager = (ConnectivityManager) context.getSystemService(Service.CONNECTIVITY_SERVICE);
@@ -312,8 +385,8 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             ArrayList<InetAddress> dnsServers = new ArrayList<>(connectivityManager.getLinkProperties(connectivityManager.getActiveNetwork()).getDnsServers());
             primaryDNS = dnsServers.get(0).toString().substring(1);
         }
-        envVars.put("ANDROID_RESOLV_DNS", primaryDNS);
-        envVars.put("WINE_NEW_NDIS", "1");
+        execEnvVars.put("ANDROID_RESOLV_DNS", primaryDNS);
+        execEnvVars.put("WINE_NEW_NDIS", "1");
 
         String ld_preload = "";
 
@@ -347,6 +420,21 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             ld_preload += fakeinputDest.getAbsolutePath();
         }
 
+        File[] jpegCandidates = new File[] {
+            new File("/system/lib64/libjpeg.so"),
+            new File("/system_ext/lib64/libjpeg.so"),
+        };
+        
+        ld_preload = appendFirstExistingPreload(ld_preload, jpegCandidates);
+
+        File[] cryptoCandidates = new File[] {
+            new File("/system/lib64/libcrypto.so"),
+            new File("/system_ext/lib64/libcrypto.so"),
+            new File(imageFs.getLibDir(), "libcrypto.so.3"),
+        };
+        
+        ld_preload = appendFirstExistingPreload(ld_preload, cryptoCandidates);
+
         File devInputDir = new File(imageFs.getRootDir(), "dev/input");
         devInputDir.mkdirs();
         File event0 = new File(devInputDir, "event0");
@@ -354,11 +442,11 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                 try { event0.createNewFile(); } catch (Exception e) {}
         }
 
-        envVars.put("FAKE_EVDEV_DIR", devInputDir.getAbsolutePath());
-        envVars.put("FAKE_EVDEV_VIBRATION", "1");
+        execEnvVars.put("FAKE_EVDEV_DIR", devInputDir.getAbsolutePath());
+        execEnvVars.put("FAKE_EVDEV_VIBRATION", "1");
 
         Log.d("GuestLauncher", "Final LD_PRELOAD: " + ld_preload);
-        envVars.put("LD_PRELOAD", ld_preload);
+        execEnvVars.put("LD_PRELOAD", ld_preload);
 
         if (this.envVars.has("MANGOHUD")) {
             this.envVars.remove("MANGOHUD");
@@ -367,9 +455,43 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         if (this.envVars.has("MANGOHUD_CONFIG")) {
             this.envVars.remove("MANGOHUD_CONFIG");
         }
-
+        
         if (this.envVars != null) {
-            envVars.putAll(this.envVars);
+            execEnvVars.putAll(this.envVars);
+        }
+
+        boolean useDisplayX = shortcut != null
+                ? shortcut.getUseDisplayX()
+                : container != null && container.getUseDisplayX();
+        boolean trueDisplayX = shortcut != null
+                ? shortcut.getTrueDisplayX()
+                : container != null && container.getTrueDisplayX();
+        String surfaceFormat = shortcut != null
+                ? shortcut.getSurfaceFormat()
+                : container != null ? container.getSurfaceFormat() : "rgba8";
+
+        execEnvVars.put("WRAPPER_SURFACE_FORMAT", surfaceFormat);
+        if (useDisplayX) execEnvVars.put("DISPLAYX_SURFACE_FORMAT", surfaceFormat);
+        else execEnvVars.remove("DISPLAYX_SURFACE_FORMAT");
+
+        final String displayXLayer = "VK_LAYER_DISPLAYX_display_x";
+        String enabledLayers = execEnvVars.get("VK_INSTANCE_LAYERS");
+        if (useDisplayX && trueDisplayX) {
+            execEnvVars.put("VK_INSTANCE_LAYERS", displayXLayer);
+        } else {
+            StringBuilder filteredLayers = new StringBuilder();
+            if (enabledLayers != null && !enabledLayers.isEmpty()) {
+                for (String layer : enabledLayers.split(":")) {
+                    if (layer.isEmpty() || layer.equals(displayXLayer)) continue;
+                    if (filteredLayers.length() > 0) filteredLayers.append(':');
+                    filteredLayers.append(layer);
+                }
+            }
+            if (filteredLayers.length() > 0) {
+                execEnvVars.put("VK_INSTANCE_LAYERS", filteredLayers.toString());
+            } else {
+                execEnvVars.remove("VK_INSTANCE_LAYERS");
+            }
         }
 
         String emulator = container.getEmulator();
@@ -377,7 +499,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             emulator = shortcut.getExtra("emulator", container.getEmulator());
 
         String command = "";
-        String overriddenCommand = envVars.get("GUEST_PROGRAM_LAUNCHER_COMMAND");
+        String overriddenCommand = execEnvVars.get("GUEST_PROGRAM_LAUNCHER_COMMAND");
         if (!overriddenCommand.isEmpty()) {
             String[] parts = overriddenCommand.split(";");
             for (String part : parts)
@@ -388,9 +510,9 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             if (wineInfo.isArm64EC()) {
                 command = winePath + "/" + guestExecutable;
                 if (emulator.toLowerCase().equals("fexcore"))
-                    envVars.put("HODLL", "libwow64fex.dll");
+                    execEnvVars.put("HODLL", "libwow64fex.dll");
                 else
-                    envVars.put("HODLL", "wowbox64.dll");
+                    execEnvVars.put("HODLL", "wowbox64.dll");
             } else
                 command = imageFs.getBinDir() + "/box64 " + guestExecutable;
         }
@@ -400,7 +522,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             FileUtils.chmod(box64File, 0755);
         }
 
-        return ProcessHelper.exec(command, envVars.toStringArray(), rootDir, (status) -> {
+        return ProcessHelper.exec(command, execEnvVars.toStringArray(), rootDir, (status) -> {
             synchronized (lock) {
                 pid = -1;
             }

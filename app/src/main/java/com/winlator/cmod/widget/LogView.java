@@ -250,3 +250,4 @@ public class LogView extends View {
         return true;
     }
 }
+

@@ -14,6 +14,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <dlfcn.h>
+#include <poll.h>
 #include <stdarg.h>
 #include <string.h>
 #include <stdbool.h>
@@ -512,7 +513,16 @@ EXPORT ssize_t read(int fd, void *buf, size_t count) {
             	errno = EINTR;
             	return bytes_read;
             }
-            usleep(1000); // yield to prevent 100% CPU lockup
+            struct pollfd pfd;
+            pfd.fd = fd;
+            pfd.events = POLLIN;
+            if (poll(&pfd, 1, 1000) > 0) {
+                // If it's a disconnected pipe, poll returns immediately with POLLHUP.
+                // We fallback to usleep to prevent a 100% CPU busy-spin loop.
+                if (pfd.revents & POLLHUP) {
+                    usleep(1000); 
+                }
+            }
             bytes_read = syscall(SYS_read, fd, buf, count);
         }
         

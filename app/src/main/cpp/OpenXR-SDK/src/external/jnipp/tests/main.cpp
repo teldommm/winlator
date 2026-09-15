@@ -1,7 +1,10 @@
+// Project Dependencies
 #include <jnipp.h>
 
+// Standard Dependencies
 #include <cmath>
 
+// Local Dependencies
 #include "testing.h"
 
 /*
@@ -571,12 +574,14 @@ TEST(Arg_ObjectPtr)
 
 int main()
 {
+    // jni::Vm Tests
     RUN_TEST(Vm_detectsJreInstall);
     RUN_TEST(Vm_notAllowedMultipleVms);
 
     {
         jni::Vm vm;
 
+        // jni::Class Tests
         RUN_TEST(Class_findByName_success);
         RUN_TEST(Class_findByName_failure);
         RUN_TEST(Class_getName);
@@ -592,6 +597,7 @@ int main()
         RUN_TEST(Class_call_staticMethod_byName);
         RUN_TEST(Class_getConstructor);
 
+        // jni::Object Tests
         RUN_TEST(Object_defaultConstructor_isNull);
         RUN_TEST(Object_nullary_construct_from_signature);
         RUN_TEST(Object_copyConstructorIsSameObject);
@@ -605,8 +611,10 @@ int main()
         RUN_TEST(Object_call_returningArray);
         RUN_TEST(Object_makeLocalReference);
 
+        // jni::Enum Tests
         RUN_TEST(Enum_get);
 
+        // jni::Array Tests
         RUN_TEST(Array_defaultConstructor);
         RUN_TEST(Array_constructor);
         RUN_TEST(Array_constructor_eachType);
@@ -619,6 +627,7 @@ int main()
         RUN_TEST(Array_setElement_string);
         RUN_TEST(Array_setElement_indexException);
 
+        // Argument Type Tests
         RUN_TEST(Arg_bool);
         RUN_TEST(Arg_wchar);
         RUN_TEST(Arg_double);

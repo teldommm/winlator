@@ -6,7 +6,6 @@ import com.winlator.cmod.box64.Box64Preset;
 import com.winlator.cmod.contentdialog.DXVKConfigDialog;
 import com.winlator.cmod.contentdialog.WineD3DConfigDialog;
 import com.winlator.cmod.core.DefaultVersion;
-import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.KeyValueSet;
 import com.winlator.cmod.core.WineInfo;
@@ -26,10 +25,11 @@ public class Container {
         BUTTON_A, BUTTON_B, BUTTON_X, BUTTON_Y, BUTTON_GRIP, BUTTON_TRIGGER,
         THUMBSTICK_UP, THUMBSTICK_DOWN, THUMBSTICK_LEFT, THUMBSTICK_RIGHT
     }
-    public static final String DEFAULT_ENV_VARS = "WRAPPER_MAX_IMAGE_COUNT=0 RENDERER_SWAPCHAIN=0 VKD3D_SHADER_MODEL=6_6 ZINK_DESCRIPTORS=lazy ZINK_DEBUG=compact MESA_SHADER_CACHE_DISABLE=false MESA_SHADER_CACHE_MAX_SIZE=512MB mesa_glthread=true WINEESYNC=1 TU_DEBUG=noconform,sysmem DXVK_HUD=/0";
+    public static final String DEFAULT_DISPLAY_DRIVER = "egl";
+    public static final String DEFAULT_ENV_VARS = "WRAPPER_MAX_IMAGE_COUNT=0 ZINK_DESCRIPTORS=lazy ZINK_DEBUG=compact MESA_SHADER_CACHE_DISABLE=false MESA_SHADER_CACHE_MAX_SIZE=512MB mesa_glthread=true WINEESYNC=1 TU_DEBUG=noconform,sysmem DXVK_HUD=devinfo,fps,frametimes,gpuload,version,api";
     public static final String DEFAULT_SCREEN_SIZE = "1280x720";
     public static final String DEFAULT_GRAPHICS_DRIVER = "wrapper";
-    public static final String DEFAULT_AUDIO_DRIVER = "alsa";
+    public static final String DEFAULT_AUDIO_DRIVER = "pulse-audio-gn";
     public static final String DEFAULT_EMULATOR = "FEXCore";
     public static final String DEFAULT_DXWRAPPER = "dxvk+vkd3d";
     public static final String DEFAULT_DXWRAPPERCONFIG = "version=" + DefaultVersion.DXVK + ",framerate=0,async=0,asyncCache=0" + ",vkd3dVersion=" + DefaultVersion.VKD3D + ",vkd3dLevel=12_1" + ",ddrawrapper=" + Container.DEFAULT_DDRAWRAPPER + ",csmt=3" + ",gpuName=NVIDIA GeForce GTX 480" + ",videoMemorySize=2048" + ",strict_shader_math=1" + ",OffscreenRenderingMode=fbo" + ",renderer=gl";
@@ -58,14 +58,14 @@ public class Container {
     private boolean showFPS;
     private boolean rendererNative = false;
     private String rendererPresentMode = "fifo";
-    private String rendererDriverId    = "";
+    private String rendererDriverId = "system";
     private int rendererFilterMode = 0;
-    private int rendererRefreshRateLimit = 60;
     private boolean rendererSwapRB = false;
     private boolean fullscreenStretched;
     private byte startupSelection = STARTUP_SELECTION_ESSENTIAL;
     private String cpuList;
     private String cpuListWoW64;
+    private boolean syncCpuTopology = false;
     private String desktopTheme = WineThemeManager.DEFAULT_DESKTOP_THEME;
     private String fexcoreVersion;
     private String fexcorePreset = FEXCorePreset.INTERMEDIATE;
@@ -80,7 +80,6 @@ public class Container {
     private String box64Version;
     private String emulator;
     private boolean exclusiveXInput = true;
-
     private ContainerManager containerManager;
 
 
@@ -132,11 +131,16 @@ public class Container {
         this.graphicsDriver = graphicsDriver;
     }
 
-    public String getGraphicsDriverConfig() { return this.graphicsDriverConfig; }
+    public String getGraphicsDriverConfig() {
+        return this.graphicsDriverConfig;
+    }
 
-    public void setGraphicsDriverConfig(String graphicsDriverConfig) { this.graphicsDriverConfig = graphicsDriverConfig; }
+    public void setGraphicsDriverConfig(String graphicsDriverConfig) {
+        this.graphicsDriverConfig = graphicsDriverConfig;
+    }
 
     public boolean isRendererNative() { return rendererNative; }
+    public boolean getRendererNative() { return rendererNative; }
     public void setRendererNative(boolean v) { this.rendererNative = v; }
     public String getRendererPresentMode() { return rendererPresentMode; }
     public void setRendererPresentMode(String v) { this.rendererPresentMode = v != null ? v : "fifo"; }
@@ -144,10 +148,59 @@ public class Container {
     public void setRendererDriverId(String v) { this.rendererDriverId = v != null ? v : ""; }
     public int getRendererFilterMode() { return rendererFilterMode; }
     public void setRendererFilterMode(int v) { this.rendererFilterMode = v; }
-    public int getRendererRefreshRateLimit() { return rendererRefreshRateLimit; }
-    public void setRendererRefreshRateLimit(int v) { this.rendererRefreshRateLimit = v > 0 ? v : 0; }
     public boolean getRendererSwapRB() { return rendererSwapRB; }
     public void setRendererSwapRB(boolean v) { this.rendererSwapRB = v; }
+
+    public boolean getUseDisplayX() {
+        return "1".equals(getExtra("useDisplayX", "0"));
+    }
+    public void setUseDisplayX(boolean v) {
+        putExtra("useDisplayX", v ? "1" : "0");
+    }
+
+    public boolean getTrueDisplayX() {
+        return "1".equals(getExtra("trueDisplayX", "0"));
+    }
+    public void setTrueDisplayX(boolean v) {
+        putExtra("trueDisplayX", v ? "1" : "0");
+    }
+
+    public String getSurfaceFormat() {
+        String value = getExtra("surfaceFormat", null);
+        if (value == null || value.isEmpty()) value = getUseDisplayX() ? "rgba8" : "bgra8";
+        return "bgra8".equalsIgnoreCase(value) ? "bgra8" : "rgba8";
+    }
+    public void setSurfaceFormat(String value) {
+        putExtra("surfaceFormat", "bgra8".equalsIgnoreCase(value) ? "bgra8" : "rgba8");
+    }
+
+    public boolean getDisplayXPerformanceMode() {
+        return "1".equals(getExtra("displayXPerformanceMode", "1"));
+    }
+    public void setDisplayXPerformanceMode(boolean v) {
+        putExtra("displayXPerformanceMode", v ? "1" : "0");
+    }
+
+    public boolean getDisplayXPresentAtRefreshRate() {
+        return "1".equals(getExtra("displayXPresentAtRefreshRate", "1"));
+    }
+    public void setDisplayXPresentAtRefreshRate(boolean v) {
+        putExtra("displayXPresentAtRefreshRate", v ? "1" : "0");
+    }
+
+    public boolean getDisplayXBackPressure() {
+        return "1".equals(getExtra("displayXBackPressure", "0"));
+    }
+    public void setDisplayXBackPressure(boolean v) {
+        putExtra("displayXBackPressure", v ? "1" : "0");
+    }
+
+    public boolean getDisplayXPrecisePresentation() {
+        return "1".equals(getExtra("displayXPrecisePresentation", "0"));
+    }
+    public void setDisplayXPrecisePresentation(boolean v) {
+        putExtra("displayXPrecisePresentation", v ? "1" : "0");
+    }
 
     public String getDXWrapper() {
         return dxwrapper;
@@ -169,8 +222,14 @@ public class Container {
         return audioDriver;
     }
 
+    public static String normalizeAudioDriver(String audioDriver) {
+        if (audioDriver == null || audioDriver.isEmpty()) return DEFAULT_AUDIO_DRIVER;
+        if (audioDriver.equals("oboe")) return "pulse-audio-gn";
+        return audioDriver;
+    }
+
     public void setAudioDriver(String audioDriver) {
-        this.audioDriver = audioDriver;
+        this.audioDriver = normalizeAudioDriver(audioDriver);
     }
 
     public String getWinComponents() {
@@ -255,6 +314,14 @@ public class Container {
 
     public void setCPUListWoW64(String cpuListWoW64) {
         this.cpuListWoW64 = cpuListWoW64 != null && !cpuListWoW64.isEmpty() ? cpuListWoW64 : null;
+    }
+
+    public boolean isSyncCpuTopology() {
+        return syncCpuTopology;
+    }
+
+    public void setSyncCpuTopology(boolean syncCpuTopology) {
+        this.syncCpuTopology = syncCpuTopology;
     }
 
     public void setFEXCoreVersion(String version) {
@@ -377,6 +444,7 @@ public class Container {
         this.inputType = inputType;
     }
 
+
     public boolean isExclusiveXInput() {
         return exclusiveXInput;
     }
@@ -384,6 +452,7 @@ public class Container {
     public void setExclusiveXInput(boolean exclusiveXInput) {
         this.exclusiveXInput = exclusiveXInput;
     }
+
 
     public Iterable<String[]> drivesIterator() {
         return drivesIterator(drives);
@@ -418,17 +487,17 @@ public class Container {
             data.put("envVars", envVars);
             data.put("cpuList", cpuList);
             data.put("cpuListWoW64", cpuListWoW64);
+            if (syncCpuTopology) data.put("syncCpuTopology", true);
             data.put("graphicsDriver", graphicsDriver);
-            data.put("graphicsDriverConfig", graphicsDriverConfig);
+            data.put("graphicsDriverConfig", getGraphicsDriverConfig());
             data.put("rendererNative", rendererNative);
             data.put("rendererPresentMode", rendererPresentMode);
             if (!rendererDriverId.isEmpty()) data.put("rendererDriverId", rendererDriverId);
             if (rendererFilterMode != 0) data.put("rendererFilterMode", rendererFilterMode);
-            if (rendererRefreshRateLimit != 60) data.put("rendererRefreshRateLimit", rendererRefreshRateLimit);
             if (rendererSwapRB) data.put("rendererSwapRB", true);
             data.put("emulator", emulator);
             data.put("dxwrapper", dxwrapper);
-            if (!dxwrapperConfig.isEmpty()) data.put("dxwrapperConfig", dxwrapperConfig);
+            data.put("dxwrapperConfig", getDXWrapperConfig());
             data.put("audioDriver", audioDriver);
             data.put("wincomponents", wincomponents);
             data.put("drives", drives);
@@ -477,6 +546,9 @@ public class Container {
                 case "cpuListWoW64" :
                     setCPUListWoW64(data.getString(key));
                     break;
+                case "syncCpuTopology" :
+                    setSyncCpuTopology(data.getBoolean(key));
+                    break;
                 case "graphicsDriver" :
                     setGraphicsDriver(data.getString(key));
                     break;
@@ -490,12 +562,10 @@ public class Container {
                     rendererPresentMode = data.getString(key);
                     break;
                 case "rendererDriverId":
-                    rendererDriverId = data.getString(key); break;
+                    rendererDriverId = data.getString(key);
+                    break;
                 case "rendererFilterMode" :
                     rendererFilterMode = data.getInt(key);
-                    break;
-                case "rendererRefreshRateLimit":
-                    rendererRefreshRateLimit = data.getInt(key);
                     break;
                 case "rendererSwapRB":
                     rendererSwapRB = data.getBoolean(key);
@@ -528,9 +598,7 @@ public class Container {
                     setStartupSelection((byte)data.getInt(key));
                     break;
                 case "extraData" : {
-                    JSONObject extraData = data.getJSONObject(key);
-                    checkObsoleteOrMissingProperties(extraData);
-                    setExtraData(extraData);
+                    setExtraData(data.getJSONObject(key));
                     break;
                 }
                 case "wineVersion" :
@@ -579,7 +647,6 @@ public class Container {
                 data.put("wincomponents", data.getString("dxcomponents"));
                 data.remove("dxcomponents");
             }
-
             if (data.has("dxwrapper")) {
                 String dxwrapper = data.getString("dxwrapper");
                 if (dxwrapper.equals("original-wined3d")) {
@@ -589,45 +656,25 @@ public class Container {
                     data.put("dxwrapper", dxwrapper);
                 }
             }
-
             if (data.has("graphicsDriver")) {
                 String graphicsDriver = data.getString("graphicsDriver");
-                if (graphicsDriver.equals("turnip-zink") || graphicsDriver.equals("turnip")) {
-                    data.put("graphicsDriver", "wrapper");
-                }
-                else if (graphicsDriver.equals("llvmpipe")) {
-                    data.put("graphicsDriver", "wrapper");
+                if (graphicsDriver.equals("wrapper") || graphicsDriver.equals("turnip-zink") || graphicsDriver.equals("turnip") || graphicsDriver.equals("llvmpipe")) {
+                    data.put("graphicsDriver", DEFAULT_GRAPHICS_DRIVER);
                 }
             }
-
-            if (data.has("envVars") && data.has("extraData")) {
-                JSONObject extraData = data.getJSONObject("extraData");
-                int appVersion = Integer.parseInt(extraData.optString("appVersion", "0"));
-                if (appVersion < 16) {
-                    EnvVars defaultEnvVars = new EnvVars(DEFAULT_ENV_VARS);
-                    EnvVars envVars = new EnvVars(data.getString("envVars"));
-                    for (String name : defaultEnvVars) if (!envVars.has(name)) envVars.put(name, defaultEnvVars.get(name));
-                    data.put("envVars", envVars.toString());
-                }
-            }
-
             KeyValueSet wincomponents1 = new KeyValueSet(DEFAULT_WINCOMPONENTS);
             KeyValueSet wincomponents2 = new KeyValueSet(data.getString("wincomponents"));
             String result = "";
-
             for (String[] wincomponent1 : wincomponents1) {
                 String value = wincomponent1[1];
-
                 for (String[] wincomponent2 : wincomponents2) {
                     if (wincomponent1[0].equals(wincomponent2[0])) {
                         value = wincomponent2[1];
                         break;
                     }
                 }
-
                 result += (!result.isEmpty() ? "," : "")+wincomponent1[0]+"="+value;
             }
-
             data.put("wincomponents", result);
         }
         catch (JSONException e) {}
@@ -647,6 +694,7 @@ public class Container {
         return cpuList;
     }
 
+    // Check if a specific environment variable exists
     public boolean hasEnvVar(String keyValue) {
         if (envVars == null || envVars.isEmpty()) return false;
         String[] vars = envVars.split(",");

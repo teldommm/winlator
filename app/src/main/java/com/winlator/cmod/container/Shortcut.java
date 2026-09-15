@@ -6,6 +6,7 @@ import android.os.Environment;
 import android.util.Log;
 
 import com.winlator.cmod.core.FileUtils;
+import com.winlator.cmod.core.KeyValueSet;
 import com.winlator.cmod.core.StringUtils;
 
 import java.io.IOException;
@@ -23,13 +24,13 @@ public class Shortcut {
     public final Container container;
     public final String name;
     public final String path;
-    public Bitmap icon;         
+    public Bitmap icon;
     public final File file;
-    public File iconFile;       
+    public File iconFile;
     public final String wmClass;
     private final JSONObject extraData = new JSONObject();
-    private Bitmap coverArt; 
-    private String customCoverArtPath; 
+    private Bitmap coverArt;
+    private String customCoverArtPath;
 
     private static final String COVER_ART_DIR = "app_data/cover_arts/";
 
@@ -48,7 +49,7 @@ public class Shortcut {
         int index;
         for (String line : FileUtils.readLines(file)) {
             line = line.trim();
-            if (line.isEmpty() || line.startsWith("#")) continue; 
+            if (line.isEmpty() || line.startsWith("#")) continue;
             if (line.startsWith("[")) {
                 section = line.substring(1, line.indexOf("]"));
             }
@@ -64,7 +65,7 @@ public class Shortcut {
                         for (File iconDir : iconDirs) {
                             File potentialIcon = new File(iconDir, value+".png");
                             if (!potentialIcon.exists()) potentialIcon = new File(iconDir, value+".ico");
-                            
+
                             if (potentialIcon.isFile()){
                                 icon = BitmapFactory.decodeFile(potentialIcon.getPath());
                                 iconFile = potentialIcon;
@@ -99,16 +100,16 @@ public class Shortcut {
         } catch (Exception e) {}
 
         this.name = FileUtils.getBasename(file.getPath());
-        
+
         this.icon = icon;
         this.iconFile = iconFile;
-        
+
         if (execArgs.contains("wine ")) {
             this.path = StringUtils.unescape(execArgs.substring(execArgs.lastIndexOf("wine ") + 4));
         } else {
             this.path = execArgs;
         }
-        
+
         this.wmClass = wmClass;
 
         this.customCoverArtPath = getExtra("customCoverArtPath");
@@ -133,7 +134,7 @@ public class Shortcut {
     public Bitmap getCoverArt() { return coverArt; }
     public void setCoverArt(Bitmap coverArt) { this.coverArt = coverArt; }
     public String getCustomCoverArtPath() { return customCoverArtPath; }
-    
+
     public void setCustomCoverArtPath(String customCoverArtPath) {
         this.customCoverArtPath = customCoverArtPath;
         putExtra("customCoverArtPath", customCoverArtPath);
@@ -153,6 +154,14 @@ public class Shortcut {
                 extraData.put(name, value);
             }
             else extraData.remove(name);
+
+            if ("hudMode".equals(name) && container != null && value != null) {
+                int mode = 0;
+                try { mode = Integer.parseInt(value); } catch (NumberFormatException ignored) {}
+                container.putExtra("hudMode", String.valueOf(mode));
+                container.setShowFPS(mode != 0);
+                container.saveData();
+            }
         }
         catch (JSONException e) {}
     }
@@ -191,15 +200,15 @@ public class Shortcut {
 
     public void saveCustomCoverArt(Bitmap coverArt) {
         try {
-            File coverArtDir = new File(container.getRootDir(), COVER_ART_DIR); 
+            File coverArtDir = new File(container.getRootDir(), COVER_ART_DIR);
             if (!coverArtDir.exists()) {
                 coverArtDir.mkdirs();
             }
 
             File coverFile = new File(coverArtDir, this.name + ".png");
             if (FileUtils.saveBitmapToFile(coverArt, coverFile)) {
-                this.coverArt = coverArt; 
-                setCustomCoverArtPath(coverFile.getPath()); 
+                this.coverArt = coverArt;
+                setCustomCoverArtPath(coverFile.getPath());
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -255,7 +264,7 @@ public class Shortcut {
     public int getContainerId() {
         return container.id;
     }
-     
+
     public String getExecutable() {
         String exe = "";
         try {
@@ -270,17 +279,8 @@ public class Shortcut {
         catch (IOException e) {
             throw new RuntimeException(e);
         }
-    
-        return exe;
-    }
-    
-    public boolean getNativeRendering() {
-        return getExtra("nativeRendering", "0").equals("1");
-    }
 
-    public void setNativeRendering(boolean enabled) {
-        putExtra("nativeRendering", enabled ? "1" : "0");
-        saveData();
+        return exe;
     }
 
     public boolean getRendererNative() {
@@ -288,6 +288,82 @@ public class Shortcut {
         return v != null ? v.equals("1") : container.isRendererNative();
     }
     public void setRendererNative(boolean v) { putExtra("rendererNative", v ? "1" : "0"); }
+
+    public boolean getUseDisplayX() {
+        String v = getExtra("useDisplayX", null);
+        if (v != null) return v.equals("1");
+        String legacyDriver = getExtra("displayDriver", null);
+        if (legacyDriver != null) return legacyDriver.equalsIgnoreCase("displayx");
+        return container.getUseDisplayX();
+    }
+    public void setUseDisplayX(boolean v) { putExtra("useDisplayX", v ? "1" : "0"); }
+
+    public boolean getTrueDisplayX() {
+        String v = getExtra("trueDisplayX", null);
+        if (v != null) return v.equals("1");
+        v = getLegacyDisplayXValue("trueDisplayX");
+        return v != null ? v.equals("1") : container.getTrueDisplayX();
+    }
+    public void setTrueDisplayX(boolean v) { putExtra("trueDisplayX", v ? "1" : "0"); }
+
+    public String getSurfaceFormat() {
+        String v = getExtra("surfaceFormat", null);
+        if (v == null || v.isEmpty()) v = getLegacyDisplayXValue("surfaceFormat");
+        if (v == null || v.isEmpty()) {
+            boolean overridesRenderer = getExtra("rendererNative", null) != null
+                    || getExtra("useDisplayX", null) != null
+                    || getExtra("displayDriver", null) != null;
+            if (!overridesRenderer) return container.getSurfaceFormat();
+            return getUseDisplayX() ? "rgba8" : "bgra8";
+        }
+        return "bgra8".equalsIgnoreCase(v) ? "bgra8" : "rgba8";
+    }
+    public void setSurfaceFormat(String value) {
+        putExtra("surfaceFormat", "bgra8".equalsIgnoreCase(value) ? "bgra8" : "rgba8");
+    }
+
+    public boolean getDisplayXPerformanceMode() {
+        String v = getExtra("displayXPerformanceMode", null);
+        if (v == null) v = getLegacyDisplayXValue("performanceMode");
+        return v != null ? v.equals("1") : container.getDisplayXPerformanceMode();
+    }
+    public void setDisplayXPerformanceMode(boolean v) {
+        putExtra("displayXPerformanceMode", v ? "1" : "0");
+    }
+
+    public boolean getDisplayXPresentAtRefreshRate() {
+        String v = getExtra("displayXPresentAtRefreshRate", null);
+        if (v == null) v = getLegacyDisplayXValue("presentRR");
+        return v != null ? v.equals("1") : container.getDisplayXPresentAtRefreshRate();
+    }
+    public void setDisplayXPresentAtRefreshRate(boolean v) {
+        putExtra("displayXPresentAtRefreshRate", v ? "1" : "0");
+    }
+
+    public boolean getDisplayXBackPressure() {
+        String v = getExtra("displayXBackPressure", null);
+        if (v == null) v = getLegacyDisplayXValue("backPressure");
+        return v != null ? v.equals("1") : container.getDisplayXBackPressure();
+    }
+    public void setDisplayXBackPressure(boolean v) {
+        putExtra("displayXBackPressure", v ? "1" : "0");
+    }
+
+    public boolean getDisplayXPrecisePresentation() {
+        String v = getExtra("displayXPrecisePresentation", null);
+        if (v == null) v = getLegacyDisplayXValue("precisePresentation");
+        return v != null ? v.equals("1") : container.getDisplayXPrecisePresentation();
+    }
+    public void setDisplayXPrecisePresentation(boolean v) {
+        putExtra("displayXPrecisePresentation", v ? "1" : "0");
+    }
+
+    private String getLegacyDisplayXValue(String key) {
+        String config = getExtra("displayxConfig", null);
+        if (config == null || config.isEmpty()) return null;
+        String value = new KeyValueSet(config).get(key);
+        return value.isEmpty() ? null : value;
+    }
 
     public String getRendererPresentMode() {
         String v = getExtra("rendererPresentMode", null);
@@ -307,13 +383,6 @@ public class Shortcut {
         catch (NumberFormatException e) { return 0; }
     }
     public void setRendererFilterMode(int v) { putExtra("rendererFilterMode", String.valueOf(v)); }
-
-    public int getRendererRefreshRateLimit() {
-        String v = getExtra("rendererRefreshRateLimit", null);
-        try { return v != null && !v.isEmpty() ? Integer.parseInt(v) : container.getRendererRefreshRateLimit(); }
-        catch (NumberFormatException e) { return 60; }
-    }
-    public void setRendererRefreshRateLimit(int v) { putExtra("rendererRefreshRateLimit", String.valueOf(v > 0 ? v : 0)); }
 
     public boolean getRendererSwapRB() {
         String v = getExtra("rendererSwapRB", null);

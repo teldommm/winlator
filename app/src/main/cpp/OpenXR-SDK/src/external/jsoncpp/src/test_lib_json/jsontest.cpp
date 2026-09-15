@@ -1,3 +1,7 @@
+// Copyright 2007-2010 Baptiste Lepilleur and The JsonCpp Authors
+// Distributed under MIT license, or public domain if desired and
+// recognized in your jurisdiction.
+// See file LICENSE for detail or copy at http://jsoncpp.sourceforge.net/LICENSE
 
 #define _CRT_SECURE_NO_WARNINGS 1 // Prevents deprecation warning with MSVC
 #include "jsontest.h"
@@ -5,10 +9,13 @@
 #include <string>
 
 #if defined(_MSC_VER)
+// Used to install a report hook that prevent dialog on assertion and error.
 #include <crtdbg.h>
 #endif // if defined(_MSC_VER)
 
 #if defined(_WIN32)
+// Used to prevent dialog on memory fault.
+// Limits headers included by Windows.h
 #define WIN32_LEAN_AND_MEAN
 #define NOSERVICE
 #define NOMCX
@@ -63,8 +70,11 @@
 
 namespace JsonTest {
 
+// class TestResult
+// //////////////////////////////////////////////////////////////////
 
 TestResult::TestResult() {
+  // The root predicate has id 0
   rootPredicateNode_.id_ = 0;
   rootPredicateNode_.next_ = nullptr;
   predicateStackTail_ = &rootPredicateNode_;
@@ -74,6 +84,8 @@ void TestResult::setTestName(const Json::String& name) { name_ = name; }
 
 TestResult& TestResult::addFailure(const char* file, unsigned int line,
                                    const char* expr) {
+  /// Walks the PredicateContext stack adding them to failures_ if not already
+  /// added.
   unsigned int nestingLevel = 0;
   PredicateContext* lastNode = rootPredicateNode_.next_;
   for (; lastNode != nullptr; lastNode = lastNode->next_) {
@@ -82,11 +94,14 @@ TestResult& TestResult::addFailure(const char* file, unsigned int line,
       lastUsedPredicateId_ = lastNode->id_;
       addFailureInfo(lastNode->file_, lastNode->line_, lastNode->expr_,
                      nestingLevel);
+      // Link the PredicateContext to the failure for message target when
+      // popping the PredicateContext.
       lastNode->failure_ = &(failures_.back());
     }
     ++nestingLevel;
   }
 
+  // Adds the failed assertion
   addFailureInfo(file, line, expr, nestingLevel);
   messageTarget_ = &(failures_.back());
   return *this;
@@ -109,10 +124,12 @@ TestResult& TestResult::popPredicateContext() {
   while (lastNode->next_ != nullptr && lastNode->next_->next_ != nullptr) {
     lastNode = lastNode->next_;
   }
+  // Set message target to popped failure
   PredicateContext* tail = lastNode->next_;
   if (tail != nullptr && tail->failure_ != nullptr) {
     messageTarget_ = tail->failure_;
   }
+  // Remove tail from list
   predicateStackTail_ = lastNode;
   lastNode->next_ = nullptr;
   return *this;
@@ -129,6 +146,7 @@ void TestResult::printFailure(bool printTestName) const {
     printf("* Detail of %s test failure:\n", name_.c_str());
   }
 
+  // Print in reverse to display the callstack in the right order
   for (const auto& failure : failures_) {
     Json::String indent(failure.nestingLevel_ * 2, ' ');
     if (failure.file_) {
@@ -181,6 +199,8 @@ TestResult& TestResult::operator<<(bool value) {
   return addToLastFailure(value ? "true" : "false");
 }
 
+// class TestCase
+// //////////////////////////////////////////////////////////////////
 
 TestCase::TestCase() = default;
 
@@ -191,6 +211,8 @@ void TestCase::run(TestResult& result) {
   runTestCase();
 }
 
+// class Runner
+// //////////////////////////////////////////////////////////////////
 
 Runner::Runner() = default;
 
@@ -278,6 +300,7 @@ void Runner::listTests() const {
 }
 
 int Runner::runCommandLine(int argc, const char* argv[]) const {
+  // typedef std::deque<String> TestNames;
   Runner subrunner;
   for (int index = 1; index < argc; ++index) {
     Json::String opt = argv[index];
@@ -316,9 +339,19 @@ int Runner::runCommandLine(int argc, const char* argv[]) const {
 }
 
 #if defined(_MSC_VER) && defined(_DEBUG)
+// Hook MSVCRT assertions to prevent dialog from appearing
 static int msvcrtSilentReportHook(int reportType, char* message,
                                   int* /*returnValue*/) {
+  // The default CRT handling of error and assertion is to display
+  // an error dialog to the user.
+  // Instead, when an error or an assertion occurs, we force the
+  // application to terminate using abort() after display
+  // the message on stderr.
   if (reportType == _CRT_ERROR || reportType == _CRT_ASSERT) {
+    // calling abort() cause the ReportHook to be called
+    // The following is used to detect this case and let's the
+    // error handler fallback on its default behaviour (
+    // display a warning message)
     static volatile bool isAborting = false;
     if (isAborting) {
       return TRUE;
@@ -329,17 +362,26 @@ static int msvcrtSilentReportHook(int reportType, char* message,
     fflush(stderr);
     abort();
   }
+  // Let's other reportType (_CRT_WARNING) be handled as they would by default
   return FALSE;
 }
 #endif // if defined(_MSC_VER)
 
 void Runner::preventDialogOnCrash() {
 #if defined(_MSC_VER) && defined(_DEBUG)
+  // Install a hook to prevent MSVCRT error and assertion from
+  // popping a dialog
+  // This function a NO-OP in release configuration
+  // (which cause warning since msvcrtSilentReportHook is not referenced)
   _CrtSetReportHook(&msvcrtSilentReportHook);
 #endif // if defined(_MSC_VER)
 
+  // @todo investigate this handler (for buffer overflow)
+  // _set_security_error_handler
 
 #if defined(_WIN32)
+  // Prevents the system from popping a dialog for debugging if the
+  // application fails due to invalid memory access.
   SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX |
                SEM_NOOPENFILEERRORBOX);
 #endif // if defined(_WIN32)
@@ -359,6 +401,8 @@ void Runner::printUsage(const char* appName) {
          appName);
 }
 
+// Assertion functions
+// //////////////////////////////////////////////////////////////////
 
 Json::String ToJsonString(const char* toConvert) {
   return Json::String(toConvert);

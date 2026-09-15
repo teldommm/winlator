@@ -21,6 +21,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     public final int id;
     private String name;
     private float cursorSpeed = 1.0f;
+    private int themeColor = 0;
     private final ArrayList<ControlElement> elements = new ArrayList<>();
     private final ArrayList<ExternalController> controllers = new ArrayList<>();
     private final List<ControlElement> immutableElements = Collections.unmodifiableList(elements);
@@ -49,6 +50,14 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
 
     public void setCursorSpeed(float cursorSpeed) {
         this.cursorSpeed = cursorSpeed;
+    }
+
+    public int getThemeColor() {
+        return themeColor;
+    }
+
+    public void setThemeColor(int themeColor) {
+        this.themeColor = themeColor;
     }
 
     public boolean isVirtualGamepad() {
@@ -81,10 +90,12 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     public ExternalController getController(int deviceId) {
         if (!controllersLoaded) loadControllers();
         
+        // First try direct deviceId match
         for (ExternalController controller : controllers) {
             if (controller.getDeviceId() == deviceId) return controller;
         }
         
+        // If no match, try to find by descriptor
         android.view.InputDevice device = android.view.InputDevice.getDevice(deviceId);
         if (device != null) {
             String descriptor = device.getDescriptor();
@@ -120,6 +131,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             data.put("id", id);
             data.put("name", name);
             data.put("cursorSpeed", Float.valueOf(cursorSpeed));
+            if (themeColor != 0) data.put("themeColor", themeColor);
 
             JSONArray elementsJSONArray = new JSONArray();
             if (!elementsLoaded && file.isFile()) {
@@ -215,6 +227,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
 
         try {
             JSONObject profileJSONObject = new JSONObject(FileUtils.readString(file));
+            if (profileJSONObject.has("themeColor")) themeColor = profileJSONObject.getInt("themeColor");
             JSONArray elementsJSONArray = profileJSONObject.getJSONArray("elements");
             for (int i = 0; i < elementsJSONArray.length(); i++) {
                 JSONObject elementJSONObject = elementsJSONArray.getJSONObject(i);
@@ -229,6 +242,10 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                 element.setIconId(elementJSONObject.getInt("iconId"));
                 if (elementJSONObject.has("range")) element.setRange(ControlElement.Range.valueOf(elementJSONObject.getString("range")));
                 if (elementJSONObject.has("orientation")) element.setOrientation((byte)elementJSONObject.getInt("orientation"));
+                if (elementJSONObject.has("opacity")) element.setOpacity((float)elementJSONObject.getDouble("opacity"));
+                if (elementJSONObject.has("customColor")) element.setCustomColor(elementJSONObject.getInt("customColor"));
+                if (elementJSONObject.has("mouseMoveMode")) element.setMouseMoveMode(elementJSONObject.getBoolean("mouseMoveMode"));
+                if (elementJSONObject.has("customIconPath")) element.setCustomIconPath(elementJSONObject.getString("customIconPath"));
 
                 boolean hasGamepadBinding = true;
                 JSONArray bindingsJSONArray = elementJSONObject.getJSONArray("bindings");

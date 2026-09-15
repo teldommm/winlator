@@ -13,7 +13,6 @@ public class XOutputStream {
     public final ClientSocket clientSocket;
     private final ReentrantLock lock = new ReentrantLock();
     private int ancillaryFd = -1;
-    private static final double FP3232_SCALE = 4294967296.0;
 
     public XOutputStream(int initialCapacity) {
         this(null, initialCapacity);
@@ -47,32 +46,21 @@ public class XOutputStream {
         buffer.putInt(value);
     }
 
+    public void writeIntPair(int first, int second) {
+        writeInt(first);
+        writeInt(second);
+    }
+
     public void writeLong(long value) {
         ensureSpaceIsAvailable(8);
         buffer.putLong(value);
     }
 
     public void writeFP3232(double value) {
-        if (Double.isNaN(value) || Double.isInfinite(value)) {
-            throw new IllegalArgumentException("FP3232 value must be finite");
-        }
-
-        long fixed = Math.round(value * FP3232_SCALE);
-
-        int integral = (int) (fixed >> 32);
-        int frac = (int) fixed;
-
+        int integral = (int) value;
+        int frac = (int) ((value - integral) * 0x100000000L);
         writeInt(integral);
         writeInt(frac);
-    }
-
-    public void writeFP3232(int integerPart, long fractionalPart) {
-        if (fractionalPart < 0L || fractionalPart > 0xFFFFFFFFL) {
-            throw new IllegalArgumentException("fractionalPart must be in range 0 .. 0xFFFFFFFF");
-        }
-
-        writeInt(integerPart);
-        writeInt((int) fractionalPart);
     }
 
     public void writeString8(String str) {
@@ -104,13 +92,12 @@ public class XOutputStream {
     private void flush() throws IOException {
         if (buffer.position() != 0) {
             buffer.flip();
-
             if (ancillaryFd != -1) {
                 clientSocket.sendAncillaryMsg(buffer, ancillaryFd);
                 ancillaryFd = -1;
+            } else {
+                clientSocket.write(buffer);
             }
-            else clientSocket.write(buffer);
-
             buffer.clear();
         }
     }
@@ -137,8 +124,7 @@ public class XOutputStream {
         public void close() throws IOException {
             try {
                 flush();
-            }
-            finally {
+            } finally {
                 lock.unlock();
             }
         }
@@ -146,12 +132,11 @@ public class XOutputStream {
 
     public void writeSuccessReply(int sequenceNumber, int replyLength) throws IOException {
         try (XStreamLock lock = lock()) {
-            writeByte((byte) 1);       // Response Code for Success
-            writeByte((byte) 0);       // Unused
-            writeShort((short) sequenceNumber);  // Sequence number
-            writeInt(replyLength);     // Reply length in 4-byte units
-            writePad(24);              // Unused padding
+            writeByte((byte) 1);
+            writeByte((byte) 0);
+            writeShort((short) sequenceNumber);
+            writeInt(replyLength);
+            writePad(24);
         }
     }
-
 }

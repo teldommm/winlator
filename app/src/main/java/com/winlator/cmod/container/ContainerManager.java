@@ -13,6 +13,7 @@ import com.winlator.cmod.core.MSLink;
 import com.winlator.cmod.core.OnExtractFileListener;
 import com.winlator.cmod.core.TarCompressorUtils;
 import com.winlator.cmod.core.WineInfo;
+import com.winlator.cmod.core.WineThemeManager;
 import com.winlator.cmod.xenvironment.ImageFs;
 
 import java.util.Arrays;
@@ -41,6 +42,7 @@ public class ContainerManager {
         isInitialized = true;
     }
 
+    // Check if the ContainerManager is fully initialized
     public boolean isInitialized() {
         return isInitialized;
     }
@@ -49,34 +51,34 @@ public class ContainerManager {
         return containers;
     }
 
+    // Load containers from the home directory
     private void loadContainers() {
         containers.clear();
         maxContainerId = 0;
 
-        File[] files = homeDir.listFiles();
-        if (files != null) {
-            for (File file : files) {
-                if (!file.isDirectory() || !file.getName().startsWith(ImageFs.USER + "-")) continue;
-                try {
-                    int containerId = Integer.parseInt(file.getName().replace(ImageFs.USER + "-", ""));
-                    Container container = new Container(containerId, this);
-                    container.setRootDir(new File(homeDir, ImageFs.USER + "-" + container.id));
+        try {
+            File[] files = homeDir.listFiles();
+            if (files != null) {
+                for (File file : files) {
+                    if (file.isDirectory()) {
+                        if (file.getName().startsWith(ImageFs.USER + "-")) {
+                            Container container = new Container(
+                                    Integer.parseInt(file.getName().replace(ImageFs.USER + "-", "")), this
+                            );
 
-                    String rawConfig = FileUtils.readString(container.getConfigFile());
-                    if (rawConfig == null || rawConfig.trim().isEmpty()) {
-                        Log.w("ContainerManager", "Skipping container with empty config: " + container.getConfigFile());
-                        continue;
+                            container.setRootDir(new File(homeDir, ImageFs.USER + "-" + container.id));
+                            File configFile = container.getConfigFile();
+                            if (!configFile.isFile() || configFile.length() == 0) continue;
+                            JSONObject data = new JSONObject(FileUtils.readString(configFile));
+                            container.loadData(data);
+                            containers.add(container);
+                            maxContainerId = Math.max(maxContainerId, container.id);
+                        }
                     }
-
-                    JSONObject data = new JSONObject(rawConfig);
-                    container.loadData(data);
-                    containers.add(container);
-                    maxContainerId = Math.max(maxContainerId, container.id);
-                }
-                catch (NumberFormatException | JSONException e) {
-                    Log.e("ContainerManager", "Skipping invalid container directory: " + file.getName(), e);
                 }
             }
+        } catch (JSONException | NullPointerException e) {
+            Log.e("ContainerManager", "Error loading containers", e);
         }
     }
 
@@ -88,9 +90,24 @@ public class ContainerManager {
 
     public void activateContainer(Container container) {
         container.setRootDir(new File(homeDir, ImageFs.USER+"-"+container.id));
+
+        WineThemeManager.getUserWallpaperFile(context);
+
         File file = new File(homeDir, ImageFs.USER);
-        file.delete();
+        if (file.exists() && !FileUtils.isSymlink(file) && file.isDirectory()) {
+            Log.w("ContainerManager", "Repairing stale real xuser directory before activation");
+            if (!FileUtils.delete(file)) {
+                Log.e("ContainerManager", "Unable to remove stale xuser directory: " + file.getAbsolutePath());
+            }
+        }
+        else if (file.exists() && !file.delete()) {
+            Log.e("ContainerManager", "Unable to remove stale xuser alias: " + file.getAbsolutePath());
+        }
+
         FileUtils.symlink("./"+ImageFs.USER+"-"+container.id, file.getPath());
+        if (!FileUtils.isSymlink(file)) {
+            Log.e("ContainerManager", "Unable to activate container: xuser alias was not created for container " + container.id);
+        }
     }
 
     public void createContainerAsync(final JSONObject data, ContentsManager contentsManager, Callback<Container> callback) {
@@ -117,13 +134,22 @@ public class ContainerManager {
         });
     }
 
+    private int findNextContainerId() {
+        int id = Math.max(1, maxContainerId + 1);
+        while (new File(homeDir, ImageFs.USER + "-" + id).exists()) id++;
+        return id;
+    }
+
     private Container createContainer(JSONObject data, ContentsManager contentsManager) {
         try {
-            int id = maxContainerId + 1;
+            int id = findNextContainerId();
             data.put("id", id);
 
             File containerDir = new File(homeDir, ImageFs.USER+"-"+id);
-            if (!containerDir.mkdirs()) return null;
+            if (!containerDir.mkdirs()) {
+                Log.e("ContainerManager", "Unable to create container directory: " + containerDir);
+                return null;
+            }
 
             Container container = new Container(id, this);
             container.setRootDir(containerDir);
@@ -136,9 +162,15 @@ public class ContainerManager {
                 return null;
             }
 
+//            // Extract the selected graphics driver files
+//            String driverVersion = container.getGraphicsDriverVersion();
+//            if (!extractGraphicsDriverFiles(driverVersion, containerDir, null)) {
+//                FileUtils.delete(containerDir);
+//                return null;
+//            }
 
             container.saveData();
-            maxContainerId++;
+            maxContainerId = Math.max(maxContainerId, id);
             containers.add(container);
             return container;
         } catch (JSONException e) {
@@ -149,11 +181,12 @@ public class ContainerManager {
 
 
     private void duplicateContainer(Container srcContainer) {
-        int id = maxContainerId + 1;
+        int id = findNextContainerId();
 
         File dstDir = new File(homeDir, ImageFs.USER + "-" + id);
         if (!dstDir.mkdirs()) return;
 
+        // Use the refactored copy method that doesn't require a Context for File operations
         if (!FileUtils.copy(srcContainer.getRootDir(), dstDir, file -> FileUtils.chmod(file, 0771))) {
             FileUtils.delete(dstDir);
             return;
@@ -179,7 +212,7 @@ public class ContainerManager {
         dstContainer.setWineVersion(srcContainer.getWineVersion());
         dstContainer.saveData();
 
-        maxContainerId++;
+        maxContainerId = Math.max(maxContainerId, id);
         containers.add(dstContainer);
     }
 
@@ -216,7 +249,7 @@ public class ContainerManager {
     }
 
     public int getNextContainerId() {
-        return maxContainerId + 1;
+        return findNextContainerId();
     }
 
     public Container getContainerById(int id) {
@@ -227,7 +260,12 @@ public class ContainerManager {
     private void extractCommonDlls(WineInfo wineInfo, String srcName, String dstName, File containerDir, OnExtractFileListener onExtractFileListener) throws JSONException {
         File srcDir = new File(wineInfo.path + "/lib/wine/" + srcName);
 
+        File staleIcuDll = new File(containerDir, ".wine/drive_c/windows/" + dstName + "/icu.dll");
+        if (staleIcuDll.exists() && !FileUtils.delete(staleIcuDll))
+            throw new JSONException("Could not remove incompatible " + dstName + "/icu.dll");
+
         File[] srcfiles = srcDir.listFiles(file -> file.isFile());
+        if (srcfiles == null) throw new JSONException("Missing Wine files");
 
         for (File file : srcfiles) {
             String dllName = file.getName();
@@ -247,6 +285,7 @@ public class ContainerManager {
 
     public boolean extractContainerPatternFile(Container container, String wineVersion, ContentsManager contentsManager, File containerDir, OnExtractFileListener onExtractFileListener) {
         WineInfo wineInfo = WineInfo.fromIdentifier(context, contentsManager, wineVersion);
+        if (wineInfo.path == null || wineInfo.path.isEmpty()) return false;
         String containerPattern = wineVersion + "_container_pattern.tzst";
         boolean result = TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, context, containerPattern, containerDir, onExtractFileListener);
 
@@ -273,6 +312,7 @@ public class ContainerManager {
     }
 
     public Container getContainerForShortcut(Shortcut shortcut) {
+        // Search for the container by its ID
         for (Container container : containers) {
             if (container.id == shortcut.getContainerId()) {
                 return container;
@@ -281,6 +321,7 @@ public class ContainerManager {
         return null;  // Return null if no matching container is found
     }
 
+    // Utility method to run on UI thread
     private void runOnUiThread(Runnable action) {
         new Handler(Looper.getMainLooper()).post(action);
     }

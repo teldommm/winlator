@@ -1,8 +1,11 @@
+// Project Dependencies
 #include <jni.h>
 #include <jnipp.h>
 
+// Standard Dependencies
 #include <cmath>
 
+// Local Dependencies
 #include "testing.h"
 
 /*
@@ -25,6 +28,7 @@ TEST(Vm_externalDetach) {
 }
 
 int main() {
+    // jni::Vm Tests
     RUN_TEST(Vm_externalDetach);
     return 0;
 }

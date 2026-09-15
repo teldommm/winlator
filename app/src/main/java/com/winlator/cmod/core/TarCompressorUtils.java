@@ -1,8 +1,11 @@
 package com.winlator.cmod.core;
 
 import android.content.Context;
+import android.content.res.AssetFileDescriptor;
 import android.net.Uri;
 import android.util.Log;
+
+import com.winlator.cmod.contents.D7VKManager;
 
 import org.apache.commons.compress.archivers.ArchiveInputStream;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
@@ -21,6 +24,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -32,6 +36,53 @@ public abstract class TarCompressorUtils {
         boolean shouldInclude(File file);
     }
 
+    public interface OnExtractProgressListener {
+        void onProgress(int progress);
+    }
+
+    private static final class ProgressInputStream extends FilterInputStream {
+        private final long totalBytes;
+        private final OnExtractProgressListener listener;
+        private long bytesRead;
+        private int lastProgress = Integer.MIN_VALUE;
+
+        private ProgressInputStream(InputStream input, long totalBytes, OnExtractProgressListener listener) {
+            super(input);
+            this.totalBytes = totalBytes;
+            this.listener = listener;
+            reportProgress();
+        }
+
+        private void reportProgress() {
+            int progress = totalBytes > 0
+                    ? (int)Math.min(100L, (bytesRead * 100L) / totalBytes)
+                    : -1;
+            if (progress != lastProgress) {
+                lastProgress = progress;
+                listener.onProgress(progress);
+            }
+        }
+
+        @Override
+        public int read() throws IOException {
+            int value = super.read();
+            if (value >= 0) {
+                bytesRead++;
+                reportProgress();
+            }
+            return value;
+        }
+
+        @Override
+        public int read(byte[] buffer, int offset, int length) throws IOException {
+            int count = super.read(buffer, offset, length);
+            if (count > 0) {
+                bytesRead += count;
+                reportProgress();
+            }
+            return count;
+        }
+    }
 
     private static void addFile(ArchiveOutputStream tar, File file, String entryName) {
         try {
@@ -59,7 +110,7 @@ public abstract class TarCompressorUtils {
         if (files == null) return;
         for (File file : files) {
             if (filter != null && !filter.shouldInclude(file)) {
-                continue; // Skip files that should be excluded
+                continue;
             }
             if (FileUtils.isSymlink(file)) {
                 addLinkFile(tar, file, basePath + file.getName());
@@ -73,6 +124,7 @@ public abstract class TarCompressorUtils {
             }
         }
     }
+
     public static void compress(Type type, File file, File destination, int level) {
         compress(type, new File[]{file}, destination, level, null);
     }
@@ -86,9 +138,7 @@ public abstract class TarCompressorUtils {
              TarArchiveOutputStream tar = new TarArchiveOutputStream(outStream)) {
             tar.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
             for (File file : files) {
-                if (filter != null && !filter.shouldInclude(file)) {
-                    continue; // Skip files that should be excluded
-                }
+                if (filter != null && !filter.shouldInclude(file)) continue;
                 if (FileUtils.isSymlink(file)) {
                     addLinkFile(tar, file, file.getName());
                 } else if (file.isDirectory()) {
@@ -106,12 +156,14 @@ public abstract class TarCompressorUtils {
         }
     }
 
-
     public static boolean extract(Type type, Context context, String assetFile, File destination) {
         return extract(type, context, assetFile, destination, null);
     }
 
     public static boolean extract(Type type, Context context, String assetFile, File destination, OnExtractFileListener onExtractFileListener) {
+        if (type == Type.ZSTD && D7VKManager.isD7VKAssetRequest(assetFile)) {
+            return D7VKManager.applyInstalled(context, D7VKManager.selectionFromAssetRequest(assetFile), destination);
+        }
         try {
             return extract(type, context.getAssets().open(assetFile), destination, onExtractFileListener);
         }
@@ -124,14 +176,37 @@ public abstract class TarCompressorUtils {
         return extract(type, context, source, destination, null);
     }
 
-    public static boolean extract(Type type, Context context, Uri source, File destination, OnExtractFileListener onExtractFileListener) {
+    public static boolean extract(Type type, Context context, Uri source, File destination,
+                                  OnExtractFileListener onExtractFileListener) {
+        return extract(type, context, source, destination, onExtractFileListener, null);
+    }
+
+    public static boolean extract(Type type, Context context, Uri source, File destination,
+                                  OnExtractFileListener onExtractFileListener,
+                                  OnExtractProgressListener progressListener) {
         if (source == null) return false;
         try {
+            InputStream input;
+            long totalBytes = -1;
             if (source.toString().startsWith("/")) {
-                return extract(type, new FileInputStream(source.toString()), destination, onExtractFileListener);
+                File sourceFile = new File(source.toString());
+                totalBytes = sourceFile.length();
+                input = new FileInputStream(sourceFile);
             } else {
-                return extract(type, context.getContentResolver().openInputStream(source), destination, onExtractFileListener);
+                try (AssetFileDescriptor descriptor =
+                             context.getContentResolver().openAssetFileDescriptor(source, "r")) {
+                    if (descriptor != null) totalBytes = descriptor.getLength();
+                } catch (IOException ignored) {
+                }
+                input = context.getContentResolver().openInputStream(source);
             }
+
+            if (progressListener != null && input != null) {
+                input = new ProgressInputStream(input, totalBytes, progressListener);
+            }
+            boolean result = extract(type, input, destination, onExtractFileListener);
+            if (result && progressListener != null) progressListener.onProgress(100);
+            return result;
         }
         catch (FileNotFoundException e) {
             return false;
@@ -215,9 +290,7 @@ public abstract class TarCompressorUtils {
              TarArchiveOutputStream tar = new TarArchiveOutputStream(outStream)) {
             tar.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
             for (File file : files) {
-                if (filter != null && !filter.shouldInclude(file)) {
-                    continue; // Skip files that should be excluded
-                }
+                if (filter != null && !filter.shouldInclude(file)) continue;
                 if (FileUtils.isSymlink(file)) {
                     addLinkFile(tar, file, file.getName());
                 } else if (file.isDirectory()) {
@@ -248,7 +321,7 @@ public abstract class TarCompressorUtils {
                 if (topLevelDirectory == null) {
                     if (entry.isDirectory()) {
                         topLevelDirectory = entryName;
-                        continue; // Skip creating the top-level directory
+                        continue;
                     }
                 }
 
@@ -285,13 +358,4 @@ public abstract class TarCompressorUtils {
             return false;
         }
     }
-
-
 }
-
-
-
-
-
-
-

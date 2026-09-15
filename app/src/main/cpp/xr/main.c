@@ -33,23 +33,28 @@ void OXRCheckErrors(XrResult result, const char* file, int line) {
 
 JNIEXPORT void JNICALL Java_com_winlator_XrActivity_init(JNIEnv *env, jobject obj) {
 
+    // Do not allow second initialization
     if (xr_initialized) {
         return;
     }
 
+    // Set platform flags
     memset(&xr_module_engine, 0, sizeof(xr_module_engine));
     xr_module_engine.PlatformFlag[PLATFORM_CONTROLLER_QUEST] = true;
     xr_module_engine.PlatformFlag[PLATFORM_EXTENSION_PASSTHROUGH] = true;
     xr_module_engine.PlatformFlag[PLATFORM_EXTENSION_PERFORMANCE] = true;
 
+    // Get Java VM
     JavaVM* vm;
     (*env)->GetJavaVM(env, &vm);
 
+    // Init XR
     xrJava java;
     java.vm = vm;
     java.activity = (*env)->NewGlobalRef(env, obj);
     XrEngineInit(&xr_module_engine, &java, "Winlator", 1);
 
+    // Enter XR
     XrEngineEnter(&xr_module_engine);
     XrInputInit(&xr_module_engine, &xr_module_input);
     XrRendererInit(&xr_module_engine, &xr_module_renderer);
@@ -77,20 +82,24 @@ JNIEXPORT jint JNICALL Java_com_winlator_XrActivity_getHeight(JNIEnv *env, jobje
 JNIEXPORT jboolean JNICALL Java_com_winlator_XrActivity_beginFrame(JNIEnv *env, jobject obj, jboolean immersive, jboolean sbs) {
     if (XrRendererInitFrame(&xr_module_engine, &xr_module_renderer)) {
 
+        // Set render canvas
         int mode = immersive ? RENDER_MODE_MONO_6DOF : RENDER_MODE_MONO_SCREEN;
         xr_module_renderer.ConfigFloat[CONFIG_CANVAS_DISTANCE] = 5.0f;
         xr_module_renderer.ConfigInt[CONFIG_PASSTHROUGH] = !immersive;
         xr_module_renderer.ConfigInt[CONFIG_MODE] = mode;
         xr_module_renderer.ConfigInt[CONFIG_SBS] = sbs;
 
+        // Recenter if mode switched
         static int last_immersive = -1;
         if (last_immersive != immersive) {
             XrRendererRecenter(&xr_module_engine, &xr_module_renderer);
             last_immersive = immersive;
         }
 
+        // Update controllers state
         XrInputUpdate(&xr_module_engine, &xr_module_input);
 
+        // Lock framebuffer
         XrRendererBeginFrame(&xr_module_renderer, 0);
 
         return true;

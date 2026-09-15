@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 
+//#define _DEBUG
 
 #ifndef ANDROID
 #define ANDROID 1

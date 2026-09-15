@@ -1,6 +1,33 @@
+// Copyright (c) 2017-2024, The Khronos Group Inc.
+// Copyright (c) 2017-2019, Valve Corporation
+// Copyright (c) 2017-2019, LunarG, Inc.
 
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 
+// *********** THIS FILE IS GENERATED - DO NOT EDIT ***********
+//     See utility_source_generator.py for modifications
+// ************************************************************
 
+// Copyright (c) 2017-2024, The Khronos Group Inc.
+// Copyright (c) 2017-2019 Valve Corporation
+// Copyright (c) 2017-2019 LunarG, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+// Author: Mark Young <marky@lunarg.com>
+//
 
 #pragma once
 
@@ -10,8 +37,10 @@
 #ifdef __cplusplus
 extern "C" { 
 #endif
+// Generated dispatch table
 struct XrGeneratedDispatchTable {
 
+    // ---- Core 1.0 commands
     PFN_xrGetInstanceProcAddr GetInstanceProcAddr;
     PFN_xrEnumerateApiLayerProperties EnumerateApiLayerProperties;
     PFN_xrEnumerateInstanceExtensionProperties EnumerateInstanceExtensionProperties;
@@ -68,8 +97,10 @@ struct XrGeneratedDispatchTable {
     PFN_xrApplyHapticFeedback ApplyHapticFeedback;
     PFN_xrStopHapticFeedback StopHapticFeedback;
 
+    // ---- Core 1.1 commands
     PFN_xrLocateSpaces LocateSpaces;
 
+    // ---- XR_EXT_debug_utils extension commands
     PFN_xrSetDebugUtilsObjectNameEXT SetDebugUtilsObjectNameEXT;
     PFN_xrCreateDebugUtilsMessengerEXT CreateDebugUtilsMessengerEXT;
     PFN_xrDestroyDebugUtilsMessengerEXT DestroyDebugUtilsMessengerEXT;
@@ -80,6 +111,7 @@ struct XrGeneratedDispatchTable {
 };
 
 
+// Prototype for dispatch table helper function
 void GeneratedXrPopulateDispatchTable(struct XrGeneratedDispatchTable *table,
                                       XrInstance instance,
                                       PFN_xrGetInstanceProcAddr get_inst_proc_addr);

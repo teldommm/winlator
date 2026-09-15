@@ -12,8 +12,6 @@ import java.io.IOException;
 public class BigReqExtension implements Extension {
     public static final byte MAJOR_OPCODE = -100;
     private static final int MAX_REQUEST_LENGTH = 4194303;
-    private byte firstEventId = 0;
-    private byte firstErrorId = 0;
 
     @Override
     public String getName() {
@@ -26,22 +24,14 @@ public class BigReqExtension implements Extension {
     }
 
     @Override
-    public int getNumEvents() { return 0; }
+    public byte getFirstErrorId() {
+        return 0;
+    }
 
     @Override
-    public int getNumErrors() { return 0; }
-
-    @Override
-    public void setFirstEventId(byte id) { this.firstEventId = id; }
-
-    @Override
-    public void setFirstErrorId(byte id) { this.firstErrorId = id; }
-
-    @Override
-    public byte getFirstEventId() { return firstEventId; }
-
-    @Override
-    public byte getFirstErrorId() { return firstErrorId; }
+    public byte getFirstEventId() {
+        return 0;
+    }
 
     @Override
     public void handleRequest(XClient client, XInputStream inputStream, XOutputStream outputStream) throws IOException {

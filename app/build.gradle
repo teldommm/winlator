@@ -1,6 +1,4 @@
 import java.net.URL
-import java.nio.file.Files
-import java.nio.file.Paths
 import java.security.MessageDigest
 
 buildscript {
@@ -12,28 +10,28 @@ buildscript {
     dependencies {
         // Adjust Gradle plugin versions if needed
         classpath 'com.android.tools.build:gradle:8.8.0'
-        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.0'
     }
 
 }
 
 plugins {
     id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+    id 'org.jetbrains.kotlin.plugin.compose'
 }
 
 tasks.register("downloadImageFS") {
-        def assetDir = new File(project.rootDir, ["app","src","main","assets"].join(File.separator))
-    File imageFS = new File(assetDir, "imagefs.txz")
-    String imageFSSHA256Sum = "https://gitlab.com/winlator3/winlator-extra/-/raw/main/imagefs/imagefs.txz.sha256sum"
-    int parts = 4
+    def assetDir = new File(project.rootDir, ["app","src","main","assets"].join(File.separator))
+    File imageFS = new File(assetDir, "imagefs.tar.zst")
+    int parts = 2
 
     doLast {
         if (!imageFS.exists()) {
             println("ImageFS was not present, downloading...\n")
             FileOutputStream outputStream = new FileOutputStream(imageFS)
             for (int i = 0; i < parts; i++) {
-                File partFile = new File(assetDir, String.format("imagefs.txz.%02d", i))
-                String partURL = String.format("https://gitlab.com/winlator3/winlator-extra/-/raw/main/imagefs/imagefs.txz.%02d", i)
+                File partFile = new File(assetDir, String.format("imagefs.tar.zst.%02d", i))
+                String partURL = String.format("https://raw.githubusercontent.com/Other-backup/winlator-imagefs-v2/main/imagefs.tar.zst.%02d", i)
                 new URL(partURL).withInputStream { p ->
                     partFile.withOutputStream { it << p }
                     outputStream << partFile.bytes
@@ -47,22 +45,41 @@ tasks.register("downloadImageFS") {
 
 tasks.register("downloadProton") {
     def assetDir = new File(project.rootDir, ["app","src","main","assets"].join(File.separator))
-    File protonARM64EC = new File(assetDir, "proton-9.0-arm64ec.txz")
-    File protonX8664 = new File(assetDir, "proton-9.0-x86_64.txz")
-    String protonARM64ECUrl = "https://gitlab.com/winlator3/winlator-extra/-/raw/main/proton/proton-9.0-arm64ec.txz"
-    String protonARM64ECSHA256Sum = "https://gitlab.com/winlator3/winlator-extra/-/raw/main/proton/proton-9.0-arm64ec.txz.sha256sum"
-    String protonX8664Url = "https://gitlab.com/winlator3/winlator-extra/-/raw/main/proton/proton-9.0-x86_64.txz"
-    String protonX8664SHA256Sum = "https://gitlab.com/winlator3/winlator-extra/-/raw/main/proton/proton-9.0-x86_64.txz.sha256sum"
+    File protonARM64EC = new File(assetDir, "proton-9.0-arm64ec.tar.zst")
+    File staleProtonARM64EC = new File(assetDir, "proton-10.0-5-arm64ec.tar.zst")
+    String protonURL = "https://github.com/Other-backup/winlator-imagefs-v2/releases/download/c/proton-9.0-arm64ec.tar.zst"
+    String protonSHA256 = "5f9375640479a5b2c4c3998fda689bb5085febc8fcdb7b6998c79d925392991a"
+    long protonSize = 73570637L
 
+    def fileSHA256 = { File file ->
+        MessageDigest digest = MessageDigest.getInstance("SHA-256")
+        file.withInputStream { input ->
+            byte[] buffer = new byte[64 * 1024]
+            int read
+            while ((read = input.read(buffer)) != -1) digest.update(buffer, 0, read)
+        }
+        digest.digest().collect { String.format("%02x", ((int) it) & 0xff) }.join()
+    }
 
     doLast {
-        if (!protonARM64EC.exists()) {
-            println("Proton 9.0 ARM64EC was not present, downloading...\n")
-            new URL(protonARM64ECUrl).withInputStream { i -> protonARM64EC.withOutputStream { it << i } }
-        }
-        if (!protonX8664.exists()) {
-            println("Proton 9.0 x86_64 was not present, downloading...\n")
-            new URL(protonX8664Url).withInputStream { i -> protonX8664.withOutputStream { it << i } }
+        if (staleProtonARM64EC.exists()) staleProtonARM64EC.delete()
+
+        boolean valid = protonARM64EC.isFile()
+                && protonARM64EC.length() == protonSize
+                && fileSHA256(protonARM64EC).equalsIgnoreCase(protonSHA256)
+        if (!valid) {
+            if (protonARM64EC.exists()) protonARM64EC.delete()
+            println("Proton 9 ARM64EC was not present or failed validation, downloading...\n")
+            new URL(protonURL).withInputStream { input ->
+                protonARM64EC.withOutputStream { output -> output << input }
+            }
+            valid = protonARM64EC.isFile()
+                    && protonARM64EC.length() == protonSize
+                    && fileSHA256(protonARM64EC).equalsIgnoreCase(protonSHA256)
+            if (!valid) {
+                protonARM64EC.delete()
+                throw new GradleException("Downloaded Proton 9 ARM64EC archive failed size/SHA-256 validation")
+            }
         }
     }
 }
@@ -74,16 +91,21 @@ preBuild.dependsOn(downloadProton)
 android {
     namespace 'com.winlator.cmod'
     // Keep compileSdk from your current config. If you want to match Termux-X11, you could set to 34.
-    compileSdk 34
-  buildToolsVersion "35.0.0"
+    compileSdk 35
+    buildToolsVersion "35.0.0"
+
+    lint {
+        disable 'ExpiredTargetSdkVersion'
+    }
+
     defaultConfig {
         applicationId "com.winlator.cmod"
-        minSdkVersion 26
+        minSdkVersion 28
         // We’re preserving Winlator’s request to keep targetSdkVersion at 28
         targetSdkVersion 28
 
         versionCode 20
-        versionName "7.1.4x-cmod"
+        versionName "4.1"
 
         // External native build from Winlator
         externalNativeBuild {
@@ -98,7 +120,6 @@ android {
         }
     }
 
-
     // Java versions: Winlator uses Java 17, Termux-X11 used 1.9
     // Using 17 is typically fine (covers 1.9 features).
     compileOptions {
@@ -106,16 +127,24 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
+    kotlinOptions {
+        jvmTarget = '17'
+        freeCompilerArgs += ['-opt-in=androidx.compose.material3.ExperimentalMaterial3Api']
+    }
+
     // Keep Winlator’s buildTypes
     buildTypes {
         debug {
             minifyEnabled false
         }
-        // If you have a release build type, add it here
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.debug
+            crunchPngs false
+        }
     }
 
-
-    ndkVersion '29.0.14206865'  // from your original config
+    ndkVersion '29.0.14206865'
 
     externalNativeBuild {
         cmake {
@@ -128,10 +157,26 @@ android {
         jniLibs {
             useLegacyPackaging = true
         }
+        resources {
+            pickFirsts += ["assets/dexopt/baseline.prof", "assets/dexopt/baseline.profm"]
+        }
+    }
+
+    buildFeatures {
+        prefab = true
+        compose = true
     }
 }
 
 dependencies {
+    implementation platform('androidx.compose:compose-bom:2025.08.00')
+    implementation 'androidx.activity:activity-compose:1.10.1'
+    implementation 'androidx.compose.ui:ui'
+    implementation 'androidx.compose.ui:ui-tooling-preview'
+    implementation 'androidx.compose.material3:material3'
+    implementation 'androidx.compose.material:material-icons-extended'
+    debugImplementation 'androidx.compose.ui:ui-tooling'
+
     // Winlator’s dependencies
     implementation 'androidx.appcompat:appcompat:1.4.0'
     implementation 'androidx.preference:preference:1.2.1'
@@ -156,7 +201,3 @@ dependencies {
     implementation 'com.kohlschutter.junixsocket:junixsocket-native-common:2.6.0'
     annotationProcessor 'com.github.bumptech.glide:compiler:4.11.0'
 }
-
-
-
-

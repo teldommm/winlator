@@ -1,3 +1,11 @@
+// Copyright (c) 2017-2024, The Khronos Group Inc.
+// Copyright (c) 2017-2019 Valve Corporation
+// Copyright (c) 2017-2019 LunarG, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+//
+// Initial Author: Mark Young <marky@lunarg.com>
+//
 
 #include "loader_logger.hpp"
 
@@ -18,6 +26,7 @@
 #include <utility>
 #include <vector>
 
+// For routing platform_utils.hpp messages into the LoaderLogger.
 void LogPlatformUtilsError(const std::string& message) { LoaderLogger::LogErrorMessage("platform_utils", message); }
 
 bool LoaderLogRecorder::LogDebugUtilsMessage(XrDebugUtilsMessageSeverityFlagsEXT /*message_severity*/,
@@ -26,6 +35,7 @@ bool LoaderLogRecorder::LogDebugUtilsMessage(XrDebugUtilsMessageSeverityFlagsEXT
     return false;
 }
 
+// Utility functions for converting to/from XR_EXT_debug_utils values
 
 XrLoaderLogMessageSeverityFlags DebugUtilsSeveritiesToLoaderLogMessageSeverities(
     XrDebugUtilsMessageSeverityFlagsEXT utils_severities) {
@@ -94,17 +104,24 @@ XrDebugUtilsMessageTypeFlagsEXT LoaderLogMessageTypesToDebugUtilsMessageTypes(Xr
 LoaderLogger::LoaderLogger() {
     std::string debug_string = PlatformUtilsGetEnv("XR_LOADER_DEBUG");
 
+    // Add an error logger by default so that we at least get errors out to std::cerr.
+    // Normally we enable stderr output. But if the XR_LOADER_DEBUG environment variable is
+    // present as "none" then we don't.
     if (debug_string != "none") {
         AddLogRecorder(MakeStdErrLoaderLogRecorder(nullptr));
 #ifdef __ANDROID__
+        // Add a logcat logger by default.
         AddLogRecorder(MakeLogcatLoaderLogRecorder());
 #endif  // __ANDROID__
     }
 
 #ifdef _WIN32
+    // Add an debugger logger by default so that we at least get errors out to the debugger.
     AddLogRecorder(MakeDebuggerLoaderLogRecorder(nullptr));
 #endif
 
+    // If the environment variable to enable loader debugging is set, then enable the
+    // appropriate logging out to std::cout.
     if (!debug_string.empty()) {
         XrLoaderLogMessageSeverityFlags debug_flags = {};
         if (debug_string == "error") {
@@ -182,6 +199,7 @@ bool LoaderLogger::LogMessage(XrLoaderLogMessageSeverityFlagBits message_severit
     return exit_app;
 }
 
+// Extension-specific logging functions
 bool LoaderLogger::LogDebugUtilsMessage(XrDebugUtilsMessageSeverityFlagsEXT message_severity,
                                         XrDebugUtilsMessageTypeFlagsEXT message_type,
                                         const XrDebugUtilsMessengerCallbackDataEXT* callback_data) {
@@ -192,8 +210,10 @@ bool LoaderLogger::LogDebugUtilsMessage(XrDebugUtilsMessageSeverityFlagsEXT mess
     AugmentedCallbackData augmented_data;
     data_.WrapCallbackData(&augmented_data, callback_data);
 
+    // Loop through the recorders
     std::shared_lock<std::shared_timed_mutex> lock(_mutex);
     for (std::unique_ptr<LoaderLogRecorder>& recorder : _recorders) {
+        // Only send the message if it's a debug utils recorder and of the type the recorder cares about.
         if (recorder->Type() != XR_LOADER_LOG_DEBUG_UTILS ||
             (recorder->MessageSeverities() & log_message_severity) != log_message_severity ||
             (recorder->MessageTypes() & log_message_type) != log_message_type) {

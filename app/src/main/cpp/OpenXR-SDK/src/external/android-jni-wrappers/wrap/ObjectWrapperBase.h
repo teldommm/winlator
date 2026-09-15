@@ -1,3 +1,6 @@
+// Copyright 2020-2021, Collabora, Ltd.
+// SPDX-License-Identifier: BSL-1.0
+// Author: Rylie Pavlik <rylie.pavlik@collabora.com>
 
 #pragma once
 #include <assert.h>
@@ -146,6 +149,7 @@ class MetaBase {
     explicit MetaBase(const char *classname, jni::jclass clazz = nullptr)
         : classname_(classname), clazz_() {
         if (clazz != nullptr) {
+            // The 0 makes it a global ref.
             clazz_ = jni::Class{clazz, 0};
         } else {
             clazz_ = jni::Class{classname};
@@ -203,6 +207,7 @@ class MetaBaseDroppable {
                                jni::jclass clazz = nullptr)
         : classname_(classname), clazz_() {
         if (clazz != nullptr) {
+            // The 0 makes it a global ref.
             clazz_ = jni::Class{clazz, 0};
         } else {
             clazz_ = jni::Class{classname};

@@ -1,3 +1,7 @@
+// Copyright 2007-2019 The JsonCpp Authors
+// Distributed under MIT license, or public domain if desired and
+// recognized in your jurisdiction.
+// See file LICENSE for detail or copy at http://jsoncpp.sourceforge.net/LICENSE
 
 #include "fuzz.h"
 
@@ -45,5 +49,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     reader->parse(data_str, data_str + size, &root, nullptr);
   } catch (Json::Exception const&) {
   }
+  // Whether it succeeded or not doesn't matter.
   return 0;
 }

@@ -7,6 +7,12 @@ import android.widget.CheckBox;
 import android.widget.Spinner;
 
 import com.winlator.cmod.R;
+import com.winlator.cmod.contents.AdrenotoolsManager;
+import com.winlator.cmod.core.AppUtils;
+import com.winlator.cmod.core.UnitUtils;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class RendererOptionsDialog extends ContentDialog {
 
@@ -18,9 +24,6 @@ public class RendererOptionsDialog extends ContentDialog {
     }
 
     public interface Config {
-        boolean getRendererNative();
-        void setRendererNative(boolean v);
-
         String getRendererPresentMode();
         void setRendererPresentMode(String v);
 
@@ -30,44 +33,48 @@ public class RendererOptionsDialog extends ContentDialog {
         int getRendererFilterMode();
         void setRendererFilterMode(int v);
 
-        int getRendererRefreshRateLimit();
-        void setRendererRefreshRateLimit(int v);
-
         boolean getRendererSwapRB();
         void setRendererSwapRB(boolean v);
     }
 
-    private static final String[] PRESENT_MODE_IDS    = {"fifo", "mailbox"};
+    private static final String[] PRESENT_MODE_IDS    = {"mailbox", "fifo"};
     private static final String[] PRESENT_MODE_LABELS = {
-        "Fifo",
-        "Mailbox"
+        "Mailbox",
+        "Fifo"
     };
 
-    private static final String[] FILTER_LABELS = {
+    private static final String[] FILTER_LABELS_VULKAN = {
+        "Bilinear",
+        "Nearest neighbor",
+        "Snapdragon Super Resolution",
+        "AMD FidelityFX Super Resolution",
+        "Lanczos 2",
+        "Color Boost"
+    };
+
+    private static final String[] FILTER_LABELS_EGL = {
         "Bilinear",
         "Nearest neighbor"
     };
-    private static final int[] REFRESH_RATE_VALUES = {60, 0};
-    private static final String[] REFRESH_RATE_LABELS = {"60 Hz", "Device Refresh Rate"};
 
     public RendererOptionsDialog(View anchorView, Config config, boolean isNativeMode) {
         super(anchorView.getContext(), R.layout.renderer_options_dialog);
         this.isNativeMode = isNativeMode;
-        setTitle("Renderer Options");
-        setIcon(R.drawable.icon_monitor);
 
         Context ctx = anchorView.getContext();
+        findViewById(R.id.FrameLayout).getLayoutParams().width = Math.min(AppUtils.getPreferredDialogWidth(ctx), Math.round(UnitUtils.dpToPx(260)));
 
         Spinner  spPresent = findViewById(R.id.SPRendererPresentMode);
+        Spinner  spDriver  = findViewById(R.id.SPRendererDriver);
         Spinner  spFilter  = findViewById(R.id.SPRendererFilter);
-        Spinner  spRefresh = findViewById(R.id.SPRendererRefreshRate);
         CheckBox cbSwapRB  = findViewById(R.id.CBRendererSwapRB);
 
-        setGroupVisibility(R.id.GroupDriver,  View.GONE);
-        setGroupVisibility(R.id.GroupFilter,  View.VISIBLE);
+        setGroupVisibility(R.id.GroupPresentMode, isNativeMode ? View.GONE : View.VISIBLE);
+        setGroupVisibility(R.id.GroupDriver,      isNativeMode ? View.GONE : View.VISIBLE);
+        setGroupVisibility(R.id.GroupFilter,      View.VISIBLE);
+        cbSwapRB.setVisibility(View.VISIBLE);
 
-        spPresent.setAdapter(new ArrayAdapter<>(ctx,
-            android.R.layout.simple_spinner_dropdown_item, PRESENT_MODE_LABELS));
+        setAmoledAdapter(ctx, spPresent, PRESENT_MODE_LABELS);
         int pmSel = 0;
         String curPm = config.getRendererPresentMode();
         for (int i = 0; i < PRESENT_MODE_IDS.length; i++) {
@@ -75,31 +82,51 @@ public class RendererOptionsDialog extends ContentDialog {
         }
         spPresent.setSelection(pmSel);
 
-        String forcedDriverId = "";
-
-        spFilter.setAdapter(new ArrayAdapter<>(ctx,
-            android.R.layout.simple_spinner_dropdown_item, FILTER_LABELS));
-        int filterSel = config.getRendererFilterMode();
-        if (filterSel < 0 || filterSel >= FILTER_LABELS.length) filterSel = 0;
-        spFilter.setSelection(filterSel);
-
-        spRefresh.setAdapter(new ArrayAdapter<>(ctx,
-            android.R.layout.simple_spinner_dropdown_item, REFRESH_RATE_LABELS));
-        int rrSel = 0;
-        int currentRefresh = config.getRendererRefreshRateLimit();
-        for (int i = 0; i < REFRESH_RATE_VALUES.length; i++) {
-            if (REFRESH_RATE_VALUES[i] == currentRefresh) { rrSel = i; break; }
+        AdrenotoolsManager atm = new AdrenotoolsManager(ctx);
+        List<String> driverLabels = new ArrayList<>();
+        List<String> driverIds    = new ArrayList<>();
+        driverLabels.add("System");  driverIds.add("system");
+        for (String id : atm.enumerateRendererDrivers()) {
+            driverLabels.add(atm.getDriverName(id) + " " + atm.getDriverVersion(id));
+            driverIds.add(id);
         }
-        spRefresh.setSelection(rrSel);
+        setAmoledAdapter(ctx, spDriver, driverLabels);
+        String curDrv = config.getRendererDriverId();
+        int drvSel = 0;
+        for (int i = 0; i < driverIds.size(); i++) {
+            if (driverIds.get(i).equals(curDrv)) { drvSel = i; break; }
+        }
+        spDriver.setSelection(drvSel);
+
+        String[] filterLabels = isNativeMode ? FILTER_LABELS_EGL : FILTER_LABELS_VULKAN;
+        setAmoledAdapter(ctx, spFilter, filterLabels);
+        int filterSel = config.getRendererFilterMode();
+        if (filterSel < 0 || filterSel >= filterLabels.length) filterSel = 0;
+        spFilter.setSelection(filterSel);
         cbSwapRB.setChecked(config.getRendererSwapRB());
 
         setOnConfirmCallback(() -> {
-            config.setRendererPresentMode(PRESENT_MODE_IDS[spPresent.getSelectedItemPosition()]);
-            config.setRendererDriverId(forcedDriverId);
+            if (!isNativeMode) {
+                config.setRendererPresentMode(PRESENT_MODE_IDS[spPresent.getSelectedItemPosition()]);
+                config.setRendererDriverId(driverIds.get(spDriver.getSelectedItemPosition()));
+            }
             config.setRendererFilterMode(spFilter.getSelectedItemPosition());
-            config.setRendererRefreshRateLimit(REFRESH_RATE_VALUES[spRefresh.getSelectedItemPosition()]);
             config.setRendererSwapRB(cbSwapRB.isChecked());
         });
+    }
+
+    private void setAmoledAdapter(Context ctx, Spinner spinner, String[] items) {
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(ctx, R.layout.spinner_item_amoled, items);
+        adapter.setDropDownViewResource(R.layout.spinner_dropdown_item_amoled);
+        spinner.setAdapter(adapter);
+        spinner.setPopupBackgroundResource(R.drawable.dialog_background_dark_blue);
+    }
+
+    private void setAmoledAdapter(Context ctx, Spinner spinner, List<String> items) {
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(ctx, R.layout.spinner_item_amoled, items);
+        adapter.setDropDownViewResource(R.layout.spinner_dropdown_item_amoled);
+        spinner.setAdapter(adapter);
+        spinner.setPopupBackgroundResource(R.drawable.dialog_background_dark_blue);
     }
 
     public static int toVkPresentMode(String mode) {

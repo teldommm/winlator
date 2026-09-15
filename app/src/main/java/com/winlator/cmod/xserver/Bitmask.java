@@ -5,15 +5,15 @@ import androidx.annotation.NonNull;
 import java.util.Iterator;
 
 public class Bitmask implements Iterable<Integer> {
-    private long bits = 0;
+    private int bits = 0;
 
     public Bitmask() {}
 
-    public Bitmask(long bits) {
+    public Bitmask(int bits) {
         this.bits = bits;
     }
 
-    public boolean isSet(long flag) {
+    public boolean isSet(int flag) {
         return (flag & this.bits) != 0;
     }
 
@@ -21,18 +21,18 @@ public class Bitmask implements Iterable<Integer> {
         return (mask.bits & this.bits) != 0;
     }
 
-    public void set(long flag) {
+    public void set(int flag) {
         bits |= flag;
     }
 
-    public void set(long flag, boolean value) {
+    public void set(int flag, boolean value) {
         if (value) {
             set(flag);
         }
         else unset(flag);
     }
 
-    public void unset(long flag) {
+    public void unset(int flag) {
         bits &= ~flag;
     }
 
@@ -40,7 +40,7 @@ public class Bitmask implements Iterable<Integer> {
         return bits == 0;
     }
 
-    public long getBits() {
+    public int getBits() {
         return bits;
     }
 
@@ -51,7 +51,7 @@ public class Bitmask implements Iterable<Integer> {
     @NonNull
     @Override
     public Iterator<Integer> iterator() {
-        final long[] bits = {this.bits};
+        final int[] bits = {this.bits};
         return new Iterator<Integer>() {
             @Override
             public boolean hasNext() {
@@ -60,15 +60,15 @@ public class Bitmask implements Iterable<Integer> {
 
             @Override
             public Integer next() {
-                long index = Long.lowestOneBit(bits[0]);
+                int index = Integer.lowestOneBit(bits[0]);
                 bits[0] &= ~index;
-                return (int) index;
+                return index;
             }
         };
     }
 
     @Override
     public int hashCode() {
-        return Long.hashCode(bits);
+        return bits;
     }
 }

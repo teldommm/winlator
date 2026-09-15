@@ -50,6 +50,12 @@ public abstract class ProcessHelper {
         }
     }
 
+    public static void killAllWineProcesses() {
+        for (String process : listRunningWineProcesses()) {
+            killProcess(Integer.parseInt(process));
+        }
+    }
+
     public static void pauseAllWineProcesses() {
         for (String process : listRunningWineProcesses()) {
             suspendProcess(Integer.parseInt(process));
@@ -77,6 +83,7 @@ public abstract class ProcessHelper {
     public static int exec(String command, String[] envp, File workingDir, Callback<Integer> terminationCallback) {
         Log.d("ProcessHelper", "env: " + Arrays.toString(envp) + "\ncmd: " + command);
 
+        // Store env vars for future use
         EnvironmentManager.setEnvVars(envp);
 
         int pid = -1;
@@ -95,6 +102,7 @@ public abstract class ProcessHelper {
             }
             java.lang.Process process = pb.start();
 
+            // Accessing hidden field
             Log.d("ProcessHelper", "Accessing hidden field to get PID");
             Field pidField = process.getClass().getDeclaredField("pid");
             pidField.setAccessible(true);
@@ -262,9 +270,10 @@ public abstract class ProcessHelper {
         List<String> filterList = Arrays.asList(filters);
         allPids = proc.list(new FilenameFilter(){
             public boolean accept(File proc, String filename){
-                return new File(proc, filename).isDirectory() && filename.matches("[0-9]+");
+                return new File(proc, filename).isDirectory() && Character.isDigit(filename.charAt(0));
             }
         });
+        if (allPids == null) return filteredPids;
 
         for (int index = 0; index < allPids.length; index++){
             String data = "";
@@ -274,11 +283,49 @@ public abstract class ProcessHelper {
                 data = br.readLine();
             }
             catch (IOException e) {}
+            if (data == null) data = "";
+
+            String cmdline = readCmdline(proc, allPids[index]);
+            String haystack = data + " " + cmdline;
             for (String filter : filterList) {
-                if (data.contains(filter))
+                if (haystack.contains(filter)) {
                     filteredPids.add(allPids[index]);
+                    break;
+                }
             }
         }
         return filteredPids;
     }
+
+    private static String readCmdline(File proc, String pid) {
+        try (FileInputStream stream =
+                     new FileInputStream(new File(proc, pid + "/cmdline"))) {
+            byte[] buffer = new byte[512];
+            int count = stream.read(buffer);
+            if (count <= 0) return "";
+
+            StringBuilder commandLine = new StringBuilder(count);
+            for (int i = 0; i < count; i++)
+                commandLine.append(buffer[i] == 0 ? ' ' : (char)buffer[i]);
+            return commandLine.toString();
+        }
+        catch (Exception e) {
+            return "";
+        }
+    }
+
+    public static int getProcessAffinityMask(int pid) {
+        try (BufferedReader br = new BufferedReader(
+                new InputStreamReader(new FileInputStream("/proc/" + pid + "/status")))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                if (line.startsWith("Cpus_allowed:")) {
+                    String hex = line.substring("Cpus_allowed:".length()).trim();
+                    return (int) Long.parseLong(hex, 16);
+                }
+            }
+        } catch (Exception e) {}
+        return 0;
+    }
+
 }

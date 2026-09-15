@@ -59,7 +59,7 @@ public class WinHandler {
     private boolean initReceived = false;
     private boolean running = false;
     private OnGetProcessInfoListener onGetProcessInfoListener;
-    private final Map<Integer, ExternalController> controllers = new HashMap<>(); // map deviceId -> controller
+    private final Map<Integer, ExternalController> controllers = new HashMap<>();
     private InetAddress localhost;
     private byte inputType = DEFAULT_INPUT_TYPE;
     private final XServerDisplayActivity activity;
@@ -74,7 +74,7 @@ public class WinHandler {
     private String fakeInputBasePath;
     private LocalServerSocket vibrationServer;
     private volatile boolean vibrationRunning = false;
-    private boolean[] vibrationEnabledSlots = new boolean[MAX_CONTROLLERS]; // per-slot vibration toggle
+    private boolean[] vibrationEnabledSlots = new boolean[MAX_CONTROLLERS];
 
     private boolean xinputDisabled;
     private boolean xinputDisabledInitialized = false;
@@ -105,7 +105,6 @@ public class WinHandler {
 
         preferences = PreferenceManager.getDefaultSharedPreferences(activity.getBaseContext());
 
-        // Load per-slot vibration preferences (default: enabled)
         for (int i = 0; i < MAX_CONTROLLERS; i++) {
             vibrationEnabledSlots[i] = preferences.getBoolean("vibration_slot_" + i, true);
         }
@@ -130,11 +129,16 @@ public class WinHandler {
         if (command.isEmpty())
             return;
 
+        // The `split` function here should be sensitive to paths with spaces.
+        // Instead of splitting, let's assume that command is directly provided in two
+        // parts: filename and parameters.
+        // Adjust command splitting based on whether it contains quotes.
 
         String filename;
         String parameters;
 
         if (command.contains("\"")) {
+            // If the command is quoted, extract the quoted part as the filename
             int firstQuote = command.indexOf("\"");
             int lastQuote = command.lastIndexOf("\"");
             filename = command.substring(firstQuote + 1, lastQuote);
@@ -144,6 +148,7 @@ public class WinHandler {
                 parameters = "";
             }
         } else {
+            // Standard split when no quotes
             String[] cmdList = command.split(" ", 2);
             filename = cmdList[0];
             if (cmdList.length > 1) {
@@ -256,6 +261,8 @@ public class WinHandler {
                 sendData.put(RequestCodes.BRING_TO_FRONT);
                 byte[] bytes = processName.getBytes();
                 sendData.putInt(bytes.length);
+                // FIXME: Chinese and Japanese got from winhandler.exe are broken, and they
+                // cause overflow.
                 sendData.put(bytes);
                 sendData.putLong(handle);
             } catch (java.nio.BufferOverflowException e) {
@@ -349,71 +356,123 @@ public class WinHandler {
     }
 
     private void triggerVibration(int strong, int weak, int durationMs, int slot) {
-        // Check if vibration is enabled for this slot
-        if (slot >= 0 && slot < MAX_CONTROLLERS && !vibrationEnabledSlots[slot])
-            return;
+    if (!isValidSlot(slot) || !vibrationEnabledSlots[slot])
+        return;
 
-        Vibrator vibrator = null;
+    boolean shouldCancel = (durationMs == 0 && strong == 0 && weak == 0);
 
-        // Find which deviceId owns this slot
-        Integer deviceId = null;
-        for (Map.Entry<Integer, Integer> entry : deviceToSlot.entrySet()) {
-            if (entry.getValue() == slot) {
-                deviceId = entry.getKey();
-                break;
-            }
+    Vibrator vibrator = null;
+    android.os.VibratorManager vibratorManager = null;
+    boolean hasMultiMotor = false;
+
+    Integer deviceId = null;
+    for (Map.Entry<Integer, Integer> entry : deviceToSlot.entrySet()) {
+        if (entry.getValue() == slot) {
+            deviceId = entry.getKey();
+            break;
         }
+    }
 
-        if (deviceId != null && deviceId == OSC_DEVICE_ID) {
-            // OSC is mapped to this slot — use the phone vibrator
-            vibrator = (Vibrator) activity.getSystemService(Context.VIBRATOR_SERVICE);
-        } else if (deviceId != null) {
-            // Physical controller
-            android.view.InputDevice device = android.view.InputDevice.getDevice(deviceId);
-            if (device != null) {
-                vibrator = device.getVibrator();
-                // Check if the physical controller has vibration capabilities
+    if (deviceId != null && deviceId.equals(OSC_DEVICE_ID)) {
+        vibrator = (Vibrator) activity.getSystemService(Context.VIBRATOR_SERVICE);
+    } else if (deviceId != null) {
+        android.view.InputDevice device = android.view.InputDevice.getDevice(deviceId);
+        if (device != null) {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                vibratorManager = device.getVibratorManager();
+                if (vibratorManager != null && vibratorManager.getVibratorIds().length > 1) {
+                    hasMultiMotor = true;
+                }
+            }
+
+            if (!hasMultiMotor) {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
+                        && vibratorManager != null) {
+                    int[] ids = vibratorManager.getVibratorIds();
+                    if (ids.length > 0) {
+                        vibrator = vibratorManager.getVibrator(ids[0]);
+                    }
+                } else {
+                    vibrator = device.getVibrator();
+                }
+
                 if (vibrator == null || !vibrator.hasVibrator()) {
-                    // Fallback to phone vibrator if OSC is off and no other controller has fallen back
-                    if (!deviceToSlot.containsKey(OSC_DEVICE_ID) && (fallbackSlot == -1 || fallbackSlot == slot)) {
+                    if (!deviceToSlot.containsKey(OSC_DEVICE_ID)
+                            && (fallbackSlot == -1 || fallbackSlot == slot)) {
                         vibrator = (Vibrator) activity.getSystemService(Context.VIBRATOR_SERVICE);
                         fallbackSlot = slot;
+                    } else {
+                        vibrator = null;
                     }
-                    else vibrator = null;
                 }
             }
         }
+    }
 
-        if (vibrator == null || !vibrator.hasVibrator())
-            return;
+    if (hasMultiMotor && vibratorManager != null
+            && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+        int[] vibratorIds = vibratorManager.getVibratorIds();
 
-        if (strong > 0 || weak > 0) {
-            int intensity = Math.max(strong, weak);
-            int amplitude = Math.min(255, Math.max(1, (int) ((intensity / 65535.0f) * 255)));
-            int duration = Math.max(1, durationMs);
-
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                vibrator.vibrate(VibrationEffect.createOneShot(duration, amplitude));
+        if (vibratorIds.length >= 1) {
+            Vibrator vStrong = vibratorManager.getVibrator(vibratorIds[0]);
+            if (!shouldCancel && strong > 0) {
+                int amplitude = clampAmplitude(strong);
+                int duration = Math.max(1, durationMs);
+                vStrong.vibrate(VibrationEffect.createOneShot(duration, amplitude));
             } else {
-                vibrator.vibrate(duration);
+                vStrong.cancel();
             }
+        }
+
+        if (vibratorIds.length >= 2) {
+            Vibrator vWeak = vibratorManager.getVibrator(vibratorIds[1]);
+            if (!shouldCancel && weak > 0) {
+                int amplitude = clampAmplitude(weak);
+                int duration = Math.max(1, durationMs);
+                vWeak.vibrate(VibrationEffect.createOneShot(duration, amplitude));
+            } else {
+                vWeak.cancel();
+            }
+        }
+        return;
+    }
+
+    if (vibrator == null || !vibrator.hasVibrator())
+        return;
+
+    if (!shouldCancel && (strong > 0 || weak > 0)) {
+        int intensity = Math.max(strong, weak);
+        int amplitude = clampAmplitude(intensity);
+        int duration = Math.max(1, durationMs);
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            vibrator.vibrate(VibrationEffect.createOneShot(duration, amplitude));
         } else {
-            vibrator.cancel();
+            vibrator.vibrate(duration);
         }
+    } else {
+        vibrator.cancel();
     }
+}
 
-    public boolean isVibrationEnabledForSlot(int slot) {
-        if (slot >= 0 && slot < MAX_CONTROLLERS)
-            return vibrationEnabledSlots[slot];
-        return false;
-    }
+private int clampAmplitude(int value) {
+    return Math.min(255, Math.max(1, (int) ((value / 65535.0f) * 255)));
+}
 
-    public void setVibrationEnabledForSlot(int slot, boolean enabled) {
-        if (slot >= 0 && slot < MAX_CONTROLLERS) {
-            vibrationEnabledSlots[slot] = enabled;
-            preferences.edit().putBoolean("vibration_slot_" + slot, enabled).apply();
-        }
+private boolean isValidSlot(int slot) {
+    return slot >= 0 && slot < MAX_CONTROLLERS;
+}
+
+public boolean isVibrationEnabledForSlot(int slot) {
+    return isValidSlot(slot) && vibrationEnabledSlots[slot];
+}
+
+public void setVibrationEnabledForSlot(int slot, boolean enabled) {
+    if (isValidSlot(slot)) {
+        vibrationEnabledSlots[slot] = enabled;
+        preferences.edit().putBoolean("vibration_slot_" + slot, enabled).apply();
     }
+}
 
     public int getMaxControllers() {
         return MAX_CONTROLLERS;
@@ -461,6 +520,9 @@ public class WinHandler {
                 break;
             }
             case RequestCodes.RELEASE_GAMEPAD: {
+                // currentController = null; // No longer needed
+                // Maybe clear all controllers or reset mapping?
+                // For now, doing nothing is safest as mapping is sticky.
             }
             case RequestCodes.CURSOR_POS_FEEDBACK: {
                 short x = receiveData.getShort();
@@ -468,12 +530,11 @@ public class WinHandler {
                 XServer xServer = activity.getXServer();
                 xServer.pointer.setX(x);
                 xServer.pointer.setY(y);
-                if (activity.getXServerView() != null && activity.getXServerView().getRenderer() != null) {
-                    activity.getXServerView().queueEvent(() -> activity.getXServerView().getRenderer().updateScene());
-                }
+                activity.getXServerView().onPointerMove(x, y);
                 break;
             }
             default: {
+                // Handle any other request codes if needed
                 break;
             }
         }
@@ -541,15 +602,11 @@ public class WinHandler {
         if (profile != null) {
             ExternalController profileController = profile.getController(controller.getDeviceId());
             if (profileController != null && profileController.getControllerBindingCount() > 0) {
-                // If bindings are present, use the remappedState from the controller
-                // This reverts the single-slot consolidation where the no-arg
-                // sendGamepadState()
-                // was solely responsible for sending remapped states.
                 int slot = assignSlot(controller.getDeviceId());
                 if (slot >= 0 && writers[slot] != null) {
                     writers[slot].writeGamepadState(controller.remappedState);
                 }
-                return; // Suppress raw state sending if remapped state was sent
+                return;
             }
         }
 
@@ -559,10 +616,6 @@ public class WinHandler {
         }
     }
 
-    /**
-     * Assign a slot to a device using FCFS. Sticky slots - disconnect keeps
-     * reservation.
-     */
     private int assignSlot(int deviceId) {
         Integer existing = deviceToSlot.get(deviceId);
         if (existing != null)
@@ -604,10 +657,6 @@ public class WinHandler {
         Log.d("WinHandler", "XInput Disabled set to: " + xinputDisabled);
     }
 
-    /**
-     * @param fakeInputPath Path to the fake-input directory (e.g.,
-     *                      /home/xuser/fake-input)
-     */
     public void setFakeInputPath(String fakeInputPath) {
         if (fakeInputPath != null && !fakeInputPath.isEmpty()) {
             this.fakeInputBasePath = fakeInputPath;

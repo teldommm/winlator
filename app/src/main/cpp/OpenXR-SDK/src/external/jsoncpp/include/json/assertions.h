@@ -1,3 +1,7 @@
+// Copyright 2007-2010 Baptiste Lepilleur and The JsonCpp Authors
+// Distributed under MIT license, or public domain if desired and
+// recognized in your jurisdiction.
+// See file LICENSE for detail or copy at http://jsoncpp.sourceforge.net/LICENSE
 
 #ifndef JSON_ASSERTIONS_H_INCLUDED
 #define JSON_ASSERTIONS_H_INCLUDED
@@ -15,6 +19,7 @@
  */
 #if JSON_USE_EXCEPTION
 
+// @todo <= add detail about condition in exception
 #define JSON_ASSERT(condition)                                                 \
   do {                                                                         \
     if (!(condition)) {                                                        \
@@ -34,6 +39,8 @@
 
 #define JSON_ASSERT(condition) assert(condition)
 
+// The call to assert() will show the failure message in debug builds. In
+// release builds we abort, for a core-dump or debugger.
 #define JSON_FAIL_MESSAGE(message)                                             \
   {                                                                            \
     OStringStream oss;                                                         \

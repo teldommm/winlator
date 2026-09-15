@@ -29,12 +29,14 @@ import com.winlator.cmod.xserver.XServer;
  */
 
 public class XrActivity extends XServerDisplayActivity implements TextWatcher {
+    // Order of the enum has to be the as in xr/main.cpp
     public enum ControllerAxis {
         L_PITCH, L_YAW, L_ROLL, L_THUMBSTICK_X, L_THUMBSTICK_Y, L_X, L_Y, L_Z,
         R_PITCH, R_YAW, R_ROLL, R_THUMBSTICK_X, R_THUMBSTICK_Y, R_X, R_Y, R_Z,
         HMD_PITCH, HMD_YAW, HMD_ROLL, HMD_X, HMD_Y, HMD_Z, HMD_IPD
     }
 
+    // Order of the enum has to be the as in xr/main.cpp
     public enum ControllerButton {
         L_GRIP,  L_MENU, L_THUMBSTICK_PRESS, L_THUMBSTICK_LEFT, L_THUMBSTICK_RIGHT, L_THUMBSTICK_UP, L_THUMBSTICK_DOWN, L_TRIGGER, L_X, L_Y,
         R_A, R_B, R_GRIP, R_THUMBSTICK_PRESS, R_THUMBSTICK_LEFT, R_THUMBSTICK_RIGHT, R_THUMBSTICK_UP, R_THUMBSTICK_DOWN, R_TRIGGER,
@@ -150,28 +152,36 @@ public class XrActivity extends XServerDisplayActivity implements TextWatcher {
     }
 
     public static void openIntent(Activity context, int containerId, String path) {
+        // 0. Create the launch intent
         Intent intent = new Intent(context, XrActivity.class);
         intent.putExtra("container_id", containerId);
         if (path != null) {
             intent.putExtra("shortcut_path", path);
         }
 
+        // 1. Locate the main display ID and add that to the intent
         final int mainDisplayId = Display.DEFAULT_DISPLAY;
         ActivityOptions options = ActivityOptions.makeBasic().setLaunchDisplayId(mainDisplayId);
 
+        // 2. Set the flags: start in a new task and replace any existing tasks in the app stack
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK |
                 Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
 
+        // 3. Launch the activity.
+        // Don't use the container's ContextWrapper, which is adding arguments
         context.getBaseContext().startActivity(intent, options.toBundle());
 
+        // 4. Finish the previous activity: this avoids an audio bug
         context.finish();
     }
 
     public static void updateControllers() {
+        // Get OpenXR data
         float[] axes = instance.getAxes();
         boolean[] buttons = instance.getButtons();
         int primaryController = instance.container.getPrimaryController();
 
+        // Primary controller mapping
         ControllerAxis mouseAxisX = primaryController == 0 ? ControllerAxis.L_X : ControllerAxis.R_X;
         ControllerAxis mouseAxisY = primaryController == 0 ? ControllerAxis.L_Y : ControllerAxis.R_Y;
         ControllerButton primaryGrip = primaryController == 0 ? ControllerButton.L_GRIP : ControllerButton.R_GRIP;
@@ -190,6 +200,7 @@ public class XrActivity extends XServerDisplayActivity implements TextWatcher {
         ControllerButton secondaryPress = primaryController == 1 ? ControllerButton.L_THUMBSTICK_PRESS : ControllerButton.R_THUMBSTICK_PRESS;
 
         try (XLock lock = instance.getXServer().lock(XServer.Lockable.WINDOW_MANAGER, XServer.Lockable.INPUT_DEVICE)) {
+            // Mouse control with hand
             float f = 0.75f;
             float meter2px = instance.getXServer().screenInfo.width * 10.0f;
             float dx = (axes[mouseAxisX.ordinal()] - lastAxes[mouseAxisX.ordinal()]) * meter2px;
@@ -199,6 +210,7 @@ public class XrActivity extends XServerDisplayActivity implements TextWatcher {
                 dy = 0;
             }
 
+            // Mouse control with head
             Pointer mouse = instance.getXServer().pointer;
             if (isImmersive) {
                 float angle2px = instance.getXServer().screenInfo.width * 0.05f / f;
@@ -211,11 +223,13 @@ public class XrActivity extends XServerDisplayActivity implements TextWatcher {
                 smoothedMouse[1] = mouse.getClampedY() + 0.5f;
             }
 
+            // Mouse smoothing
             dx *= mouseSpeed;
             dy *= mouseSpeed;
             smoothedMouse[0] = smoothedMouse[0] * f + (mouse.getClampedX() + 0.5f + dx) * (1 - f);
             smoothedMouse[1] = smoothedMouse[1] * f + (mouse.getClampedY() + 0.5f - dy) * (1 - f);
 
+            // Mouse "snap turn"
             int snapturn = isImmersive ? 125 : 25;
             if (getButtonClicked(buttons, primaryLeft)) {
                 smoothedMouse[0] = mouse.getClampedX() - snapturn;
@@ -224,12 +238,14 @@ public class XrActivity extends XServerDisplayActivity implements TextWatcher {
                 smoothedMouse[0] = mouse.getClampedX() + snapturn;
             }
 
+            // Set mouse status
             mouse.setPosition((int) smoothedMouse[0], (int) smoothedMouse[1]);
             mouse.setButton(Pointer.Button.BUTTON_LEFT, buttons[primaryTrigger.ordinal()]);
             mouse.setButton(Pointer.Button.BUTTON_RIGHT, buttons[primaryGrip.ordinal()]);
             mouse.setButton(Pointer.Button.BUTTON_SCROLL_UP, buttons[primaryUp.ordinal()]);
             mouse.setButton(Pointer.Button.BUTTON_SCROLL_DOWN, buttons[primaryDown.ordinal()]);
 
+            // Switch immersive/SBS mode
             if (getButtonClicked(buttons, secondaryPress)) {
                 if (buttons[primaryGrip.ordinal()]) {
                     isSBS = !isSBS;
@@ -239,6 +255,7 @@ public class XrActivity extends XServerDisplayActivity implements TextWatcher {
                 }
             }
 
+            // Show system keyboard
             if (getButtonClicked(buttons, primaryPress)) {
                 instance.runOnUiThread(() -> {
                     isSBS = false;
@@ -249,9 +266,11 @@ public class XrActivity extends XServerDisplayActivity implements TextWatcher {
                 });
             }
 
+            // Store the OpenXR data
             System.arraycopy(axes, 0, lastAxes, 0, axes.length);
             System.arraycopy(buttons, 0, lastButtons, 0, buttons.length);
 
+            // Update keyboard
             mapKey(ControllerButton.L_MENU, XKeycode.KEY_ESC.id);
             mapKey(ControllerButton.R_A, instance.container.getControllerMapping(Container.XrControllerMapping.BUTTON_A));
             mapKey(ControllerButton.R_B, instance.container.getControllerMapping(Container.XrControllerMapping.BUTTON_B));
@@ -298,6 +317,7 @@ public class XrActivity extends XServerDisplayActivity implements TextWatcher {
         }
     }
 
+    // Rendering
     public native void init();
     public native void bindFramebuffer();
     public native int getWidth();
@@ -305,6 +325,7 @@ public class XrActivity extends XServerDisplayActivity implements TextWatcher {
     public native boolean beginFrame(boolean immersive, boolean sbs);
     public native void endFrame();
 
+    // Input
     public native float[] getAxes();
     public native boolean[] getButtons();
 }

@@ -2,14 +2,10 @@ package com.winlator.cmod.core;
 
 import android.app.Activity;
 import android.app.Dialog;
-import android.content.SharedPreferences;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
-import android.widget.LinearLayout;
 import android.widget.TextView;
-
-import androidx.preference.PreferenceManager;
 
 import com.google.android.material.progressindicator.CircularProgressIndicator;
 import com.winlator.cmod.R;
@@ -30,27 +26,12 @@ public class DownloadProgressDialog {
         dialog.setCancelable(false);
         dialog.setCanceledOnTouchOutside(false);
         dialog.setContentView(R.layout.download_progress_dialog);
-        applyTheme();
 
         Window window = dialog.getWindow();
         if (window != null) {
             window.clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
             window.clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
         }
-    }
-
-    private void applyTheme() {
-        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(activity);
-        boolean isDarkMode = sharedPreferences.getBoolean("dark_mode", true);
-        LinearLayout container = dialog.findViewById(R.id.LLDownloadContainer);
-        TextView title = dialog.findViewById(R.id.TextView);
-        TextView progress = dialog.findViewById(R.id.TVProgress);
-        if (container != null) {
-            container.setBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.preloader_background);
-        }
-        int textColor = activity.getResources().getColor(isDarkMode ? android.R.color.white : R.color.colorPrimaryDark, activity.getTheme());
-        if (title != null) title.setTextColor(textColor);
-        if (progress != null) progress.setTextColor(textColor);
     }
 
     public void show() {
@@ -94,6 +75,11 @@ public class DownloadProgressDialog {
             }
         }
         catch (Exception e) {}
+    }
+    
+    public void setMessage(int textResId) {
+        if (textResId > 0) 
+            ((TextView)dialog.findViewById(R.id.TextView)).setText(textResId);
     }
 
     public void closeOnUiThread() {

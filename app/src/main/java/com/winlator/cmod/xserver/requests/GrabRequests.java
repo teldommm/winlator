@@ -2,9 +2,6 @@ package com.winlator.cmod.xserver.requests;
 
 import static com.winlator.cmod.xserver.XClientRequestHandler.RESPONSE_CODE_SUCCESS;
 
-import android.graphics.Rect;
-import android.util.Log;
-
 import com.winlator.cmod.xconnector.XInputStream;
 import com.winlator.cmod.xconnector.XOutputStream;
 import com.winlator.cmod.xconnector.XStreamLock;
@@ -38,13 +35,7 @@ public abstract class GrabRequests {
         if (window == null) throw new BadWindow(windowId);
 
         Bitmask eventMask = new Bitmask(inputStream.readShort());
-        byte pointerMode = inputStream.readByte();
-        byte keyboardMode = inputStream.readByte();
-        int confineToWindowId = inputStream.readInt();
-        int cursorId = inputStream.readInt();
-        int time = inputStream.readInt();
-
-        Window confineToWindow = null;
+        inputStream.skip(14);
 
         Status status;
         if (client.xServer.grabManager.getWindow() != null && client.xServer.grabManager.getClient() != client) {
@@ -55,13 +46,7 @@ public abstract class GrabRequests {
         }
         else {
             status = Status.SUCCESS;
-            if (confineToWindowId != 0) {
-                confineToWindow = client.xServer.windowManager.getWindow(confineToWindowId);
-                if (confineToWindow != null && confineToWindow.getMapState() != Window.MapState.VIEWABLE) {
-                    confineToWindow = null;
-                }
-            }
-            client.xServer.grabManager.activatePointerGrab(window, ownerEvents, eventMask, client, confineToWindow);
+            client.xServer.grabManager.activatePointerGrab(window, ownerEvents, eventMask, client);
         }
 
         try (XStreamLock lock = outputStream.lock()) {

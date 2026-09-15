@@ -41,18 +41,20 @@ import com.winlator.cmod.winhandler.WinHandler;
 import com.winlator.cmod.xserver.Pointer;
 import com.winlator.cmod.xserver.XServer;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Timer;
 import java.util.TimerTask;
 
 public class InputControlsView extends View {
-    public static final float DEFAULT_OVERLAY_OPACITY = 0.4f;
+    public static final float DEFAULT_OVERLAY_OPACITY = 0.85f;
     private static final byte MOUSE_WHEEL_DELTA = 120;
+    private static final boolean AUTO_HIDE_CONTROLS = false;
     private boolean editMode = false;
-    private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG | Paint.FILTER_BITMAP_FLAG);
     private final Path path = new Path();
-    private final ColorFilter colorFilter = new PorterDuffColorFilter(0xffffffff, PorterDuff.Mode.SRC_IN);
+    private final ColorFilter colorFilter = new PorterDuffColorFilter(0xff2184ff, PorterDuff.Mode.SRC_IN);
     private final Point cursor = new Point();
     private boolean readyToDraw = false;
     private boolean moveCursor = false;
@@ -64,10 +66,11 @@ public class InputControlsView extends View {
     private float overlayOpacity = DEFAULT_OVERLAY_OPACITY;
     private TouchpadView touchpadView;
     private XServer xServer;
-    private final Bitmap[] icons = new Bitmap[17];
+    private final android.util.SparseArray<Bitmap> icons = new android.util.SparseArray<>();
     private Timer mouseMoveTimer;
     private final PointF mouseMoveOffset = new PointF();
     private boolean showTouchscreenControls = true;
+    private int activeTouchPointerCount = 0;
 
     private Handler timeoutHandler; // Reference to the activity's timeout handler
     private Runnable hideControlsRunnable; // Runnable to hide the controls
@@ -126,6 +129,7 @@ public class InputControlsView extends View {
         setBackgroundColor(0x00000000);
         setPointerIcon(PointerIcon.load(getResources(), R.drawable.hidden_pointer_arrow));
 
+        // If focusOnStick is true, adjust the layout params to match the stick element size
         if (focusOnStick) {
             setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         } else {
@@ -140,8 +144,24 @@ public class InputControlsView extends View {
         this.editMode = editMode;
     }
 
+    public boolean isEditMode() {
+        return editMode;
+    }
+
     public void setOverlayOpacity(float overlayOpacity) {
         this.overlayOpacity = overlayOpacity;
+    }
+
+    public float getOverlayOpacity() {
+        return overlayOpacity;
+    }
+
+    public void invalidateElement(Rect rect) {
+        if (rect == null) {
+            invalidate();
+            return;
+        }
+        invalidate(rect.left, rect.top, rect.right, rect.bottom);
     }
 
     public int getSnappingSize() {
@@ -153,10 +173,12 @@ public class InputControlsView extends View {
         int width, height;
 
         if (stickElement != null && isFocusedOnStick()) {
+            // If focusing on the stick, set width and height to the stick's bounding box size
             Rect boundingBox = stickElement.getBoundingBox();
             width = boundingBox.width();
             height = boundingBox.height();
         } else {
+            // Default behavior for full screen
             width = getWidth();
             height = getHeight();
         }
@@ -175,6 +197,7 @@ public class InputControlsView extends View {
         }
 
         if (stickElement != null) {
+            // Draw only the stick element if focus mode is active
             stickElement.draw(canvas);
         }
 
@@ -331,11 +354,13 @@ public class InputControlsView extends View {
     }
 
     public int getPrimaryColor() {
+        // Kept for compatibility with ControlElement; visual style now derives from secondary blue.
         return Color.argb((int)(overlayOpacity * 255), 255, 255, 255);
     }
 
     public int getSecondaryColor() {
-        return Color.argb((int)(overlayOpacity * 255), 2, 119, 189);
+        // Winlator-like electric blue used by the app UI. Alpha is handled per primitive.
+        return Color.argb(255, 33, 132, 255);
     }
 
     private synchronized ControlElement intersectElement(float x, float y) {
@@ -399,14 +424,14 @@ public class InputControlsView extends View {
             mouseMoveTimer.schedule(new TimerTask() {
                 @Override
                 public void run() {
-                    if (mouseMoveOffset.x != 0 || mouseMoveOffset.y != 0) {// Only move if there's an offsete if there's an offset
+                    if (mouseMoveOffset.x != 0 || mouseMoveOffset.y != 0) {// Only move if there's an offset
                         if (xServer.isRelativeMouseMovement())
                             winHandler.mouseEvent(MouseEventFlags.MOVE, (int) (mouseMoveOffset.x * cursorSpeed * 10), (int) (mouseMoveOffset.y * cursorSpeed * 10), 0);
                         else
                             xServer.injectPointerMoveDelta(
                                 (int) (mouseMoveOffset.x * cursorSpeed * 10),
                                 (int) (mouseMoveOffset.y * cursorSpeed * 10)
-                        );
+                            );
                     }
                 }
             }, 0, 1000 / 60); // 60 FPS
@@ -437,6 +462,7 @@ public class InputControlsView extends View {
                     handleInputEvent(controller, controllerBinding.getBinding(), true, value, false);
                 }
             } else {
+                // Handle releasing the bindings when the axis returns to deadzone
                 for (byte sign = -1; sign <= 1; sign += 2) {
                     int keyCode = ExternalControllerBinding.getKeyCodeForAxis(axes[i], sign);
                     ExternalControllerBinding controllerBinding = controller.getControllerBinding(keyCode);
@@ -447,9 +473,12 @@ public class InputControlsView extends View {
             }
         }
 
+        // Handle Analog Triggers (L2/R2)
+        // We use the binding for the digital button (e.g. KEYCODE_BUTTON_L2) to determing where to map the analog value
         processTriggerInput(controller, controller.state.triggerL, KeyEvent.KEYCODE_BUTTON_L2, false);
         processTriggerInput(controller, controller.state.triggerR, KeyEvent.KEYCODE_BUTTON_R2, false);
 
+        // Send the updated state once after processing all axes
         WinHandler winHandler = xServer != null ? xServer.getWinHandler() : null;
         if (winHandler != null) {
             winHandler.sendGamepadState(controller);
@@ -487,16 +516,20 @@ public class InputControlsView extends View {
 
 
         if (!editMode && profile != null) {
+            // Retrieve the associated controller for this event
             ExternalController controller = profile.getController(event.getDeviceId());
 
             if (controller != null && controller.updateStateFromMotionEvent(event)) {
+                // Process L2 and R2 button bindings
                 ExternalControllerBinding controllerBinding;
 
+                // L2 button
                 controllerBinding = controller.getControllerBinding(KeyEvent.KEYCODE_BUTTON_L2);
                 if (controllerBinding != null) {
                     handleInputEvent(controller, controllerBinding.getBinding(), controller.state.isPressed(ExternalController.IDX_BUTTON_L2));
                 }
 
+                // R2 button
                 controllerBinding = controller.getControllerBinding(KeyEvent.KEYCODE_BUTTON_R2);
                 if (controllerBinding != null) {
                     handleInputEvent(controller, controllerBinding.getBinding(), controller.state.isPressed(ExternalController.IDX_BUTTON_R2));
@@ -506,12 +539,15 @@ public class InputControlsView extends View {
                 Log.d("InputEvent", "Device ID: " + event.getDeviceId());
                 Log.d("InputEvent", "Action: " + event.getAction());
 
+                // Process joystick inputs for mouse movement and other bindings
                 processJoystickInput(controller);
 
+                // Return true to indicate the motion event was handled
                 return true;
             }
         }
 
+        // Pass the event to the super method if not handled
         return super.onGenericMotionEvent(event);
     }
 
@@ -521,7 +557,9 @@ public class InputControlsView extends View {
 
         boolean hapticsEnabled = preferences.getBoolean("touchscreen_haptics_enabled", true);
 
-        resetTouchscreenTimeout();
+        // Do not let the auto-hide runnable hide controls while a finger is still down.
+        // This fixes controls disappearing under load or while holding a stick/button.
+        updateTouchscreenTimeout(event);
 
         if (editMode && readyToDraw) {
             switch (event.getAction()) {
@@ -574,6 +612,7 @@ public class InputControlsView extends View {
                         if (element.handleTouchDown(pointerId, x, y)) {
                             handled = true;
 
+                            // Trigger haptic feedback for input controls
                             if (hapticsEnabled) {
                                 Vibrator vibrator = (Vibrator) getContext().getSystemService(Context.VIBRATOR_SERVICE);
                                 if (vibrator != null && vibrator.hasVibrator()) {
@@ -598,10 +637,11 @@ public class InputControlsView extends View {
                     for (byte i = 0, count = (byte)event.getPointerCount(); i < count; i++) {
                         float x = event.getX(i);
                         float y = event.getY(i);
+                        int pid = event.getPointerId(i);
 
                         handled = false;
                         for (ControlElement element : profile.getElements()) {
-                            if (element.handleTouchMove(i, x, y)) handled = true;
+                            if (element.handleTouchMove(pid, x, y)) handled = true;
                         }
                         if (!handled) touchpadView.onTouchEvent(event);
                     }
@@ -622,12 +662,50 @@ public class InputControlsView extends View {
 
 
 
-    private void resetTouchscreenTimeout() {
-        Log.d("InputControlsView", "Touch detected, resetting timeout.");
-        if (timeoutHandler != null && hideControlsRunnable != null) {
-            timeoutHandler.removeCallbacks(hideControlsRunnable);
-            timeoutHandler.postDelayed(hideControlsRunnable, 5000); // Adjust timeout as necessary
+    private void updateTouchscreenTimeout(MotionEvent event) {
+        if (timeoutHandler == null || hideControlsRunnable == null) return;
+
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                activeTouchPointerCount = 1;
+                timeoutHandler.removeCallbacks(hideControlsRunnable);
+                break;
+            case MotionEvent.ACTION_POINTER_DOWN:
+                activeTouchPointerCount = event.getPointerCount();
+                timeoutHandler.removeCallbacks(hideControlsRunnable);
+                break;
+            case MotionEvent.ACTION_MOVE:
+                if (activeTouchPointerCount > 0) {
+                    timeoutHandler.removeCallbacks(hideControlsRunnable);
+                }
+                break;
+            case MotionEvent.ACTION_POINTER_UP:
+                activeTouchPointerCount = Math.max(0, event.getPointerCount() - 1);
+                if (activeTouchPointerCount > 0) {
+                    timeoutHandler.removeCallbacks(hideControlsRunnable);
+                }
+                else {
+                    scheduleTouchscreenTimeout();
+                }
+                break;
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
+                activeTouchPointerCount = 0;
+                scheduleTouchscreenTimeout();
+                break;
         }
+    }
+
+    private void scheduleTouchscreenTimeout() {
+        if (!AUTO_HIDE_CONTROLS) {
+            if (timeoutHandler != null && hideControlsRunnable != null) {
+                timeoutHandler.removeCallbacks(hideControlsRunnable);
+            }
+            return;
+        }
+        if (timeoutHandler == null || hideControlsRunnable == null) return;
+        timeoutHandler.removeCallbacks(hideControlsRunnable);
+        timeoutHandler.postDelayed(hideControlsRunnable, 5000);
     }
 
     public boolean onKeyEvent(KeyEvent event) {
@@ -671,6 +749,7 @@ public class InputControlsView extends View {
         GamepadState state = profile.getGamepadState();
         WinHandler winHandler = xServer != null ? xServer.getWinHandler() : null;
         
+        // Determine which stick this is based on the first binding
         boolean isLeftStick = firstBinding == Binding.GAMEPAD_LEFT_THUMB_UP || 
                              firstBinding == Binding.GAMEPAD_LEFT_THUMB_DOWN ||
                              firstBinding == Binding.GAMEPAD_LEFT_THUMB_LEFT ||
@@ -775,14 +854,37 @@ public class InputControlsView extends View {
         }
     }
 
+
+    public void invalidateIconCache() {
+        icons.clear();
+    }
+
     public Bitmap getIcon(byte id) {
-        if (icons[id] == null) {
+        if (id < 0) return null;
+        Bitmap cached = icons.get(id);
+        if (cached == null) {
+            File overrideFile = new File(
+                android.os.Environment.getExternalStorageDirectory(),
+                "winlator/custom_icons/override_" + id + ".png"
+            );
+            if (overrideFile.exists()) {
+                cached = BitmapFactory.decodeFile(overrideFile.getAbsolutePath());
+                if (cached != null) {
+                    android.util.Log.i("Icons", "Using custom override for built-in icon " + id);
+                    icons.put(id, cached);
+                    return cached;
+                }
+            }
             Context context = getContext();
             try (InputStream is = context.getAssets().open("inputcontrols/icons/"+id+".png")) {
-                icons[id] = BitmapFactory.decodeStream(is);
+                cached = BitmapFactory.decodeStream(is);
+                if (cached != null) icons.put(id, cached);
+                else android.util.Log.w("Icons", "Built-in icon " + id + " decoded as null");
             }
-            catch (IOException e) {}
+            catch (IOException e) {
+                android.util.Log.w("Icons", "Built-in icon " + id + " not in assets: " + e.getMessage());
+            }
         }
-        return icons[id];
+        return cached;
     }
 }

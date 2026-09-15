@@ -2,15 +2,15 @@
 <resources>
     <string-array name="screen_size_entries">
         <item>Custom</item>
-        <item>690x360 (16:9)</item>
+        <item>640x360 (16:9)</item>
         <item>780x360 (19.5:9)</item>
         <item>640x480 (4:3)</item>
         <item>800x600 (4:3)</item>
         <item>854x480 (16:9)</item>
         <item>960x544 (16:9)</item>
         <item>1024x768 (4:3)</item>
+        <item>1280x576 (20:9)</item>
         <item>1280x720 (16:9)</item>
-        <item>1280x800 (16:10)</item>
         <item>1280x1024 (5:4)</item>
         <item>1366x768 (16:9)</item>
         <item>1440x900 (16:10)</item>
@@ -23,12 +23,13 @@
     </string-array>
     <string-array name="wrapper_graphics_driver_version_entries">
         <item>System</item>
-        <item>v819</item>
-        <item>turnip26.0.0</item>
+        <item>v863</item>
+        <item>turnip26.2.0</item>
     </string-array>
     <string-array name="audio_driver_entries">
         <item>ALSA</item>
         <item>PulseAudio</item>
+        <item>PulseAudio-GN</item>
     </string-array>
     <string-array name="binding_type_entries">
         <item>Keyboard</item>
@@ -42,6 +43,7 @@
     <string-array name="ddrawrapper_entries">
         <item>CnC-DDraw</item>
         <item>Dd7To9</item>
+        <item>D7VK</item>
         <item>None</item>
     </string-array>
     <string-array name="dxvk_version_entries">
@@ -128,10 +130,10 @@
         <item>Native (Windows)</item>
     </string-array>
     <string-array name="box64_version_entries">
-        <item>0.4.1</item>
+        <item>0.4.2</item>
     </string-array>
     <string-array name="wowbox64_version_entries">
-        <item>0.4.1</item>
+        <item>0.4.2</item>
     </string-array>
     <string-array name="fexcore_version_entries">
         <item>2601</item>
@@ -309,7 +311,6 @@
         <item>Box64</item>
     </string-array>
     <string-array name="wine_entries">
-        <item>proton-9.0-x86_64</item>
         <item>proton-9.0-arm64ec</item>
     </string-array>
     <string-array name="vkbasalt_sharpness_entries">
@@ -318,4 +319,3 @@
         <item>DLS</item>
     </string-array>
 </resources>
-

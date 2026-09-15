@@ -1,3 +1,11 @@
+// Copyright (c) 2017-2024, The Khronos Group Inc.
+// Copyright (c) 2017-2019 Valve Corporation
+// Copyright (c) 2017-2019 LunarG, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+//
+// Initial Author: Mark Young <marky@lunarg.com>
+//
 
 #pragma once
 
@@ -64,11 +72,15 @@ class LoaderInitData {
     XrResult initialize(const XrLoaderInitInfoBaseHeaderKHR* info);
 
    private:
+    //! Private constructor, forces use of singleton accessor.
     LoaderInitData() = default;
+    //! Platform-specific init data
     StructType _data = {};
+    //! Flag for indicating whether _data is valid.
     bool _initialized = false;
 };
 
+//! Initialize loader init data, where required.
 XrResult InitializeLoaderInitData(const XrLoaderInitInfoBaseHeaderKHR* loaderInitInfo);
 
 #ifdef XR_USE_PLATFORM_ANDROID

@@ -17,7 +17,9 @@ enum XrButton
     Left = 0x00040000,
     Right = 0x00080000,
     Enter = 0x00100000,  //< Set for touchpad click on the Go Controller, menu
+    // button on Left Quest Controller
     Back = 0x00200000,  //< Back button on the Go Controller (only set when
+    // a short press comes up)
     Grip = 0x04000000,    //< grip trigger engaged
     Trigger = 0x20000000  //< Index Trigger engaged
 };
@@ -26,6 +28,7 @@ struct XrInput {
 
     bool Initialized;
 
+    // OpenXR controller mapping
     XrActionSet ActionSet;
     XrPath LeftHandPath;
     XrPath RightHandPath;
@@ -49,6 +52,7 @@ struct XrInput {
     XrSpace LeftControllerSpace;
     XrSpace RightControllerSpace;
 
+    // Controller state
     uint32_t ButtonsLeft;
     uint32_t ButtonsRight;
     XrSpaceLocation ControllerPose[2];
@@ -56,6 +60,7 @@ struct XrInput {
     float VibrationChannelDuration[2];
     float VibrationChannelIntensity[2];
 
+    // Timer
     unsigned long SysTimeBase;
 };
 

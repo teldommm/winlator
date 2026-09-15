@@ -48,24 +48,30 @@ public class BigPictureAdapter extends RecyclerView.Adapter<BigPictureAdapter.Vi
     public void onBindViewHolder(ViewHolder holder, int position) {
         Shortcut shortcut = shortcuts.get(position);
 
+        // Set shortcut's icon in the carousel
         if (shortcut.icon != null) {
             holder.iconView.setImageBitmap(shortcut.icon);
         } else {
             holder.iconView.setImageResource(R.mipmap.ic_launcher_foreground); // Placeholder for missing icon
         }
 
+        // Make sure the item can receive focus
         holder.itemView.setFocusable(true);
         holder.itemView.setFocusableInTouchMode(true);
 
+        // Set click listener to load data when clicked
         holder.itemView.setOnClickListener(v -> {
             recyclerView.smoothScrollToPosition(position);
             ((BigPictureActivity) recyclerView.getContext()).loadShortcutData(shortcut);
         });
 
+        // Set focus listener to load data when focused
         holder.itemView.setOnFocusChangeListener((v, hasFocus) -> {
             if (hasFocus) {
+                // Smooth scroll to the focused item to keep it centered
                 recyclerView.smoothScrollToPosition(position);
 
+                // Load data for the focused item
                 ((BigPictureActivity) recyclerView.getContext()).loadShortcutData(shortcut);
             }
         });

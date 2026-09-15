@@ -5,6 +5,7 @@
 
 enum XrConfigFloat
 {
+    // 2D canvas positioning
     CONFIG_CANVAS_DISTANCE,
     CONFIG_MENU_PITCH,
     CONFIG_MENU_YAW,
@@ -15,13 +16,17 @@ enum XrConfigFloat
 
 enum XrConfigInt
 {
+    // switching between modes
     CONFIG_MODE,
     CONFIG_PASSTHROUGH,
     CONFIG_SBS,
+    // viewport setup
     CONFIG_VIEWPORT_WIDTH,
     CONFIG_VIEWPORT_HEIGHT,
+    // render status
     CONFIG_CURRENT_FBO,
 
+    // end
     CONFIG_INT_MAX
 };
 

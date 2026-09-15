@@ -2,6 +2,8 @@ package com.winlator.cmod.contentdialog;
 
 import android.app.Activity;
 import android.content.Context;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -11,7 +13,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
-import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -50,14 +51,15 @@ public class DriverDownloadDialog {
         builder.setTitle("Available Drivers"); // English
 
         recyclerView = new RecyclerView(context);
+        recyclerView.setBackgroundColor(Color.BLACK);
         recyclerView.setLayoutManager(new LinearLayoutManager(context));
-        recyclerView.addItemDecoration(new DividerItemDecoration(context, DividerItemDecoration.VERTICAL));
-        
+
         builder.setView(recyclerView);
         builder.setNegativeButton("Back", null); // English
 
         dialog = builder.create();
         dialog.show();
+        if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.BLACK));
 
         fetchDrivers();
     }

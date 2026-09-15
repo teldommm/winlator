@@ -1,6 +1,3 @@
-/*
- * winhandler.c for Winlator copetrol and process management.
- */
 
 #ifndef _WIN32_WINNT
 #define _WIN32_WINNT 0x0600
@@ -28,11 +25,11 @@
 #define RC_SET_PROCESS_AFFINITY 6
 #define RC_MOUSE_EVENT 7
 #define RC_GET_GAMEPAD                                                         \
-  8 // Unimplemented, our gamepad implementation doesnt depend on winhandler
+  8
 #define RC_GET_GAMEPAD_STATE                                                   \
-  9 // Unimplemented, our gamepad implementation doesnt depend on winhandler
+  9
 #define RC_RELEASE_GAMEPAD                                                     \
-  10 // Unimplemented, our gamepad implementation doesnt depend on winhandler
+  10
 #define RC_KEYBOARD_EVENT 11
 #define RC_BRING_TO_FRONT 12
 #define RC_CURSOR_POS_FEEDBACK 13
@@ -263,7 +260,7 @@ BOOL CALLBACK EnumWindowsProc(HWND hWnd, LPARAM lParam) {
   if (currPid == data->pid && IsWindowVisible(hWnd) &&
       GetWindow(hWnd, GW_OWNER) == NULL) {
     data->hWnd = hWnd;
-    return FALSE; // Stop
+    return FALSE;
   }
   return TRUE;
 }

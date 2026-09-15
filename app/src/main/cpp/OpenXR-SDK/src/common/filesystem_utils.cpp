@@ -1,3 +1,12 @@
+// Copyright (c) 2017-2024, The Khronos Group Inc.
+// Copyright (c) 2017 Valve Corporation
+// Copyright (c) 2017 LunarG, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+//
+// Initial Authors: Mark Young <marky@lunarg.com>
+//                  Nat Brown <natb@valvesoftware.com>
+//
 
 #include "filesystem_utils.hpp"
 
@@ -21,9 +30,11 @@
 #include <experimental/filesystem>
 #define FS_PREFIX std::experimental::filesystem
 #elif defined(XR_USE_PLATFORM_WIN32)
+// Windows fallback includes
 #include <stdint.h>
 #include <direct.h>
 #else
+// Linux/Apple fallback includes
 #include <sys/stat.h>
 #include <unistd.h>
 #include <limits.h>
@@ -41,6 +52,7 @@
 #endif
 
 #if (USE_FINAL_FS == 1) || (USE_EXPERIMENTAL_FS == 1)
+// We can use one of the C++ filesystem packages
 
 bool FileSysUtilsIsRegularFile(const std::string& path) { return FS_PREFIX::is_regular_file(path); }
 
@@ -72,6 +84,9 @@ bool FileSysUtilsGetAbsolutePath(const std::string& path, std::string& absolute)
 
 bool FileSysUtilsGetCanonicalPath(const std::string& path, std::string& canonical) {
 #if defined(XR_USE_PLATFORM_WIN32)
+    // std::filesystem::canonical fails on UWP and must be avoided. Further, PathCchCanonicalize is not available on Windows 7 and
+    // PathCanonicalizeW is not available on UWP. However, symbolic links are not important on Windows since the loader uses the
+    // registry for indirection instead, and so this function can be a no-op on Windows.
     canonical = path;
 #else
     canonical = FS_PREFIX::canonical(path).string();
@@ -108,6 +123,7 @@ bool FileSysUtilsFindFilesInPath(const std::string& path, std::vector<std::strin
 
 #elif defined(XR_OS_WINDOWS)
 
+// For pre C++17 compiler that doesn't support experimental filesystem
 
 bool FileSysUtilsIsRegularFile(const std::string& path) {
     const DWORD attr = GetFileAttributesW(utf8_to_wide(path).c_str());
@@ -161,6 +177,9 @@ bool FileSysUtilsGetAbsolutePath(const std::string& path, std::string& absolute)
 }
 
 bool FileSysUtilsGetCanonicalPath(const std::string& path, std::string& absolute) {
+    // PathCchCanonicalize is not available on Windows 7 and PathCanonicalizeW is not available on UWP. However, symbolic links are
+    // not important on Windows since the loader uses the registry for indirection instead, and so this function can be a no-op on
+    // Windows.
     absolute = path;
     return true;
 }
@@ -210,6 +229,7 @@ bool FileSysUtilsFindFilesInPath(const std::string& path, std::vector<std::strin
 
 #else  // XR_OS_LINUX/XR_OS_APPLE fallback
 
+// simple POSIX-compatible implementation of the <filesystem> pieces used by OpenXR
 
 bool FileSysUtilsIsRegularFile(const std::string& path) {
     struct stat path_stat;
@@ -247,6 +267,7 @@ bool FileSysUtilsGetParentPath(const std::string& file_path, std::string& parent
 }
 
 bool FileSysUtilsGetAbsolutePath(const std::string& path, std::string& absolute) {
+    // canonical path is absolute
     return FileSysUtilsGetCanonicalPath(path, absolute);
 }
 

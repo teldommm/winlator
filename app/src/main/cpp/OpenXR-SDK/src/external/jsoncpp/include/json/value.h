@@ -1,3 +1,7 @@
+// Copyright 2007-2010 Baptiste Lepilleur and The JsonCpp Authors
+// Distributed under MIT license, or public domain if desired and
+// recognized in your jurisdiction.
+// See file LICENSE for detail or copy at http://jsoncpp.sourceforge.net/LICENSE
 
 #ifndef JSON_H_INCLUDED
 #define JSON_H_INCLUDED
@@ -6,6 +10,9 @@
 #include "forwards.h"
 #endif // if !defined(JSON_IS_AMALGAMATION)
 
+// Conditional NORETURN attribute on the throw functions would:
+// a) suppress false positives from static code analysis
+// b) possibly improve optimization opportunities.
 #if !defined(JSONCPP_NORETURN)
 #if defined(_MSC_VER) && _MSC_VER == 1800
 #define JSONCPP_NORETURN __declspec(noreturn)
@@ -14,6 +21,9 @@
 #endif
 #endif
 
+// Support for '= delete' with template declarations was a late addition
+// to the c++11 standard and is rejected by clang 3.8 and Apple clang 8.2
+// even though these declare themselves to be c++11 compilers.
 #if !defined(JSONCPP_TEMPLATE_DELETE)
 #if defined(__clang__) && defined(__apple_build_version__)
 #if __apple_build_version__ <= 8000042
@@ -36,6 +46,8 @@
 #include <string>
 #include <vector>
 
+// Disable warning C4251: <data member>: <type> needs to have dll-interface to
+// be used by...
 #if defined(JSONCPP_DISABLE_DLL_INTERFACE_WARNING)
 #pragma warning(push)
 #pragma warning(disable : 4251 4275)
@@ -85,7 +97,9 @@ public:
 };
 #endif
 
+/// used internally
 JSONCPP_NORETURN void throwRuntimeError(String const& msg);
+/// used internally
 JSONCPP_NORETURN void throwLogicError(String const& msg);
 
 /** \brief Type of the value held by a Value object.
@@ -105,6 +119,7 @@ enum CommentPlacement {
   commentBefore = 0,      ///< a comment placed on the line before a value
   commentAfterOnSameLine, ///< a comment just after a value on the same line
   commentAfter, ///< a comment on the line after a value (only make sense for
+  /// root value)
   numberOfCommentPlacement
 };
 
@@ -192,31 +207,50 @@ public:
   using LargestUInt = Json::LargestUInt;
   using ArrayIndex = Json::ArrayIndex;
 
+  // Required for boost integration, e. g. BOOST_TEST
   using value_type = std::string;
 
 #if JSON_USE_NULLREF
+  // Binary compatibility kludges, do not use.
   static const Value& null;
   static const Value& nullRef;
 #endif
 
+  // null and nullRef are deprecated, use this instead.
   static Value const& nullSingleton();
 
+  /// Minimum signed integer value that can be stored in a Json::Value.
   static constexpr LargestInt minLargestInt =
       LargestInt(~(LargestUInt(-1) / 2));
+  /// Maximum signed integer value that can be stored in a Json::Value.
   static constexpr LargestInt maxLargestInt = LargestInt(LargestUInt(-1) / 2);
+  /// Maximum unsigned integer value that can be stored in a Json::Value.
   static constexpr LargestUInt maxLargestUInt = LargestUInt(-1);
 
+  /// Minimum signed int value that can be stored in a Json::Value.
   static constexpr Int minInt = Int(~(UInt(-1) / 2));
+  /// Maximum signed int value that can be stored in a Json::Value.
   static constexpr Int maxInt = Int(UInt(-1) / 2);
+  /// Maximum unsigned int value that can be stored in a Json::Value.
   static constexpr UInt maxUInt = UInt(-1);
 
 #if defined(JSON_HAS_INT64)
+  /// Minimum signed 64 bits int value that can be stored in a Json::Value.
   static constexpr Int64 minInt64 = Int64(~(UInt64(-1) / 2));
+  /// Maximum signed 64 bits int value that can be stored in a Json::Value.
   static constexpr Int64 maxInt64 = Int64(UInt64(-1) / 2);
+  /// Maximum unsigned 64 bits int value that can be stored in a Json::Value.
   static constexpr UInt64 maxUInt64 = UInt64(-1);
 #endif // defined(JSON_HAS_INT64)
+  /// Default precision for real value for string representation.
   static constexpr UInt defaultRealPrecision = 17;
+  // The constant is hard-coded because some compiler have trouble
+  // converting Value::maxUInt64 to a double correctly (AIX/xlC).
+  // Assumes that UInt64 is a 64 bits integer.
   static constexpr double maxUInt64AsDouble = 18446744073709551615.0;
+// Workaround for bug in the NVIDIAs CUDA 9.1 nvcc compiler
+// when using gcc and clang backend compilers.  CZString
+// cannot be defined as private.  See issue #486
 #ifdef __NVCC__
 public:
 #else
@@ -237,6 +271,7 @@ private:
     bool operator<(CZString const& other) const;
     bool operator==(CZString const& other) const;
     ArrayIndex index() const;
+    // const char* c_str() const; ///< \deprecated
     char const* data() const;
     unsigned length() const;
     bool isStaticString() const;
@@ -312,17 +347,24 @@ public:
   Value(Value&& other) noexcept;
   ~Value();
 
+  /// \note Overwrite existing comments. To preserve comments, use
+  /// #swapPayload().
   Value& operator=(const Value& other);
   Value& operator=(Value&& other) noexcept;
 
+  /// Swap everything.
   void swap(Value& other);
+  /// Swap values but leave comments and source offsets in place.
   void swapPayload(Value& other);
 
+  /// copy everything.
   void copy(const Value& other);
+  /// copy values but leave comments and source offsets in place.
   void copyPayload(const Value& other);
 
   ValueType type() const;
 
+  /// Compare payload only, not comments etc.
   bool operator<(const Value& other) const;
   bool operator<=(const Value& other) const;
   bool operator>=(const Value& other) const;
@@ -334,6 +376,7 @@ public:
   const char* asCString() const; ///< Embedded zeroes could cause you trouble!
 #if JSONCPP_USING_SECURE_MEMORY
   unsigned getCStringLength() const; // Allows you to understand the length of
+                                     // the CString
 #endif
   String asString() const; ///< Embedded zeroes are possible.
   /** Get raw char* of string-value.
@@ -365,38 +408,80 @@ public:
   bool isArray() const;
   bool isObject() const;
 
+  /// The `as<T>` and `is<T>` member function templates and specializations.
   template <typename T> T as() const JSONCPP_TEMPLATE_DELETE;
   template <typename T> bool is() const JSONCPP_TEMPLATE_DELETE;
 
   bool isConvertibleTo(ValueType other) const;
 
+  /// Number of values in array or object
   ArrayIndex size() const;
 
+  /// \brief Return true if empty array, empty object, or null;
+  /// otherwise, false.
   bool empty() const;
 
+  /// Return !isNull()
   explicit operator bool() const;
 
+  /// Remove all object members and array elements.
+  /// \pre type() is arrayValue, objectValue, or nullValue
+  /// \post type() is unchanged
   void clear();
 
+  /// Resize the array to newSize elements.
+  /// New elements are initialized to null.
+  /// May only be called on nullValue or arrayValue.
+  /// \pre type() is arrayValue or nullValue
+  /// \post type() is arrayValue
   void resize(ArrayIndex newSize);
 
+  //@{
+  /// Access an array element (zero based index). If the array contains less
+  /// than index element, then null value are inserted in the array so that
+  /// its size is index+1.
+  /// (You may need to say 'value[0u]' to get your compiler to distinguish
+  /// this from the operator[] which takes a string.)
   Value& operator[](ArrayIndex index);
   Value& operator[](int index);
+  //@}
 
+  //@{
+  /// Access an array element (zero based index).
+  /// (You may need to say 'value[0u]' to get your compiler to distinguish
+  /// this from the operator[] which takes a string.)
   const Value& operator[](ArrayIndex index) const;
   const Value& operator[](int index) const;
+  //@}
 
+  /// If the array contains at least index+1 elements, returns the element
+  /// value, otherwise returns defaultValue.
   Value get(ArrayIndex index, const Value& defaultValue) const;
+  /// Return true if index < size().
   bool isValidIndex(ArrayIndex index) const;
+  /// \brief Append value to array at the end.
+  ///
+  /// Equivalent to jsonvalue[jsonvalue.size()] = value;
   Value& append(const Value& value);
   Value& append(Value&& value);
 
+  /// \brief Insert value in array at specific index
   bool insert(ArrayIndex index, const Value& newValue);
   bool insert(ArrayIndex index, Value&& newValue);
 
+  /// Access an object value by name, create a null member if it does not exist.
+  /// \note Because of our implementation, keys are limited to 2^30 -1 chars.
+  /// Exceeding that will cause an exception.
   Value& operator[](const char* key);
+  /// Access an object value by name, returns null if there is no member with
+  /// that name.
   const Value& operator[](const char* key) const;
+  /// Access an object value by name, create a null member if it does not exist.
+  /// \param key may contain embedded nulls.
   Value& operator[](const String& key);
+  /// Access an object value by name, returns null if there is no member with
+  /// that name.
+  /// \param key may contain embedded nulls.
   const Value& operator[](const String& key) const;
   /** \brief Access an object value by name, create a null member if it does not
    * exist.
@@ -411,14 +496,37 @@ public:
    *   \endcode
    */
   Value& operator[](const StaticString& key);
+  /// Return the member named key if it exist, defaultValue otherwise.
+  /// \note deep copy
   Value get(const char* key, const Value& defaultValue) const;
+  /// Return the member named key if it exist, defaultValue otherwise.
+  /// \note deep copy
+  /// \note key may contain embedded nulls.
   Value get(const char* begin, const char* end,
             const Value& defaultValue) const;
+  /// Return the member named key if it exist, defaultValue otherwise.
+  /// \note deep copy
+  /// \param key may contain embedded nulls.
   Value get(const String& key, const Value& defaultValue) const;
+  /// Most general and efficient version of isMember()const, get()const,
+  /// and operator[]const
+  /// \note As stated elsewhere, behavior is undefined if (end-begin) >= 2^30
   Value const* find(char const* begin, char const* end) const;
+  /// Most general and efficient version of object-mutators.
+  /// \note As stated elsewhere, behavior is undefined if (end-begin) >= 2^30
+  /// \return non-zero, but JSON_ASSERT if this is neither object nor nullValue.
   Value* demand(char const* begin, char const* end);
+  /// \brief Remove and return the named member.
+  ///
+  /// Do nothing if it did not exist.
+  /// \pre type() is objectValue or nullValue
+  /// \post type() is unchanged
   void removeMember(const char* key);
+  /// Same as removeMember(const char*)
+  /// \param key may contain embedded nulls.
   void removeMember(const String& key);
+  /// Same as removeMember(const char* begin, const char* end, Value* removed),
+  /// but 'key' is null-terminated.
   bool removeMember(const char* key, Value* removed);
   /** \brief Remove the named map member.
    *
@@ -427,6 +535,7 @@ public:
    *  \return true iff removed (no exceptions)
    */
   bool removeMember(String const& key, Value* removed);
+  /// Same as removeMember(String const& key, Value* removed)
   bool removeMember(const char* begin, const char* end, Value* removed);
   /** \brief Remove the indexed array element.
    *
@@ -436,21 +545,35 @@ public:
    */
   bool removeIndex(ArrayIndex index, Value* removed);
 
+  /// Return true if the object has a member named key.
+  /// \note 'key' must be null-terminated.
   bool isMember(const char* key) const;
+  /// Return true if the object has a member named key.
+  /// \param key may contain embedded nulls.
   bool isMember(const String& key) const;
+  /// Same as isMember(String const& key)const
   bool isMember(const char* begin, const char* end) const;
 
+  /// \brief Return a list of the member names.
+  ///
+  /// If null, return an empty list.
+  /// \pre type() is objectValue or nullValue
+  /// \post if type() was nullValue, it remains nullValue
   Members getMemberNames() const;
 
+  /// \deprecated Always pass len.
   JSONCPP_DEPRECATED("Use setComment(String const&) instead.")
   void setComment(const char* comment, CommentPlacement placement) {
     setComment(String(comment, strlen(comment)), placement);
   }
+  /// Comments must be //... or /* ... */
   void setComment(const char* comment, size_t len, CommentPlacement placement) {
     setComment(String(comment, len), placement);
   }
+  /// Comments must be //... or /* ... */
   void setComment(String comment, CommentPlacement placement);
   bool hasComment(CommentPlacement placement) const;
+  /// Include delimiters and embedded newlines.
   String getComment(CommentPlacement placement) const;
 
   String toStyledString() const;
@@ -461,6 +584,8 @@ public:
   iterator begin();
   iterator end();
 
+  // Accessors for the [start, limit) range of bytes within the JSON text from
+  // which this value was parsed, if any.
   void setOffsetStart(ptrdiff_t start);
   void setOffsetLimit(ptrdiff_t limit);
   ptrdiff_t getOffsetStart() const;
@@ -481,6 +606,14 @@ private:
   Value& resolveReference(const char* key);
   Value& resolveReference(const char* key, const char* end);
 
+  // struct MemberNamesTransform
+  //{
+  //   typedef const char *result_type;
+  //   const char *operator()( const CZString &name ) const
+  //   {
+  //      return name.c_str();
+  //   }
+  //};
 
   union ValueHolder {
     LargestInt int_;
@@ -492,7 +625,9 @@ private:
   } value_;
 
   struct {
+    // Really a ValueType, but types should agree for bitfield packing.
     unsigned int value_type_ : 8;
+    // Unless allocated_, string_ must be null-terminated.
     unsigned int allocated_ : 1;
   } bits_;
 
@@ -513,6 +648,8 @@ private:
   };
   Comments comments_;
 
+  // [start, limit) byte offsets in the source JSON text from which this Value
+  // was extracted.
   ptrdiff_t start_;
   ptrdiff_t limit_;
 };
@@ -540,6 +677,8 @@ template <> inline bool Value::is<double>() const { return isDouble(); }
 template <> inline String Value::as<String>() const { return asString(); }
 template <> inline bool Value::is<String>() const { return isString(); }
 
+/// These `as` specializations are type conversions, and do not have a
+/// corresponding `is`.
 template <> inline float Value::as<float>() const { return asFloat(); }
 template <> inline const char* Value::as<const char*>() const {
   return asCString();
@@ -585,6 +724,8 @@ public:
 
   const Value& resolve(const Value& root) const;
   Value resolve(const Value& root, const Value& defaultValue) const;
+  /// Creates the "path" to access the specified node and returns a reference on
+  /// the node.
   Value& make(Value& root) const;
 
 private:
@@ -617,14 +758,28 @@ public:
     return other.computeDistance(*this);
   }
 
+  /// Return either the index or the member name of the referenced value as a
+  /// Value.
   Value key() const;
 
+  /// Return the index of the referenced Value, or -1 if it is not an
+  /// arrayValue.
   UInt index() const;
 
+  /// Return the member name of the referenced Value, or "" if it is not an
+  /// objectValue.
+  /// \note Avoid `c_str()` on result, as embedded zeroes are possible.
   String name() const;
 
+  /// Return the member name of the referenced Value. "" if it is not an
+  /// objectValue.
+  /// \deprecated This cannot be used for UTF-8 strings, since there can be
+  /// embedded nulls.
   JSONCPP_DEPRECATED("Use `key = name();` instead.")
   char const* memberName() const;
+  /// Return the member name of the referenced Value, or NULL if it is not an
+  /// objectValue.
+  /// \note Better version than memberName(). Allows embedded nulls.
   char const* memberName(char const** end) const;
 
 protected:
@@ -649,9 +804,12 @@ protected:
 
 private:
   Value::ObjectValues::iterator current_;
+  // Indicates that iterator is for a null value.
   bool isNull_{true};
 
 public:
+  // For some reason, BORLAND needs these at the end, rather
+  // than earlier. No idea why.
   ValueIteratorBase();
   explicit ValueIteratorBase(const Value::ObjectValues::iterator& current);
 };
@@ -664,6 +822,8 @@ class JSON_API ValueConstIterator : public ValueIteratorBase {
 
 public:
   using value_type = const Value;
+  // typedef unsigned int size_t;
+  // typedef int difference_type;
   using reference = const Value&;
   using pointer = const Value*;
   using SelfType = ValueConstIterator;

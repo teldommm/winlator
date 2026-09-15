@@ -69,14 +69,15 @@ public abstract class WineUtils {
         }
 
         final String[] direct3dLibs = {"d3d8", "d3d9", "d3d10", "d3d10_1", "d3d10core", "d3d11", "d3d12", "d3d12core", "ddraw", "dxgi", "wined3d"};
-        final String[] openglLibs = {"opengl32"};
+        final String[] xinputLibs = {"dinput", "dinput8", "xinput1_1", "xinput1_2", "xinput1_3", "xinput1_4", "xinput9_1_0", "xinputuap"};
         final String dllOverridesKey = "Software\\Wine\\DllOverrides";
+        final String[] openglLibs = {"opengl32"};
 
         try (WineRegistryEditor registryEditor = new WineRegistryEditor(userRegFile)) {
             for (String name : direct3dLibs) registryEditor.setStringValue(dllOverridesKey, name, "native,builtin");
-            if (wineInfo.isArm64EC() && !GPUInformation.getRenderer(null, null).contains("Mali"))
-                for (String name : openglLibs) registryEditor.setStringValue(dllOverridesKey, name, "native,builtin");
+            for (String name : xinputLibs) registryEditor.setStringValue(dllOverridesKey, name, "builtin,native");
             setWindowMetrics(registryEditor);
+            if (wineInfo.isArm64EC() && !GPUInformation.getRenderer(null,null).contains("Mali")) for(String name: openglLibs) registryEditor.setStringValue(dllOverridesKey, name, "native,builtin");
         }
     }
 
@@ -208,9 +209,7 @@ public abstract class WineUtils {
         }
     }
 
-
-    public static void changeServicesStatus(Container container, String startupSelection) {
-
+public static void changeServicesStatus(Container container, String startupSelection) {
     final String[] services = {
         "BITS:3", "Eventlog:2", "HTTP:3", "LanmanServer:3", "NDIS:2",
         "PlugPlay:4", "RpcSs:4", "scardsvr:3", "Schedule:3",
@@ -237,13 +236,7 @@ public abstract class WineUtils {
     try (WineRegistryEditor registryEditor = new WineRegistryEditor(systemRegFile)) {
         registryEditor.setCreateKeyIfNotExist(false);
 
-        String[] targetList;
-
-        if (selection == Container.STARTUP_SELECTION_AGGRESSIVE) {
-            targetList = aggressiveServices;
-        } else {
-            targetList = services;
-        }
+        String[] targetList = (selection == Container.STARTUP_SELECTION_AGGRESSIVE) ? aggressiveServices : services;
 
         for (String service : targetList) {
             String name = service.substring(0, service.indexOf(":"));
@@ -251,11 +244,8 @@ public abstract class WineUtils {
 
             if (selection == Container.STARTUP_SELECTION_AGGRESSIVE) {
                 value = 4;
-
-                if (name.equalsIgnoreCase("winebus") ||
-                    name.equalsIgnoreCase("winehid") ||
-                    name.equalsIgnoreCase("MountMgr") ||
-                    name.equalsIgnoreCase("PlugPlay")) {
+                if (name.equalsIgnoreCase("winebus") || name.equalsIgnoreCase("winehid") ||
+                    name.equalsIgnoreCase("MountMgr") || name.equalsIgnoreCase("PlugPlay")) {
                     value = 2;
                 }
             }
@@ -268,12 +258,8 @@ public abstract class WineUtils {
             registryEditor.setDwordValue("System\\ControlSet001\\Services\\" + name, "Start", value);
             registryEditor.setDwordValue("System\\ControlSet002\\Services\\" + name, "Start", value);
         }
-
-        registryEditor.setDwordValue("System\\CurrentControlSet\\Services\\winebus", "Start", 2);
-        registryEditor.setDwordValue("System\\CurrentControlSet\\Services\\winehid", "Start", 2);
-        registryEditor.setDwordValue("System\\CurrentControlSet\\Services\\MountMgr", "Start", 2);
     }
-    }
+}
 
     /**
      * Configure Wine DirectInput joystick registry keys for all gamepads.
@@ -288,9 +274,11 @@ public abstract class WineUtils {
         File userRegFile = new File(container.getRootDir(), ".wine/user.reg");
         final String joysticksKey = "Software\\Wine\\DirectInput\\Joysticks";
         
+        // The value to set: "disabled" hides from DInput, "override" makes visible
         final String value = dinputEnabled ? "override" : "disabled";
         
         try (WineRegistryEditor registryEditor = new WineRegistryEditor(userRegFile)) {
+            // Configure all 4 possible gamepad slots
             for (int i = 0; i < 4; i++) {
                 if (exclusiveXInput) {
                     registryEditor.setStringValue(joysticksKey, "Generic HID Gamepad " + i, value);
@@ -304,4 +292,3 @@ public abstract class WineUtils {
         }
     }
 }
-

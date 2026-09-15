@@ -28,9 +28,9 @@ public abstract class CursorRequests {
 
         Pixmap maskPixmap = client.xServer.pixmapManager.getPixmap(maskPixmapId);
         if (maskPixmap != null && (
-                maskPixmap.drawable.visual.depth != 1 ||
-                        maskPixmap.drawable.width != sourcePixmap.drawable.width ||
-                        maskPixmap.drawable.height != sourcePixmap.drawable.height)) {
+            maskPixmap.drawable.visual.depth != 1 ||
+            maskPixmap.drawable.width != sourcePixmap.drawable.width ||
+            maskPixmap.drawable.height != sourcePixmap.drawable.height)) {
             throw new BadMatch();
         }
 
@@ -53,24 +53,21 @@ public abstract class CursorRequests {
         client.xServer.cursorManager.freeCursor(inputStream.readInt());
     }
 
-    public static void getPointerMapping(XClient client, XInputStream inputStream, XOutputStream outputStream) throws XRequestError, IOException {
+    public static void getPointerMaping(XClient client, XInputStream inputStream, XOutputStream outputStream) throws IOException, XRequestError {
         try (XStreamLock lock = outputStream.lock()) {
-            byte[] buttonsMap = { 1, 2, 3, 4, 5, 6, 7 };
-            int nElts = buttonsMap.length;
-
-            int lengthUnits = (nElts + 3) / 4;
+            byte[] buttonsMap = {1, 2, 3};
+            byte n = (byte) buttonsMap.length;
+            int padLen = -n & 3;
 
             outputStream.writeByte(RESPONSE_CODE_SUCCESS);
-            outputStream.writeByte((byte) nElts);
+            outputStream.writeByte(n);
             outputStream.writeShort(client.getSequenceNumber());
-            outputStream.writeInt(lengthUnits);
+            outputStream.writeInt((n + padLen) / 4);
             outputStream.writePad(24);
-            outputStream.write(buttonsMap);
 
-            int pad = (-nElts) & 3;
-            if (pad > 0) {
-                outputStream.writePad(pad);
-            }
+            for (byte b: buttonsMap)
+                outputStream.writeByte(b);
+            outputStream.writePad(padLen);
         }
     }
 }

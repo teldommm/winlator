@@ -11,7 +11,7 @@
         app:showAsAction="ifRoom" />
 
     <item
-        android:icon="@drawable/icon_action_bar_add"
+        android:icon="@drawable/ui_ic_add"
         android:id="@+id/containers_menu_add"
         android:title="@string/add"
         app:showAsAction="ifRoom" />

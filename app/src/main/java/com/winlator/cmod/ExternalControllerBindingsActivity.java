@@ -1,50 +1,29 @@
 package com.winlator.cmod;
 
-import android.animation.ValueAnimator;
-import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
-import android.graphics.Color;
 import android.os.Bundle;
-import android.view.KeyEvent;
-import android.view.LayoutInflater;
-import android.view.MenuItem;
-import android.view.MotionEvent;
 import android.view.InputDevice;
-import android.view.View;
-import android.view.ViewGroup;
-import android.view.animation.AccelerateDecelerateInterpolator;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
-import android.widget.ImageButton;
-import android.widget.Spinner;
-import android.widget.TextView;
-
-import androidx.appcompat.app.ActionBar;
+import android.view.KeyEvent;
+import android.view.MotionEvent;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.Toolbar;
-import androidx.core.content.ContextCompat;
-import androidx.preference.PreferenceManager;
-import androidx.recyclerview.widget.DividerItemDecoration;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
-
-import com.winlator.cmod.R;
-import com.winlator.cmod.core.AppUtils;
-import com.winlator.cmod.contentdialog.ContentDialog;
 import com.winlator.cmod.inputcontrols.Binding;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.ExternalController;
 import com.winlator.cmod.inputcontrols.ExternalControllerBinding;
 import com.winlator.cmod.inputcontrols.InputControlsManager;
 import com.winlator.cmod.math.Mathf;
+import com.winlator.cmod.ui.inputcontrols.ExternalControllerBindingItem;
+import com.winlator.cmod.ui.inputcontrols.ExternalControllerBindingsCallbacks;
+import com.winlator.cmod.ui.inputcontrols.ExternalControllerBindingsComposeHost;
+import com.winlator.cmod.ui.inputcontrols.ExternalControllerBindingsState;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 public class ExternalControllerBindingsActivity extends AppCompatActivity {
-    private TextView emptyTextView;
     private ControlsProfile profile;
     private ExternalController controller;
-    private RecyclerView recyclerView;
-    private ControllerBindingsAdapter adapter;
+    private final ExternalControllerBindingsState screenState = new ExternalControllerBindingsState();
 
     private boolean l2WasPressed = false;
     private boolean r2WasPressed = false;
@@ -52,7 +31,6 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.external_controller_bindings_activity);
 
         Intent intent = getIntent();
         int profileId = intent.getIntExtra("profile_id", 0);
@@ -65,45 +43,76 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
             profile.save();
         }
 
-        Toolbar toolbar = findViewById(R.id.Toolbar);
-        toolbar.setTitle(controller.getName());
-        setSupportActionBar(toolbar);
+        refreshBindings();
+        List<List<String>> labels = Arrays.asList(
+                Arrays.asList(Binding.keyboardBindingLabels()),
+                Arrays.asList(Binding.mouseBindingLabels()),
+                Arrays.asList(Binding.gamepadBindingLabels()));
+        setContentView(ExternalControllerBindingsComposeHost.create(
+                this, controller.getName(), screenState, labels,
+                new ExternalControllerBindingsCallbacks() {
+                    @Override
+                    public void onBack() {
+                        finish();
+                    }
 
-        ActionBar actionBar = getSupportActionBar();
-        actionBar.setDisplayHomeAsUpEnabled(true);
-        actionBar.setHomeAsUpIndicator(R.drawable.icon_action_bar_back);
+                    @Override
+                    public void onRemove(int keyCode) {
+                        ExternalControllerBinding item = controller.getControllerBinding(keyCode);
+                        if (item == null) return;
+                        controller.removeControllerBinding(item);
+                        profile.save();
+                        refreshBindings();
+                    }
 
-        emptyTextView = findViewById(R.id.TVEmptyText);
-        recyclerView = findViewById(R.id.RecyclerView);
-        recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        recyclerView.addItemDecoration(new DividerItemDecoration(this, DividerItemDecoration.VERTICAL));
-        recyclerView.setAdapter(adapter = new ControllerBindingsAdapter());
-        updateEmptyTextView();
+                    @Override
+                    public void onBindingSelected(int keyCode, int type, int position) {
+                        ExternalControllerBinding item = controller.getControllerBinding(keyCode);
+                        if (item == null) return;
+                        Binding[] values;
+                        switch (type) {
+                            case 0: values = Binding.keyboardBindingValues(); break;
+                            case 1: values = Binding.mouseBindingValues(); break;
+                            case 2: values = Binding.gamepadBindingValues(); break;
+                            default: return;
+                        }
+                        if (position < 0 || position >= values.length) return;
+                        if (item.getBinding() != values[position]) {
+                            item.setBinding(values[position]);
+                            profile.save();
+                            refreshBindings();
+                        }
+                    }
+                }));
     }
 
+    private void refreshBindings() {
+        List<ExternalControllerBindingItem> items = new ArrayList<>();
+        for (int i = 0; i < controller.getControllerBindingCount(); i++) {
+            ExternalControllerBinding item = controller.getControllerBindingAt(i);
+            Binding binding = item.getBinding();
+            int type = binding.isMouse() ? 1 : binding.isGamepad() ? 2 : 0;
+            items.add(new ExternalControllerBindingItem(
+                    item.getKeyCode(), item.toString(), type, binding.toString()));
+        }
+        screenState.update(items);
+    }
 
     private void updateControllerBinding(int keyCode, Binding binding) {
         if (keyCode == KeyEvent.KEYCODE_UNKNOWN)
             return;
 
         ExternalControllerBinding controllerBinding = controller.getControllerBinding(keyCode);
-        int position;
         if (controllerBinding == null) {
             controllerBinding = new ExternalControllerBinding();
             controllerBinding.setKeyCode(keyCode);
             controllerBinding.setBinding(binding);
-
             controller.addControllerBinding(controllerBinding);
             profile.save();
-            adapter.notifyDataSetChanged();
-            updateEmptyTextView();
-            position = controller.getPosition(controllerBinding);
-        } else {
-            animateItemView(position = controller.getPosition(controllerBinding));
+            refreshBindings();
         }
-        recyclerView.scrollToPosition(position);
+        screenState.activate(keyCode);
     }
-
 
     private void processJoystickInput() {
         final int[] axes = {
@@ -122,7 +131,7 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
             byte sign = Mathf.sign(value);
             if (sign != 0) {
                 int keyCode = ExternalControllerBinding.getKeyCodeForAxis(axes[i], sign);
-                updateControllerBinding(keyCode, Binding.NONE); // Or prompt the user to select a binding
+                updateControllerBinding(keyCode, Binding.NONE);
             }
         }
     }
@@ -192,147 +201,6 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
                 keyCode == KeyEvent.KEYCODE_DPAD_LEFT ||
                 keyCode == KeyEvent.KEYCODE_DPAD_RIGHT ||
                 keyCode == KeyEvent.KEYCODE_DPAD_CENTER;
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem menuItem) {
-        finish();
-        return true;
-    }
-
-    private class ControllerBindingsAdapter extends RecyclerView.Adapter<ControllerBindingsAdapter.ViewHolder> {
-        private class ViewHolder extends RecyclerView.ViewHolder {
-            private final ImageButton removeButton;
-            private final TextView title;
-            private final Spinner bindingType;
-            private final Spinner binding;
-
-            private ViewHolder(View view) {
-                super(view);
-                this.title = view.findViewById(R.id.TVTitle);
-                this.bindingType = view.findViewById(R.id.SBindingType);
-                this.binding = view.findViewById(R.id.SBinding);
-                this.removeButton = view.findViewById(R.id.BTRemove);
-            }
-        }
-
-        @Override
-        public final ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-            return new ViewHolder(LayoutInflater.from(parent.getContext())
-                    .inflate(R.layout.external_controller_binding_list_item, parent, false));
-        }
-
-        @Override
-        public void onBindViewHolder(ViewHolder holder, int position) {
-            final ExternalControllerBinding item = controller.getControllerBindingAt(position);
-            holder.title.setText(item.toString());
-            loadBindingSpinner(holder, item);
-            holder.removeButton.setOnClickListener((view) -> {
-                controller.removeControllerBinding(item);
-                profile.save();
-                notifyDataSetChanged();
-                updateEmptyTextView();
-            });
-        }
-
-        @Override
-        public final int getItemCount() {
-            return controller.getControllerBindingCount();
-        }
-
-        private void loadBindingSpinner(ViewHolder holder, final ExternalControllerBinding item) {
-            final Context $this = ExternalControllerBindingsActivity.this;
-
-            Runnable update = () -> {
-                String[] bindingEntries = null;
-                switch (holder.bindingType.getSelectedItemPosition()) {
-                    case 0:
-                        bindingEntries = Binding.keyboardBindingLabels();
-                        break;
-                    case 1:
-                        bindingEntries = Binding.mouseBindingLabels();
-                        break;
-                    case 2:
-                        bindingEntries = Binding.gamepadBindingLabels();
-                        break;
-                }
-
-                holder.binding.setAdapter(
-                        new ArrayAdapter<>($this, android.R.layout.simple_spinner_dropdown_item, bindingEntries));
-                AppUtils.setSpinnerSelectionFromValue(holder.binding, item.getBinding().toString());
-            };
-
-            holder.bindingType.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                @Override
-                public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                    update.run();
-                }
-
-                @Override
-                public void onNothingSelected(AdapterView<?> parent) {
-                }
-            });
-
-            Binding selectedBinding = item.getBinding();
-            if (selectedBinding.isKeyboard()) {
-                holder.bindingType.setSelection(0, false);
-            } else if (selectedBinding.isMouse()) {
-                holder.bindingType.setSelection(1, false);
-            } else if (selectedBinding.isGamepad()) {
-                holder.bindingType.setSelection(2, false);
-            }
-
-            holder.binding.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                @Override
-                public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                    Binding binding = Binding.NONE;
-                    switch (holder.bindingType.getSelectedItemPosition()) {
-                        case 0:
-                            binding = Binding.keyboardBindingValues()[position];
-                            break;
-                        case 1:
-                            binding = Binding.mouseBindingValues()[position];
-                            break;
-                        case 2:
-                            binding = Binding.gamepadBindingValues()[position];
-                            break;
-                    }
-
-                    if (binding != item.getBinding()) {
-                        item.setBinding(binding);
-                        profile.save();
-                    }
-                }
-
-                @Override
-                public void onNothingSelected(AdapterView<?> parent) {
-                }
-            });
-
-            update.run();
-
-        }
-    }
-
-    private void updateEmptyTextView() {
-        emptyTextView.setVisibility(adapter.getItemCount() == 0 ? View.VISIBLE : View.GONE);
-    }
-
-    private void animateItemView(int position) {
-        final ControllerBindingsAdapter.ViewHolder holder = (ControllerBindingsAdapter.ViewHolder) recyclerView
-                .findViewHolderForAdapterPosition(position);
-        if (holder != null) {
-            final int color = ContextCompat.getColor(this, R.color.colorAccent);
-            final ValueAnimator animator = ValueAnimator.ofFloat(0.4f, 0.0f);
-            animator.setDuration(200);
-            animator.setInterpolator(new AccelerateDecelerateInterpolator());
-            animator.addUpdateListener((animation) -> {
-                float alpha = (float) animation.getAnimatedValue();
-                holder.itemView.setBackgroundColor(
-                        Color.argb((int) (alpha * 255), Color.red(color), Color.green(color), Color.blue(color)));
-            });
-            animator.start();
-        }
     }
 
 }

@@ -1,33 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
+    android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     android:orientation="vertical">
 
     <ScrollView
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:fillViewport="true">
 
         <LinearLayout
-            android:layout_width="300dp"
+            android:layout_width="240dp"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:padding="12dp">
 
-            <!-- Present Mode -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Present Mode"
-                android:textAppearance="?android:attr/textAppearanceSmall"
-                android:paddingBottom="4dp"/>
-            <Spinner
-                android:id="@+id/SPRendererPresentMode"
-                style="@style/ComboBox"
+            <LinearLayout
+                android:id="@+id/GroupPresentMode"
                 android:layout_width="match_parent"
-                android:layout_height="40dp"
-                android:spinnerMode="dialog"
-                android:layout_marginBottom="8dp"/>
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Present Mode"
+                    android:textAppearance="?android:attr/textAppearanceMedium"
+                    android:paddingBottom="8dp"/>
+                <Spinner
+                    android:id="@+id/SPRendererPresentMode"
+                    style="@style/ComboBoxCompact"
+                    android:background="@drawable/combo_box_no_arrow_dark"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:spinnerMode="dropdown"
+                    android:layout_marginBottom="8dp"/>
+            </LinearLayout>
 
             <LinearLayout
                 android:id="@+id/GroupDriver"
@@ -38,14 +45,15 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Renderer Driver"
-                    android:textAppearance="?android:attr/textAppearanceSmall"
-                    android:paddingBottom="4dp"/>
+                    android:textAppearance="?android:attr/textAppearanceMedium"
+                    android:paddingBottom="8dp"/>
                 <Spinner
                     android:id="@+id/SPRendererDriver"
-                    style="@style/ComboBox"
+                    style="@style/ComboBoxCompact"
+                    android:background="@drawable/combo_box_no_arrow_dark"
                     android:layout_width="match_parent"
-                    android:layout_height="40dp"
-                    android:spinnerMode="dialog"
+                    android:layout_height="wrap_content"
+                    android:spinnerMode="dropdown"
                     android:layout_marginBottom="8dp"/>
             </LinearLayout>
 
@@ -58,35 +66,22 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Texture Filter"
-                    android:textAppearance="?android:attr/textAppearanceSmall"
-                    android:paddingBottom="4dp"/>
+                    android:textAppearance="?android:attr/textAppearanceMedium"
+                    android:paddingBottom="8dp"/>
                 <Spinner
                     android:id="@+id/SPRendererFilter"
-                    style="@style/ComboBox"
+                    style="@style/ComboBoxCompact"
+                    android:background="@drawable/combo_box_no_arrow_dark"
                     android:layout_width="match_parent"
-                    android:layout_height="40dp"
-                    android:spinnerMode="dialog"/>
+                    android:layout_height="wrap_content"
+                    android:spinnerMode="dropdown"/>
             </LinearLayout>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Refresh Rate"
-                android:textAppearance="?android:attr/textAppearanceSmall"
-                android:paddingBottom="4dp"
-                android:layout_marginTop="8dp"/>
-            <Spinner
-                android:id="@+id/SPRendererRefreshRate"
-                style="@style/ComboBox"
-                android:layout_width="match_parent"
-                android:layout_height="40dp"
-                android:spinnerMode="dialog"/>
 
             <CheckBox
                 android:id="@+id/CBRendererSwapRB"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="8dp"
                 android:text="Swap red/blue channels" />
 
         </LinearLayout>

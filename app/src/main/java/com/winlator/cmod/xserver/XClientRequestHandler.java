@@ -24,7 +24,6 @@ import com.winlator.cmod.xserver.requests.WindowRequests;
 import java.io.IOException;
 import java.nio.ByteOrder;
 
-
 public class XClientRequestHandler implements RequestHandler {
     public static final byte RESPONSE_CODE_ERROR = 0;
     public static final byte RESPONSE_CODE_SUCCESS = 1;
@@ -45,12 +44,7 @@ public class XClientRequestHandler implements RequestHandler {
     private void sendServerInformation(XClient client, XOutputStream outputStream) throws IOException {
         short vendorNameLength = (short)XServer.VENDOR_NAME.length();
         byte pixmapFormatCount = (byte)client.xServer.pixmapManager.supportedPixmapFormats.length;
-        int visualBytes = 0;
-        for (Visual visual : client.xServer.pixmapManager.supportedVisuals) {
-            visualBytes += 8;
-            if (visual.displayable) visualBytes += 24;
-        }
-        short additionalDataLength = (short)(8 + (2 * pixmapFormatCount) + ((vendorNameLength + 3) / 4) + ((40 + visualBytes) + 3) / 4);
+        short additionalDataLength = (short)(8 + (2 * pixmapFormatCount) + ((vendorNameLength + 3) / 4) + ((40 + 8 * client.xServer.pixmapManager.supportedVisuals.length + 24) + 3) / 4);
 
         try (XStreamLock lock = outputStream.lock()) {
             outputStream.writeByte(RESPONSE_CODE_SUCCESS);
@@ -88,7 +82,7 @@ public class XClientRequestHandler implements RequestHandler {
             outputStream.writeInt(0);
             outputStream.writeInt(0xffffff);
             outputStream.writeInt(0x000000);
-            outputStream.writeInt((int)client.xServer.windowManager.rootWindow.getAllEventMasks().getBits());
+            outputStream.writeInt(client.xServer.windowManager.rootWindow.getAllEventMasks().getBits());
             outputStream.writeShort(client.xServer.screenInfo.width);
             outputStream.writeShort(client.xServer.screenInfo.height);
             outputStream.writeShort(client.xServer.screenInfo.getWidthInMillimeters());
@@ -177,7 +171,7 @@ public class XClientRequestHandler implements RequestHandler {
         try {
             switch (opcode) {
                 case ClientOpcodes.CREATE_WINDOW:
-                    try (XLock lock = client.xServer.lock(XServer.Lockable.WINDOW_MANAGER, XServer.Lockable.DRAWABLE_MANAGER, XServer.Lockable.CURSOR_MANAGER)) {
+                    try (XLock lock = client.xServer.lock(XServer.Lockable.WINDOW_MANAGER, XServer.Lockable.DRAWABLE_MANAGER, XServer.Lockable.INPUT_DEVICE, XServer.Lockable.CURSOR_MANAGER)) {
                         WindowRequests.createWindow(client, inputStream, outputStream);
                     }
                     break;
@@ -197,10 +191,9 @@ public class XClientRequestHandler implements RequestHandler {
                     }
                     break;
                 case ClientOpcodes.DESTROY_SUB_WINDOWS:
-                    try (XLock lock = client.xServer.lock(XServer.Lockable.WINDOW_MANAGER, XServer.Lockable.DRAWABLE_MANAGER, XServer.Lockable.INPUT_DEVICE)){
+                    try (XLock lock = client.xServer.lock(XServer.Lockable.WINDOW_MANAGER, XServer.Lockable.DRAWABLE_MANAGER, XServer.Lockable.INPUT_DEVICE)) {
                         WindowRequests.destroySubWindows(client, inputStream, outputStream);
                     }
-                    break;
                 case ClientOpcodes.REPARENT_WINDOW:
                     try (XLock lock = client.xServer.lock(XServer.Lockable.WINDOW_MANAGER)) {
                         WindowRequests.reparentWindow(client, inputStream, outputStream);
@@ -212,7 +205,7 @@ public class XClientRequestHandler implements RequestHandler {
                     }
                     break;
                 case ClientOpcodes.MAP_SUB_WINDOWS:
-                    try (XLock lock = client.xServer.lock(XServer.Lockable.WINDOW_MANAGER, XServer.Lockable.INPUT_DEVICE)){
+                    try (XLock lock = client.xServer.lock(XServer.Lockable.WINDOW_MANAGER, XServer.Lockable.INPUT_DEVICE)) {
                         WindowRequests.mapSubWindows(client, inputStream, outputStream);
                     }
                     break;
@@ -240,7 +233,9 @@ public class XClientRequestHandler implements RequestHandler {
                     AtomRequests.internAtom(client, inputStream, outputStream);
                     break;
                 case ClientOpcodes.GET_ATOM_NAME:
-                    AtomRequests.getAtomName(client, inputStream, outputStream);
+                    try (XLock lock = client.xServer.lock(XServer.Lockable.WINDOW_MANAGER, XServer.Lockable.INPUT_DEVICE)) {
+                        AtomRequests.getAtomName(client, inputStream, outputStream);
+                    }
                     break;
                 case ClientOpcodes.CHANGE_PROPERTY:
                     try (XLock lock = client.xServer.lock(XServer.Lockable.WINDOW_MANAGER)) {
@@ -432,17 +427,18 @@ public class XClientRequestHandler implements RequestHandler {
                     client.skipRequest();
                     break;
                 case ClientOpcodes.GET_POINTER_MAPPING:
-                    CursorRequests.getPointerMapping(client, inputStream, outputStream);
+                    CursorRequests.getPointerMaping(client, inputStream, outputStream);
                     break;
-                case ClientOpcodes.GRAB_SERVER:
-                    try (XLock lock = client.xServer.lockAll()){
+                case 36:
+                    try (XLock lock = client.xServer.lockAll()) {
                         client.xServer.setGrabbed(true, client);
                         outputStream.writeSuccessReply(client.getSequenceNumber(), 0);
                         Log.d("XClientRequestHandler", "X_GrabServer request handled successfully:" + outputStream.buffer.position());
                     }
                     break;
-                case ClientOpcodes.UNGRAB_SERVER:
-                    try (XLock lock = client.xServer.lockAll()){
+
+                case 37:
+                    try (XLock lock = client.xServer.lockAll()) {
                         if (client.xServer.isGrabbedBy(client)) {
                             client.xServer.setGrabbed(false, null);
                         }
@@ -453,19 +449,14 @@ public class XClientRequestHandler implements RequestHandler {
                 default:
                     if (opcode < 0) {
                         Extension extension = client.xServer.extensions.get(opcode);
-                        if (extension != null)
-                            extension.handleRequest(client, inputStream, outputStream);
-                        else
-                            Log.w("XServer", String.format("handleNormalRequest: unhandled opcode=%d, requestData=%d, requestLength=%d", opcode, requestData, requestLength));
-
+                        if (extension != null) extension.handleRequest(client, inputStream, outputStream);
                     }
-                    else Log.w("XServer", String.format("handleNormalRequest: unsupported opcode " + opcode));
+                    else Log.d("XClientRequestHandler", "Unsupported opcode " + opcode);
                     break;
             }
         }
         catch (XRequestError e) {
             client.skipRequest();
-            Log.e("XServer", String.format("handleNormalRequest: XRequestError for opcode=%d: %s", opcode, e));
             e.sendError(client, opcode);
         }
 

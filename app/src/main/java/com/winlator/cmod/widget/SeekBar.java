@@ -10,6 +10,7 @@ import android.graphics.RectF;
 import android.graphics.Shader;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.util.TypedValue;
 
 import androidx.appcompat.widget.AppCompatImageView;
 import androidx.core.content.ContextCompat;
@@ -27,6 +28,7 @@ public class SeekBar extends AppCompatImageView {
     private final int colorPrimary;
     private final int colorSecondary;
     private final int textColor;
+    private final int thumbColor;
     private float textSize;
     private final float thumbRadius;
     private final float thumbSize;
@@ -51,10 +53,15 @@ public class SeekBar extends AppCompatImageView {
         thumbSize = UnitUtils.dpToPx(20.0f);
         thumbRadius = thumbSize / 2.0f;
         textSize = UnitUtils.dpToPx(16.0f);
-        textColor = -0x8c8c8d; // Dark gray color
 
-        colorPrimary = -0x282829; // Primary color
-        colorSecondary = ContextCompat.getColor(context, R.color.colorPrimary); // Color secondary
+        colorPrimary = resolveThemeColor(context, R.attr.ingameSidebarSurfaceVariant, -0x282829);
+        colorSecondary = resolveThemeColor(
+                context,
+                R.attr.ingameSidebarPrimary,
+                ContextCompat.getColor(context, R.color.colorPrimary)
+        );
+        textColor = resolveThemeColor(context, R.attr.ingameSidebarOnSurfaceVariant, -0x8c8c8d);
+        thumbColor = resolveThemeColor(context, R.attr.ingameSidebarOnSurface, Color.WHITE);
 
         if (attrs != null) {
             TypedArray ta = context.obtainStyledAttributes(attrs, R.styleable.SeekBar, 0, 0);
@@ -72,6 +79,12 @@ public class SeekBar extends AppCompatImageView {
 
         setFocusable(true);
         setFocusableInTouchMode(true);
+    }
+
+    private static int resolveThemeColor(Context context, int attr, int fallback) {
+        TypedValue value = new TypedValue();
+        if (context.getTheme().resolveAttribute(attr, value, true)) return value.data;
+        return fallback;
     }
 
     public float getMaxValue() {
@@ -124,7 +137,7 @@ public class SeekBar extends AppCompatImageView {
             float normalized = Mathf.roundTo(value, step);
             normalized = Mathf.clamp((normalized - minValue) / (maxValue - minValue), 0.0f, 1.0f);
             this.normalizedValue = normalized;
-            postInvalidate(); // Redraw view with new value
+            postInvalidate();
         }
     }
 
@@ -158,7 +171,7 @@ public class SeekBar extends AppCompatImageView {
         canvas.drawRoundRect(rect, barHeight / 2, barHeight / 2, paint);
 
         float thumbX = progressWidth;
-        paint.setColor(Color.WHITE);
+        paint.setColor(thumbColor);
         canvas.drawCircle(thumbX, centerY, thumbRadius, paint);
 
         paint.setColor(getThumbHoleColor());
@@ -180,7 +193,7 @@ public class SeekBar extends AppCompatImageView {
         }
         paint.setShader(glossyEffectGradient);
         canvas.drawRoundRect(rect, barHeight / 2, barHeight / 2, paint);
-        paint.setShader(null); // Reset the shader
+        paint.setShader(null);
     }
 
     @Override
@@ -226,5 +239,4 @@ public class SeekBar extends AppCompatImageView {
         int b = Mathf.clamp(Color.blue(colorSecondary) - 30, 0, 255);
         return Color.rgb(r, g, b);
     }
-
 }

@@ -29,7 +29,8 @@ public class StringUtils {
     }
 
     public static String parseIdentifier(Object text) {
-        return text.toString().toLowerCase(Locale.ENGLISH).replaceAll(" *\\(([^\\)]+)\\)$", "").replaceAll("( \\+ )+| +", "-");
+        String identifier = text.toString().toLowerCase(Locale.ENGLISH).replaceAll(" *\\(([^\\)]+)\\)$", "").replaceAll("( \\+ )+| +", "-");
+        return identifier.equals("pulseaudio-gn") ? "pulse-audio-gn" : identifier;
     }
 
     public static String parseNumber(Object text) {
@@ -82,8 +83,10 @@ public class StringUtils {
             return "";
         }
 
+        // Replace backslashes with double backslashes
         String escapedPath = path.replace("\\", "\\\\");
 
+        // Replace spaces with escaped spaces
         escapedPath = escapedPath.replace(" ", "\\ ");
 
         return escapedPath;
@@ -94,8 +97,10 @@ public class StringUtils {
             return "";
         }
 
+        // Replace backslashes with double backslashes
         String escapedPath = path.replace("\\", "\\\\\\\\");
 
+        // Replace spaces with escaped spaces
         escapedPath = escapedPath.replace(" ", "\\\\");
 
         return escapedPath;

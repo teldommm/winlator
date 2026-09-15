@@ -1,3 +1,11 @@
+// Copyright (c) 2017-2024, The Khronos Group Inc.
+// Copyright (c) 2017-2019 Valve Corporation
+// Copyright (c) 2017-2019 LunarG, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+//
+// Initial Author: Mark Young <marky@lunarg.com>
+//
 
 #if defined(_MSC_VER) && !defined(_CRT_SECURE_NO_WARNINGS)
 #define _CRT_SECURE_NO_WARNINGS
@@ -55,6 +63,8 @@ bool IsAvailable() { return GetSetCurrentLoaderInstance() != nullptr; }
 void Remove() { GetSetCurrentLoaderInstance().reset(nullptr); }
 }  // namespace ActiveLoaderInstance
 
+// Extensions that are supported by the loader, but may not be supported
+// the the runtime.
 const std::array<XrExtensionProperties, 1>& LoaderInstance::LoaderSpecificExtensions() {
     static const std::array<XrExtensionProperties, 1> extensions = {XrExtensionProperties{
         XR_TYPE_EXTENSION_PROPERTIES, nullptr, XR_EXT_DEBUG_UTILS_EXTENSION_NAME, XR_EXT_debug_utils_SPEC_VERSION}};
@@ -68,6 +78,7 @@ class InstanceCreateInfoManager {
         Reset();
     }
 
+    // Reset the "modified" state to match the original state.
     void Reset() {
         enabled_extensions_cstr.clear();
         enabled_extensions_cstr.reserve(original_create_info->enabledExtensionCount);
@@ -78,6 +89,7 @@ class InstanceCreateInfoManager {
         Update();
     }
 
+    // Remove extensions named in the parameter and return a pointer to the current state.
     const XrInstanceCreateInfo* FilterOutExtensions(const std::vector<const char*>& extensions_to_skip) {
         if (enabled_extensions_cstr.empty()) {
             return Get();
@@ -90,6 +102,7 @@ class InstanceCreateInfoManager {
         }
         return Update();
     }
+    // Remove the extension named in the parameter and return a pointer to the current state.
     const XrInstanceCreateInfo* FilterOutExtension(const char* extension_to_skip) {
         if (enabled_extensions_cstr.empty()) {
             return &modified_create_info;
@@ -98,11 +111,13 @@ class InstanceCreateInfoManager {
         auto e = enabled_extensions_cstr.end();
         auto it = std::find_if(b, e, [&](const char* extension) { return strcmp(extension_to_skip, extension) == 0; });
         if (it != e) {
+            // Just that one element goes away
             enabled_extensions_cstr.erase(it);
         }
         return Update();
     }
 
+    // Get the current modified XrInstanceCreateInfo
     const XrInstanceCreateInfo* Get() const { return &modified_create_info; }
 
    private:
@@ -118,6 +133,7 @@ class InstanceCreateInfoManager {
 };
 }  // namespace
 
+// Factory method
 XrResult LoaderInstance::CreateInstance(PFN_xrGetInstanceProcAddr get_instance_proc_addr_term,
                                         PFN_xrCreateInstance create_instance_term,
                                         PFN_xrCreateApiLayerInstance create_api_layer_instance_term,
@@ -125,12 +141,16 @@ XrResult LoaderInstance::CreateInstance(PFN_xrGetInstanceProcAddr get_instance_p
                                         const XrInstanceCreateInfo* info, std::unique_ptr<LoaderInstance>* loader_instance) {
     LoaderLogger::LogVerboseMessage("xrCreateInstance", "Entering LoaderInstance::CreateInstance");
 
+    // Check the list of enabled extensions to make sure something supports them, and, if we do,
+    // add it to the list of enabled extensions
     XrResult last_error = XR_SUCCESS;
     for (uint32_t ext = 0; ext < info->enabledExtensionCount; ++ext) {
         bool found = false;
+        // First check the runtime
         if (RuntimeInterface::GetRuntime().SupportsExtension(info->enabledExtensionNames[ext])) {
             found = true;
         }
+        // Next check the loader
         if (!found) {
             for (auto& loader_extension : LoaderInstance::LoaderSpecificExtensions()) {
                 if (strcmp(loader_extension.extensionName, info->enabledExtensionNames[ext]) == 0) {
@@ -139,6 +159,7 @@ XrResult LoaderInstance::CreateInstance(PFN_xrGetInstanceProcAddr get_instance_p
                 }
             }
         }
+        // Finally, check the enabled layers
         if (!found) {
             for (auto& layer_interface : api_layer_interfaces) {
                 if (layer_interface->SupportsExtension(info->enabledExtensionNames[ext])) {
@@ -156,10 +177,13 @@ XrResult LoaderInstance::CreateInstance(PFN_xrGetInstanceProcAddr get_instance_p
         }
     }
 
+    // Topmost means "closest to the application"
     PFN_xrGetInstanceProcAddr topmost_gipa = get_instance_proc_addr_term;
     XrInstance instance{XR_NULL_HANDLE};
 
     if (XR_SUCCEEDED(last_error)) {
+        // Remove the loader-supported-extensions (debug utils), if it's in the list of enabled extensions but not supported by
+        // the runtime.
         InstanceCreateInfoManager create_info_manager{info};
         const XrInstanceCreateInfo* modified_create_info = info;
         if (info->enabledExtensionCount > 0) {
@@ -172,7 +196,9 @@ XrResult LoaderInstance::CreateInstance(PFN_xrGetInstanceProcAddr get_instance_p
             modified_create_info = create_info_manager.FilterOutExtensions(extensions_to_skip);
         }
 
+        // Only start the xrCreateApiLayerInstance stack if we have layers.
         if (!api_layer_interfaces.empty()) {
+            // Initialize an array of ApiLayerNextInfo structs
             std::unique_ptr<XrApiLayerNextInfo[]> next_info_list(new XrApiLayerNextInfo[api_layer_interfaces.size()]);
             size_t ni_index = api_layer_interfaces.size() - 1;
             for (size_t i = 0; i <= ni_index; i++) {
@@ -181,13 +207,18 @@ XrResult LoaderInstance::CreateInstance(PFN_xrGetInstanceProcAddr get_instance_p
                 next_info_list[i].structSize = sizeof(XrApiLayerNextInfo);
             }
 
+            // Go through all layers, and override the instance pointers with the layer version.  However,
+            // go backwards through the layer list so we replace in reverse order so the layers can call their next function
+            // appropriately.
             PFN_xrCreateApiLayerInstance topmost_cali_fp = create_api_layer_instance_term;
             XrApiLayerNextInfo* topmost_nextinfo = nullptr;
             for (auto layer_interface = api_layer_interfaces.rbegin(); layer_interface != api_layer_interfaces.rend();
                  ++layer_interface) {
+                // Collect current layer's function pointers
                 PFN_xrGetInstanceProcAddr cur_gipa_fp = (*layer_interface)->GetInstanceProcAddrFuncPointer();
                 PFN_xrCreateApiLayerInstance cur_cali_fp = (*layer_interface)->GetCreateApiLayerInstanceFuncPointer();
 
+                // Fill in layer info and link previous (lower) layer fxn pointers
                 strncpy(next_info_list[ni_index].layerName, (*layer_interface)->LayerName().c_str(),
                         XR_MAX_API_LAYER_NAME_SIZE - 1);
                 next_info_list[ni_index].layerName[XR_MAX_API_LAYER_NAME_SIZE - 1] = '\0';
@@ -195,12 +226,14 @@ XrResult LoaderInstance::CreateInstance(PFN_xrGetInstanceProcAddr get_instance_p
                 next_info_list[ni_index].nextGetInstanceProcAddr = topmost_gipa;
                 next_info_list[ni_index].nextCreateApiLayerInstance = topmost_cali_fp;
 
+                // Update saved pointers for next iteration
                 topmost_nextinfo = &next_info_list[ni_index];
                 topmost_gipa = cur_gipa_fp;
                 topmost_cali_fp = cur_cali_fp;
                 ni_index--;
             }
 
+            // Populate the ApiLayerCreateInfo struct and pass to topmost CreateApiLayerInstance()
             XrApiLayerCreateInfo api_layer_ci = {};
             api_layer_ci.structType = XR_LOADER_INTERFACE_STRUCT_API_LAYER_CREATE_INFO;
             api_layer_ci.structVersion = XR_API_LAYER_CREATE_INFO_STRUCT_VERSION;
@@ -208,9 +241,12 @@ XrResult LoaderInstance::CreateInstance(PFN_xrGetInstanceProcAddr get_instance_p
             api_layer_ci.loaderInstance = nullptr;  // Not used.
             api_layer_ci.settings_file_location[0] = '\0';
             api_layer_ci.nextInfo = next_info_list.get();
+            //! @todo do we filter our create info extension list here?
+            //! Think that actually each layer might need to filter...
             last_error = topmost_cali_fp(modified_create_info, &api_layer_ci, &instance);
 
         } else {
+            // The loader's terminator is the topmost CreateInstance if there are no layers.
             last_error = create_instance_term(modified_create_info, &instance);
         }
 

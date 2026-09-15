@@ -36,8 +36,6 @@ import java.util.Stack;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 
-
-
 public abstract class FileUtils {
 
     private static final String TAG = "FileUtils";
@@ -189,8 +187,6 @@ public abstract class FileUtils {
         return true;
     }
 
-
-
     public static boolean copy(Context context, Object src, File dstFile, Callback<File> callback) {
         if (src instanceof File) {
             File sourceFile = (File) src;
@@ -246,9 +242,6 @@ public abstract class FileUtils {
 
         return false;
     }
-
-
-
 
     public static void copy(Context context, String assetFile, File dstFile) {
         if (isDirectory(context, assetFile)) {
@@ -365,11 +358,14 @@ public abstract class FileUtils {
 
         if ("primary".equalsIgnoreCase(type)) {
             return Environment.getExternalStorageDirectory() + "/" + path;
-        } else {
-            return "/mnt/media_rw/" + type + "/" + path;
         }
-    }
 
+        String volumePath = "/storage/" + type + (path.isEmpty() ? "" : "/" + path);
+        if (new File(volumePath).exists()) return volumePath;
+
+        Log.w(TAG, volumePath + " is not accessible, falling back to /mnt/media_rw");
+        return "/mnt/media_rw/" + type + "/" + path;
+    }
 
     public static String getFilePathFromUri(Context context, Uri uri) {
         Log.d(TAG, "getFilePathFromUri called with URI: " + uri.toString());
@@ -377,7 +373,6 @@ public abstract class FileUtils {
         Log.d(TAG, "File path obtained: " + filePath);
         return filePath;
     }
-
 
     public static boolean contentEquals(File origin, File target) {
         if (origin.length() != target.length()) return false;
@@ -536,6 +531,7 @@ public abstract class FileUtils {
 
         return null;
     }
+
     public static String getUriFileName(Context context, Uri uri) {
         String fileName = null;
         Cursor cursor = context.getContentResolver().query(uri, null, null, null, null);
@@ -571,5 +567,4 @@ public abstract class FileUtils {
             return false;
         }
     }
-
 }

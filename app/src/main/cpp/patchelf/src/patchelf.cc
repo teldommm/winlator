@@ -50,6 +50,7 @@
 #define PACKAGE_STRING "patchelf"
 #endif
 
+// This is needed for Windows/mingw
 #ifndef O_BINARY
 #define O_BINARY 0
 #endif
@@ -232,6 +233,7 @@ struct ElfType
 
     bool is32Bit = contents[EI_CLASS] == ELFCLASS32;
 
+    // FIXME: endianness
     return ElfType { is32Bit, is32Bit ? (reinterpret_cast<Elf32_Ehdr *>(contents))->e_machine : (reinterpret_cast<Elf64_Ehdr *>(contents))->e_machine };
 }
 
@@ -360,6 +362,9 @@ unsigned int ElfFile<ElfFileParamNames>::getPageSize() const noexcept
     if (forcedPageSize > 0)
         return forcedPageSize;
 
+    // Architectures (and ABIs) can have different minimum section alignment
+    // requirements. There is no authoritative list of these values. The
+    // current list is extracted from GNU gold's source code (abi_pagesize).
     switch (rdi(hdr()->e_machine)) {
       case EM_IA_64:
       case EM_MIPS:
@@ -370,6 +375,7 @@ unsigned int ElfFile<ElfFileParamNames>::getPageSize() const noexcept
       case EM_LOONGARCH:
         return 0x10000;
       case EM_SPARC: // This should be sparc 32-bit. According to the linux
+                     // kernel 4KB should be also fine, but it seems that solaris is doing 8KB
       case EM_SPARCV9: /* SPARC64 support */
         return 0x2000;
       default:
@@ -839,6 +845,9 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
 
     Elf_Off startOffset = roundUp(fileContents->size(), getPageSize());
 
+    // In older version of binutils (2.30), readelf would check if the dynamic
+    // section segment is strictly smaller than the file (and not same size).
+    // By making it one byte larger, we don't break readelf.
     off_t binutilsQuirkPadding = 1;
     fileContents->resize(startOffset + neededSpace + binutilsQuirkPadding, 0);
 
@@ -1010,6 +1019,8 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
 
         /* Calculate how many bytes are needed out of the additional pages. */
         size_t extraSpace = neededSpace - startOffset; 
+        // Always give one extra page to avoid colliding with segments that start at
+        // unaligned addresses and will be rounded down when loaded
         unsigned int neededPages = 1 + roundUp(extraSpace, getPageSize()) / getPageSize();
         debug("needed pages is %d\n", neededPages);
         if (neededPages * getPageSize() > firstPage)
@@ -1189,8 +1200,12 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
                 dyn->d_un.d_ptr = findSectionHeader(".hash").sh_addr;
             else if (d_tag == DT_GNU_HASH) {
                 auto shdr = tryFindSectionHeader(".gnu.hash");
+                // some binaries might this section stripped
+                // in which case we just ignore the value.
                 if (shdr) dyn->d_un.d_ptr = (*shdr).get().sh_addr;
             } else if (d_tag == DT_MIPS_XHASH) {
+                // the .MIPS.xhash section was added to the glibc-ABI
+                // in commit 23c1c256ae7b0f010d0fcaff60682b620887b164
                 dyn->d_un.d_ptr = findSectionHeader(".MIPS.xhash").sh_addr;
             } else if (d_tag == DT_JMPREL) {
                 auto shdr = tryFindSectionHeader(".rel.plt");
@@ -1269,6 +1284,7 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
                 const std::string & section = sectionsByOldIndex.at(shndx);
                 assert(!section.empty());
                 auto newIndex = getSectionIndex(section); // inefficient
+                //debug("rewriting symbol %d: index = %d (%s) -> %d\n", entry, shndx, section.c_str(), newIndex);
                 wri(sym->st_shndx, newIndex);
                 /* Rewrite st_value.  FIXME: we should do this for all
                    types, but most don't actually change. */
@@ -1741,13 +1757,17 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
                 debug("replacing DT_NEEDED entry '%s' with '%s'\n", name, replacement.c_str());
 
                 auto a = addedStrings.find(replacement);
+                // the same replacement string has already been added, reuse it
                 if (a != addedStrings.end()) {
                     wri(dyn->d_un.d_val, a->second);
                     continue;
                 }
 
+                // technically, the string referred by d_val could be used otherwise, too (although unlikely)
+                // we'll therefore add a new string
                 debug("resizing .dynstr ...\n");
 
+                // relative location of the new string
                 Elf_Off strOffset = rdi(shdrDynStr.sh_size) + dynStrAddedBytes;
                 std::string & newDynStr = replaceSection(".dynstr",
                     strOffset + replacement.size() + 1);
@@ -1768,19 +1788,32 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
         }
     }
 
+    // If a replaced library uses symbol versions, then there will also be
+    // references to it in the "version needed" table, and these also need to
+    // be replaced.
 
     if (verNeedNum) {
         auto shdrVersionR = findSectionHeader(".gnu.version_r");
+        // The filename strings in the .gnu.version_r are different from the
+        // ones in .dynamic: instead of being in .dynstr, they're in some
+        // arbitrary section and we have to look in ->sh_link to figure out
+        // which one.
         Elf_Shdr & shdrVersionRStrings = shdrs.at(rdi(shdrVersionR.sh_link));
+        // this is where we find the actual filename strings
         char * verStrTab = (char *) fileContents->data() + rdi(shdrVersionRStrings.sh_offset);
+        // and we also need the name of the section containing the strings, so
+        // that we can pass it to replaceSection
         std::string versionRStringsSName = getSectionName(shdrVersionRStrings);
 
         debug("found .gnu.version_r with %i entries, strings in %s\n", verNeedNum, versionRStringsSName.c_str());
 
         unsigned int verStrAddedBytes = 0;
+        // It may be that it is .dynstr again, in which case we must take the already
+        // added bytes into account.
         if (versionRStringsSName == ".dynstr")
             verStrAddedBytes += dynStrAddedBytes;
         else
+            // otherwise the already added strings can't be reused
             addedStrings.clear();
 
         auto need = (Elf_Verneed *)(fileContents->data() + rdi(shdrVersionR.sh_offset));
@@ -1793,6 +1826,7 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
                 debug("replacing .gnu.version_r entry '%s' with '%s'\n", file, replacement.c_str());
 
                 auto a = addedStrings.find(replacement);
+                // the same replacement string has already been added, reuse it
                 if (a != addedStrings.end()) {
                     wri(need->vn_file, a->second);
                 } else {
@@ -1813,6 +1847,7 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
             } else {
                 debug("keeping .gnu.version_r entry '%s'\n", file);
             }
+            // the Elf_Verneed structures form a linked list, so jump to next entry
             need = (Elf_Verneed *) (((char *) need) + rdi(need->vn_next));
             --verNeedNum;
         }
@@ -1989,12 +2024,15 @@ void ElfFile<ElfFileParamNames>::rebuildGnuHashTable(span<char> strTab, span<Elf
 
     auto ght = parseGnuHashTable(sectionData);
 
+    // We can't trust the value of symndx when the hash table is empty
     if (ght.m_table.size() == 0)
         return;
 
+    // The hash table includes only a subset of dynsyms
     auto firstSymIdx = rdi(ght.m_hdr.symndx);
     dynsyms = span(&dynsyms[firstSymIdx], dynsyms.end());
 
+    // Only use the range of symbol versions that will be changed
     auto versyms = tryGetSectionSpan<Elf_Versym>(".gnu.version");
     if (versyms)
         versyms = span(&versyms[firstSymIdx], versyms.end());
@@ -2017,14 +2055,18 @@ void ElfFile<ElfFileParamNames>::rebuildGnuHashTable(span<char> strTab, span<Elf
         entries.push_back(e);
     }
 
+    // Sort the entries based on the buckets. This is a requirement for gnu hash table to work
     std::sort(entries.begin(), entries.end(), [&] (auto& l, auto& r) {
         return l.bucketIdx < r.bucketIdx;
     });
 
+    // Create a map of old positions to new positions after sorting
     std::vector<uint32_t> old2new(entries.size());
     for (size_t i = 0; i < entries.size(); ++i)
         old2new[entries[i].originalPos] = i;
 
+    // Update the symbol table with the new order and
+    // all tables that refer to symbols through indexes in the symbol table
     auto reorderSpan = [] (auto dst, auto& old2new)
     {
         std::vector tmp(dst.begin(), dst.end());
@@ -2052,6 +2094,7 @@ void ElfFile<ElfFileParamNames>::rebuildGnuHashTable(span<char> strTab, span<Elf
             changeRelocTableSymIds<Elf_Rela>(shdr, remapSymbolId);
     }
 
+    // Update bloom filters
     std::fill(ght.m_bloomFilters.begin(), ght.m_bloomFilters.end(), 0); 
     for (size_t i = 0; i < entries.size(); ++i)
     {
@@ -2063,6 +2106,7 @@ void ElfFile<ElfFileParamNames>::rebuildGnuHashTable(span<char> strTab, span<Elf
         wri(ght.m_bloomFilters[idx], val);
     }
 
+    // Fill buckets
     std::fill(ght.m_buckets.begin(), ght.m_buckets.end(), 0); 
     for (size_t i = 0; i < entries.size(); ++i)
     {
@@ -2071,10 +2115,12 @@ void ElfFile<ElfFileParamNames>::rebuildGnuHashTable(span<char> strTab, span<Elf
             wri(ght.m_buckets[symBucketIdx], i + firstSymIdx);
     }
 
+    // Fill hash table
     for (size_t i = 0; i < entries.size(); ++i)
     {
         auto& n = entries[i];
         bool isLast = (i == entries.size() - 1) || (n.bucketIdx != entries[i+1].bucketIdx);
+        // Add hash with first bit indicating end of chain
         wri(ght.m_table[i], isLast ? (n.hash | 1) : (n.hash & ~1));
     }
 }
@@ -2113,6 +2159,7 @@ void ElfFile<ElfFileParamNames>::rebuildHashTable(span<char> strTab, span<Elf_Sy
     std::fill(ht.m_buckets.begin(), ht.m_buckets.end(), 0);
     std::fill(ht.m_chain.begin(), ht.m_chain.end(), 0);
 
+    // The hash table includes only a subset of dynsyms
     auto firstSymIdx = dynsyms.size() - ht.m_chain.size();
     dynsyms = span(&dynsyms[firstSymIdx], dynsyms.end());
 

@@ -43,6 +43,7 @@ void XrRendererInit(struct XrEngine* engine, struct XrRenderer* renderer)
     renderer->ConfigInt[CONFIG_VIEWPORT_WIDTH] = eyeW;
     renderer->ConfigInt[CONFIG_VIEWPORT_HEIGHT] = eyeH;
 
+    // Get the viewport configuration info for the chosen viewport configuration type.
     renderer->ViewportConfig.type = XR_TYPE_VIEW_CONFIGURATION_PROPERTIES;
     OXR(xrGetViewConfigurationProperties(engine->Instance, engine->SystemId,
                                          XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,
@@ -75,6 +76,7 @@ void XrRendererInit(struct XrEngine* engine, struct XrRenderer* renderer)
         renderer->Projections[eye].type = XR_TYPE_VIEW;
     }
 
+    // Create framebuffers.
     int width = renderer->ViewConfig[0].recommendedImageRectWidth;
     int height = renderer->ViewConfig[0].recommendedImageRectHeight;
     for (int i = 0; i < XrMaxNumEyes; i++)
@@ -131,6 +133,7 @@ void XrRendererGetResolution(struct XrEngine* engine, struct XrRenderer* rendere
 
     if (engine)
     {
+        // Enumerate the viewport configurations.
         uint32_t viewport_config_count = 0;
         OXR(xrEnumerateViewConfigurations(engine->Instance, engine->SystemId, 0,
                                           &viewport_config_count, NULL));
@@ -172,6 +175,7 @@ void XrRendererGetResolution(struct XrEngine* engine, struct XrRenderer* rendere
                                                       viewport_config_type, view_count, &view_count,
                                                       elements));
 
+                // Cache the view config properties for the selected config type.
                 if (viewport_config_type == XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO)
                 {
                     assert(view_count == XrMaxNumEyes);
@@ -196,6 +200,7 @@ void XrRendererGetResolution(struct XrEngine* engine, struct XrRenderer* rendere
     }
     else
     {
+        // use cached values
         *pWidth = width;
         *pHeight = height;
     }
@@ -215,6 +220,7 @@ bool XrRendererInitFrame(struct XrEngine* engine, struct XrRenderer* renderer)
 
     XrRendererUpdateStageBounds(engine);
 
+    // Update passthrough
     if (renderer->PassthroughRunning != renderer->ConfigInt[CONFIG_PASSTHROUGH])
     {
         if (renderer->ConfigInt[CONFIG_PASSTHROUGH])
@@ -245,6 +251,10 @@ bool XrRendererInitFrame(struct XrEngine* engine, struct XrRenderer* renderer)
     OXR(xrLocateViews(engine->Session, &projection_info, &view_state, projection_capacity,
                       &projection_count, renderer->Projections));
 
+    // Get the HMD pose, predicted for the middle of the time period during which
+    // the new eye images will be displayed. The number of frames predicted ahead
+    // depends on the pipeline depth of the engine and the synthesis rate.
+    // The better the prediction, the less black will be pulled in at the edges.
     XrFrameBeginInfo begin_frame_info = {};
     begin_frame_info.type = XR_TYPE_FRAME_BEGIN_INFO;
     begin_frame_info.next = NULL;
@@ -343,6 +353,7 @@ void XrRendererFinishFrame(struct XrEngine* engine, struct XrRenderer* renderer)
     }
     else if ((mode == RENDER_MODE_MONO_SCREEN) || (mode == RENDER_MODE_STEREO_SCREEN))
     {
+        // Flat screen pose
         float distance = renderer->ConfigFloat[CONFIG_CANVAS_DISTANCE];
         float menu_pitch = ToRadians(renderer->ConfigFloat[CONFIG_MENU_PITCH]);
         float menu_yaw = ToRadians(renderer->ConfigFloat[CONFIG_MENU_YAW]);
@@ -354,6 +365,7 @@ void XrRendererFinishFrame(struct XrEngine* engine, struct XrRenderer* renderer)
         XrQuaternionf pitch = XrQuaternionfCreateFromVectorAngle(pitch_axis, -menu_pitch);
         XrQuaternionf yaw = XrQuaternionfCreateFromVectorAngle(yaw_axis, menu_yaw);
 
+        // Setup quad layer
         struct XrFramebuffer* framebuffer = &renderer->Framebuffer[0];
         XrCompositionLayerQuad quad_layer = {};
         quad_layer.type = XR_TYPE_COMPOSITION_LAYER_QUAD;
@@ -371,6 +383,7 @@ void XrRendererFinishFrame(struct XrEngine* engine, struct XrRenderer* renderer)
         quad_layer.size.width = 4;
         quad_layer.size.height = 4;
 
+        // Build the cylinder layer
         if (renderer->ConfigInt[CONFIG_SBS])
         {
             quad_layer.eyeVisibility = XR_EYE_VISIBILITY_LEFT;
@@ -398,6 +411,7 @@ void XrRendererFinishFrame(struct XrEngine* engine, struct XrRenderer* renderer)
         assert(false);
     }
 
+    // Compose the layers for this frame.
     const XrCompositionLayerBaseHeader* layers[XrMaxLayerCount] = {};
     for (int i = 0; i < renderer->LayerCount; i++)
     {
@@ -424,6 +438,7 @@ void XrRendererBindFramebuffer(struct XrRenderer* renderer)
 
 void XrRendererRecenter(struct XrEngine* engine, struct XrRenderer* renderer)
 {
+    // Calculate recenter reference
     XrReferenceSpaceCreateInfo space_info = {};
     space_info.type = XR_TYPE_REFERENCE_SPACE_CREATE_INFO;
     space_info.poseInReferenceSpace.orientation.w = 1.0f;
@@ -443,6 +458,7 @@ void XrRendererRecenter(struct XrEngine* engine, struct XrRenderer* renderer)
         space_info.poseInReferenceSpace.orientation.w = cosf(renceter_yaw / 2);
     }
 
+    // Delete previous space instances
     if (engine->StageSpace != XR_NULL_HANDLE)
     {
         OXR(xrDestroySpace(engine->StageSpace));
@@ -452,6 +468,8 @@ void XrRendererRecenter(struct XrEngine* engine, struct XrRenderer* renderer)
         OXR(xrDestroySpace(engine->FakeSpace));
     }
 
+    // Create a default stage space to use if SPACE_TYPE_STAGE is not
+    // supported, or calls to xrGetReferenceSpaceBoundsRect fail.
     space_info.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_LOCAL;
     memset(&space_info.poseInReferenceSpace, 0, sizeof(XrPosef));
     space_info.poseInReferenceSpace.orientation.w = 1.0;
@@ -476,6 +494,7 @@ void XrRendererRecenter(struct XrEngine* engine, struct XrRenderer* renderer)
         }
     }
 
+    // Update menu orientation
     renderer->ConfigFloat[CONFIG_MENU_PITCH] = renderer->HmdOrientation.x;
     renderer->ConfigFloat[CONFIG_MENU_YAW] = 0.0f;
 }
@@ -535,6 +554,7 @@ void XrRendererHandleXrEvents(struct XrEngine* engine, struct XrRenderer* render
 {
     XrEventDataBuffer event_data_bufer = {};
 
+    // Poll for events
     for (;;)
     {
         XrEventDataBaseHeader* base_event_handler = (XrEventDataBaseHeader*)(&event_data_bufer);

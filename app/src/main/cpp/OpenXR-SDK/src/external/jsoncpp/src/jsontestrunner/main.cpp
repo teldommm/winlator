@@ -1,3 +1,7 @@
+// Copyright 2007-2010 Baptiste Lepilleur and The JsonCpp Authors
+// Distributed under MIT license, or public domain if desired and
+// recognized in your jurisdiction.
+// See file LICENSE for detail or copy at http://jsoncpp.sourceforge.net/LICENSE
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
@@ -39,6 +43,7 @@ static Json::String normalizeFloatingPointStr(double value) {
         s.find_first_not_of('0', exponentStartIndex);
     Json::String exponent = "0";
     if (indexDigit != Json::String::npos) // There is an exponent different
+                                          // from 0
     {
       exponent = s.substr(indexDigit);
     }
@@ -144,6 +149,8 @@ static int parseAndSaveValueTree(const Json::String& input,
       return 1;
     }
 
+    // We may instead check the legacy implementation (to ensure it doesn't
+    // randomly get broken).
   } else {
     Json::Reader reader(features);
     const bool parsingSuccessful =
@@ -167,6 +174,11 @@ static int parseAndSaveValueTree(const Json::String& input,
   }
   return 0;
 }
+// static Json::String useFastWriter(Json::Value const& root) {
+//   Json::FastWriter writer;
+//   writer.enableYAMLCompatibility();
+//   return writer.write(root);
+// }
 static Json::String useStyledWriter(Json::Value const& root) {
   Json::StyledWriter writer;
   return writer.write(root);
@@ -207,6 +219,7 @@ static Json::String removeSuffix(const Json::String& path,
 }
 
 static void printConfig() {
+// Print the configuration used to compile JsonCpp
 #if defined(JSON_NO_INT64)
   std::cout << "JSON_NO_INT64=1" << std::endl;
 #else

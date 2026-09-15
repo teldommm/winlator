@@ -1,3 +1,11 @@
+// Copyright (c) 2017-2024, The Khronos Group Inc.
+// Copyright (c) 2017-2019 Valve Corporation
+// Copyright (c) 2017-2019 LunarG, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+//
+// Initial Authors: Mark Young <marky@lunarg.com>, Dave Houlton <daveh@lunarg.com>
+//
 
 #pragma once
 
@@ -16,6 +24,7 @@
 #define LOADER_EXPORT
 #endif
 
+// Environment variables
 #if defined(XR_OS_LINUX) || defined(XR_OS_APPLE) || defined(XR_OS_ANDROID)
 
 #include <sys/types.h>
@@ -32,8 +41,14 @@
 #define PATH_SEPARATOR ':'
 #define DIRECTORY_SYMBOL '/'
 
+// Dynamic Loading of libraries:
 typedef void *LoaderPlatformLibraryHandle;
 static inline LoaderPlatformLibraryHandle LoaderPlatformLibraryOpen(const std::string &path) {
+    // When loading the library, we use RTLD_LAZY so that not all symbols have to be
+    // resolved at this time (which improves performance). Note that if not all symbols
+    // can be resolved, this could cause crashes later.
+    // For experimenting/debugging: Define the LD_BIND_NOW environment variable to force all
+    // symbols to be resolved here.
     return dlopen(path.c_str(), RTLD_LAZY | RTLD_LOCAL);
 }
 
@@ -60,6 +75,7 @@ static inline const char *LoaderPlatformLibraryGetProcAddrError(const std::strin
 #define PATH_SEPARATOR ';'
 #define DIRECTORY_SYMBOL '\\'
 
+// Workaround for MS VS 2010/2013 missing snprintf and vsnprintf
 #if defined(_MSC_VER) && _MSC_VER < 1900
 #include <stdint.h>
 
@@ -96,6 +112,7 @@ static inline std::string DescribeError(uint32_t code, bool prefixErrorCode = tr
         str = prefixBuffer;
     }
 
+    // Could use FORMAT_MESSAGE_FROM_HMODULE to specify an error source.
     WCHAR errorBufferW[1024]{};
     const DWORD errorBufferWCapacity = sizeof(errorBufferW) / sizeof(errorBufferW[0]);
     const DWORD length = FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr, (DWORD)code,
@@ -110,16 +127,19 @@ static inline std::string DescribeError(uint32_t code, bool prefixErrorCode = tr
     return str;
 }
 
+// Dynamic Loading:
 typedef HMODULE LoaderPlatformLibraryHandle;
 static inline LoaderPlatformLibraryHandle LoaderPlatformLibraryOpen(const std::string &path) {
     const std::wstring pathW = utf8_to_wide(path);
 
+    // Try loading the library the original way first.
     LoaderPlatformLibraryHandle handle = LoadLibraryW(pathW.c_str());
 
     if (handle == NULL && GetLastError() == ERROR_MOD_NOT_FOUND) {
         const DWORD dwAttrib = GetFileAttributesW(pathW.c_str());
         const bool fileExists = (dwAttrib != INVALID_FILE_ATTRIBUTES && !(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
         if (fileExists) {
+            // If that failed, then try loading it with broader search folders.
             handle = LoadLibraryExW(pathW.c_str(), NULL, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS | LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR);
         }
     }
@@ -155,24 +175,29 @@ static inline std::string LoaderPlatformLibraryGetProcAddrAddrError(const std::s
 #define DIRECTORY_SYMBOL '/'
 
 static inline LoaderPlatformLibraryHandle LoaderPlatformLibraryOpen(const std::string &path) {
+// Stub func
 #error("Unknown platform, undefined dynamic library routines resulting");
     (void)path;
 }
 
 static inline const char *LoaderPlatformLibraryOpenError(const std::string &path) {
+    // Stub func
     (void)path;
 }
 
 static inline void LoaderPlatformLibraryClose(LoaderPlatformLibraryHandle library) {
+    // Stub func
     (void)library;
 }
 
 static inline void *LoaderPlatformLibraryGetProcAddr(LoaderPlatformLibraryHandle library, const std::string &name) {
+    // Stub func
     void(library);
     void(name);
 }
 
 static inline const char *LoaderPlatformLibraryGetProcAddrError(const std::string &name) {
+    // Stub func
     (void)name;
 }
 

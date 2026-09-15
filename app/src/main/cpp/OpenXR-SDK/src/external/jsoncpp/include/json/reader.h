@@ -1,3 +1,7 @@
+// Copyright 2007-2010 Baptiste Lepilleur and The JsonCpp Authors
+// Distributed under MIT license, or public domain if desired and
+// recognized in your jurisdiction.
+// See file LICENSE for detail or copy at http://jsoncpp.sourceforge.net/LICENSE
 
 #ifndef JSON_READER_H_INCLUDED
 #define JSON_READER_H_INCLUDED
@@ -12,6 +16,8 @@
 #include <stack>
 #include <string>
 
+// Disable warning C4251: <data member>: <type> needs to have dll-interface to
+// be used by...
 #if defined(JSONCPP_DISABLE_DLL_INTERFACE_WARNING)
 #pragma warning(push)
 #pragma warning(disable : 4251)
@@ -89,6 +95,8 @@ public:
   bool parse(const char* beginDoc, const char* endDoc, Value& root,
              bool collectComments = true);
 
+  /// \brief Parse from input stream.
+  /// \see Json::operator>>(std::istream&, Json::Value&).
   bool parse(IStream& is, Value& root, bool collectComments = true);
 
   /** \brief Returns a user friendly string that list errors in the parsed
@@ -279,6 +287,8 @@ public:
  */
 class JSON_API CharReaderBuilder : public CharReader::Factory {
 public:
+  // Note: We use a Json::Value so that we can add data-members to this class
+  // without a major version bump.
   /** Configuration of this builder.
    * These are case-sensitive.
    * Available settings (case-sensitive):

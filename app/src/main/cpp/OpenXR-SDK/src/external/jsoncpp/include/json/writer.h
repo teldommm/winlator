@@ -1,3 +1,7 @@
+// Copyright 2007-2010 Baptiste Lepilleur and The JsonCpp Authors
+// Distributed under MIT license, or public domain if desired and
+// recognized in your jurisdiction.
+// See file LICENSE for detail or copy at http://jsoncpp.sourceforge.net/LICENSE
 
 #ifndef JSON_WRITER_H_INCLUDED
 #define JSON_WRITER_H_INCLUDED
@@ -9,6 +13,8 @@
 #include <string>
 #include <vector>
 
+// Disable warning C4251: <data member>: <type> needs to have dll-interface to
+// be used by...
 #if defined(JSONCPP_DISABLE_DLL_INTERFACE_WARNING) && defined(_MSC_VER)
 #pragma warning(push)
 #pragma warning(disable : 4251)
@@ -82,6 +88,8 @@ String JSON_API writeString(StreamWriter::Factory const& factory,
 */
 class JSON_API StreamWriterBuilder : public StreamWriter::Factory {
 public:
+  // Note: We use a Json::Value so that we can add data-members to this class
+  // without a major version bump.
   /** Configuration of this builder.
    *  Available settings (case-sensitive):
    *  - "commentStyle": "None" or "All"
@@ -346,6 +354,8 @@ String JSON_API valueToString(
 String JSON_API valueToString(bool value);
 String JSON_API valueToQuotedString(const char* value);
 
+/// \brief Output using the StyledStreamWriter.
+/// \see Json::operator>>()
 JSON_API OStream& operator<<(OStream&, const Value& root);
 
 } // namespace Json

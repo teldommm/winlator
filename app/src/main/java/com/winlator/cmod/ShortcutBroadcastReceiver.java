@@ -27,6 +27,7 @@ public class ShortcutBroadcastReceiver extends BroadcastReceiver {
                 Log.d(LOG_TAG, "Shortcut addition failed.");
                 Toast.makeText(context, "Failed to add shortcut.", Toast.LENGTH_SHORT).show();
 
+                // Attempt to add the shortcut here if it failed
                 addShortcutToHomeScreen(context, intent);
             }
         } else {
@@ -61,6 +62,7 @@ public class ShortcutBroadcastReceiver extends BroadcastReceiver {
                     }
                 }
             } else {
+                // Fallback for older versions (API < 26)
                 Intent addIntent = new Intent();
                 addIntent.putExtra(Intent.EXTRA_SHORTCUT_INTENT, shortcutIntent);
                 addIntent.putExtra(Intent.EXTRA_SHORTCUT_NAME, shortcutName);

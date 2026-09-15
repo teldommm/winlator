@@ -48,6 +48,7 @@ void XrEngineInit(struct XrEngine* engine, void* system, const char* name, int v
     }
 #endif
 
+    // Create the OpenXR instance.
     XrApplicationInfo app_info;
     memset(&app_info, 0, sizeof(app_info));
     strcpy(app_info.applicationName, name);
@@ -108,6 +109,7 @@ void XrEngineInit(struct XrEngine* engine, void* system, const char* name, int v
         exit(1);
     }
 
+    // Get the graphics requirements.
 #ifdef XR_USE_GRAPHICS_API_OPENGL_ES
     PFN_xrGetOpenGLESGraphicsRequirementsKHR pfnGetOpenGLESGraphicsRequirementsKHR = NULL;
     OXR(xrGetInstanceProcAddr(engine->Instance, "xrGetOpenGLESGraphicsRequirementsKHR",
@@ -141,6 +143,7 @@ void XrEngineEnter(struct XrEngine* engine)
         return;
     }
 
+    // Create the OpenXR Session.
     XrSessionCreateInfo session_info;
     memset(&session_info, 0, sizeof(session_info));
 #ifdef XR_USE_GRAPHICS_API_OPENGL_ES
@@ -164,6 +167,7 @@ void XrEngineEnter(struct XrEngine* engine)
         exit(1);
     }
 
+    // Create a space to the first path
     XrReferenceSpaceCreateInfo space_info = {};
     space_info.type = XR_TYPE_REFERENCE_SPACE_CREATE_INFO;
     space_info.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_VIEW;
@@ -176,6 +180,7 @@ void XrEngineLeave(struct XrEngine* engine)
     if (engine->Session)
     {
         OXR(xrDestroySpace(engine->HeadSpace));
+        // StageSpace is optional.
         if (engine->StageSpace != XR_NULL_HANDLE)
         {
             OXR(xrDestroySpace(engine->StageSpace));

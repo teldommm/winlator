@@ -1,6 +1,6 @@
 package com.winlator.cmod.xserver;
 
-import android.graphics.Rect;
+import android.util.Log;
 import android.util.SparseArray;
 
 import com.winlator.cmod.xserver.events.Event;
@@ -35,6 +35,7 @@ public class Window extends XResource {
     private final ArrayList<Window> children = new ArrayList<>();
     private final List<Window> immutableChildren = Collections.unmodifiableList(children);
     private final ArrayList<EventListener> eventListeners = new ArrayList<>();
+    private boolean compositeRedirected = false;
 
     public Window(int id, Drawable content, int x, int y, int width, int height, XClient originClient) {
         super(id);
@@ -100,6 +101,14 @@ public class Window extends XResource {
 
     public void setParent(Window parent) {
         this.parent = parent;
+    }
+    
+    public void setCompositeRedirected(boolean isCompositeRedirected) {
+        this.compositeRedirected = isCompositeRedirected;
+    }
+    
+    public boolean isCompositeRedirected() {
+        return this.compositeRedirected;
     }
 
     public Property getProperty(int id) {
@@ -178,7 +187,7 @@ public class Window extends XResource {
 
     public boolean isApplicationWindow() {
         int windowGroup = getWMHintsValue(WMHints.WINDOW_GROUP);
-        return isRenderable() && windowGroup == this.id;
+        return attributes.isMapped() && windowGroup == id && width > 1 && height > 1;
     }
 
     public boolean isInputOutput() {
@@ -332,12 +341,6 @@ public class Window extends XResource {
         return rootY;
     }
 
-    public Rect getAbsoluteBounds() {
-        short rootX = getRootX();
-        short rootY = getRootY();
-        return new Rect(rootX, rootY, rootX + width, rootY + height);
-    }
-
     public Window getAncestorWithEventMask(Bitmask eventMask) {
         Window window = this;
         while (window != null) {
@@ -420,9 +423,5 @@ public class Window extends XResource {
             result += property.nameAsString()+"="+property+"\n";
         }
         return result;
-    }
-
-    public boolean isRenderable() {
-        return this.attributes.isMapped() && this.width > 1 && this.height > 1;
     }
 }

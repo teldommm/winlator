@@ -1,10 +1,12 @@
 #ifndef _JNIPP_H_
 #define _JNIPP_H_ 1
 
+// Standard Dependencies
 #include <cstring>
 #include <stdexcept>        // For std::runtime_error
 #include <string>
 
+// Forward Declarations
 struct JNIEnv_;
 struct _JNIEnv;
 struct JavaVM_;
@@ -17,6 +19,7 @@ class  _jarray;
 
 namespace jni
 {
+    // JNI Base Types
 #ifdef __ANDROID__
     typedef _JNIEnv     JNIEnv;
     typedef _JavaVM JavaVM;
@@ -68,6 +71,7 @@ namespace jni
 
 #endif // JNIPP_EXCEPTION_CLASS
 
+    // Foward Declarations
     class Object;
     template <class TElement> class Array;
 
@@ -321,6 +325,7 @@ namespace jni
             if (std::strstr(name, "()"))
                 return call<TReturn>(getMethod(name));
 
+            // No signature supplied. Generate our own.
             method_t method = getMethod(name, ("()" + internal::valueSig((TReturn*) nullptr)).c_str());
             return call<TReturn>(method);
         }
@@ -367,6 +372,8 @@ namespace jni
          */
         template <class TType>
         TType get(field_t field) const {
+            // If you get a compile error here, then you've asked for a type
+            // we don't know how to get from JNI directly.
             return getFieldValue(field, internal::ReturnTypeWrapper<TType>{});
         }
 
@@ -432,6 +439,7 @@ namespace jni
         jobject makeLocalReference() const;
 
     private:
+        // Helper Functions
         method_t getMethod(const char* name, const char* signature) const;
         method_t getMethod(const char* nameAndSignature) const;
         field_t getField(const char* name, const char* signature) const;
@@ -466,6 +474,7 @@ namespace jni
         std::wstring getFieldValue(field_t field, internal::ReturnTypeWrapper<std::wstring> const&) const;
         jni::Object getFieldValue(field_t field, internal::ReturnTypeWrapper<jni::Object> const&) const;
 
+        // Instance Variables
         jobject _handle;
         mutable jclass _class;
         bool _isGlobal;
@@ -817,6 +826,7 @@ namespace jni
         jclass getHandle() const noexcept { return jclass(Object::getHandle()); }
 
     private:
+        // Helper Functions
         template <class TType> TType callStaticMethod(method_t method, internal::value_t* values) const;
         template <class TType> TType callExactMethod(jobject obj, method_t method, internal::value_t* values) const;
         Object newObject(method_t constructor, internal::value_t* args) const;
@@ -842,6 +852,7 @@ namespace jni
         Object get(const char* name) const;
 
     private:
+        // Instance Variables
         std::string _name;
     };
 
@@ -953,6 +964,7 @@ namespace jni
         jarray getHandle() const noexcept { return jarray(Object::getHandle()); }
 
     private:
+        // Instance Variables
         mutable long _length;   ///< Mutable as it may only finally get set in a getLength() call.
     };
 

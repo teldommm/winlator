@@ -1,8 +1,11 @@
+// Project Dependencies
 #include <jni.h>
 #include <jnipp.h>
 
+// Standard Dependencies
 #include <cmath>
 
+// Local Dependencies
 #include "testing.h"
 
 /*
@@ -27,6 +30,7 @@ TEST(Vm_externalCreateAndAttach) {
 }
 
 int main() {
+    // jni::Vm Tests
     RUN_TEST(Vm_externalCreateAndAttach);
 
     return 0;

@@ -1,3 +1,9 @@
+// Copyright (c) 2018-2024, The Khronos Group Inc.
+//
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+//
+// This file includes headers with types which openxr.h depends on in order
+// to compile when platforms, graphics apis, and the like are enabled.
 
 #pragma once
 
@@ -11,6 +17,7 @@
 
 #include <winapifamily.h>
 #if !(WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP | WINAPI_PARTITION_SYSTEM))
+// Enable desktop partition APIs, such as RegOpenKeyEx, LoadLibraryEx, PathFileExists etc.
 #undef WINAPI_PARTITION_DESKTOP
 #define WINAPI_PARTITION_DESKTOP 1
 #endif

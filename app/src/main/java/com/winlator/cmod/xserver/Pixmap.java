@@ -13,11 +13,12 @@ public class Pixmap extends XResource {
     }
 
     public Bitmap toBitmap(Pixmap maskPixmap) {
-        ByteBuffer maskData = maskPixmap != null ? maskPixmap.drawable.getData() : null;
+        long maskData = maskPixmap != null ? maskPixmap.drawable.backingAHB : 0;
+        short maskStride = maskPixmap != null ? maskPixmap.drawable.getStride() : 0;
         Bitmap bitmap = Bitmap.createBitmap(drawable.width, drawable.height, Bitmap.Config.ARGB_8888);
-        toBitmap(drawable.getData(), maskData, bitmap);
+        toBitmap(drawable.getStride(), drawable.backingAHB, maskStride, maskData, bitmap);
         return bitmap;
     }
 
-    private static native void toBitmap(ByteBuffer colorData, ByteBuffer maskData, Bitmap bitmap);
+    private static native void toBitmap(short colorStride, long colorData, short maskStride, long maskData, Bitmap bitmap);
 }

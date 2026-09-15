@@ -1,3 +1,9 @@
+// Copyright (c) 2020-2024, The Khronos Group Inc.
+// Copyright (c) 2020-2021, Collabora, Ltd.
+//
+// SPDX-License-Identifier:  Apache-2.0 OR MIT
+//
+// Initial Author: Rylie Pavlik <rylie.pavlik@collabora.com>
 
 #include "android_utilities.h"
 
@@ -26,6 +32,7 @@ using wrap::android::database::Cursor;
 using wrap::android::net::Uri;
 using wrap::android::net::Uri_Builder;
 
+// Code in here corresponds roughly to the Java "BrokerContract" class and subclasses.
 namespace {
 constexpr auto AUTHORITY = "org.khronos.openxr.runtime_broker";
 constexpr auto SYSTEM_AUTHORITY = "org.khronos.openxr.system_runtime_broker";
@@ -181,6 +188,7 @@ static constexpr auto ABI = "x86_64";
 #error "Unknown ABI!"
 #endif
 
+/// Helper class to generate the jsoncpp object corresponding to a synthetic runtime manifest.
 class JsonManifestBuilder {
    public:
     JsonManifestBuilder(const std::string &libraryPathParent, const std::string &libraryPath);
@@ -236,6 +244,11 @@ static int populateFunctions(wrap::android::content::Context const &context, boo
     return 0;
 }
 
+// The current file relies on android-jni-wrappers and jnipp, which may throw on failure.
+// This is problematic when the loader is compiled with exception handling disabled - the consumers can reasonably
+// expect that the compilation with -fno-exceptions will succeed, but the compiler will not accept the code that
+// uses `try` & `catch` keywords. We cannot use the `exception_handling.hpp` here since we're not at an ABI boundary,
+// so we define helper macros here. This is fine for now since the only occurrence of exception-handling code is in this file.
 #ifdef XRLOADER_DISABLE_EXCEPTION_HANDLING
 
 #define ANDROID_UTILITIES_TRY
@@ -251,6 +264,7 @@ static int populateFunctions(wrap::android::content::Context const &context, boo
 
 #endif  // XRLOADER_DISABLE_EXCEPTION_HANDLING
 
+/// Get cursor for active runtime, parameterized by whether or not we use the system broker
 static bool getActiveRuntimeCursor(wrap::android::content::Context const &context, jni::Array<std::string> const &projection,
                                    bool systemBroker, Cursor &cursor) {
     auto uri = active_runtime::makeContentUri(systemBroker, XR_VERSION_MAJOR(XR_CURRENT_API_VERSION), ABI);
@@ -281,14 +295,17 @@ int getActiveRuntimeVirtualManifest(wrap::android::content::Context const &conte
     jni::Array<std::string> projection = makeArray({active_runtime::Columns::PACKAGE_NAME, active_runtime::Columns::NATIVE_LIB_DIR,
                                                     active_runtime::Columns::SO_FILENAME, active_runtime::Columns::HAS_FUNCTIONS});
 
+    // First, try getting the installable broker's provider
     bool systemBroker = false;
     Cursor cursor;
     if (!getActiveRuntimeCursor(context, projection, systemBroker, cursor)) {
+        // OK, try the system broker as a fallback.
         systemBroker = true;
         getActiveRuntimeCursor(context, projection, systemBroker, cursor);
     }
 
     if (cursor.isNull()) {
+        // Couldn't find either broker
         ALOGE("Could access neither the installable nor system runtime broker.");
         return -1;
     }
@@ -307,6 +324,7 @@ int getActiveRuntimeVirtualManifest(wrap::android::content::Context const &conte
         auto lib_path = libDir + "/" + filename;
         auto *lib = dlopen(lib_path.c_str(), RTLD_LAZY | RTLD_LOCAL);
         if (lib) {
+            // we found a runtime that we can dlopen, use it.
             dlclose(lib);
 
             JsonManifestBuilder builder{"runtime", lib_path};
@@ -321,6 +339,8 @@ int getActiveRuntimeVirtualManifest(wrap::android::content::Context const &conte
             cursor.close();
             return 0;
         }
+        // this runtime was not accessible, see if the broker has more runtimes on
+        // offer.
         ALOGV("Unable to open broker provided runtime at %s, checking for more records...", lib_path.c_str());
     } while (cursor.moveToNext());
 

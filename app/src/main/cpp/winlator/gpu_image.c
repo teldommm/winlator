@@ -1,96 +1,133 @@
 #include <android/log.h>
 #include <android/hardware_buffer.h>
+#include <android/native_window.h>
+
+#define EGL_EGLEXT_PROTOTYPES
+#define GL_GLEXT_PROTOTYPES
+
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
+#include <GLES2/gl2.h>
+#include <GLES2/gl2ext.h>
 #include <jni.h>
 #include <unistd.h>
+#include <string.h>
 
-#define LOG_TAG "GPUImage"
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
-static jmethodID g_setStride = NULL;
+#define LOG_TAG "System.out"
+#define printf(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
+#define HAL_PIXEL_FORMAT_BGRA_8888 5
 
-JNIEXPORT jlong JNICALL
-Java_com_winlator_cmod_renderer_GPUImage_hardwareBufferFromSocket(JNIEnv *env, jclass obj, jint fd) {
-    AHardwareBuffer *ahb;
-    uint8_t buf = 1;
-    if (write(fd, &buf, 1) == -1) {
-        LOGE("hardwareBufferFromSocket: write failed");
-        return 0;
+AHardwareBuffer* createHardwareBuffer(int width, int height) {
+    AHardwareBuffer_Desc buffDesc = {};
+    buffDesc.width = width;
+    buffDesc.height = height;
+    buffDesc.layers = 1;
+    buffDesc.usage = AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE | AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN;
+    buffDesc.format = HAL_PIXEL_FORMAT_BGRA_8888;
+
+    AHardwareBuffer *hardwareBuffer = NULL;
+    if (AHardwareBuffer_allocate(&buffDesc, &hardwareBuffer) != 0) {
+        printf("Failed to allocate AHardwareBuffer\n");
+        return NULL;
     }
-    if (AHardwareBuffer_recvHandleFromUnixSocket(fd, &ahb) != 0) {
-        LOGE("hardwareBufferFromSocket: recvHandle failed");
-        return 0;
-    }
-    AHardwareBuffer_acquire(ahb);
-    return (jlong)ahb;
+
+    return hardwareBuffer;
 }
 
 JNIEXPORT jlong JNICALL
 Java_com_winlator_cmod_renderer_GPUImage_createHardwareBuffer(JNIEnv *env, jclass obj, jshort width, jshort height) {
-    AHardwareBuffer_Desc desc = {
-        .width  = (uint32_t)width,
-        .height = (uint32_t)height,
-        .layers = 1,
-        .usage  = AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE
-                | AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN
-                | AHARDWAREBUFFER_USAGE_COMPOSER_OVERLAY,
-        .format = AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM, 
-    };
-#if __ANDROID_API__ >= 29
-    if (AHardwareBuffer_isSupported(&desc) == 0) {
-        desc.usage = AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE | AHARDWAREBUFFER_USAGE_COMPOSER_OVERLAY;
-        if (AHardwareBuffer_isSupported(&desc) == 0) {
-            LOGE("createHardwareBuffer: unsupported desc");
-            return 0;
-        }
-    }
-#endif
-    AHardwareBuffer *ahb = NULL;
-    if (AHardwareBuffer_allocate(&desc, &ahb) != 0) {
-        LOGE("createHardwareBuffer: alloc failed");
+    AHardwareBuffer *buffer = createHardwareBuffer(width, height);
+    if (!buffer) {
+        printf("Failed to create hardware buffer\n");
         return 0;
     }
-    return (jlong)ahb;
+    return (jlong)buffer;
 }
 
 JNIEXPORT void JNICALL
-Java_com_winlator_cmod_renderer_GPUImage_destroyHardwareBuffer(JNIEnv *env, jclass obj, jlong ptr) {
-    AHardwareBuffer *ahb = (AHardwareBuffer *)ptr;
-    if (ahb) {
-        AHardwareBuffer_release(ahb);
+Java_com_winlator_cmod_renderer_GPUImage_destroyHardwareBuffer(JNIEnv *env, jclass obj, jlong hardwareBufferPtr) {
+    AHardwareBuffer* hardwareBuffer = (AHardwareBuffer*)hardwareBufferPtr;
+    if (hardwareBuffer) {
+        AHardwareBuffer_unlock(hardwareBuffer, NULL);
+        AHardwareBuffer_release(hardwareBuffer);
     }
-}
-
-JNIEXPORT void JNICALL
-Java_com_winlator_cmod_renderer_GPUImage_unlockHardwareBuffer(JNIEnv *env, jclass obj, jlong ptr) {
-    AHardwareBuffer *ahb = (AHardwareBuffer *)ptr;
-    if (ahb) AHardwareBuffer_unlock(ahb, NULL);
 }
 
 JNIEXPORT jobject JNICALL
-Java_com_winlator_cmod_renderer_GPUImage_lockHardwareBuffer(JNIEnv *env, jclass obj, jlong ptr) {
-    AHardwareBuffer *ahb = (AHardwareBuffer *)ptr;
-    if (!ahb) {
-        LOGE("lockHardwareBuffer: null pointer");
+Java_com_winlator_cmod_renderer_GPUImage_lockHardwareBuffer(JNIEnv *env, jclass obj, jlong hardwareBufferPtr) {
+    AHardwareBuffer* hardwareBuffer = (AHardwareBuffer*)hardwareBufferPtr;
+    if (!hardwareBuffer) {
+        printf("Invalid AHardwareBuffer pointer\n");
         return NULL;
     }
-    void *addr;
-    if (AHardwareBuffer_lock(ahb, AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN, -1, NULL, &addr) != 0) {
-        LOGE("lockHardwareBuffer: lock failed");
+    
+    void *virtualAddr;
+    if (AHardwareBuffer_lock(hardwareBuffer, AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN, -1, NULL, &virtualAddr) != 0) {
+        printf("Failed to lock AHardwareBuffer\n");
         return NULL;
     }
-    AHardwareBuffer_Desc desc;
-    AHardwareBuffer_describe(ahb, &desc);
 
-    if (!g_setStride) {
-        jclass cls = (*env)->GetObjectClass(env, obj);
-        g_setStride = (*env)->GetMethodID(env, cls, "setStride", "(S)V");
-    }
-    if (g_setStride)
-        (*env)->CallVoidMethod(env, obj, g_setStride, (jshort)desc.stride);
+    AHardwareBuffer_Desc buffDesc;
+    AHardwareBuffer_describe(hardwareBuffer, &buffDesc);
 
-    jobject buffer = (*env)->NewDirectByteBuffer(env, addr, (jlong)desc.stride * desc.height * 4);
-    if (!buffer) {
-        LOGE("lockHardwareBuffer: NewDirectByteBuffer failed");
-        AHardwareBuffer_unlock(ahb, NULL);
+    jclass cls = (*env)->GetObjectClass(env, obj);
+    if (cls == NULL) {
+        printf("Failed to get Java class reference\n");
+        AHardwareBuffer_unlock(hardwareBuffer, NULL);
+        return NULL;
     }
+
+    jmethodID setStride = (*env)->GetMethodID(env, cls, "setStride", "(S)V");
+    if (setStride == NULL) {
+        printf("Failed to get setStride method ID\n");
+        AHardwareBuffer_unlock(hardwareBuffer, NULL);
+        return NULL;
+    }
+    (*env)->CallVoidMethod(env, obj, setStride, (jshort)buffDesc.stride);
+
+    jlong size = buffDesc.stride * buffDesc.height * 4;
+    jobject buffer = (*env)->NewDirectByteBuffer(env, virtualAddr, size);
+    if (buffer == NULL) {
+        printf("Failed to create Java ByteBuffer\n");
+        AHardwareBuffer_unlock(hardwareBuffer, NULL);
+    }
+
     return buffer;
+}
+
+JNIEXPORT jlong JNICALL
+Java_com_winlator_cmod_renderer_GPUImage_nativeHardwareBufferFromSocket(JNIEnv *env, jclass obj, jint fd) {
+    AHardwareBuffer *ahb;
+    uint8_t buf = 1;
+    
+    if ((write(fd, &buf, 1)) == -1) {
+        printf("Failed to write data to socketpair");
+        return 0;
+    }
+    
+    if ((AHardwareBuffer_recvHandleFromUnixSocket(fd, &ahb)) != 0) {
+        printf("Failed to extract hardware buffer from socketpair");
+        return 0;
+    }
+    
+    AHardwareBuffer_Desc buffDesc;
+    AHardwareBuffer_describe(ahb, &buffDesc);
+    
+    jclass cls = (*env)->GetObjectClass(env, obj);
+    if (cls == NULL) {
+        printf("Failed to get Java class reference\n");
+        return 0;
+    }
+
+    jmethodID setStride = (*env)->GetMethodID(env, cls, "setStride", "(S)V");
+    if (setStride == NULL) {
+        printf("Failed to get setStride method ID\n");
+        return 0;
+    }
+    (*env)->CallVoidMethod(env, obj, setStride, (jshort)buffDesc.stride);
+    
+    jfieldID format = (*env)->GetFieldID(env, cls, "format", "I");
+    (*env)->SetIntField(env, obj, format, buffDesc.format);
+    
+    return (jlong)ahb;
 }

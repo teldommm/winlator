@@ -1,3 +1,11 @@
+// Copyright (c) 2017-2024, The Khronos Group Inc.
+// Copyright (c) 2017-2019 Valve Corporation
+// Copyright (c) 2017-2019 LunarG, Inc.
+//
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+//
+// Initial Author: Mark Young <marky@lunarg.com>
+//
 
 #pragma once
 
@@ -18,18 +26,25 @@ class ApiLayerInterface;
 struct XrGeneratedDispatchTable;
 class LoaderInstance;
 
+// Manage the single loader instance that is available.
 namespace ActiveLoaderInstance {
+// Set the active loader instance. This will fail if there is already an active loader instance.
 XrResult Set(std::unique_ptr<LoaderInstance> loader_instance, const char* log_function_name);
 
+// Returns true if there is an active loader instance.
 bool IsAvailable();
 
+// Get the active LoaderInstance.
 XrResult Get(LoaderInstance** loader_instance, const char* log_function_name);
 
+// Destroy the currently active LoaderInstance if there is one. This will make the loader able to create a new XrInstance if needed.
 void Remove();
 };  // namespace ActiveLoaderInstance
 
+// Manages information needed by the loader for an XrInstance, such as what extensions are available and the dispatch table.
 class LoaderInstance {
    public:
+    // Factory method
     static XrResult CreateInstance(PFN_xrGetInstanceProcAddr get_instance_proc_addr_term, PFN_xrCreateInstance create_instance_term,
                                    PFN_xrCreateApiLayerInstance create_api_layer_instance_term,
                                    std::vector<std::unique_ptr<ApiLayerInterface>> layer_interfaces,
@@ -57,5 +72,6 @@ class LoaderInstance {
     std::vector<std::unique_ptr<ApiLayerInterface>> _api_layer_interfaces;
 
     std::unique_ptr<XrGeneratedDispatchTable> _dispatch_table;
+    // Internal debug messenger created during xrCreateInstance
     XrDebugUtilsMessengerEXT _messenger{XR_NULL_HANDLE};
 };

@@ -15,14 +15,17 @@ public class FakeInputWriter {
     private static final int MAX_EVENTS_PER_UPDATE = 20; // Buttons + axes + sync
     private static final int BUFFER_SIZE = EVENT_SIZE * MAX_EVENTS_PER_UPDATE;
 
+    // Event types
     public static final short EV_SYN = 0x00;
     public static final short EV_KEY = 0x01;
     public static final short EV_ABS = 0x03;
     public static final short EV_MSC = 0x04;
 
+    // Event codes
     public static final short MSC_SCAN = 0x04;
     public static final short SYN_REPORT = 0x00;
 
+    // Xbox 360 controller button codes
     public static final short BTN_A = 0x130;
     public static final short BTN_B = 0x131;
     public static final short BTN_X = 0x133;
@@ -34,6 +37,7 @@ public class FakeInputWriter {
     public static final short BTN_THUMBL = 0x13D;
     public static final short BTN_THUMBR = 0x13E;
 
+    // Absolute axis codes
     public static final short ABS_X = 0x00;
     public static final short ABS_Y = 0x01;
     public static final short ABS_RX = 0x03;
@@ -43,6 +47,7 @@ public class FakeInputWriter {
     public static final short ABS_GAS = 0x09;
     public static final short ABS_BRAKE = 0x0A;
 
+    // Button mapping
     private static final short[] BUTTON_MAP = {
             BTN_A, BTN_B, BTN_X, BTN_Y, BTN_TL, BTN_TR,
             BTN_SELECT, BTN_START, BTN_THUMBL, BTN_THUMBR
@@ -121,6 +126,7 @@ public class FakeInputWriter {
         buffer.clear();
         hasChanges = false;
 
+        // Release all buttons
         for (int i = 0; i < BUTTON_MAP.length; i++) {
             if (prevButtonStates[i]) {
                 prevButtonStates[i] = false;
@@ -129,6 +135,7 @@ public class FakeInputWriter {
             }
         }
 
+        // Zero all axes
         if (prevThumbLX != 0) {
             prevThumbLX = 0;
             writeEvent(EV_ABS, ABS_X, 0);
@@ -223,10 +230,12 @@ public class FakeInputWriter {
         buffer.clear();
         hasChanges = false;
 
+        // Buttons
         for (int i = 0; i < 10; i++) {
             writeButton(i, state.isPressed((byte) i));
         }
 
+        // Sticks
         int lx = (int) (state.thumbLX * 32767);
         int ly = (int) (state.thumbLY * 32767);
         int rx = (int) (state.thumbRX * 32767);
@@ -249,6 +258,7 @@ public class FakeInputWriter {
             writeEvent(EV_ABS, ABS_RY, ry);
         }
 
+        // L2 and R2 (Triggers)
         int tl = (int) (state.triggerL * 255);
         int tr = (int) (state.triggerR * 255);
         if (tl != prevTriggerL) {
@@ -260,6 +270,7 @@ public class FakeInputWriter {
             writeEvent(EV_ABS, ABS_GAS, tr);
         }
 
+        // D-pad
         int hatX = state.dpad[3] ? -1 : (state.dpad[1] ? 1 : 0);
         int hatY = state.dpad[0] ? -1 : (state.dpad[2] ? 1 : 0);
         if (hatX != prevHatX) {
@@ -271,6 +282,7 @@ public class FakeInputWriter {
             writeEvent(EV_ABS, ABS_HAT0Y, hatY);
         }
 
+        // Detect Change else no need to write
         if (hasChanges) {
             writeEvent(EV_SYN, SYN_REPORT, 0);
             buffer.flip();

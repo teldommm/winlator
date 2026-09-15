@@ -4,6 +4,7 @@ import com.winlator.cmod.xserver.Drawable;
 
 import java.nio.ByteBuffer;
 
+
 public class Texture {
     protected int textureId = 0;
     protected boolean needsUpdate = true;
@@ -18,9 +19,15 @@ public class Texture {
 
     public boolean needsUpdate() { return needsUpdate; }
 
+    
     public void allocateTexture(short width, short height, ByteBuffer data) {}
 
+    
     public void updateFromDrawable(Drawable drawable) {}
 
+    
+    public void copyFromFramebuffer(int framebuffer, short width, short height) {}
+
+    
     public void destroy() {}
 }
