@@ -76,6 +76,7 @@ import com.winlator.cmod.core.LosslessDll;
 import com.winlator.cmod.core.OnExtractFileListener;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.ProcessHelper;
+import com.winlator.cmod.core.RuntimeBackendProbe;
 import com.winlator.cmod.core.StringUtils;
 import com.winlator.cmod.core.TarCompressorUtils;
 import com.winlator.cmod.core.WineInfo;
@@ -198,6 +199,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private short taskAffinityMaskWoW64 = 0;
     private String wineCpuTopologyValue = "";
     private int frameRatingWindowId = -1;
+    private volatile RuntimeBackendProbe.FexMode runtimeFexMode = RuntimeBackendProbe.FexMode.NA;
+    private volatile boolean runtimeStatusProbeRunning;
+    private volatile boolean runtimeStatusProbeStopped;
+    private String runtimeDxvkVersion = "";
+    private String runtimeVkd3dVersion = "";
+    private String runtimeDdrawWrapper = "";
 
     private int activeRendererWindowId = -1;
     private String lastRendererName = null;
@@ -933,6 +940,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        runtimeStatusProbeStopped = true;
         if (taskManagerSidebar != null) taskManagerSidebar.stop();
         super.onDestroy();
     }
@@ -1354,6 +1362,123 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         setupSidebarHudControls();
         setupSidebarGraphicsControls();
+        setupRuntimeStatusSection();
+    }
+
+    private void setupRuntimeStatusSection() {
+        runtimeStatusProbeStopped = false;
+        if (dxwrapperConfig != null) {
+            runtimeDxvkVersion = dxwrapperConfig.get("version");
+            runtimeVkd3dVersion = dxwrapperConfig.get("vkd3dVersion");
+            runtimeDdrawWrapper = dxwrapperConfig.get("ddrawrapper");
+        }
+        updateRuntimeStatusUi(runtimeFexMode);
+        requestRuntimeStatusProbe();
+    }
+
+    private void requestRuntimeStatusProbe() {
+        if (runtimeStatusProbeRunning || runtimeStatusProbeStopped || container == null) return;
+        runtimeStatusProbeRunning = true;
+        Thread probe = new Thread(() -> {
+            try {
+                for (int i = 0; i < 15 && !runtimeStatusProbeStopped; i++) {
+                    RuntimeBackendProbe.FexMode detected = RuntimeBackendProbe.detect(container.getRootDir());
+                    runtimeFexMode = detected;
+                    runOnUiThread(() -> {
+                        if (!isFinishing() && !isDestroyed()) updateRuntimeStatusUi(detected);
+                    });
+                    if (wineInfo == null || !wineInfo.isArm64EC()
+                            || !"fexcore".equalsIgnoreCase(emulator)
+                            || detected != RuntimeBackendProbe.FexMode.NA) break;
+                    Thread.sleep(1000L);
+                }
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            } finally {
+                runtimeStatusProbeRunning = false;
+            }
+        }, "runtime-status-probe");
+        probe.setDaemon(true);
+        probe.start();
+    }
+
+    private void updateRuntimeStatusUi(RuntimeBackendProbe.FexMode fexMode) {
+        int normal = Color.rgb(184, 196, 206);
+        int active = Color.rgb(76, 175, 80);
+        int warning = Color.rgb(255, 152, 0);
+
+        boolean displayX = xServer != null && xServer.isDisplayX();
+        String renderer = xServerView instanceof VulkanXServerView ? "Vulkan"
+                : displayX ? "DisplayX" : "EGL";
+        setRuntimeStatus(R.id.TVRuntimeRendererStatus, "Renderer", renderer + " active", active);
+
+        boolean dxvkActive = dxwrapper != null && dxwrapper.contains("dxvk");
+        boolean vkd3dActive = dxvkActive && dxwrapper.contains("vkd3d")
+                && !runtimeVkd3dVersion.isEmpty() && !"None".equalsIgnoreCase(runtimeVkd3dVersion);
+        boolean dd7to9Active = "dd7to9".equalsIgnoreCase(runtimeDdrawWrapper);
+        String openglDriver = "freedreno".equals(getSelectedOpenGLDriver()) ? "Freedreno" : "Zink";
+
+        StringBuilder graphicsRendererStatus = new StringBuilder();
+        if (dxvkActive) {
+            graphicsRendererStatus.append("DXVK ").append(runtimeDxvkVersion.isEmpty() ? "?" : runtimeDxvkVersion);
+            if (vkd3dActive) graphicsRendererStatus.append(" + VKD3D ").append(runtimeVkd3dVersion);
+        } else {
+            graphicsRendererStatus.append("WineD3D (native)");
+        }
+        if (dd7to9Active) graphicsRendererStatus.append(" · DD7to9");
+        graphicsRendererStatus.append(" · ").append(openglDriver);
+        setRuntimeStatus(R.id.TVRuntimeGraphicsRendererStatus, "Graphics renderer", graphicsRendererStatus.toString(),
+                dxvkActive ? active : normal);
+
+        Switch upscaler = findViewById(R.id.SWEnableFSR);
+        Spinner upscalerMode = findViewById(R.id.SPUpscalerMode);
+        boolean upscalerAvailable = xServerView instanceof VulkanXServerView
+                || xServerView instanceof XServerView && !displayX;
+        boolean upscalerActive = upscalerAvailable && upscaler != null && upscaler.isChecked();
+        String upscalerStatus = !upscalerAvailable ? "Unavailable"
+                : upscalerActive && upscalerMode != null ? upscalerMode.getSelectedItem() + " active"
+                : "Off";
+        setRuntimeStatus(R.id.TVRuntimeUpscalerStatus, "Upscaler", upscalerStatus,
+                upscalerActive ? active : normal);
+
+        VulkanXServerView framegenRenderer = xServerView instanceof VulkanXServerView
+                ? (VulkanXServerView) xServerView : null;
+        boolean framegenAvailable = framegenRenderer != null;
+        boolean framegenActive = framegenAvailable && activeLsfgMultiplier >= 2;
+        String framegenError = framegenAvailable ? framegenRenderer.getFrameGenError() : "";
+        String framegenStatus = !framegenAvailable ? "Unavailable"
+                : !framegenActive ? "Off"
+                : !framegenError.isEmpty() ? framegenError
+                : "LSFG Native " + activeLsfgMultiplier + "x active";
+        int framegenColor = framegenActive && framegenError.isEmpty() ? active
+                : framegenActive ? warning : normal;
+        setRuntimeStatus(R.id.TVRuntimeFramegenStatus, "Framegen", framegenStatus, framegenColor);
+
+        boolean arm64ec = wineInfo != null && wineInfo.isArm64EC();
+        boolean fexConfigured = arm64ec && "fexcore".equalsIgnoreCase(emulator);
+        String version = container == null ? "" : shortcut != null
+                ? shortcut.getExtra("fexcoreVersion", container.getFEXCoreVersion())
+                : container.getFEXCoreVersion();
+        String fexStatus = !arm64ec ? "Not applicable"
+                : !fexConfigured ? "Off · " + emulator
+                : (version == null || version.isEmpty() ? "" : version + " ")
+                        + (fexMode == RuntimeBackendProbe.FexMode.NA ? "not detected" : "active");
+        setRuntimeStatus(R.id.TVRuntimeFEXCoreStatus, "FEXCore", fexStatus,
+                fexConfigured ? (fexMode == RuntimeBackendProbe.FexMode.NA ? warning : active) : normal);
+
+        String unixLibsStatus = !fexConfigured ? "Not applicable"
+                : fexMode == RuntimeBackendProbe.FexMode.UNIXLIB ? "Active"
+                : fexMode == RuntimeBackendProbe.FexMode.DLL ? "Off · DLL mode" : "Not detected";
+        setRuntimeStatus(R.id.TVRuntimeUnixLibsStatus, "Unixlibs", unixLibsStatus,
+                fexMode == RuntimeBackendProbe.FexMode.UNIXLIB ? active
+                        : fexConfigured && fexMode == RuntimeBackendProbe.FexMode.NA ? warning : normal);
+    }
+
+    private void setRuntimeStatus(int viewId, String label, String value, int color) {
+        TextView view = findViewById(viewId);
+        if (view == null) return;
+        view.setText(label + ": " + value);
+        view.setTextColor(color);
     }
 
     private ActivityResultLauncher<Intent> controlsEditorActivityResultLauncher = registerForActivityResult(
@@ -1629,6 +1754,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             sub.animate().alpha(1.0f).translationX(0.0f).setDuration(130).start();
         }
         setSidebarActiveItem(parentId);
+        if (parentId == R.id.BTItemGraphics) requestRuntimeStatusProbe();
         if (parentId != R.id.BTItemMouse && parentId != R.id.BTItemPause) {
             activeSidebarItemId = parentId;
             activeSidebarPanelId = subId;
@@ -1941,6 +2067,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
                     if (swEnableFSR != null && swEnableFSR.isChecked())
                         vkRenderer.setFilterMode(pos + 2);
+                    updateRuntimeStatusUi(runtimeFexMode);
                 }
                 @Override public void onNothingSelected(AdapterView<?> p) {}
             });
@@ -1978,6 +2105,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     ? (spUpscalerMode != null ? spUpscalerMode.getSelectedItemPosition() + 2 : 2)
                     : (container != null ? container.getRendererFilterMode() : 0));
                 updateSharpnessVis.run();
+                updateRuntimeStatusUi(runtimeFexMode);
             });
         }
 
@@ -2019,6 +2147,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             spFrameGenFPS.setAdapter(a);
             spFrameGenFPS.setSelection(activeLsfgMultiplier < 2 ? 0 : Math.min(3, activeLsfgMultiplier - 1), false);
             Runnable updateFrameGenStatus = () -> {
+                updateRuntimeStatusUi(runtimeFexMode);
                 if (tvFrameGenStatus == null) return;
                 String error = vkRenderer.getFrameGenError();
                 if (activeLsfgMultiplier < 2) tvFrameGenStatus.setText("Off");
