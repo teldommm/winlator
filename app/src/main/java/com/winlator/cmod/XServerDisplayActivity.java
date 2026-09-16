@@ -66,6 +66,7 @@ import com.winlator.cmod.contentdialog.WineD3DConfigDialog;
 import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.contents.AdrenotoolsManager;
+import com.winlator.cmod.contents.D7VKManager;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.EnvVars;
@@ -1415,19 +1416,23 @@ public class XServerDisplayActivity extends AppCompatActivity {
         boolean dxvkActive = dxwrapper != null && dxwrapper.contains("dxvk");
         boolean vkd3dActive = dxvkActive && dxwrapper.contains("vkd3d")
                 && !runtimeVkd3dVersion.isEmpty() && !"None".equalsIgnoreCase(runtimeVkd3dVersion);
-        boolean dd7to9Active = "dd7to9".equalsIgnoreCase(runtimeDdrawWrapper);
+        boolean d7vkActive = D7VKManager.isD7VK(runtimeDdrawWrapper);
+        boolean dd7to9Active = !d7vkActive && "dd7to9".equalsIgnoreCase(runtimeDdrawWrapper);
+        boolean cncDdrawActive = !d7vkActive && !dd7to9Active && "cnc-ddraw".equalsIgnoreCase(runtimeDdrawWrapper);
         String openglDriver = "freedreno".equals(getSelectedOpenGLDriver()) ? "Freedreno" : "Zink";
 
-        StringBuilder graphicsRendererStatus = new StringBuilder();
+        StringBuilder dxWrapperStatus = new StringBuilder();
         if (dxvkActive) {
-            graphicsRendererStatus.append("DXVK ").append(runtimeDxvkVersion.isEmpty() ? "?" : runtimeDxvkVersion);
-            if (vkd3dActive) graphicsRendererStatus.append(" + VKD3D ").append(runtimeVkd3dVersion);
+            dxWrapperStatus.append("DXVK ").append(runtimeDxvkVersion.isEmpty() ? "?" : runtimeDxvkVersion);
+            if (vkd3dActive) dxWrapperStatus.append(" + VKD3D ").append(runtimeVkd3dVersion);
         } else {
-            graphicsRendererStatus.append("WineD3D (native)");
+            dxWrapperStatus.append("WineD3D (native)");
         }
-        if (dd7to9Active) graphicsRendererStatus.append(" · DD7to9");
-        graphicsRendererStatus.append(" · ").append(openglDriver);
-        setRuntimeStatus(R.id.TVRuntimeGraphicsRendererStatus, "Graphics renderer", graphicsRendererStatus.toString(),
+        if (d7vkActive) dxWrapperStatus.append(" · ").append(D7VKManager.getWrapperLabel(runtimeDdrawWrapper));
+        else if (dd7to9Active) dxWrapperStatus.append(" · Dd7To9");
+        else if (cncDdrawActive) dxWrapperStatus.append(" · CnC-DDraw");
+        dxWrapperStatus.append(" · ").append(openglDriver);
+        setRuntimeStatus(R.id.TVRuntimeDXWrapperStatus, "DX Wrapper", dxWrapperStatus.toString(),
                 dxvkActive ? active : normal);
 
         Switch upscaler = findViewById(R.id.SWEnableFSR);
