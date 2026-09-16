@@ -19,6 +19,7 @@ import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
+import com.winlator.cmod.core.FrameGenManager;
 import com.winlator.cmod.core.GPUInformation;
 import com.winlator.cmod.core.KeyValueSet;
 import com.winlator.cmod.core.ProcessHelper;
@@ -493,6 +494,8 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                 execEnvVars.remove("VK_INSTANCE_LAYERS");
             }
         }
+
+        FrameGenManager.applyLaunchEnv(execEnvVars);
 
         String emulator = container.getEmulator();
         if (shortcut != null)

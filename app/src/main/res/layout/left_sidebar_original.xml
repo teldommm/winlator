@@ -379,6 +379,13 @@
                         android:layout_height="42dp"
                         android:layout_marginTop="8dp"
                         android:background="@drawable/sidebar_spinner" />
+                    <TextView
+                        android:id="@+id/TVFrameGenStatus"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textColor="#B3FFFFFF"
+                        android:textSize="12sp" />
                 </LinearLayout>
                 <LinearLayout
                     android:id="@+id/BTSaveGraphicsPreset"

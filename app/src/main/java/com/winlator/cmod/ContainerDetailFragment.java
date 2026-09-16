@@ -493,6 +493,36 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                                 if (isEditMode())
                                     rendererCfgHolder.saveData();
                             }
+
+                            public boolean isLsfgDllAvailable() {
+                                return com.winlator.cmod.core.LosslessDll.isGlobalDllAvailable(getContext())
+                                        || com.winlator.cmod.core.LosslessDll.containerDllPath(rendererCfgHolder) != null;
+                            }
+
+                            public int getLsfgMultiplier() {
+                                return rendererCfgHolder.getLsfgMultiplier();
+                            }
+
+                            public void setLsfgMultiplier(int val) {
+                                rendererCfgHolder.setLsfgMultiplier(val);
+                                if (isEditMode())
+                                    rendererCfgHolder.saveData();
+                            }
+
+                            public void setLsfgEnabled(boolean val) {
+                                rendererCfgHolder.setLsfgEnabled(val);
+                                if (isEditMode())
+                                    rendererCfgHolder.saveData();
+                            }
+
+                            public float getLsfgFlowScale() {
+                                return rendererCfgHolder.getLsfgFlowScale();
+                            }
+
+                            public void setLsfgFlowScale(float val) {
+                                rendererCfgHolder.setLsfgFlowScale(val);
+                                if (isEditMode()) rendererCfgHolder.saveData();
+                            }
                         }, rendererCfgHolder.isRendererNative()).show();
             });
         }

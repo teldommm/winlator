@@ -68,6 +68,7 @@ import com.winlator.cmod.core.DefaultVersion
 import com.winlator.cmod.core.FileUtils
 import com.winlator.cmod.core.GPUInformation
 import com.winlator.cmod.core.ImageUtils
+import com.winlator.cmod.core.LosslessDll
 import com.winlator.cmod.core.StringUtils
 import com.winlator.cmod.core.WineInfo
 import com.winlator.cmod.core.WineRegistryEditor
@@ -81,6 +82,7 @@ import com.winlator.cmod.ui.settings.DDrawWrapperChoice
 import com.winlator.cmod.ui.settings.DriverOption
 import com.winlator.cmod.ui.settings.DxvkAsyncMode
 import com.winlator.cmod.ui.settings.EnvironmentVariablesEditor
+import com.winlator.cmod.ui.settings.FrameGenerationSettings
 import com.winlator.cmod.ui.settings.SettingChoice
 import com.winlator.cmod.ui.settings.SettingDriverChoice
 import com.winlator.cmod.ui.settings.SettingInstallChoice
@@ -181,6 +183,8 @@ private class ContainerEditorStateV2(
     var displayXPresentAtRefreshRate by mutableStateOf(editing?.getDisplayXPresentAtRefreshRate() ?: true)
     var displayXBackPressure by mutableStateOf(editing?.getDisplayXBackPressure() ?: false)
     var displayXPrecisePresentation by mutableStateOf(editing?.getDisplayXPrecisePresentation() ?: false)
+    var lsfgMultiplier by mutableIntStateOf(editing?.getLsfgMultiplier() ?: 0)
+    var lsfgFlowScale by mutableStateOf(editing?.getLsfgFlowScale() ?: 0.80f)
 
     var graphicsDriver by mutableStateOf(
         editing?.graphicsDriver ?: if (preferredDriver == DefaultVersion.WRAPPER_ADRENO) {
@@ -314,7 +318,7 @@ private class ContainerEditorStateV2(
         fullscreen, desktopTheme, desktopBackground, wallpaperStamp, mouseWarp, drives,
         renderer, rendererPresentMode, rendererDriver, filterMode, surfaceFormat, trueDisplayX,
         displayXPerformanceMode, displayXPresentAtRefreshRate, displayXBackPressure,
-        displayXPrecisePresentation, graphicsDriver, graphicsConfig,
+        displayXPrecisePresentation, lsfgMultiplier, lsfgFlowScale, graphicsDriver, graphicsConfig,
         wrapper, wrapperConfig, emulator, fexVersion, boxVersion, fexPreset, boxPreset, exclusive, xinput, dinput,
         syncCpu, startup, openGlDefaultInitialized, autoMesaGlVersionOverride, envVars,
         cpu64.joinToString(), cpu32.joinToString(), components.entries.sortedBy { it.key }.joinToString()
@@ -460,6 +464,9 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
         container.setDisplayXPresentAtRefreshRate(state.displayXPresentAtRefreshRate)
         container.setDisplayXBackPressure(state.displayXBackPressure)
         container.setDisplayXPrecisePresentation(state.displayXPrecisePresentation)
+        container.setLsfgMultiplier(state.lsfgMultiplier)
+        container.setLsfgEnabled(state.lsfgMultiplier >= 2)
+        container.setLsfgFlowScale(state.lsfgFlowScale)
         container.setDXWrapper(state.wrapper)
         container.setDXWrapperConfig(state.wrapperConfig)
         container.setAudioDriver(state.audio)
@@ -551,6 +558,9 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
                     .put("displayXPresentAtRefreshRate", if (state.displayXPresentAtRefreshRate) "1" else "0")
                     .put("displayXBackPressure", if (state.displayXBackPressure) "1" else "0")
                     .put("displayXPrecisePresentation", if (state.displayXPrecisePresentation) "1" else "0")
+                    .put("lsfgEnabled", if (state.lsfgMultiplier >= 2) "true" else "false")
+                    .put("lsfgMultiplier", state.lsfgMultiplier.toString())
+                    .put("lsfgFlowScale", String.format(java.util.Locale.US, "%.2f", state.lsfgFlowScale))
                     .put("oboeProfile", state.oboeProfile)
                     .put("oboeApi", state.oboeApi)
                     .put("oboeAdaptive", if (state.oboeAdaptive) "1" else "0")
@@ -892,6 +902,17 @@ private fun ContainerCategoryV2(
                     SettingChoice("Texture Filter", filters.getOrElse(s.filterMode) { filters.first() }, filters) {
                         s.filterMode = filters.indexOf(it).coerceAtLeast(0)
                     }
+                }
+            }
+            if (s.renderer != "EGL") {
+                SettingsCard {
+                    FrameGenerationSettings(
+                        multiplier = s.lsfgMultiplier,
+                        flowScale = s.lsfgFlowScale,
+                        lsfgAvailable = LosslessDll.isGlobalDllAvailable(context) || LosslessDll.containerDllPath(s.editing) != null,
+                        onMultiplierChanged = { s.lsfgMultiplier = it },
+                        onFlowScaleChanged = { s.lsfgFlowScale = it }
+                    )
                 }
             }
             SettingsCard {

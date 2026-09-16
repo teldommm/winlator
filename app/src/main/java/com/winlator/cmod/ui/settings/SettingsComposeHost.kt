@@ -92,6 +92,7 @@ data class SettingsModel(
     val fexPresets: List<SettingChoice>,
     val selectedFexPreset: String,
     val soundFonts: List<SettingChoice>,
+    val losslessDllAvailable: Boolean,
     val winlatorPath: String,
     val shortcutPath: String,
     val bigPicture: Boolean,
@@ -123,6 +124,7 @@ interface SettingsCallbacks {
     fun onFexPresetSelected(id: String)
     fun onInstallSoundFont()
     fun onRemoveSoundFont(name: String)
+    fun onImportLosslessDll()
     fun onChooseWinlatorPath()
     fun onChooseShortcutPath()
     fun onBooleanChanged(key: String, value: Boolean)
@@ -191,6 +193,16 @@ private fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) {
             }
             item("components") {
                 NavigationRow(Icons.Outlined.Apps, "Components", "Wine, Proton, DXVK, VKD3D and runtimes", callbacks::onOpenComponents)
+            }
+
+            item("frame-generation-title") { SectionTitle("FRAME GENERATION") }
+            item("lossless-dll") {
+                NavigationRow(
+                    Icons.Outlined.FolderOpen,
+                    "Import Lossless.dll",
+                    if (model.losslessDllAvailable) "Lossless.dll imported - LSFG Native ready" else "Required for LSFG Native",
+                    callbacks::onImportLosslessDll
+                )
             }
 
             item("presets-title") { SectionTitle("PRESETS") }

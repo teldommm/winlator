@@ -202,6 +202,40 @@ public class Container {
         putExtra("displayXPrecisePresentation", v ? "1" : "0");
     }
 
+    public boolean isLsfgEnabled() {
+        String value = getExtra("lsfgEnabled", "false");
+        return "1".equals(value) || "true".equalsIgnoreCase(value);
+    }
+
+    public void setLsfgEnabled(boolean enabled) {
+        putExtra("lsfgEnabled", enabled ? "true" : "false");
+    }
+
+    public int getLsfgMultiplier() {
+        try {
+            int value = Integer.parseInt(getExtra("lsfgMultiplier", "0"));
+            return value < 2 ? 0 : Math.max(2, Math.min(4, value));
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+    }
+
+    public void setLsfgMultiplier(int multiplier) {
+        putExtra("lsfgMultiplier", String.valueOf(multiplier < 2 ? 0 : Math.max(2, Math.min(4, multiplier))));
+    }
+
+    public float getLsfgFlowScale() {
+        try {
+            return Math.max(0.25f, Math.min(1.0f, Float.parseFloat(getExtra("lsfgFlowScale", "0.80"))));
+        } catch (NumberFormatException ignored) {
+            return 0.80f;
+        }
+    }
+
+    public void setLsfgFlowScale(float flowScale) {
+        putExtra("lsfgFlowScale", String.format(java.util.Locale.US, "%.2f", Math.max(0.25f, Math.min(1.0f, flowScale))));
+    }
+
     public String getDXWrapper() {
         return dxwrapper;
     }

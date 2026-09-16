@@ -389,4 +389,45 @@ public class Shortcut {
         return v != null ? v.equals("1") : container.getRendererSwapRB();
     }
     public void setRendererSwapRB(boolean v) { putExtra("rendererSwapRB", v ? "1" : "0"); }
+
+    public boolean isLsfgEnabled() {
+        String value = getExtra("lsfgEnabled", null);
+        if (value == null || value.isEmpty()) return container.isLsfgEnabled();
+        return value.equals("1") || value.equalsIgnoreCase("true");
+    }
+
+    public void setLsfgEnabled(boolean enabled) {
+        putExtra("lsfgEnabled", enabled ? "true" : "false");
+    }
+
+    public int getLsfgMultiplier() {
+        String value = getExtra("lsfgMultiplier", null);
+        try {
+            return value != null && !value.isEmpty()
+                    ? (Integer.parseInt(value) < 2 ? 0 : Math.max(2, Math.min(4, Integer.parseInt(value))))
+                    : container.getLsfgMultiplier();
+        } catch (NumberFormatException e) {
+            return container.getLsfgMultiplier();
+        }
+    }
+
+    public void setLsfgMultiplier(int multiplier) {
+        putExtra("lsfgMultiplier", String.valueOf(multiplier < 2 ? 0 : Math.max(2, Math.min(4, multiplier))));
+    }
+
+    public float getLsfgFlowScale() {
+        String value = getExtra("lsfgFlowScale", null);
+        try {
+            return value != null && !value.isEmpty()
+                    ? Math.max(0.25f, Math.min(1.0f, Float.parseFloat(value)))
+                    : container.getLsfgFlowScale();
+        } catch (NumberFormatException e) {
+            return container.getLsfgFlowScale();
+        }
+    }
+
+    public void setLsfgFlowScale(float flowScale) {
+        float clamped = Math.max(0.25f, Math.min(1.0f, flowScale));
+        putExtra("lsfgFlowScale", String.format(java.util.Locale.US, "%.2f", clamped));
+    }
 }

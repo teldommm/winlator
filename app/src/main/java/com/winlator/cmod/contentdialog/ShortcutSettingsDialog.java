@@ -43,6 +43,7 @@ import com.winlator.cmod.contents.Downloader;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.EnvVars;
+import com.winlator.cmod.core.LosslessDll;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.StringUtils;
 import com.winlator.cmod.core.WineInfo;
@@ -140,6 +141,8 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
         final String[] rendererDriverHolder = new String[] { shortcut.getRendererDriverId() };
         final int[] rendererFilterHolder = new int[] { shortcut.getRendererFilterMode() };
         final boolean[] rendererSwapRBHolder = new boolean[] { shortcut.getRendererSwapRB() };
+        final int[] lsfgMultiplierHolder = new int[] { shortcut.getLsfgMultiplier() };
+        final float[] lsfgFlowScaleHolder = new float[] { shortcut.getLsfgFlowScale() };
         final Spinner spRendererMode = findViewById(R.id.SPRendererMode);
         if (spRendererMode != null) {
             ArrayAdapter<String> rendererModeAdapter = new ArrayAdapter<>(context, R.layout.spinner_item_amoled,
@@ -166,6 +169,14 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                 public void setRendererFilterMode(int val) { rendererFilterHolder[0] = val; }
                 public boolean getRendererSwapRB() { return rendererSwapRBHolder[0]; }
                 public void setRendererSwapRB(boolean val) { rendererSwapRBHolder[0] = val; }
+                public boolean isLsfgDllAvailable() {
+                    return LosslessDll.isGlobalDllAvailable(context) || LosslessDll.containerDllPath(shortcut) != null;
+                }
+                public int getLsfgMultiplier() { return lsfgMultiplierHolder[0]; }
+                public void setLsfgMultiplier(int val) { lsfgMultiplierHolder[0] = val; }
+                public void setLsfgEnabled(boolean val) { /* derived from multiplier on save */ }
+                public float getLsfgFlowScale() { return lsfgFlowScaleHolder[0]; }
+                public void setLsfgFlowScale(float val) { lsfgFlowScaleHolder[0] = val; }
             }, rendererNativeHolder[0]).show());
         }
 
@@ -472,6 +483,9 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
             shortcut.setRendererDriverId(rendererDriverHolder[0]);
             shortcut.setRendererFilterMode(rendererFilterHolder[0]);
             shortcut.setRendererSwapRB(rendererSwapRBHolder[0]);
+            shortcut.setLsfgMultiplier(lsfgMultiplierHolder[0]);
+            shortcut.setLsfgEnabled(lsfgMultiplierHolder[0] >= 2);
+            shortcut.setLsfgFlowScale(lsfgFlowScaleHolder[0]);
             shortcut.putExtra("emulator", emulator);
             shortcut.putExtra("midiSoundFont", midiSoundFont);
             shortcut.putExtra("lc_all", lc_all);

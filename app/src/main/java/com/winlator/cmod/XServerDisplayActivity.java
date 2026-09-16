@@ -72,6 +72,7 @@ import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.GPUInformation;
 import com.winlator.cmod.core.KeyValueSet;
+import com.winlator.cmod.core.LosslessDll;
 import com.winlator.cmod.core.OnExtractFileListener;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.ProcessHelper;
@@ -163,6 +164,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private WinlatorHUD modernHud = null;
     private Runnable editInputControlsCallback;
     private Shortcut shortcut;
+    private int activeLsfgMultiplier;
+    private java.io.File activeLsfgDll;
+    private float activeLsfgFlowScale = 0.80f;
     private String graphicsDriver = Container.DEFAULT_GRAPHICS_DRIVER;
     private HashMap<String, String> graphicsDriverConfig;
     private String audioDriver = Container.DEFAULT_AUDIO_DRIVER;
@@ -1237,6 +1241,19 @@ public class XServerDisplayActivity extends AppCompatActivity {
             vkRenderer.setVkPresentMode(com.winlator.cmod.contentdialog.RendererOptionsDialog.toVkPresentMode(presentMode));
             vkRenderer.setFilterMode(shortcut != null ? shortcut.getRendererFilterMode()
                     : (container != null ? container.getRendererFilterMode() : 0));
+
+            int lsfgMultiplier = shortcut != null ? shortcut.getLsfgMultiplier()
+                    : container != null ? container.getLsfgMultiplier() : 0;
+            java.io.File lsfgDll = LosslessDll.isGlobalDllAvailable(this) ? LosslessDll.globalDllFile(this)
+                    : shortcut != null ? LosslessDll.containerDllFile(shortcut)
+                    : LosslessDll.containerDllFile(container);
+            float lsfgFlowScale = shortcut != null ? shortcut.getLsfgFlowScale()
+                    : container != null ? container.getLsfgFlowScale() : 0.80f;
+            activeLsfgMultiplier = lsfgMultiplier;
+            activeLsfgDll = lsfgDll;
+            activeLsfgFlowScale = lsfgFlowScale;
+            vkRenderer.setFrameGenRefreshRate(pickHighestRefreshRate());
+            vkRenderer.setFrameGenNative(lsfgDll, lsfgMultiplier, lsfgFlowScale);
         }
 
         if (shortcut != null) {
@@ -1879,7 +1896,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
             spNativeFPS.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
                     if (llStandardOptions != null) llStandardOptions.setVisibility(isVulkanRenderer ? View.VISIBLE : View.GONE);
-                    if (llFrameGenOptions != null) llFrameGenOptions.setVisibility(View.GONE);
                     int fpsLimit = pos < fpsValues.length ? fpsValues[pos] : 0;
                     if (vkRenderer != null) vkRenderer.setFpsLimit(fpsLimit);
                     if (nativeRenderer != null) nativeRenderer.setFpsLimit(fpsLimit);
@@ -1991,11 +2007,38 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (lblSharpnessHeader != null) lblSharpnessHeader.setVisibility(sharpVis);
         if (sbSharpness        != null) sbSharpness.setVisibility(sharpVis);
 
-        final String[] frameGenLabels = {"2x Interpolation", "Always On"};
+        final TextView tvFrameGenStatus = findViewById(R.id.TVFrameGenStatus);
+        if (llFrameGenOptions != null) llFrameGenOptions.setVisibility(View.VISIBLE);
         if (spFrameGenFPS != null) {
+            String[] frameGenLabels = {"Off", "LSFG 2x", "LSFG 3x", "LSFG 4x"};
             ArrayAdapter<String> a = createSidebarSpinnerAdapter(frameGenLabels);
             a.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
             spFrameGenFPS.setAdapter(a);
+            spFrameGenFPS.setSelection(activeLsfgMultiplier < 2 ? 0 : Math.min(3, activeLsfgMultiplier - 1), false);
+            Runnable updateFrameGenStatus = () -> {
+                if (tvFrameGenStatus == null) return;
+                String error = vkRenderer.getFrameGenError();
+                if (activeLsfgMultiplier < 2) tvFrameGenStatus.setText("Off");
+                else if (!error.isEmpty()) tvFrameGenStatus.setText(error);
+                else tvFrameGenStatus.setText("LSFG Native " + activeLsfgMultiplier + "x active");
+            };
+            vkRenderer.setFrameGenStatusListener(updateFrameGenStatus);
+            spFrameGenFPS.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
+                    activeLsfgMultiplier = pos < 1 ? 0 : pos + 1;
+                    if (shortcut != null) {
+                        shortcut.setLsfgMultiplier(activeLsfgMultiplier);
+                        shortcut.setLsfgEnabled(activeLsfgMultiplier >= 2);
+                        shortcut.saveData();
+                    } else if (container != null) {
+                        container.setLsfgMultiplier(activeLsfgMultiplier);
+                        container.setLsfgEnabled(activeLsfgMultiplier >= 2);
+                        container.saveData();
+                    }
+                    vkRenderer.setFrameGenNative(activeLsfgDll, activeLsfgMultiplier, activeLsfgFlowScale);
+                }
+                @Override public void onNothingSelected(AdapterView<?> p) {}
+            });
         }
 
     }

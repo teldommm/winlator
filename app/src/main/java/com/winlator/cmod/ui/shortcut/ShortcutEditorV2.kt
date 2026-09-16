@@ -81,6 +81,7 @@ import com.winlator.cmod.container.Shortcut
 import com.winlator.cmod.core.DefaultVersion
 import com.winlator.cmod.core.FileUtils
 import com.winlator.cmod.core.GPUInformation
+import com.winlator.cmod.core.LosslessDll
 import com.winlator.cmod.core.OpenGLDriverDefaults
 import com.winlator.cmod.core.StringUtils
 import com.winlator.cmod.fexcore.FEXCorePresetManager
@@ -92,6 +93,7 @@ import com.winlator.cmod.ui.settings.DriverOption
 import com.winlator.cmod.ui.settings.DxvkAsyncMode
 import com.winlator.cmod.ui.settings.EnvironmentVariablesEditor
 import com.winlator.cmod.ui.settings.DDrawWrapperChoice
+import com.winlator.cmod.ui.settings.FrameGenerationSettings
 import com.winlator.cmod.ui.settings.SettingChoice
 import com.winlator.cmod.ui.settings.SettingDriverChoice
 import com.winlator.cmod.ui.settings.SettingInstallChoice
@@ -166,6 +168,8 @@ private class ShortcutEditorStateV2(val shortcut: Shortcut) {
     var displayXPresentAtRefreshRate by mutableStateOf(shortcut.getDisplayXPresentAtRefreshRate())
     var displayXBackPressure by mutableStateOf(shortcut.getDisplayXBackPressure())
     var displayXPrecisePresentation by mutableStateOf(shortcut.getDisplayXPrecisePresentation())
+    var lsfgMultiplier by mutableIntStateOf(shortcut.getLsfgMultiplier())
+    var lsfgFlowScale by mutableStateOf(shortcut.getLsfgFlowScale())
     var graphicsDriver by mutableStateOf(StringUtils.parseIdentifier(shortcut.getExtra("graphicsDriver", container.getGraphicsDriver())))
     private val defaultDriverVersion = runCatching {
         val context = container.manager.context
@@ -376,6 +380,13 @@ private class ShortcutEditorStateV2(val shortcut: Shortcut) {
         shortcut.setDisplayXPresentAtRefreshRate(displayXPresentAtRefreshRate)
         shortcut.setDisplayXBackPressure(displayXBackPressure)
         shortcut.setDisplayXPrecisePresentation(displayXPrecisePresentation)
+        save()
+    }
+
+    fun saveFrameGeneration() {
+        shortcut.setLsfgMultiplier(lsfgMultiplier)
+        shortcut.setLsfgEnabled(lsfgMultiplier >= 2)
+        shortcut.setLsfgFlowScale(lsfgFlowScale)
         save()
     }
 
@@ -825,6 +836,17 @@ private fun ShortcutCategoryV2(
                         s.filterMode = filters.indexOf(it).coerceAtLeast(0)
                         s.saveRenderer()
                     }
+                }
+            }
+            if (s.renderer != "EGL") {
+                SettingsCard {
+                    FrameGenerationSettings(
+                        multiplier = s.lsfgMultiplier,
+                        flowScale = s.lsfgFlowScale,
+                        lsfgAvailable = LosslessDll.isGlobalDllAvailable(context) || LosslessDll.containerDllPath(s.shortcut) != null,
+                        onMultiplierChanged = { s.lsfgMultiplier = it; s.saveFrameGeneration() },
+                        onFlowScaleChanged = { s.lsfgFlowScale = it; s.saveFrameGeneration() }
+                    )
                 }
             }
             SettingsCard {
