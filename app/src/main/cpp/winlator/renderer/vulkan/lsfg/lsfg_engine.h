@@ -27,7 +27,6 @@
 #include <vulkan/vulkan.h>
 
 #include "lsfg_common.hpp"
-#include "lsfg_governor.h"
 #include "lsfg_pacer.hpp"
 
 namespace lsfg {
@@ -81,10 +80,6 @@ public:
                       VkImage targetImage, VkImageView targetView,
                       uint32_t width, uint32_t height);
 
-    // What the probe governor currently trusts, and the latest thermal
-    // reading (-1 = no signal). Surfaced for the HUD and diagnostics.
-    uint32_t acceptedGenerations() const { return governor_.accepted(); }
-    int      thermalStatus() const { return governor_.thermalStatus(); }
     float    sourceRate() const;
     // The rate that actually reaches the panel, generated frames included.
     // Supplied by the renderer, which is the only thing that counts presents.
@@ -104,14 +99,6 @@ private:
     std::unique_ptr<LsfgShaders> shaders_;
     std::unique_ptr<LsfgChain>   chain_;
     LsfgPacer      pacer_;
-    ProbeGovernor  governor_;
-    // The governor is OFF by default: the device's own thermal management is
-    // the authority, and a probe loop that can veto the user's setting is not
-    // wanted here. The multiplier is then what was asked for, still clamped by
-    // what the panel can show. Kept behind a flag rather than deleted because
-    // the probe/backoff logic is the right answer for a device WITHOUT decent
-    // native throttling, and this is the only thing that would have to change.
-    bool           governorEnabled_ = false;
     LsfgPlan    plan_{};
 
     VkExtent2D builtExtent_{};

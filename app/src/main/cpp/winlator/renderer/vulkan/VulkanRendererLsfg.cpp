@@ -5,7 +5,6 @@
 // ported here: this file only wires up LSFG.
 #include "VulkanRendererContext.h"
 #include "lsfg/lsfg_engine.h"
-#include "lsfg/lsfg_capture.h"
 #include "lsfg/lsfg_vkd.h"
 
 VkRenderPass VulkanRendererContext::createCompatibleRenderPass(
@@ -297,11 +296,9 @@ void VulkanRendererContext::setLsfgCachePath(const char* path) {
     std::lock_guard<std::mutex> lk(renderMutex);
     const std::string next = path ? path : "";
     // Only a genuinely NEW cache justifies throwing the engine away. This is
-    // called on every multiplier change, and rebuilding here meant the chain,
-    // the pacer's rate history and the governor's accepted level were all
-    // discarded each time - so the governor restarted at zero generations and
-    // never survived long enough to probe. Frame generation reported gen=0
-    // forever while looking perfectly healthy.
+    // called on every multiplier change, and rebuilding here meant the chain
+    // and the pacer's rate history were discarded each time, so frame
+    // generation kept re-measuring from scratch instead of settling.
     if (next == lsfgCachePath_ && lsfgEngine_) return;
     lsfgCachePath_ = next;
     lsfgEngineTried_ = false;    // a new cache deserves a fresh attempt
@@ -319,13 +316,15 @@ void VulkanRendererContext::setFrameGenTuning(float flowScale, float refreshHz) 
 }
 
 void VulkanRendererContext::compositeExtentFor(uint32_t& w, uint32_t& h) const {
+    // Reverted: this used to shrink the composite/generation target below the
+    // panel resolution based on containerHeight (lsfg::captureExtent), which
+    // made the upscale filters (FSR/Lanczos/SGSR) render below display
+    // resolution and left only a cheap linear/nearest blit to reach full
+    // size. That traded LSFG's generated-frame sharpness for GPU headroom
+    // without the tradeoff being reviewed, so LSFG now always composites and
+    // generates at the real swapchain resolution again, matching upstream.
     w = swapchainExt.width;
     h = swapchainExt.height;
-    // LSFG follows the real X/render height while keeping the panel aspect so
-    // the final blit cannot stretch the image.
-    const lsfg::CaptureExtent capture = lsfg::captureExtent(w, h, containerHeight);
-    w = capture.width;
-    h = capture.height;
 }
 
 void VulkanRendererContext::recordCompositeToSwapchainTransfer(
@@ -425,10 +424,8 @@ void VulkanRendererContext::frameGenStats(float out[6]) const {
     out[3] = fgPresentedRate_;
     out[5] = fgChainMsPerGen_;
     if (!lsfgEngine_) return;
-    out[0] = (float)lsfgEngine_->acceptedGenerations();
-    out[1] = (float)fgPlan_.generations;
+    out[0] = out[1] = (float)fgPlan_.generations;
     out[2] = lsfgEngine_->sourceRate();
-    out[4] = (float)lsfgEngine_->thermalStatus();
 }
 
 void VulkanRendererContext::trackPresentedRate(uint32_t presents) {

@@ -189,7 +189,6 @@ bool Engine::prepare(uint32_t width, uint32_t height, VkFormat format) {
     warm_ = false;
     generating_ = false;
     pacer_.Reset();
-    governor_.reset();
     LSFG_LOGI("chain built at %ux%u, flow %ux%u scale %.2f (preset %.2f, guest %ux%u)",
               width, height, (unsigned)(width * scale), (unsigned)(height * scale),
               (double)scale, (double)flowScale_,
@@ -201,21 +200,6 @@ uint32_t Engine::plan(uint32_t capacity, uint64_t sourceFrames) {
     if (unavailable_ || !chain_) return 0;
 
     plan_ = pacer_.Plan(std::min<size_t>(capacity, kMaxGenerations), sourceFrames);
-
-    // The pacer says how many frames FIT in the panel's budget. The governor
-    // says how many this device can actually afford right now - on a handheld
-    // the chain competes with the game for one GPU, so an extra generation has
-    // to prove it improves total output without collapsing the real frame rate.
-    if (governorEnabled_) {
-        const LsfgPacerStats s = pacer_.Stats();
-        governor_.configure((uint32_t)std::min<size_t>(pacer_.MaxGenerations(), kMaxGenerations));
-        // presentedRate_, NOT the pacer's loop rate. The pacer samples its loop
-        // once per SOURCE frame, so its "loop rate" is the guest rate by
-        // construction and can never show that generation added anything - the
-        // governor could not accept a probe on any hardware.
-        plan_.generations = governor_.cap((uint32_t)plan_.generations, s.source_rate,
-                                          presentedRate_);
-    }
 
     warm_ = plan_.warm && frameCount_ + 1 >= kRequiredFrames;
     warmStreak_ = warm_ ? warmStreak_ + 1 : 0;
@@ -259,8 +243,7 @@ void Engine::process(VkCommandBuffer cmd, VkImage source, uint32_t width, uint32
     lastCount_ = count;
     lastGenerations_ = generations;
 
-    const bool needHistory = generations > 0 || primeHistory_
-        || (governorEnabled_ && governor_.wantsHistory());
+    const bool needHistory = generations > 0 || primeHistory_;
     if (needHistory) {
         copyPresentedFrame(cmd, source, chain_->Input(count), VkExtent2D{width, height});
         lastCopiedCount_ = count;
@@ -270,10 +253,8 @@ void Engine::process(VkCommandBuffer cmd, VkImage source, uint32_t width, uint32
     // The SHARED chain is 24 of the 25 shaders - the whole flow pyramid - and
     // only `generate` runs per generated frame. Running it while producing
     // nothing spends almost the entire cost of frame generation for no frames
-    // at all, every frame. That is what pinned the GPU at 100% on device
-    // regardless of the game's own settings, and it fed straight back into the
-    // governor: the chain made the source rate collapse, the governor saw the
-    // collapse and refused to generate, and refusing did not stop the chain.
+    // at all, every frame - pinning the GPU at 100% regardless of the game's
+    // own settings. Only dispatch it when actually generating.
     if (warm_ && generations > 0) chain_->DispatchShared(cmd, count);
 }
 
@@ -296,7 +277,6 @@ void Engine::forgetTargets() {
 
 void Engine::reset() {
     pacer_.Reset();
-    governor_.reset();
     peakGuestExtent_ = VkExtent2D{};
     lastCopiedCount_ = 0;
     haveCopied_ = false;

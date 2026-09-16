@@ -229,7 +229,6 @@ add_library(vulkan_renderer SHARED
         winlator/renderer/vulkan/lsfg/lsfg_engine.cpp
         winlator/renderer/vulkan/lsfg/lsfg_gamma.cpp
         winlator/renderer/vulkan/lsfg/lsfg_generate.cpp
-        winlator/renderer/vulkan/lsfg/lsfg_governor.cpp
         winlator/renderer/vulkan/lsfg/lsfg_jni.cpp
         winlator/renderer/vulkan/lsfg/lsfg_mipmaps.cpp
         winlator/renderer/vulkan/lsfg/lsfg_pacer.cpp

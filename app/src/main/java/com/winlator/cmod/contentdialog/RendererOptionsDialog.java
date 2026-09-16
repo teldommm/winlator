@@ -4,9 +4,7 @@ import android.content.Context;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
-import android.widget.SeekBar;
 import android.widget.Spinner;
-import android.widget.TextView;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.contents.AdrenotoolsManager;
@@ -37,13 +35,6 @@ public class RendererOptionsDialog extends ContentDialog {
 
         boolean getRendererSwapRB();
         void setRendererSwapRB(boolean v);
-
-        boolean isLsfgDllAvailable();
-        int getLsfgMultiplier();
-        void setLsfgMultiplier(int value);
-        void setLsfgEnabled(boolean value);
-        float getLsfgFlowScale();
-        void setLsfgFlowScale(float value);
     }
 
     private static final String[] PRESENT_MODE_IDS    = {"mailbox", "fifo"};
@@ -92,8 +83,6 @@ public class RendererOptionsDialog extends ContentDialog {
         spPresent.setSelection(pmSel);
         findViewById(R.id.BTHelpPresentMode).setOnClickListener(v -> AppUtils.showHelpBox(ctx, v,
                 "FIFO queues frames in order and avoids tearing; use it with native frame generation. Mailbox keeps the newest completed frame and can reduce latency when frame generation is off."));
-        findViewById(R.id.BTHelpFrameGeneration).setOnClickListener(v -> AppUtils.showHelpBox(ctx, v,
-                "LSFG Native supports 2x-4x, requires an imported Lossless.dll, Vulkan 1.3 and a compatible Vulkan renderer driver."));
 
         AdrenotoolsManager atm = new AdrenotoolsManager(ctx);
         List<String> driverLabels = new ArrayList<>();
@@ -118,30 +107,6 @@ public class RendererOptionsDialog extends ContentDialog {
         spFilter.setSelection(filterSel);
         cbSwapRB.setChecked(config.getRendererSwapRB());
 
-        View frameGenGroup = findViewById(R.id.GroupFrameGen);
-        Spinner spMultiplier = findViewById(R.id.SPFrameGenMultiplier);
-        SeekBar sbFlowScale = findViewById(R.id.SBFrameGenFlowScale);
-        TextView tvFlowScale = findViewById(R.id.TVLsfgFlowScale);
-        TextView tvStatus = findViewById(R.id.TVFrameGenStatus);
-        frameGenGroup.setVisibility(isNativeMode ? View.GONE : View.VISIBLE);
-        setAmoledAdapter(ctx, spMultiplier, new String[]{"Off", "2x", "3x", "4x"});
-        int multiplier = config.getLsfgMultiplier();
-        spMultiplier.setSelection(multiplier < 2 ? 0 : Math.min(3, multiplier - 1));
-        float flowScale = config.getLsfgFlowScale();
-        tvStatus.setText(config.isLsfgDllAvailable()
-                ? "LSFG Native uses the imported Lossless.dll."
-                : "LSFG Native can't run: Lossless.dll is missing. Import it, then relaunch the game.");
-        sbFlowScale.setMax(75);
-        sbFlowScale.setProgress(Math.round((flowScale - 0.25f) * 100));
-        tvFlowScale.setText(String.format(java.util.Locale.US, "%.2f", flowScale));
-        sbFlowScale.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                tvFlowScale.setText(String.format(java.util.Locale.US, "%.2f", 0.25f + progress / 100f));
-            }
-            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
-        });
-
         setOnConfirmCallback(() -> {
             if (!isNativeMode) {
                 config.setRendererPresentMode(PRESENT_MODE_IDS[spPresent.getSelectedItemPosition()]);
@@ -149,13 +114,6 @@ public class RendererOptionsDialog extends ContentDialog {
             }
             config.setRendererFilterMode(spFilter.getSelectedItemPosition());
             config.setRendererSwapRB(cbSwapRB.isChecked());
-
-            int selection = spMultiplier.getSelectedItemPosition();
-            int selectedMultiplier = selection < 1 ? 0 : selection + 1;
-            if (selectedMultiplier >= 2 && !config.isLsfgDllAvailable()) selectedMultiplier = 0;
-            config.setLsfgMultiplier(selectedMultiplier);
-            config.setLsfgEnabled(selectedMultiplier >= 2);
-            config.setLsfgFlowScale(0.25f + sbFlowScale.getProgress() / 100f);
         });
     }
 

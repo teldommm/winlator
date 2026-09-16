@@ -1865,9 +1865,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
         View    btSaveGraphicsPreset = findViewById(R.id.BTSaveGraphicsPreset);
         View    llFrameGenOptions  = findViewById(R.id.LLFrameGenOptions);
         Spinner spFrameGenFPS      = findViewById(R.id.SPFrameGenFPS);
+        SeekBar sbFrameGenFlowScale = findViewById(R.id.SBFrameGenFlowScale);
 
         if (llFrameGenOptions != null) llFrameGenOptions.setVisibility(View.GONE);
         if (spFrameGenFPS  != null) spFrameGenFPS.setVisibility(View.GONE);
+        if (sbFrameGenFlowScale != null) sbFrameGenFlowScale.setVisibility(View.GONE);
         if (spColorMode    != null) spColorMode.setVisibility(View.GONE);
         if (llStandardOptions != null) llStandardOptions.setVisibility(isVulkanRenderer ? View.VISIBLE : View.GONE);
         if (btSaveGraphicsPreset != null) btSaveGraphicsPreset.setVisibility(isVulkanRenderer ? View.VISIBLE : View.GONE);
@@ -2010,6 +2012,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         final TextView tvFrameGenStatus = findViewById(R.id.TVFrameGenStatus);
         if (llFrameGenOptions != null) llFrameGenOptions.setVisibility(View.VISIBLE);
         if (spFrameGenFPS != null) {
+            spFrameGenFPS.setVisibility(View.VISIBLE);
             String[] frameGenLabels = {"Off", "LSFG 2x", "LSFG 3x", "LSFG 4x"};
             ArrayAdapter<String> a = createSidebarSpinnerAdapter(frameGenLabels);
             a.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -2028,16 +2031,29 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     activeLsfgMultiplier = pos < 1 ? 0 : pos + 1;
                     if (shortcut != null) {
                         shortcut.setLsfgMultiplier(activeLsfgMultiplier);
-                        shortcut.setLsfgEnabled(activeLsfgMultiplier >= 2);
                         shortcut.saveData();
                     } else if (container != null) {
                         container.setLsfgMultiplier(activeLsfgMultiplier);
-                        container.setLsfgEnabled(activeLsfgMultiplier >= 2);
                         container.saveData();
                     }
                     vkRenderer.setFrameGenNative(activeLsfgDll, activeLsfgMultiplier, activeLsfgFlowScale);
                 }
                 @Override public void onNothingSelected(AdapterView<?> p) {}
+            });
+        }
+        if (sbFrameGenFlowScale != null) {
+            sbFrameGenFlowScale.setVisibility(View.VISIBLE);
+            sbFrameGenFlowScale.setValue(activeLsfgFlowScale);
+            sbFrameGenFlowScale.setOnValueChangeListener((sb, v) -> {
+                activeLsfgFlowScale = v;
+                if (shortcut != null) {
+                    shortcut.setLsfgFlowScale(activeLsfgFlowScale);
+                    shortcut.saveData();
+                } else if (container != null) {
+                    container.setLsfgFlowScale(activeLsfgFlowScale);
+                    container.saveData();
+                }
+                vkRenderer.setFrameGenNative(activeLsfgDll, activeLsfgMultiplier, activeLsfgFlowScale);
             });
         }
 

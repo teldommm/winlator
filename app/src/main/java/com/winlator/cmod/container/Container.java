@@ -202,15 +202,6 @@ public class Container {
         putExtra("displayXPrecisePresentation", v ? "1" : "0");
     }
 
-    public boolean isLsfgEnabled() {
-        String value = getExtra("lsfgEnabled", "false");
-        return "1".equals(value) || "true".equalsIgnoreCase(value);
-    }
-
-    public void setLsfgEnabled(boolean enabled) {
-        putExtra("lsfgEnabled", enabled ? "true" : "false");
-    }
-
     public int getLsfgMultiplier() {
         try {
             int value = Integer.parseInt(getExtra("lsfgMultiplier", "0"));

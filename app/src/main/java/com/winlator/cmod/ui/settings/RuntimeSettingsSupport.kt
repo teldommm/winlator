@@ -28,7 +28,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -771,39 +770,4 @@ internal fun CpuSelectorRow(
             }
         }
     }
-}
-@Composable
-internal fun FrameGenerationSettings(
-    multiplier: Int,
-    flowScale: Float,
-    lsfgAvailable: Boolean,
-    onMultiplierChanged: (Int) -> Unit,
-    onFlowScaleChanged: (Float) -> Unit
-) {
-    val selected = if (multiplier < 2) "Off" else "LSFG Native ${multiplier}x"
-    SettingChoice("Frame Generation", selected,
-        listOf("Off", "LSFG Native 2x", "LSFG Native 3x", "LSFG Native 4x")) {
-        if (it == "Off") onMultiplierChanged(0)
-        else onMultiplierChanged(if (lsfgAvailable) it.substringAfterLast(' ').removeSuffix("x").toInt() else 0)
-    }
-    SettingsDivider()
-    Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp)) {
-        Row(Modifier.fillMaxWidth()) {
-            Text("Flow Scale", modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(String.format(java.util.Locale.US, "%.2f", flowScale), fontWeight = FontWeight.SemiBold)
-        }
-        Slider(
-            value = flowScale.coerceIn(0.25f, 1f),
-            onValueChange = onFlowScaleChanged,
-            valueRange = 0.25f..1f,
-            steps = 74
-        )
-    }
-    Text(
-        if (!lsfgAvailable) "Import Lossless.dll before enabling LSFG Native"
-        else "LSFG Native requires a Vulkan 1.3 driver",
-        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
 }
