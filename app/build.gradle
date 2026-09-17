@@ -99,7 +99,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.winlator.cmod"
+        applicationId "com.winlite.bionic"
         minSdkVersion 28
         // We’re preserving Winlator’s request to keep targetSdkVersion at 28
         targetSdkVersion 28
