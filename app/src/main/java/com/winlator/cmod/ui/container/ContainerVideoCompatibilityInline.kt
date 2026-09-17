@@ -44,6 +44,7 @@ import com.winlator.cmod.core.DefaultVersion
 import com.winlator.cmod.core.StringUtils
 import com.winlator.cmod.core.WineInfo
 import com.winlator.cmod.fexcore.FEXCorePresetManager
+import com.winlator.cmod.ui.theme.controlAccentColor
 
 @Composable
 internal fun ContainerWrapperInline(containerId: Int, callbacks: ContainerInlineCallbacks) {
