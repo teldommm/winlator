@@ -8,6 +8,7 @@ import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.util.Log;
 import android.view.ContextThemeWrapper;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -30,7 +31,6 @@ import androidx.annotation.Nullable;
 import androidx.preference.PreferenceManager;
 
 import com.google.android.material.tabs.TabLayout;
-import com.winlator.cmod.ContainerDetailFragment;
 import com.winlator.cmod.R;
 import com.winlator.cmod.ShortcutsFragment;
 import com.winlator.cmod.box64.Box64PresetManager;
@@ -43,6 +43,7 @@ import com.winlator.cmod.contents.Downloader;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.EnvVars;
+import com.winlator.cmod.core.KeyValueSet;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.StringUtils;
 import com.winlator.cmod.core.WineInfo;
@@ -108,8 +109,6 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
 
         final EditText etExecArgs = findViewById(R.id.ETExecArgs);
         etExecArgs.setText(shortcut.getExtra("execArgs"));
-
-        ContainerDetailFragment containerDetailFragment = new ContainerDetailFragment(shortcut.container.id);
 
         loadScreenSizeSpinner(getContentView(), shortcut.getExtra("screenSize", shortcut.container.getScreenSize()), isDarkMode);
 
@@ -333,7 +332,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
         String isTouchScreenMode = shortcut.getExtra("simTouchScreen");
         cbSimTouchScreen.setChecked(isTouchScreenMode.equals("1") ? true : false);
 
-        ContainerDetailFragment.createWinComponentsTabFromShortcut(this, getContentView(),
+        createWinComponentsTabFromShortcut(getContentView(),
                 shortcut.getExtra("wincomponents", shortcut.container.getWinComponents()), isDarkMode);
 
         final EnvVarsView envVarsView = createEnvVarsTab();
@@ -433,7 +432,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
             String emulator = StringUtils.parseIdentifier(sEmulator.getSelectedItem());
             String lc_all = etLC_ALL.getText().toString();
             String midiSoundFont = sMIDISoundFont.getSelectedItemPosition() == 0 ? "" : sMIDISoundFont.getSelectedItem().toString();
-            String screenSize = containerDetailFragment.getScreenSize(getContentView());
+            String screenSize = getScreenSize(getContentView());
 
             int finalInputType = 0;
             finalInputType |= cbEnableXInput.isChecked() ? WinHandler.FLAG_INPUT_TYPE_XINPUT : 0;
@@ -470,7 +469,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
 
             shortcut.putExtra("fullscreenStretched", cbFullscreenStretched.isChecked() ? "1" : null);
 
-            String wincomponents = containerDetailFragment.getWinComponents(getContentView());
+            String wincomponents = getWinComponents(getContentView());
             shortcut.putExtra("wincomponents", wincomponents);
 
             String envVars = envVarsView.getEnvVars();
@@ -960,7 +959,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
     public void loadGraphicsDriverSpinner(final Spinner sGraphicsDriver, final Spinner sDXWrapper, final View vGraphicsDriverConfig, String selectedGraphicsDriver, String selectedDXWrapper) {
         final Context context = sGraphicsDriver.getContext();
 
-        ContainerDetailFragment.updateGraphicsDriverSpinner(context, sGraphicsDriver);
+        updateGraphicsDriverSpinner(context, sGraphicsDriver);
 
         final String[] dxwrapperEntries = context.getResources().getStringArray(R.array.dxwrapper_entries);
 
@@ -994,6 +993,80 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
 
         AppUtils.setSpinnerSelectionFromIdentifier(sGraphicsDriver, selectedGraphicsDriver);
         update.run();
+    }
+
+    // --- Formerly in ContainerDetailFragment; that fragment was never attached to the
+    // FragmentManager anywhere in the app (its full tabbed UI was dead code) and only these
+    // four helpers were actually used, via ShortcutSettingsDialog. Inlined here so the dead
+    // fragment class could be removed. ---
+
+    private static String getScreenSize(View view) {
+        Spinner sScreenSize = view.findViewById(R.id.SScreenSize);
+        String value = sScreenSize.getSelectedItem().toString();
+        if (value.equalsIgnoreCase("custom")) {
+            value = Container.DEFAULT_SCREEN_SIZE;
+            String strWidth = ((EditText) view.findViewById(R.id.ETScreenWidth)).getText().toString().trim();
+            String strHeight = ((EditText) view.findViewById(R.id.ETScreenHeight)).getText().toString().trim();
+            if (strWidth.matches("[0-9]+") && strHeight.matches("[0-9]+")) {
+                int width = Integer.parseInt(strWidth);
+                int height = Integer.parseInt(strHeight);
+                if ((width % 2) == 0 && (height % 2) == 0)
+                    return width + "x" + height;
+            }
+        }
+        return StringUtils.parseIdentifier(value);
+    }
+
+    private static String getWinComponents(View view) {
+        ViewGroup parent = view.findViewById(R.id.LLTabWinComponents);
+        ArrayList<View> views = new ArrayList<>();
+        AppUtils.findViewsWithClass(parent, Spinner.class, views);
+        String[] wincomponents = new String[views.size()];
+
+        for (int i = 0; i < views.size(); i++) {
+            Spinner spinner = (Spinner) views.get(i);
+            wincomponents[i] = spinner.getTag() + "=" + spinner.getSelectedItemPosition();
+        }
+        return String.join(",", wincomponents);
+    }
+
+    private void createWinComponentsTabFromShortcut(View view, String wincomponents, boolean isDarkMode) {
+        Context context = getContext();
+        LayoutInflater inflater = LayoutInflater.from(context);
+        ViewGroup tabView = view.findViewById(R.id.LLTabWinComponents);
+        ViewGroup directxSectionView = tabView.findViewById(R.id.LLWinComponentsDirectX);
+        ViewGroup generalSectionView = tabView.findViewById(R.id.LLWinComponentsGeneral);
+
+        for (String[] wincomponent : new KeyValueSet(wincomponents)) {
+            ViewGroup parent = wincomponent[0].startsWith("direct") ? directxSectionView : generalSectionView;
+            View itemView = inflater.inflate(R.layout.wincomponent_list_item, parent, false);
+            ((TextView) itemView.findViewById(R.id.TextView)).setText(StringUtils.getString(context, wincomponent[0]));
+            Spinner spinner = itemView.findViewById(R.id.Spinner);
+            applyWinComponentSpinnerAdapter(context, spinner);
+            spinner.setSelection(Integer.parseInt(wincomponent[1]), false);
+            spinner.setTag(wincomponent[0]);
+
+            spinner.setPopupBackgroundResource(
+                    isDarkMode ? R.drawable.dialog_background_dark_blue : R.drawable.content_dialog_background);
+
+            parent.addView(itemView);
+        }
+
+        onWinComponentsViewsAdded(isDarkMode);
+    }
+
+    private static void applyWinComponentSpinnerAdapter(Context context, Spinner spinner) {
+        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(
+                context, R.array.wincomponent_entries, R.layout.spinner_item_amoled);
+        adapter.setDropDownViewResource(R.layout.spinner_dropdown_item_amoled_compact);
+        spinner.setAdapter(adapter);
+        spinner.setPopupBackgroundResource(R.drawable.dialog_background_dark_blue);
+    }
+
+    private static void updateGraphicsDriverSpinner(Context context, Spinner spinner) {
+        String[] originalItems = context.getResources().getStringArray(R.array.graphics_driver_entries);
+        List<String> itemList = new ArrayList<>(Arrays.asList(originalItems));
+        spinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, itemList));
     }
 }
 

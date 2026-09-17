@@ -347,7 +347,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             Fragment current = getSupportFragmentManager().findFragmentById(R.id.FLFragmentContainer);
             if (current instanceof GameDetailFragment
                     || current instanceof ContainerOverviewFragment
-                    || current instanceof ContainerDetailFragment
                     || current instanceof ContainerSectionFragment) {
                 onBackPressed();
                 return true;
