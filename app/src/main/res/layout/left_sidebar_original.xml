@@ -218,6 +218,14 @@
                         android:textSize="12sp" />
 
                     <TextView
+                        android:id="@+id/TVRuntimeGLDriverStatus"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textColor="?attr/ingameSidebarOnSurfaceVariant"
+                        android:textSize="12sp" />
+
+                    <TextView
                         android:id="@+id/TVRuntimeUpscalerStatus"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -461,13 +469,6 @@
                         app:minValue="0.25"
                         app:maxValue="1.0"
                         app:step="0.01" />
-                    <TextView
-                        android:id="@+id/TVFrameGenStatus"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:textColor="#B3FFFFFF"
-                        android:textSize="12sp" />
                 </LinearLayout>
                 <LinearLayout
                     android:id="@+id/BTSaveGraphicsPreset"

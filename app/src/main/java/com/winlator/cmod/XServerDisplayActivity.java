@@ -1431,9 +1431,15 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (d7vkActive) dxWrapperStatus.append(" · ").append(D7VKManager.getWrapperLabel(runtimeDdrawWrapper));
         else if (dd7to9Active) dxWrapperStatus.append(" · Dd7To9");
         else if (cncDdrawActive) dxWrapperStatus.append(" · CnC-DDraw");
-        dxWrapperStatus.append(" · ").append(openglDriver);
         setRuntimeStatus(R.id.TVRuntimeDXWrapperStatus, "DX Wrapper", dxWrapperStatus.toString(),
                 dxvkActive ? active : normal);
+
+        // GALLIUM_DRIVER/MESA_LOADER_DRIVER_OVERRIDE are set on the whole guest
+        // environment (applyOpenGLDriverEnvVars), not gated by dxwrapper - any
+        // OpenGL call anywhere in the container (GDI, video codecs, wine's own
+        // internals) goes through it regardless of which D3D wrapper the game
+        // itself uses, so it gets its own row rather than riding on DX Wrapper.
+        setRuntimeStatus(R.id.TVRuntimeGLDriverStatus, "GL Driver", openglDriver, active);
 
         Switch upscaler = findViewById(R.id.SWEnableFSR);
         Spinner upscalerMode = findViewById(R.id.SPUpscalerMode);
@@ -1453,8 +1459,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
         String framegenError = framegenAvailable ? framegenRenderer.getFrameGenError() : "";
         String framegenStatus = !framegenAvailable ? "Unavailable"
                 : !framegenActive ? "Off"
-                : !framegenError.isEmpty() ? framegenError
-                : "LSFG Native " + activeLsfgMultiplier + "x active";
+                : !framegenError.isEmpty() ? "Error"
+                : "LSFG " + activeLsfgMultiplier + "x active";
         int framegenColor = framegenActive && framegenError.isEmpty() ? active
                 : framegenActive ? warning : normal;
         setRuntimeStatus(R.id.TVRuntimeFramegenStatus, "Framegen", framegenStatus, framegenColor);
@@ -2142,7 +2148,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (lblSharpnessHeader != null) lblSharpnessHeader.setVisibility(sharpVis);
         if (sbSharpness        != null) sbSharpness.setVisibility(sharpVis);
 
-        final TextView tvFrameGenStatus = findViewById(R.id.TVFrameGenStatus);
         if (llFrameGenOptions != null) llFrameGenOptions.setVisibility(View.VISIBLE);
         if (spFrameGenFPS != null) {
             spFrameGenFPS.setVisibility(View.VISIBLE);
@@ -2151,15 +2156,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             a.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
             spFrameGenFPS.setAdapter(a);
             spFrameGenFPS.setSelection(activeLsfgMultiplier < 2 ? 0 : Math.min(3, activeLsfgMultiplier - 1), false);
-            Runnable updateFrameGenStatus = () -> {
-                updateRuntimeStatusUi(runtimeFexMode);
-                if (tvFrameGenStatus == null) return;
-                String error = vkRenderer.getFrameGenError();
-                if (activeLsfgMultiplier < 2) tvFrameGenStatus.setText("Off");
-                else if (!error.isEmpty()) tvFrameGenStatus.setText(error);
-                else tvFrameGenStatus.setText("LSFG Native " + activeLsfgMultiplier + "x active");
-            };
-            vkRenderer.setFrameGenStatusListener(updateFrameGenStatus);
+            vkRenderer.setFrameGenStatusListener(() -> updateRuntimeStatusUi(runtimeFexMode));
             spFrameGenFPS.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
                     activeLsfgMultiplier = pos < 1 ? 0 : pos + 1;
