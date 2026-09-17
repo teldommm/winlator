@@ -179,6 +179,7 @@ public class WinlatorHUD extends View {
     private final AtomicInteger frameAccum = new AtomicInteger(0);
     private long lastFpsNs = 0;
     private float snapFps = 0;
+    private volatile float frameGenPresentedRate = 0f;
 
     private int snapGpu = -1, snapCpu = -1, snapCpuTemp = -1, snapMw = -1;
     private int snapTmp = -1, snapPct = -1, snapRam = -1;
@@ -429,6 +430,12 @@ public class WinlatorHUD extends View {
 
     public void update() {
         onFrame();
+    }
+
+    /** Presents/sec incl. generated frames, pushed once per real frame while frame gen is
+     *  actually running; 0 means "not generating right now", so the plain measured FPS shows. */
+    public void setFrameGenPresentedRate(float rate) {
+        frameGenPresentedRate = rate;
     }
 
     public void setIsNative(boolean n) {
@@ -715,7 +722,9 @@ public class WinlatorHUD extends View {
         if (dt < 350_000_000L) return;
 
         int frames = frameAccum.getAndSet(0);
-        snapFps = frames * 1_000_000_000f / dt;
+        float measuredFps = frames * 1_000_000_000f / dt;
+        float genRate = frameGenPresentedRate;
+        snapFps = genRate > 0f ? genRate : measuredFps;
         lastFpsNs = now;
 
         String value = String.format(Locale.US, "%.0f", snapFps);

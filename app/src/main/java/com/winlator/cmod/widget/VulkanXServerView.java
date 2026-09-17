@@ -136,6 +136,7 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
 
     private native String nativeConfigureFrameGen(long handle, String cachePath,
                                                    int multiplier, float flowScale, float refreshHz);
+    @FastNative private native float nativeGetFrameGenPresentedRate(long handle);
 
     private native void nativeDumpRendererInfo(long handle);
     private native void nativeSetFilterMode(long handle, int mode);
@@ -478,8 +479,16 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
 
     public void onUpdateWindowContentDirect(Window window, Drawable pixmap, short xOff, short yOff) {
         if (window.id == fpsWindowId) {
-            if (hudRef != null) hudRef.onFrame();
-            if (classicHudRef != null) classicHudRef.update();
+            float frameGenRate = (nativeHandle != 0 && pendingLsfgMultiplier >= 2 && frameGenError.isEmpty())
+                    ? nativeGetFrameGenPresentedRate(nativeHandle) : 0f;
+            if (hudRef != null) {
+                hudRef.setFrameGenPresentedRate(frameGenRate);
+                hudRef.onFrame();
+            }
+            if (classicHudRef != null) {
+                classicHudRef.setFrameGenPresentedRate(frameGenRate);
+                classicHudRef.update();
+            }
         }
         synchronized (lock) {
             if (nativeHandle == 0 || pixmap == null) return;

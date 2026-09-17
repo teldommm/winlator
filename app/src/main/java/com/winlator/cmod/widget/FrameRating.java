@@ -26,6 +26,7 @@ public class FrameRating extends FrameLayout implements Runnable {
     private long lastTime = 0;
     private int frameCount = 0;
     private float lastFPS = 0;
+    private volatile float frameGenPresentedRate = 0f;
     private String totalRAM = null;
     private final TextView tvFPS;
     private final TextView tvRenderer;
@@ -136,6 +137,12 @@ public class FrameRating extends FrameLayout implements Runnable {
         return userEnabled;
     }
 
+    /** Presents/sec incl. generated frames, pushed once per real frame while frame gen is
+     *  actually running; 0 means "not generating right now", so the plain measured FPS shows. */
+    public void setFrameGenPresentedRate(float rate) {
+        frameGenPresentedRate = rate;
+    }
+
     public void update() {
         if (!userEnabled) return;
         if (lastTime == 0) lastTime = SystemClock.elapsedRealtime();
@@ -153,7 +160,9 @@ public class FrameRating extends FrameLayout implements Runnable {
     public void run() {
         if (!userEnabled) return;
         if (getVisibility() == GONE) setVisibility(View.VISIBLE);
-        tvFPS.setText(String.format(Locale.ENGLISH, "%.1f", lastFPS));
+        float genRate = frameGenPresentedRate;
+        float displayFps = genRate > 0f ? genRate : lastFPS;
+        tvFPS.setText(String.format(Locale.ENGLISH, "%.1f", displayFps));
         tvRAM.setText(getAvailableRAM() + " GB Used / " + totalRAM + " Total");
     }
 }

@@ -38,6 +38,21 @@ Java_com_winlator_cmod_widget_VulkanXServerView_nativeConfigureFrameGen(
     return nullptr;
 }
 
+// Measured presents/sec (real + generated), already smoothed by the renderer
+// itself (see VulkanRendererContext::trackPresentedRate). Shared-locked the
+// same way renderFrame() locks for rendering, so this never blocks or races
+// against a config change (setFrameGenArmed etc. take the exclusive lock).
+extern "C" JNIEXPORT jfloat JNICALL
+Java_com_winlator_cmod_widget_VulkanXServerView_nativeGetFrameGenPresentedRate(
+    JNIEnv*, jobject, jlong handle) {
+    auto* ctx = reinterpret_cast<VulkanRendererContext*>(handle);
+    if (!ctx) return 0.0f;
+    std::shared_lock<std::shared_mutex> frameLock(ctx->frameMutex);
+    float stats[6];
+    ctx->frameGenStats(stats);
+    return stats[3];
+}
+
 static void* openAdrenotoolsDriver(const char* driverPath, const char* libraryName,
                                    const char* nativeLibDir) {
     if (!driverPath || !libraryName || !nativeLibDir) return nullptr;
