@@ -6,23 +6,34 @@
 #   - no Java/Kotlin R.layout / class usage
 #   - no XML <include>, no styles.xml @layout entries, no tools:layout
 #
-# The preference_* layout family + res/xml/preferences*.xml are now included below
-# too (round 2): confirmed the whole AndroidX Preference apparatus is unused —
-# no live PreferenceFragmentCompat/Preference widget anywhere, no preferenceTheme
-# attribute set, and preferences.xml/preferences_x11.xml are never loaded from Java.
-# This DOES require an accompanying edit to values/styles.xml (removing the
-# Preference.*/PreferenceFragment*/PreferenceThemeOverlay* style block, lines
-# ~420-582) — that file is a content edit, not a deletion, so drop in the full
-# replacement styles.xml you already have alongside running this script.
+# The preference_* layout family + res/xml/preferences*.xml are also included
+# below (round 2): confirmed the whole AndroidX Preference apparatus is unused.
+# That round also required an accompanying edit to values/styles.xml (removing
+# the Preference.*/PreferenceFragment*/PreferenceThemeOverlay* style block) —
+# drop in the full replacement styles.xml you already have alongside this script.
+#
+# Round 3: ShortcutSettingsDialog.java itself turned out to be dead too (the
+# live per-shortcut editor is ui/shortcut/ShortcutEditorV2.kt, Compose). Its
+# whole call chain — GraphicsDriverConfigDialog, DXVKConfigDialog,
+# WineD3DConfigDialog, AddEnvVarDialog — is deleted below. RendererOptionsDialog
+# is NOT deleted (kept, trimmed) because XServerDisplayActivity still calls its
+# static toVkPresentMode() live — same for GraphicsDriverConfigDialog,
+# DXVKConfigDialog and WineD3DConfigDialog, which each had live static config/
+# env-var helpers alongside their dead dialog UI: drop in the trimmed
+# replacement versions of those four files you already have, alongside this
+# script — do NOT let this script delete them, it only deletes the confirmed
+# fully-dead files below.
 #
 # NOT included here (left alone on purpose — confirmed still live):
 #   - left_sidebar.xml / left_sidebar_original.xml / main_menu_storage_footer.xml —
 #     these looked orphaned at first glance but are live via <include> in
 #     xserver_display_activity.xml / main_activity.xml
 #
-# This script only DELETES files. It does not apply the separate content edits to
-# ShortcutSettingsDialog.java, RemoteDriverCatalog.java, MainActivity.java and
-# values/styles.xml — those are full replacement files, drop them in manually.
+# This script only DELETES files. It does not apply the separate content edits
+# to MainActivity.java, RemoteDriverCatalog.java, values/styles.xml,
+# GraphicsDriverConfigDialog.java, DXVKConfigDialog.java, WineD3DConfigDialog.java
+# and RendererOptionsDialog.java — those are full replacement files, drop them
+# in manually.
 #
 # Usage:
 #   bash cleanup_dead_code.sh                     # uses default path below
@@ -108,6 +119,22 @@ FILES=(
     "app/src/main/res/layout/preference_widget_switch_compat.xml"
     "app/src/main/res/xml/preferences.xml"
     "app/src/main/res/xml/preferences_x11.xml"
+
+    # --- Round 3: ShortcutSettingsDialog itself was dead (real editor is
+    #     ui/shortcut/ShortcutEditorV2.kt, Compose) — deleting it and the two
+    #     dialogs that had NO live static methods left over ---
+    "app/src/main/java/com/winlator/cmod/contentdialog/ShortcutSettingsDialog.java"
+    "app/src/main/java/com/winlator/cmod/contentdialog/AddEnvVarDialog.java"
+    "app/src/main/res/layout/shortcut_settings_dialog.xml"
+    "app/src/main/res/layout/wincomponent_list_item.xml"
+    "app/src/main/res/layout/add_env_var_dialog.xml"
+    "app/src/main/res/layout/dxvk_config_dialog.xml"
+    "app/src/main/res/layout/graphics_driver_config_dialog.xml"
+    "app/src/main/res/layout/renderer_options_dialog.xml"
+    "app/src/main/res/layout/wined3d_config_dialog.xml"
+    "app/src/main/res/layout/spinner_dropdown_item_amoled.xml"
+    "app/src/main/res/layout/spinner_dropdown_item_amoled_compact.xml"
+    "app/src/main/res/layout/spinner_item_amoled.xml"
 )
 
 removed=0
@@ -127,9 +154,12 @@ echo ""
 echo "Done in: $BASE_DIR"
 echo "Removed: $removed | already missing: $missing | total tracked: ${#FILES[@]}"
 echo ""
-echo "REMINDER — this script does NOT touch these four (they need full content"
+echo "REMINDER — this script does NOT touch these seven (they need full content"
 echo "replacement, not deletion; drop in the versions you already have):"
-echo "  app/src/main/java/com/winlator/cmod/contentdialog/ShortcutSettingsDialog.java"
 echo "  app/src/main/java/com/winlator/cmod/contents/RemoteDriverCatalog.java"
 echo "  app/src/main/java/com/winlator/cmod/MainActivity.java"
+echo "  app/src/main/java/com/winlator/cmod/contentdialog/GraphicsDriverConfigDialog.java"
+echo "  app/src/main/java/com/winlator/cmod/contentdialog/DXVKConfigDialog.java"
+echo "  app/src/main/java/com/winlator/cmod/contentdialog/WineD3DConfigDialog.java"
+echo "  app/src/main/java/com/winlator/cmod/contentdialog/RendererOptionsDialog.java"
 echo "  app/src/main/res/values/styles.xml"
