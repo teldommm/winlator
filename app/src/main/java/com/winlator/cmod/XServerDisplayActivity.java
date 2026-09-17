@@ -59,10 +59,10 @@ import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.container.Shortcut;
 import com.winlator.cmod.contentdialog.ContentDialog;
-import com.winlator.cmod.contentdialog.DXVKConfigDialog;
+import com.winlator.cmod.contentdialog.DXVKConfig;
 import com.winlator.cmod.contentdialog.DebugDialog;
-import com.winlator.cmod.contentdialog.GraphicsDriverConfigDialog;
-import com.winlator.cmod.contentdialog.WineD3DConfigDialog;
+import com.winlator.cmod.contentdialog.GraphicsDriverConfig;
+import com.winlator.cmod.contentdialog.WineD3DConfig;
 import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.contents.AdrenotoolsManager;
@@ -526,8 +526,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
             isMouseDisabled = shortcut.getExtra("disableMouse").equals("1");
         }
 
-        this.graphicsDriverConfig = GraphicsDriverConfigDialog.parseGraphicsDriverConfig(graphicsDriverConfig);
-        this.dxwrapperConfig = DXVKConfigDialog.parseConfig(dxwrapperConfig);
+        this.graphicsDriverConfig = GraphicsDriverConfig.parseGraphicsDriverConfig(graphicsDriverConfig);
+        this.dxwrapperConfig = DXVKConfig.parseConfig(dxwrapperConfig);
 
         if (!wineInfo.isWin64()) {
             onExtractFileListener = (file, size) -> {
@@ -1214,7 +1214,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
             String presentMode = shortcut != null ? shortcut.getRendererPresentMode()
                     : (container != null ? container.getRendererPresentMode() : "fifo");
-            vkRenderer.setVkPresentMode(com.winlator.cmod.contentdialog.RendererOptionsDialog.toVkPresentMode(presentMode));
+            vkRenderer.setVkPresentMode(com.winlator.cmod.contentdialog.RendererOptions.toVkPresentMode(presentMode));
             vkRenderer.setFilterMode(shortcut != null ? shortcut.getRendererFilterMode()
                     : (container != null ? container.getRendererFilterMode() : 0));
 
@@ -2521,14 +2521,14 @@ public class XServerDisplayActivity extends AppCompatActivity {
         File rootDir = imageFs.getRootDir();
 
         if (dxwrapper.contains("dxvk")) {
-            DXVKConfigDialog.setEnvVars(this, dxwrapperConfig, envVars);
+            DXVKConfig.setEnvVars(this, dxwrapperConfig, envVars);
             String version = dxwrapperConfig.get("version");
             if (version.equals("1.11.1-sarek")) {
                 Log.d("GraphicsDriverExtraction", "Disabling Wrapper PATCH_OPCONSTCOMP SPIR-V pass");
                 envVars.put("WRAPPER_NO_PATCH_OPCONSTCOMP", "1");
             }
         } else {
-            WineD3DConfigDialog.setEnvVars(this, dxwrapperConfig, envVars);
+            WineD3DConfig.setEnvVars(this, dxwrapperConfig, envVars);
         }
 
         boolean useDRI3 = preferences.getBoolean("use_dri3", true);
@@ -2570,8 +2570,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
         String dxvkVersion = dxwrapperConfig.get("version");
         if (!gpuName.equals("Device") && !dxvkVersion.equals("1.11.1-sarek")) {
             envVars.put("WRAPPER_DEVICE_NAME", gpuName);
-            envVars.put("WRAPPER_DEVICE_ID", WineD3DConfigDialog.getDeviceIdFromGPUName(this, gpuName));
-            envVars.put("WRAPPER_VENDOR_ID", WineD3DConfigDialog.getVendorIdFromGPUName(this, gpuName));
+            envVars.put("WRAPPER_DEVICE_ID", WineD3DConfig.getDeviceIdFromGPUName(this, gpuName));
+            envVars.put("WRAPPER_VENDOR_ID", WineD3DConfig.getVendorIdFromGPUName(this, gpuName));
         }
 
         String maxDeviceMemory = graphicsDriverConfig.get("maxDeviceMemory");

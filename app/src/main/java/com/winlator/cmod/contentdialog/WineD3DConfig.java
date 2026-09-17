@@ -10,11 +10,13 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-public class WineD3DConfigDialog {
-    // The interactive dialog UI here was dead code — its only caller was the
-    // legacy ShortcutSettingsDialog, which is itself never shown (the live
-    // per-shortcut editor is ui/shortcut/ShortcutEditorV2.kt). Trimmed to the
-    // static GPU-lookup + env-var helpers used live by XServerDisplayActivity.
+public class WineD3DConfig {
+    // Was WineD3DConfigDialog. The interactive dialog UI here was dead code —
+    // its only caller was the legacy ShortcutSettingsDialog, which is itself
+    // never shown (the live per-shortcut editor is
+    // ui/shortcut/ShortcutEditorV2.kt). Trimmed to the static GPU-lookup +
+    // env-var helpers used live by XServerDisplayActivity, and renamed since
+    // it's no longer a dialog.
     public static String getDeviceIdFromGPUName(Context context, String gpuName) {
         String gpuNameList = FileUtils.readString(context, "gpu_cards.json");
         String deviceId = "";

@@ -7,11 +7,12 @@ import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.KeyValueSet;
 import com.winlator.cmod.xenvironment.ImageFs;
 
-public class DXVKConfigDialog {
-    // The interactive dialog UI here was dead code — its only caller was the
-    // legacy ShortcutSettingsDialog, which is itself never shown (the live
-    // per-shortcut editor is ui/shortcut/ShortcutEditorV2.kt). Trimmed to the
-    // static config codec used live by XServerDisplayActivity.
+public class DXVKConfig {
+    // Was DXVKConfigDialog. The interactive dialog UI here was dead code — its
+    // only caller was the legacy ShortcutSettingsDialog, which is itself never
+    // shown (the live per-shortcut editor is ui/shortcut/ShortcutEditorV2.kt).
+    // Trimmed to the static config codec used live by XServerDisplayActivity,
+    // and renamed since it's no longer a dialog.
     public static final String DEFAULT_CONFIG = Container.DEFAULT_DXWRAPPERCONFIG;
 
     public static KeyValueSet parseConfig(Object config) {

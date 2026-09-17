@@ -3,8 +3,6 @@ package com.winlator.cmod.container;
 import android.os.Environment;
 
 import com.winlator.cmod.box64.Box64Preset;
-import com.winlator.cmod.contentdialog.DXVKConfigDialog;
-import com.winlator.cmod.contentdialog.WineD3DConfigDialog;
 import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.KeyValueSet;

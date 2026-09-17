@@ -135,6 +135,32 @@ FILES=(
     "app/src/main/res/layout/spinner_dropdown_item_amoled.xml"
     "app/src/main/res/layout/spinner_dropdown_item_amoled_compact.xml"
     "app/src/main/res/layout/spinner_item_amoled.xml"
+
+    # --- Round 4: real gradle build caught this — ImagePickerView.java referenced
+    #     R.id.* that only ever existed inside container_detail_fragment.xml
+    #     (deleted in round 1). Root cause: I checked R.layout.X references before
+    #     deleting layouts, but never checked R.id.X for ids declared only inside
+    #     them — R.id is a global namespace, not scoped to one layout. Turned out
+    #     ImagePickerView itself was dead too (only ever used from the same
+    #     already-deleted cluster), so this completes that cleanup rather than
+    #     restoring anything. Re-verified with an exhaustive sweep: every R.id.X
+    #     and R.layout.X reference in the whole codebase now resolves against
+    #     what's still on disk.
+    "app/src/main/java/com/winlator/cmod/widget/ImagePickerView.java"
+    "app/src/main/res/layout/image_picker_view.xml"
+    "app/src/main/res/drawable-hdpi/icon_image_picker.png"
+
+    # --- Round 5: renamed 4 trimmed utility classes to drop the misleading
+    #     "Dialog" suffix (they no longer show any UI). Old filenames deleted
+    #     here; new files (GraphicsDriverConfig.java, DXVKConfig.java,
+    #     WineD3DConfig.java, RendererOptions.java) and the two files whose
+    #     call sites changed (XServerDisplayActivity.java,
+    #     contents/AdrenotoolsManager.java) are full replacement files —
+    #     drop them in alongside running this script.
+    "app/src/main/java/com/winlator/cmod/contentdialog/GraphicsDriverConfigDialog.java"
+    "app/src/main/java/com/winlator/cmod/contentdialog/DXVKConfigDialog.java"
+    "app/src/main/java/com/winlator/cmod/contentdialog/WineD3DConfigDialog.java"
+    "app/src/main/java/com/winlator/cmod/contentdialog/RendererOptionsDialog.java"
 )
 
 removed=0
@@ -154,12 +180,15 @@ echo ""
 echo "Done in: $BASE_DIR"
 echo "Removed: $removed | already missing: $missing | total tracked: ${#FILES[@]}"
 echo ""
-echo "REMINDER — this script does NOT touch these seven (they need full content"
+echo "REMINDER — this script does NOT touch these nine (they need full content"
 echo "replacement, not deletion; drop in the versions you already have):"
 echo "  app/src/main/java/com/winlator/cmod/contents/RemoteDriverCatalog.java"
 echo "  app/src/main/java/com/winlator/cmod/MainActivity.java"
-echo "  app/src/main/java/com/winlator/cmod/contentdialog/GraphicsDriverConfigDialog.java"
-echo "  app/src/main/java/com/winlator/cmod/contentdialog/DXVKConfigDialog.java"
-echo "  app/src/main/java/com/winlator/cmod/contentdialog/WineD3DConfigDialog.java"
-echo "  app/src/main/java/com/winlator/cmod/contentdialog/RendererOptionsDialog.java"
+echo "  app/src/main/java/com/winlator/cmod/XServerDisplayActivity.java"
+echo "  app/src/main/java/com/winlator/cmod/container/Container.java"
+echo "  app/src/main/java/com/winlator/cmod/contents/AdrenotoolsManager.java"
+echo "  app/src/main/java/com/winlator/cmod/contentdialog/GraphicsDriverConfig.java  (new, was GraphicsDriverConfigDialog.java)"
+echo "  app/src/main/java/com/winlator/cmod/contentdialog/DXVKConfig.java            (new, was DXVKConfigDialog.java)"
+echo "  app/src/main/java/com/winlator/cmod/contentdialog/WineD3DConfig.java         (new, was WineD3DConfigDialog.java)"
+echo "  app/src/main/java/com/winlator/cmod/contentdialog/RendererOptions.java       (new, was RendererOptionsDialog.java)"
 echo "  app/src/main/res/values/styles.xml"

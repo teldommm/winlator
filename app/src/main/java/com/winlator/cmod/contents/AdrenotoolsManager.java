@@ -15,7 +15,7 @@ import com.winlator.cmod.core.DownloadProgressDialog;
 import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.GPUInformation;
-import com.winlator.cmod.contentdialog.GraphicsDriverConfigDialog;
+import com.winlator.cmod.contentdialog.GraphicsDriverConfig;
 import com.winlator.cmod.core.OnExtractFileListener;
 import com.winlator.cmod.core.TarCompressorUtils;
 import com.winlator.cmod.xenvironment.ImageFs;
@@ -93,22 +93,22 @@ public class AdrenotoolsManager {
     private void reloadContainers(String adrenoToolsDriverId) {
         ContainerManager containerManager = new ContainerManager(mContext);
         for (Container container : containerManager.getContainers()) {
-            HashMap<String, String> config = GraphicsDriverConfigDialog.parseGraphicsDriverConfig(container.getGraphicsDriverConfig());
+            HashMap<String, String> config = GraphicsDriverConfig.parseGraphicsDriverConfig(container.getGraphicsDriverConfig());
             Log.d("AdrenotoolsManager", "Checking if container driver version " + config.get("version") + " matches " + getDriverName(adrenoToolsDriverId));
             if (config.get("version").contains(getDriverName(adrenoToolsDriverId))) {
                 Log.d("AdrenotoolsManager", "Found a match for container " + container.getName());
                 config.put("version", GPUInformation.isDriverSupported(DefaultVersion.WRAPPER_ADRENO, mContext) ? DefaultVersion.WRAPPER_ADRENO : DefaultVersion.WRAPPER);
-                container.setGraphicsDriverConfig(GraphicsDriverConfigDialog.toGraphicsDriverConfig(config));
+                container.setGraphicsDriverConfig(GraphicsDriverConfig.toGraphicsDriverConfig(config));
                 container.saveData();
             }     
         }
         for (Shortcut shortcut : containerManager.loadShortcuts()) {
-            HashMap<String, String> config = GraphicsDriverConfigDialog.parseGraphicsDriverConfig(shortcut.getExtra("graphicsDriverConfig", shortcut.container.getGraphicsDriverConfig()));
+            HashMap<String, String> config = GraphicsDriverConfig.parseGraphicsDriverConfig(shortcut.getExtra("graphicsDriverConfig", shortcut.container.getGraphicsDriverConfig()));
             Log.d("AdrenotoolsManager", "Checking if shortcut driver version " + config.get("version") + " matches " + getDriverName(adrenoToolsDriverId));
             if (config.get("version").contains(getDriverName(adrenoToolsDriverId))) {
                 Log.d("AdrenotoolsManager", "Found a match for shortcut " + shortcut.name);
                 config.put("version", GPUInformation.isDriverSupported(DefaultVersion.WRAPPER_ADRENO, mContext) ? DefaultVersion.WRAPPER_ADRENO : DefaultVersion.WRAPPER);
-                shortcut.putExtra("graphicsDriverConfig", GraphicsDriverConfigDialog.toGraphicsDriverConfig(config));
+                shortcut.putExtra("graphicsDriverConfig", GraphicsDriverConfig.toGraphicsDriverConfig(config));
                 shortcut.saveData();
             }
         }
