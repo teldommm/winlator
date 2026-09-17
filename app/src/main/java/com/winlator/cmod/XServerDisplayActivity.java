@@ -237,8 +237,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private EnvVars overrideEnvVars;
 
     private void createNotifcationChannel() {
-        String name = "Winlator";
-        String description = "Winlator XServer Messages";
+        String name = "WinLite";
+        String description = "WinLite XServer Messages";
         int importance = NotificationManager.IMPORTANCE_HIGH;
         NotificationChannel channel = new NotificationChannel(NOTIFICATION_CHANNEL_ID, name, importance);
         channel.setDescription(description);
@@ -634,13 +634,19 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         createNotifcationChannel();
 
+        // Stop the library's "keep-alive" notification/service while a game session's own
+        // notification is showing, so the user doesn't see two near-identical "app is running"
+        // notifications at once. Exiting a session fully restarts the process (see exit()),
+        // which naturally re-starts NotificationService from MainActivity.onCreate().
+        stopService(new Intent(this, com.winlator.cmod.services.NotificationService.class));
+
         Intent notificationIntent = new Intent(this, XServerDisplayActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent,
                 PendingIntent.FLAG_IMMUTABLE);
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_stat_ab_gear_0011)
-                .setContentTitle("Winlator")
-                .setContentText("Winlator is running, do not kill or swipe this notification")
+                .setContentTitle("WinLite")
+                .setContentText("WinLite is running, do not kill or swipe this notification")
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setContentIntent(pendingIntent)
                 .setAutoCancel(false);
@@ -1171,7 +1177,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     private String getSelectedSurfaceFormat() {
         if (shortcut != null) return shortcut.getSurfaceFormat();
-        return container != null ? container.getSurfaceFormat() : "rgba8";
+        return container != null ? container.getSurfaceFormat() : "bgra8";
     }
 
     private void setupUI() {

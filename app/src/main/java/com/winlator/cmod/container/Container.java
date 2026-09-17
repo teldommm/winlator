@@ -142,7 +142,7 @@ public class Container {
 
     public String getSurfaceFormat() {
         String value = getExtra("surfaceFormat", null);
-        if (value == null || value.isEmpty()) value = "rgba8";
+        if (value == null || value.isEmpty()) value = "bgra8";
         return "bgra8".equalsIgnoreCase(value) ? "bgra8" : "rgba8";
     }
     public void setSurfaceFormat(String value) {

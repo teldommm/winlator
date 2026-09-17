@@ -463,7 +463,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
 
         String surfaceFormat = shortcut != null
                 ? shortcut.getSurfaceFormat()
-                : container != null ? container.getSurfaceFormat() : "rgba8";
+                : container != null ? container.getSurfaceFormat() : "bgra8";
 
         execEnvVars.put("WRAPPER_SURFACE_FORMAT", surfaceFormat);
 

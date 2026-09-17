@@ -169,7 +169,7 @@ private class ContainerEditorStateV2(
     var rendererPresentMode by mutableStateOf(editing?.rendererPresentMode ?: "fifo")
     var rendererDriver by mutableStateOf(editing?.rendererDriverId ?: "system")
     var filterMode by mutableIntStateOf(editing?.rendererFilterMode ?: 0)
-    var surfaceFormat by mutableStateOf(editing?.getSurfaceFormat() ?: "rgba8")
+    var surfaceFormat by mutableStateOf(editing?.getSurfaceFormat() ?: "bgra8")
 
     var graphicsDriver by mutableStateOf(
         editing?.graphicsDriver ?: if (preferredDriver == DefaultVersion.WRAPPER_ADRENO) {
