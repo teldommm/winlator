@@ -66,7 +66,6 @@ import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.winlator.cmod.XrActivity
 import com.winlator.cmod.XServerDisplayActivity
 import com.winlator.cmod.container.Container
 import com.winlator.cmod.container.ContainerManager
@@ -174,11 +173,7 @@ class ContainersSettingsActivity : AppCompatActivity() {
     }
 
     private fun runContainer(id: Int) {
-        if (!XrActivity.isEnabled(this)) {
-            startActivity(Intent(this, XServerDisplayActivity::class.java).putExtra("container_id", id))
-        } else {
-            XrActivity.openIntent(this, id, null)
-        }
+        startActivity(Intent(this, XServerDisplayActivity::class.java).putExtra("container_id", id))
     }
 
     override fun onBackPressed() {

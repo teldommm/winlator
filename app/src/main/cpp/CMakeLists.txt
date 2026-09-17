@@ -4,7 +4,6 @@ project(Winlator)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -Wno-unused-function -Wimplicit-function-declaration")
 
-add_subdirectory(OpenXR-SDK)
 add_subdirectory(patchelf)
 add_subdirectory(adrenotools)
 add_subdirectory(thirdparty/dxbc)
@@ -13,14 +12,10 @@ add_subdirectory(thirdparty/dxbc)
 # NOTE: the DisplayX and EGL X-server renderer path (winlator/renderer/{egl,window,shader,
 # cursor,xform,view_transformation,displayx,renderer_jni}.* and renderer/effectcomposer/*)
 # was removed. Vulkan (vulkan_renderer, below) is now the only X-server presentation path.
-# xr/*.c (OpenXR/VR) keeps its own independent EGL/GLES usage and is unaffected.
+# The OpenXR/VR module (xr/*.c, OpenXR-SDK/) was also removed: it was already fully
+# disconnected in this fork (no Java call site ever invoked its native entry points, and
+# the JNI symbol names didn't even match the actual Java package).
 add_library(winlator SHARED
-        xr/engine.c
-        xr/framebuffer.c
-        xr/input.c
-        xr/main.c
-        xr/math.c
-        xr/renderer.c
         winlator/drawable.c
         winlator/gpu_image.c
         winlator/process_helper.c
@@ -36,11 +31,7 @@ target_link_libraries(winlator
         log
         android
         jnigraphics
-        openxr_loader
         aaudio
-        EGL
-        GLESv2
-        GLESv3
         adrenotools
         vulkan
 )

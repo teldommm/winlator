@@ -130,27 +130,19 @@ public class GameDetailFragment extends Fragment {
 
     private void runShortcut() {
         Activity activity = requireActivity();
-        if (!XrActivity.isEnabled(requireContext())) {
-            Intent intent = new Intent(activity, XServerDisplayActivity.class);
-            intent.putExtra("container_id", shortcut.container.id);
-            intent.putExtra("shortcut_path", shortcut.file.getPath());
-            intent.putExtra("shortcut_name", shortcut.name);
-            intent.putExtra("disableXinput", shortcut.getExtra("disableXinput", "0"));
-            activity.startActivity(intent);
-        } else {
-            XrActivity.openIntent(activity, shortcut.container.id, shortcut.file.getPath());
-        }
+        Intent intent = new Intent(activity, XServerDisplayActivity.class);
+        intent.putExtra("container_id", shortcut.container.id);
+        intent.putExtra("shortcut_path", shortcut.file.getPath());
+        intent.putExtra("shortcut_name", shortcut.name);
+        intent.putExtra("disableXinput", shortcut.getExtra("disableXinput", "0"));
+        activity.startActivity(intent);
     }
 
     private void runContainer() {
         Activity activity = requireActivity();
-        if (!XrActivity.isEnabled(requireContext())) {
-            Intent intent = new Intent(activity, XServerDisplayActivity.class);
-            intent.putExtra("container_id", shortcut.container.id);
-            activity.startActivity(intent);
-        } else {
-            XrActivity.openIntent(activity, shortcut.container.id, null);
-        }
+        Intent intent = new Intent(activity, XServerDisplayActivity.class);
+        intent.putExtra("container_id", shortcut.container.id);
+        activity.startActivity(intent);
     }
 
     private boolean isLandscape() {

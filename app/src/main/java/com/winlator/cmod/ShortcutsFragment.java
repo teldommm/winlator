@@ -619,16 +619,12 @@ public class ShortcutsFragment extends Fragment {
             libraryController.setSelectedShortcutPath(shortcut.file.getPath());
             publishLibraryItems();
         }
-        if (!XrActivity.isEnabled(getContext())) {
-            Intent intent = new Intent(activity, XServerDisplayActivity.class);
-            intent.putExtra("container_id", shortcut.container.id);
-            intent.putExtra("shortcut_path", shortcut.file.getPath());
-            intent.putExtra("shortcut_name", shortcut.name);
-            intent.putExtra("disableXinput", shortcut.getExtra("disableXinput", "0"));
-            activity.startActivity(intent);
-        } else {
-            XrActivity.openIntent(activity, shortcut.container.id, shortcut.file.getPath());
-        }
+        Intent intent = new Intent(activity, XServerDisplayActivity.class);
+        intent.putExtra("container_id", shortcut.container.id);
+        intent.putExtra("shortcut_path", shortcut.file.getPath());
+        intent.putExtra("shortcut_name", shortcut.name);
+        intent.putExtra("disableXinput", shortcut.getExtra("disableXinput", "0"));
+        activity.startActivity(intent);
     }
 
     private void handleShortcutAction(Shortcut shortcut, String action) {

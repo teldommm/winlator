@@ -432,21 +432,6 @@
     <string name="reconfigure">Reconfigure</string>
     <string name="do_you_want_to_reconfigure_wine">Do you want to reconfigure this container on the next startup? This will remove the timestamp to trigger Wine Configuration.</string>
 
-    <!-- OpenXR specific text -->
-    <string name="xr" translatable="false">XR</string>
-    <string name="primary_controller">Primary controller</string>
-    <string name="left_controller">Left controller</string>
-    <string name="right_controller">Right controller</string>
-    <string name="button_a">Button A</string>
-    <string name="button_b">Button B</string>
-    <string name="button_x">Button X</string>
-    <string name="button_y">Button Y</string>
-    <string name="button_grip">Grip button</string>
-    <string name="button_trigger">Trigger button</string>
-    <string name="thumbstick_left">Thumbstick left</string>
-    <string name="thumbstick_right">Thumbstick right</string>
-    <string name="thumbstick_up">Thumbstick up</string>
-    <string name="thumbstick_down">Thumbstick down</string>
     <string name="secondary_executable">Path:</string>
     <string name="enter_secondary_exec_path"> ex: "D:/Games/My Game/My Game.exe"</string>
     <string name="exec_delay">Delayed Execution (seconds):</string>
@@ -497,7 +482,6 @@
     <string name="invert_x_axis_right">Invert X Axis (Right Stick)</string>
     <string name="invert_y_axis_right">Invert Y Axis (Right Stick)</string>
     <string name="save">Save</string>
-    <string name="use_xr">Use OpenXR integration</string>
 
 
 
@@ -584,7 +568,6 @@ E.g. <b>META</b> for <i>META key</i>, \n
 
     <string name="pref_clipboardEnable">Clipboard sharing</string>
     <string name="pref_requestNotificationPermission">Request notification permission</string>
-    <string name="pref_xrMode">Meta Oculus XR mode</string>
     <string name="pref_configureResponseToUserActions">Configure response to user actions</string>
     <string name="pref_storeSecondaryDisplayPreferencesSeparately">Store preferences for secondary displays separately</string>
     <string name="pref_storeSecondaryDisplayPreferencesSeparately_summary">Open this screen on display you want to configure</string>

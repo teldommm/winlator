@@ -21,11 +21,6 @@ import java.io.File;
 import java.util.Iterator;
 
 public class Container {
-    public enum XrControllerMapping {
-        BUTTON_A, BUTTON_B, BUTTON_X, BUTTON_Y, BUTTON_GRIP, BUTTON_TRIGGER,
-        THUMBSTICK_UP, THUMBSTICK_DOWN, THUMBSTICK_LEFT, THUMBSTICK_RIGHT
-    }
-    public static final String DEFAULT_DISPLAY_DRIVER = "egl";
     public static final String DEFAULT_ENV_VARS = "WRAPPER_MAX_IMAGE_COUNT=0 ZINK_DESCRIPTORS=lazy ZINK_DEBUG=compact MESA_SHADER_CACHE_DISABLE=false MESA_SHADER_CACHE_MAX_SIZE=512MB mesa_glthread=true WINEESYNC=1 TU_DEBUG=noconform,sysmem DXVK_HUD=devinfo,fps,frametimes,gpuload,version,api";
     public static final String DEFAULT_SCREEN_SIZE = "1280x720";
     public static final String DEFAULT_GRAPHICS_DRIVER = "wrapper";
@@ -74,8 +69,6 @@ public class Container {
     private String midiSoundFont = "";
     private int inputType = WinHandler.DEFAULT_INPUT_TYPE;
     private String lc_all = "";
-    private int primaryController = 1;
-    private String controllerMapping = new String(new char[XrControllerMapping.values().length]);
     private String box64Version;
     private String emulator;
     private boolean exclusiveXInput = true;
@@ -233,22 +226,6 @@ public class Container {
 
     public void setLC_ALL(String lc_all) {
         this.lc_all = lc_all;
-    }
-
-    public int getPrimaryController() {
-        return primaryController;
-    }
-
-    public void setPrimaryController(int primaryController) {
-        this.primaryController = primaryController;
-    }
-
-    public byte getControllerMapping(XrControllerMapping input) {
-        return (byte) controllerMapping.charAt(input.ordinal());
-    }
-
-    public void setControllerMapping(String controllerMapping) {
-        this.controllerMapping = controllerMapping;
     }
 
     public boolean isFullscreenStretched() { return fullscreenStretched; }
@@ -491,8 +468,6 @@ public class Container {
             data.put("extraData", extraData);
             data.put("midiSoundFont", midiSoundFont);
             data.put("lc_all", lc_all);
-            data.put("primaryController", primaryController);
-            data.put("controllerMapping", controllerMapping);
             data.put("exclusiveXInput", exclusiveXInput);
             if (!WineInfo.isMainWineVersion(wineVersion)) data.put("wineVersion", wineVersion);
             FileUtils.writeString(getConfigFile(), data.toString());
@@ -602,12 +577,6 @@ public class Container {
                     break;
                 case "lc_all" :
                     setLC_ALL(data.getString(key));
-                    break;
-                case "primaryController" :
-                    setPrimaryController(data.getInt(key));
-                    break;
-                case "controllerMapping" :
-                    controllerMapping = data.getString(key);
                     break;
                 case "exclusiveXInput" :
                     setExclusiveXInput(data.getBoolean(key));

@@ -149,13 +149,9 @@ public class ContainerOverviewFragment extends Fragment {
 
     private void runContainer() {
         Activity activity = requireActivity();
-        if (!XrActivity.isEnabled(requireContext())) {
-            Intent intent = new Intent(activity, XServerDisplayActivity.class);
-            intent.putExtra("container_id", container.id);
-            activity.startActivity(intent);
-        } else {
-            XrActivity.openIntent(activity, container.id, null);
-        }
+        Intent intent = new Intent(activity, XServerDisplayActivity.class);
+        intent.putExtra("container_id", container.id);
+        activity.startActivity(intent);
     }
 
     @Override

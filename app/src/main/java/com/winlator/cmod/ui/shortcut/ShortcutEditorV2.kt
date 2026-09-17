@@ -72,7 +72,6 @@ import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
 import com.winlator.cmod.R
 import com.winlator.cmod.ShortcutsFragment
-import com.winlator.cmod.XrActivity
 import com.winlator.cmod.XServerDisplayActivity
 import com.winlator.cmod.box64.Box64PresetManager
 import com.winlator.cmod.container.Container
@@ -471,11 +470,7 @@ internal fun ShortcutEditorV2(fragment: Fragment, shortcut: Shortcut, close: () 
 
     fun enterContainer() {
         val activity = fragment.requireActivity()
-        if (!XrActivity.isEnabled(context)) {
-            activity.startActivity(Intent(activity, XServerDisplayActivity::class.java).putExtra("container_id", state.container.id))
-        } else {
-            XrActivity.openIntent(activity, state.container.id, null)
-        }
+        activity.startActivity(Intent(activity, XServerDisplayActivity::class.java).putExtra("container_id", state.container.id))
     }
 
     fun createContainer() {

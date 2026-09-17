@@ -100,8 +100,6 @@ data class SettingsModel(
     val cursorLock: Boolean,
     val xInput: Boolean,
     val useDri3: Boolean,
-    val useXr: Boolean,
-    val xrSupported: Boolean,
     val highRefreshRate: Boolean,
     val fileProvider: Boolean,
     val openInBrowser: Boolean,
@@ -255,10 +253,6 @@ private fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) {
                     CursorSpeedRow(model.cursorSpeedPercent, callbacks::onCursorSpeedChanged)
                     GroupDivider()
                     ToggleRow(stringResource(R.string.use_dri3_extension), model.useDri3) { callbacks.onBooleanChanged("use_dri3", it) }
-                    if (model.xrSupported) {
-                        GroupDivider()
-                        ToggleRow(stringResource(R.string.use_xr), model.useXr) { callbacks.onBooleanChanged("use_xr", it) }
-                    }
                     GroupDivider()
                     ToggleRow("Capture External Pointer", model.cursorLock) { callbacks.onBooleanChanged("cursor_lock", it) }
                     GroupDivider()

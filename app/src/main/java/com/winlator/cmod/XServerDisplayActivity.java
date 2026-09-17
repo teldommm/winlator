@@ -1497,12 +1497,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (btItemLogs != null)
             btItemLogs.setVisibility(enableLogs ? View.VISIBLE : View.GONE);
 
-        if (XrActivity.isEnabled(this)) {
-            View btItemMagnifier = findViewById(R.id.BTItemMagnifier);
-            if (btItemMagnifier != null)
-                btItemMagnifier.setVisibility(View.GONE);
-        }
-
         toggleOnClick(R.id.BTItemInput, R.id.LLSubInput);
         toggleOnClick(R.id.BTItemMouse, R.id.LLSubMouse);
         toggleOnClick(R.id.BTItemFPS, R.id.LLSubFPS);
