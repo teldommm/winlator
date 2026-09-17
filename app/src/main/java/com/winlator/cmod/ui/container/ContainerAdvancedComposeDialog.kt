@@ -47,6 +47,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -68,6 +69,7 @@ import androidx.compose.ui.unit.dp
 import com.winlator.cmod.R
 import com.winlator.cmod.container.ContainerManager
 import com.winlator.cmod.ui.theme.WinZTheme
+import com.winlator.cmod.ui.theme.controlAccentColor
 import com.winlator.cmod.winhandler.WinHandler
 
 private data class AdvancedEnvEntry(val name: String, val value: String)
@@ -334,7 +336,11 @@ private fun AdvancedEnvRow(item: AdvancedEnvEntry, onValue: (String) -> Unit, on
             if (spec.kind == AdvancedEnvKind.CHECKBOX) {
                 val off = spec.options.getOrElse(0) { "0" }
                 val on = spec.options.getOrElse(1) { "1" }
-                Switch(checked = item.value == on, onCheckedChange = { onValue(if (it) on else off) })
+                Switch(
+                    checked = item.value == on,
+                    onCheckedChange = { onValue(if (it) on else off) },
+                    colors = SwitchDefaults.colors(checkedTrackColor = controlAccentColor(), checkedThumbColor = Color.White)
+                )
             }
         }
         if (spec.kind != AdvancedEnvKind.CHECKBOX) {
@@ -449,7 +455,12 @@ private fun AdvancedToggle(label: String, checked: Boolean, enabled: Boolean, on
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-        Switch(checked = checked, enabled = enabled, onCheckedChange = onChange)
+        Switch(
+            checked = checked,
+            enabled = enabled,
+            onCheckedChange = onChange,
+            colors = SwitchDefaults.colors(checkedTrackColor = controlAccentColor(), checkedThumbColor = Color.White)
+        )
     }
 }
 

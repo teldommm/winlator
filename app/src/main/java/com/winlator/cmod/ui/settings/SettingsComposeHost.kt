@@ -50,8 +50,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -79,6 +81,7 @@ import com.winlator.cmod.MainActivity
 import com.winlator.cmod.R
 import com.winlator.cmod.ui.LandscapeMainNavigation
 import com.winlator.cmod.ui.theme.WinZTheme
+import com.winlator.cmod.ui.theme.controlAccentColor
 import com.winlator.cmod.ui.theme.WinlatorThemePreferenceCard
 import kotlin.math.roundToInt
 
@@ -364,7 +367,11 @@ private fun SmallIcon(icon: ImageVector) {
 private fun ToggleRow(title: String, checked: Boolean, onChecked: (Boolean) -> Unit) {
     Row(Modifier.fillMaxWidth().padding(start = 15.dp, end = 11.dp, top = 9.dp, bottom = 9.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-        Switch(checked = checked, onCheckedChange = onChecked)
+        Switch(
+            checked = checked,
+            onCheckedChange = onChecked,
+            colors = SwitchDefaults.colors(checkedTrackColor = controlAccentColor(), checkedThumbColor = androidx.compose.ui.graphics.Color.White)
+        )
     }
 }
 
@@ -380,7 +387,8 @@ private fun CursorSpeedRow(value: Int, onChanged: (Int) -> Unit) {
             value = draft,
             onValueChange = { draft = it },
             onValueChangeFinished = { onChanged(draft.roundToInt()) },
-            valueRange = 10f..200f
+            valueRange = 10f..200f,
+            colors = SliderDefaults.colors(thumbColor = controlAccentColor(), activeTrackColor = controlAccentColor())
         )
     }
 }

@@ -46,6 +46,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
@@ -80,6 +81,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.MainActivity
 import com.winlator.cmod.R
+import com.winlator.cmod.ui.theme.controlAccentColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -270,7 +272,13 @@ private fun LibraryOrientationMenu(activity: MainActivity?) {
 private fun OrientationToggleMenuItem(label: String, checked: Boolean, onClick: () -> Unit) {
     DropdownMenuItem(
         text = { Text(label) },
-        trailingIcon = { Switch(checked = checked, onCheckedChange = null) },
+        trailingIcon = {
+            Switch(
+                checked = checked,
+                onCheckedChange = null,
+                colors = SwitchDefaults.colors(checkedTrackColor = controlAccentColor(), checkedThumbColor = Color.White)
+            )
+        },
         onClick = onClick
     )
 }

@@ -30,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -59,6 +60,7 @@ import com.winlator.cmod.core.ProtonPackageManager
 import com.winlator.cmod.core.WineInfo
 import com.winlator.cmod.core.WineRuntimeGuard
 import com.winlator.cmod.core.WineThemeManager
+import com.winlator.cmod.ui.theme.controlAccentColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -718,7 +720,12 @@ internal fun SettingToggle(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-        Switch(checked = checked, onCheckedChange = onChanged, enabled = enabled)
+        Switch(
+            checked = checked,
+            onCheckedChange = onChanged,
+            enabled = enabled,
+            colors = SwitchDefaults.colors(checkedTrackColor = controlAccentColor(), checkedThumbColor = Color.White)
+        )
     }
 }
 
@@ -753,17 +760,18 @@ internal fun CpuSelectorRow(
             horizontalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             items(selected.indices.toList(), key = { it }) { index ->
+                val accent = controlAccentColor()
                 Surface(
                     onClick = { onToggle(index, !selected[index]) },
                     shape = RoundedCornerShape(9.dp),
-                    color = if (selected[index]) Color.White else Color.Transparent,
-                    contentColor = if (selected[index]) Color.Black else MaterialTheme.colorScheme.onSurface,
-                    border = BorderStroke(1.dp, if (selected[index]) Color.White else MaterialTheme.colorScheme.outlineVariant)
+                    color = if (selected[index]) accent else Color.Transparent,
+                    contentColor = if (selected[index]) Color.White else MaterialTheme.colorScheme.onSurface,
+                    border = BorderStroke(1.dp, if (selected[index]) accent else MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Text(
                         "CPU$index",
                         modifier = Modifier.padding(horizontal = 11.dp, vertical = 8.dp),
-                        color = if (selected[index]) Color.Black else MaterialTheme.colorScheme.onSurface,
+                        color = if (selected[index]) Color.White else MaterialTheme.colorScheme.onSurface,
                         fontWeight = if (selected[index]) FontWeight.SemiBold else FontWeight.Normal
                     )
                 }

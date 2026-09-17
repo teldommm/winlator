@@ -40,6 +40,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -54,6 +55,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -65,6 +67,7 @@ import com.winlator.cmod.MainActivity
 import com.winlator.cmod.R
 import com.winlator.cmod.ui.LandscapeMainNavigation
 import com.winlator.cmod.ui.theme.WinZTheme
+import com.winlator.cmod.ui.theme.controlAccentColor
 import kotlin.math.roundToInt
 
 @Immutable
@@ -224,18 +227,21 @@ private fun ProfileSection(model: InputControlsModel, selectedName: String, call
 
 @Composable
 private fun TransferActions(callbacks: InputControlsCallbacks) {
+    val accent = controlAccentColor()
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         OutlinedButton(
             onClick = callbacks::onImportProfile,
             modifier = Modifier.weight(1f).height(48.dp),
             shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = accent),
+            border = BorderStroke(1.dp, accent)
         ) { Icon(Icons.Outlined.FileDownload, null); Spacer(Modifier.width(8.dp)); Text("Import") }
         OutlinedButton(
             onClick = callbacks::onExportProfile,
             modifier = Modifier.weight(1f).height(48.dp),
             shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = accent),
+            border = BorderStroke(1.dp, accent)
         ) { Icon(Icons.Outlined.FileUpload, null); Spacer(Modifier.width(8.dp)); Text("Export") }
     }
 }
@@ -246,7 +252,7 @@ private fun EditorButton(callbacks: InputControlsCallbacks) {
         onClick = callbacks::onOpenEditor,
         modifier = Modifier.fillMaxWidth().height(52.dp),
         shape = RoundedCornerShape(14.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
+        colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
     ) {
         Icon(Icons.Outlined.SportsEsports, null)
         Spacer(Modifier.width(10.dp))
@@ -319,7 +325,8 @@ private fun OpacityCard(initialPercent: Int, onOpacityChanged: (Int) -> Unit) {
                 value = opacity,
                 onValueChange = { opacity = (it / 5f).roundToInt() * 5f },
                 onValueChangeFinished = { onOpacityChanged(opacity.roundToInt()) },
-                modifier = Modifier.weight(1f), valueRange = 0f..100f, steps = 19
+                modifier = Modifier.weight(1f), valueRange = 0f..100f, steps = 19,
+                colors = SliderDefaults.colors(thumbColor = controlAccentColor(), activeTrackColor = controlAccentColor())
             )
             Spacer(Modifier.width(14.dp))
             Text("${opacity.roundToInt()}%", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

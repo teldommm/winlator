@@ -62,6 +62,7 @@ import com.winlator.cmod.MainActivity
 import com.winlator.cmod.ui.KeepLandscapeChromeHidden
 import com.winlator.cmod.ui.applyAppFullscreen
 import com.winlator.cmod.ui.theme.WinZTheme
+import com.winlator.cmod.ui.theme.controlAccentColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -174,7 +175,7 @@ private fun LandscapeDetail(title: String, subtitle: String, artwork: Bitmap?, f
                     Spacer(Modifier.height(10.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         DetailAction(Icons.Outlined.Settings, "Configure", Modifier.weight(1f), callbacks::onConfigure)
-                        DetailAction(Icons.Outlined.PlayArrow, "Enter container", Modifier.weight(1f), callbacks::onArguments)
+                        DetailAction(Icons.Outlined.PlayArrow, "Enter container", Modifier.weight(1f), callbacks::onArguments, accent = true)
                     }
                     Spacer(Modifier.height(10.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -210,7 +211,7 @@ private fun PortraitDetail(title: String, subtitle: String, artwork: Bitmap?, fa
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
             ) { Icon(Icons.Outlined.PlayArrow, null); Spacer(Modifier.size(8.dp)); Text("Play", fontWeight = FontWeight.Bold) }
             DetailAction(Icons.Outlined.Settings, "Configure", Modifier.fillMaxWidth(), callbacks::onConfigure)
-            DetailAction(Icons.Outlined.PlayArrow, "Enter container", Modifier.fillMaxWidth(), callbacks::onArguments)
+            DetailAction(Icons.Outlined.PlayArrow, "Enter container", Modifier.fillMaxWidth(), callbacks::onArguments, accent = true)
             DetailAction(Icons.Outlined.Folder, "Game folder", Modifier.fillMaxWidth(), callbacks::onGameFolder)
             DetailAction(Icons.Outlined.DeleteOutline, "Remove", Modifier.fillMaxWidth(), callbacks::onRemove, true)
             Spacer(Modifier.height(12.dp))
@@ -219,15 +220,20 @@ private fun PortraitDetail(title: String, subtitle: String, artwork: Bitmap?, fa
 }
 
 @Composable
-private fun DetailAction(icon: ImageVector, label: String, modifier: Modifier, onClick: () -> Unit, destructive: Boolean = false) {
-    val tint = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+private fun DetailAction(icon: ImageVector, label: String, modifier: Modifier, onClick: () -> Unit, destructive: Boolean = false, accent: Boolean = false) {
+    val accentColor = controlAccentColor()
+    val tint = if (destructive) MaterialTheme.colorScheme.error else if (accent) Color.White else MaterialTheme.colorScheme.onSurface
     Surface(
         onClick = onClick,
         modifier = modifier.height(54.dp),
         shape = RoundedCornerShape(12.dp),
-        color = if (destructive) MaterialTheme.colorScheme.errorContainer.copy(.22f) else MaterialTheme.colorScheme.surface.copy(.90f),
+        color = when {
+            destructive -> MaterialTheme.colorScheme.errorContainer.copy(.22f)
+            accent -> accentColor
+            else -> MaterialTheme.colorScheme.surface.copy(.90f)
+        },
         contentColor = tint,
-        border = BorderStroke(1.dp, if (destructive) MaterialTheme.colorScheme.error.copy(.62f) else MaterialTheme.colorScheme.outlineVariant)
+        border = BorderStroke(1.dp, if (destructive) MaterialTheme.colorScheme.error.copy(.62f) else if (accent) accentColor else MaterialTheme.colorScheme.outlineVariant)
     ) {
         Row(Modifier.fillMaxSize().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, null)

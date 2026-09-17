@@ -37,6 +37,7 @@ import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -46,6 +47,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -117,6 +119,7 @@ import com.winlator.cmod.ui.settings.normalizeLocaleValue
 import com.winlator.cmod.ui.settings.normalizeResolution
 import com.winlator.cmod.ui.settings.readConfig
 import com.winlator.cmod.ui.settings.writeConfig
+import com.winlator.cmod.ui.theme.controlAccentColor
 import com.winlator.cmod.winhandler.WinHandler
 import kotlinx.coroutines.launch
 import org.json.JSONArray
@@ -653,7 +656,11 @@ private fun ShortcutCategoryV2(
                     }
                 }
                 SettingsDivider()
-                Button(onClick = enterContainer, modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+                Button(
+                    onClick = enterContainer,
+                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
+                ) {
                     Icon(Icons.Outlined.PlayArrow, null)
                     Spacer(Modifier.size(7.dp))
                     Text("Enter container")
@@ -994,7 +1001,8 @@ private fun SharpnessSliderV2(label: String, value: String, onChanged: (String) 
         Slider(
             value = numeric,
             onValueChange = { onChanged(it.roundToInt().coerceIn(0, 100).toString()) },
-            valueRange = 0f..100f
+            valueRange = 0f..100f,
+            colors = SliderDefaults.colors(thumbColor = controlAccentColor(), activeTrackColor = controlAccentColor())
         )
     }
 }

@@ -15,5 +15,6 @@ object WinlatorLegacyTheme {
     @JvmStatic fun primary(context: Context): Int = colors(context).primary.toArgb()
     @JvmStatic fun onPrimary(context: Context): Int = colors(context).onPrimary.toArgb()
     @JvmStatic fun outlineVariant(context: Context): Int = colors(context).outlineVariant.toArgb()
+    @JvmStatic fun controlAccent(context: Context): Int = controlAccentFor(WinlatorThemeManager.currentTheme(context)).toArgb()
     @JvmStatic fun isLight(context: Context): Boolean = WinlatorThemeManager.currentTheme(context) == WinlatorThemeType.WHITE
 }

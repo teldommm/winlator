@@ -39,6 +39,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -56,6 +57,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.R
 import com.winlator.cmod.ui.theme.WinZTheme
+import com.winlator.cmod.ui.theme.controlAccentColor
 
 data class PresetEditorVariable(
     val name: String,
@@ -297,7 +299,8 @@ private fun PresetVariableRow(
                 Switch(
                     checked = value == "1",
                     enabled = !readOnly,
-                    onCheckedChange = { onValueChange(if (it) "1" else "0") }
+                    onCheckedChange = { onValueChange(if (it) "1" else "0") },
+                    colors = SwitchDefaults.colors(checkedTrackColor = controlAccentColor(), checkedThumbColor = androidx.compose.ui.graphics.Color.White)
                 )
             }
         }

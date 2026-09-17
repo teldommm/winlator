@@ -90,17 +90,31 @@ object WinlatorThemeManager {
     }
 }
 
+// Tuned to match claude.ai's own dark theme (extracted from the app's resources.arsc,
+// night config: bg100/bg300/text100/text300/text500/oat/claude_widget_tile).
 private val BlackColors = darkColorScheme(
-    primary = Color(0xFFF4F4F6), onPrimary = Color(0xFF090A0D),
-    primaryContainer = Color(0xFF303138), onPrimaryContainer = Color(0xFFF7F7F8),
-    secondary = Color(0xFFC7C8CF), onSecondary = Color(0xFF111217),
-    secondaryContainer = Color(0xFF24252B), onSecondaryContainer = Color(0xFFE7E7EA),
-    background = Color(0xFF06070A), onBackground = Color(0xFFF5F5F7),
-    surface = Color(0xFF101116), onSurface = Color(0xFFF5F5F7),
-    surfaceVariant = Color(0xFF1C1D23), onSurfaceVariant = Color(0xFFA8A9B1),
-    outline = Color(0xFF41434D), outlineVariant = Color(0xFF2A2B32),
+    primary = Color(0xFFF9F9F7), onPrimary = Color(0xFF151515),
+    primaryContainer = Color(0xFF242423), onPrimaryContainer = Color(0xFFF9F9F7),
+    secondary = Color(0xFFC3C2B7), onSecondary = Color(0xFF151515),
+    secondaryContainer = Color(0xFF242423), onSecondaryContainer = Color(0xFFC3C2B7),
+    background = Color(0xFF0D0D0D), onBackground = Color(0xFFF9F9F7),
+    // Cards float slightly translucent over the background (~90% opacity), per request.
+    surface = Color(0xE6151515), onSurface = Color(0xFFF9F9F7),
+    surfaceVariant = Color(0xFF313130), onSurfaceVariant = Color(0xFF97958D),
+    outline = Color(0xFF3D3D3A), outlineVariant = Color(0xFF242423),
     error = Color(0xFFFFB4AB), onError = Color(0xFF690005)
 )
+
+// Dedicated accent for Switch/Slider controls only — intentionally NOT wired into
+// `primary`, so buttons/nav/other accents stay neutral gray. Scoped to Black only;
+// every other theme keeps using its own `primary` as before (unchanged behavior).
+private val BlackControlAccent = Color(0xFF3B82F6)
+
+internal fun controlAccentFor(theme: WinlatorThemeType): Color =
+    if (theme == WinlatorThemeType.BLACK) BlackControlAccent else winlatorColorScheme(theme).primary
+
+@Composable
+fun controlAccentColor(): Color = controlAccentFor(WinlatorThemeManager.currentTheme())
 
 private val AmoledColors = darkColorScheme(
     primary = Color.White, onPrimary = Color.Black,

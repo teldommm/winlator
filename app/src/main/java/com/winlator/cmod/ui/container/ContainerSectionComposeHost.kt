@@ -44,6 +44,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
@@ -64,6 +65,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.core.DefaultVersion
 import com.winlator.cmod.ui.theme.WinZTheme
+import com.winlator.cmod.ui.theme.controlAccentColor
 
 @Stable
 interface ContainerSectionCallbacks {
@@ -840,7 +842,11 @@ private fun RendererOptionsPanel(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("Swap red/blue channels", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                Switch(checked = swapRB, onCheckedChange = onSwapRB)
+                Switch(
+                    checked = swapRB,
+                    onCheckedChange = onSwapRB,
+                    colors = SwitchDefaults.colors(checkedTrackColor = controlAccentColor(), checkedThumbColor = Color.White)
+                )
             }
         }
     }
@@ -1069,7 +1075,11 @@ private fun ToggleSetting(label: String, checked: Boolean, onCheckedChange: (Boo
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(checkedTrackColor = controlAccentColor(), checkedThumbColor = Color.White)
+        )
     }
 }
 
