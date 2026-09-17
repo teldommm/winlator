@@ -165,22 +165,11 @@ private class ContainerEditorStateV2(
     var mouseWarp by mutableStateOf(editing?.getExtra("mouseWarpOverride", "disable") ?: "disable")
     var drives by mutableStateOf(editing?.drives ?: Container.DEFAULT_DRIVES)
 
-    var renderer by mutableStateOf(
-        when {
-            editing?.getUseDisplayX() == true -> "DisplayX"
-            editing?.isRendererNative == true -> "EGL"
-            else -> "Vulkan"
-        }
-    )
+    var renderer by mutableStateOf("Vulkan")
     var rendererPresentMode by mutableStateOf(editing?.rendererPresentMode ?: "fifo")
     var rendererDriver by mutableStateOf(editing?.rendererDriverId ?: "system")
     var filterMode by mutableIntStateOf(editing?.rendererFilterMode ?: 0)
-    var surfaceFormat by mutableStateOf(editing?.getSurfaceFormat() ?: if (renderer == "DisplayX") "rgba8" else "bgra8")
-    var trueDisplayX by mutableStateOf(editing?.getTrueDisplayX() ?: false)
-    var displayXPerformanceMode by mutableStateOf(editing?.getDisplayXPerformanceMode() ?: true)
-    var displayXPresentAtRefreshRate by mutableStateOf(editing?.getDisplayXPresentAtRefreshRate() ?: true)
-    var displayXBackPressure by mutableStateOf(editing?.getDisplayXBackPressure() ?: false)
-    var displayXPrecisePresentation by mutableStateOf(editing?.getDisplayXPrecisePresentation() ?: false)
+    var surfaceFormat by mutableStateOf(editing?.getSurfaceFormat() ?: "rgba8")
 
     var graphicsDriver by mutableStateOf(
         editing?.graphicsDriver ?: if (preferredDriver == DefaultVersion.WRAPPER_ADRENO) {
@@ -312,9 +301,8 @@ private class ContainerEditorStateV2(
     fun fingerprint(): String = listOf(
         name, screen, audio, oboeProfile, oboeApi, oboeAdaptive, oboeExclusive, hudMode, locale, soundFont,
         fullscreen, desktopTheme, desktopBackground, wallpaperStamp, mouseWarp, drives,
-        renderer, rendererPresentMode, rendererDriver, filterMode, surfaceFormat, trueDisplayX,
-        displayXPerformanceMode, displayXPresentAtRefreshRate, displayXBackPressure,
-        displayXPrecisePresentation, graphicsDriver, graphicsConfig,
+        renderer, rendererPresentMode, rendererDriver, filterMode, surfaceFormat,
+        graphicsDriver, graphicsConfig,
         wrapper, wrapperConfig, emulator, fexVersion, boxVersion, fexPreset, boxPreset, exclusive, xinput, dinput,
         syncCpu, startup, openGlDefaultInitialized, autoMesaGlVersionOverride, envVars,
         cpu64.joinToString(), cpu32.joinToString(), components.entries.sortedBy { it.key }.joinToString()
@@ -449,17 +437,10 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
         container.setSyncCpuTopology(state.syncCpu)
         container.setGraphicsDriver(state.graphicsDriver)
         container.setGraphicsDriverConfig(state.graphicsConfig)
-        container.setRendererNative(state.renderer == "EGL")
         container.setRendererPresentMode(state.rendererPresentMode)
         container.setRendererDriverId(state.rendererDriver)
         container.setRendererFilterMode(state.filterMode)
-        container.setUseDisplayX(state.renderer == "DisplayX")
         container.setSurfaceFormat(state.surfaceFormat)
-        container.setTrueDisplayX(state.trueDisplayX)
-        container.setDisplayXPerformanceMode(state.displayXPerformanceMode)
-        container.setDisplayXPresentAtRefreshRate(state.displayXPresentAtRefreshRate)
-        container.setDisplayXBackPressure(state.displayXBackPressure)
-        container.setDisplayXPrecisePresentation(state.displayXPrecisePresentation)
         container.setDXWrapper(state.wrapper)
         container.setDXWrapperConfig(state.wrapperConfig)
         container.setAudioDriver(state.audio)
@@ -515,7 +496,6 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
                 if (state.syncCpu) put("syncCpuTopology", true)
                 put("graphicsDriver", state.graphicsDriver)
                 put("graphicsDriverConfig", state.graphicsConfig)
-                put("rendererNative", state.renderer == "EGL")
                 put("rendererPresentMode", state.rendererPresentMode)
                 if (state.rendererDriver.isNotBlank()) put("rendererDriverId", state.rendererDriver)
                 if (state.filterMode != 0) put("rendererFilterMode", state.filterMode)
@@ -544,13 +524,7 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
                 put("extraData", JSONObject()
                     .put("hudMode", state.hudMode.toString())
                     .put("mouseWarpOverride", state.mouseWarp)
-                    .put("useDisplayX", if (state.renderer == "DisplayX") "1" else "0")
                     .put("surfaceFormat", state.surfaceFormat)
-                    .put("trueDisplayX", if (state.trueDisplayX) "1" else "0")
-                    .put("displayXPerformanceMode", if (state.displayXPerformanceMode) "1" else "0")
-                    .put("displayXPresentAtRefreshRate", if (state.displayXPresentAtRefreshRate) "1" else "0")
-                    .put("displayXBackPressure", if (state.displayXBackPressure) "1" else "0")
-                    .put("displayXPrecisePresentation", if (state.displayXPrecisePresentation) "1" else "0")
                     .put("oboeProfile", state.oboeProfile)
                     .put("oboeApi", state.oboeApi)
                     .put("oboeAdaptive", if (state.oboeAdaptive) "1" else "0")
@@ -834,10 +808,8 @@ private fun ContainerCategoryV2(
                     SettingText("Custom resolution", s.screen) { s.screen = it }
                 }
                 SettingsDivider()
-                SettingChoice("Renderer", s.renderer, listOf("Vulkan", "EGL", "DisplayX")) {
+                SettingChoice("Renderer", s.renderer, listOf("Vulkan")) {
                     s.renderer = it
-                    s.surfaceFormat = if (it == "DisplayX") "rgba8" else "bgra8"
-                    if (it == "EGL" && s.filterMode > 1) s.filterMode = 0
                 }
                 SettingsDivider()
                 SettingChoice(
@@ -845,53 +817,27 @@ private fun ContainerCategoryV2(
                     if (s.surfaceFormat == "bgra8") "BGRA" else "RGBA",
                     listOf("RGBA", "BGRA")
                 ) { s.surfaceFormat = if (it == "BGRA") "bgra8" else "rgba8" }
-                if (s.renderer == "DisplayX") {
+                SettingsDivider()
+                SettingChoice("Present Mode", s.rendererPresentMode, listOf("fifo", "mailbox")) {
+                    s.rendererPresentMode = it
+                }
+                catalog?.let { c ->
                     SettingsDivider()
-                    SettingToggle("Bypass X11", s.trueDisplayX) {
-                        s.trueDisplayX = it
+                    SettingMappedChoice("Renderer Driver", s.rendererDriver, c.rendererDrivers) {
+                        s.rendererDriver = it
                     }
-                    SettingsDivider()
-                    SettingToggle("Performance mode", s.displayXPerformanceMode) {
-                        s.displayXPerformanceMode = it
-                    }
-                    SettingsDivider()
-                    SettingToggle("Present at refresh rate", s.displayXPresentAtRefreshRate) {
-                        s.displayXPresentAtRefreshRate = it
-                    }
-                    SettingsDivider()
-                    SettingToggle("Submit every buffer", s.displayXBackPressure) {
-                        s.displayXBackPressure = it
-                    }
-                    SettingsDivider()
-                    SettingToggle("Precise presentation", s.displayXPrecisePresentation) {
-                        s.displayXPrecisePresentation = it
-                    }
-                } else {
-                    if (s.renderer != "EGL") {
-                        SettingsDivider()
-                        SettingChoice("Present Mode", s.rendererPresentMode, listOf("fifo", "mailbox")) {
-                            s.rendererPresentMode = it
-                        }
-                        catalog?.let { c ->
-                            SettingsDivider()
-                            SettingMappedChoice("Renderer Driver", s.rendererDriver, c.rendererDrivers) {
-                                s.rendererDriver = it
-                            }
-                        }
-                    }
-                    SettingsDivider()
-                    val filters = if (s.renderer == "EGL") listOf("Bilinear", "Nearest neighbor")
-                    else listOf(
-                        "Bilinear",
-                        "Nearest neighbor",
-                        "Snapdragon Super Resolution",
-                        "AMD FidelityFX Super Resolution",
-                        "Lanczos 2 (16-tap)",
-                        "Color Boost"
-                    )
-                    SettingChoice("Texture Filter", filters.getOrElse(s.filterMode) { filters.first() }, filters) {
-                        s.filterMode = filters.indexOf(it).coerceAtLeast(0)
-                    }
+                }
+                SettingsDivider()
+                val filters = listOf(
+                    "Bilinear",
+                    "Nearest neighbor",
+                    "Snapdragon Super Resolution",
+                    "AMD FidelityFX Super Resolution",
+                    "Lanczos 2 (16-tap)",
+                    "Color Boost"
+                )
+                SettingChoice("Texture Filter", filters.getOrElse(s.filterMode) { filters.first() }, filters) {
+                    s.filterMode = filters.indexOf(it).coerceAtLeast(0)
                 }
             }
             SettingsCard {

@@ -680,6 +680,5 @@ E.g. <b>META</b> for <i>META key</i>, \n
     <string name="arguments">Arguments</string>
     <string name="game_folder">Game Folder</string>
 
-    <string name="magnifier_not_available">Magnifier is not available in DisplayX mode</string>
 </resources>
 

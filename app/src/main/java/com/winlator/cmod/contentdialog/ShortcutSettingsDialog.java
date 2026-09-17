@@ -134,26 +134,20 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
 
         findViewById(R.id.BTHelpDXWrapper).setOnClickListener((v) -> AppUtils.showHelpBox(context, v, R.string.dxwrapper_help_content));
 
-        final boolean[] rendererNativeHolder = new boolean[] { shortcut.getRendererNative() };
-        final boolean[] useDisplayXHolder = new boolean[] { shortcut.getUseDisplayX() };
         final String[] rendererPresentModeHolder = new String[] { shortcut.getRendererPresentMode() };
         final String[] rendererDriverHolder = new String[] { shortcut.getRendererDriverId() };
         final int[] rendererFilterHolder = new int[] { shortcut.getRendererFilterMode() };
         final boolean[] rendererSwapRBHolder = new boolean[] { shortcut.getRendererSwapRB() };
         final Spinner spRendererMode = findViewById(R.id.SPRendererMode);
         if (spRendererMode != null) {
+            // Vulkan is the only renderer now (EGL/DisplayX were removed); the spinner
+            // stays for layout consistency but no longer offers a choice.
             ArrayAdapter<String> rendererModeAdapter = new ArrayAdapter<>(context, R.layout.spinner_item_amoled,
-                    new String[]{"Vulkan", "EGL", "DisplayX"});
+                    new String[]{"Vulkan"});
             rendererModeAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item_amoled);
             spRendererMode.setAdapter(rendererModeAdapter);
-            spRendererMode.setSelection(useDisplayXHolder[0] ? 2 : (rendererNativeHolder[0] ? 1 : 0));
-            spRendererMode.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
-                public void onItemSelected(android.widget.AdapterView<?> parent, View v, int position, long id) {
-                    rendererNativeHolder[0] = position == 1;
-                    useDisplayXHolder[0] = position == 2;
-                }
-                public void onNothingSelected(android.widget.AdapterView<?> parent) {}
-            });
+            spRendererMode.setSelection(0);
+            spRendererMode.setEnabled(false);
         }
         View btRendererOptions = findViewById(R.id.BTRendererOptions);
         if (btRendererOptions != null) {
@@ -166,7 +160,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                 public void setRendererFilterMode(int val) { rendererFilterHolder[0] = val; }
                 public boolean getRendererSwapRB() { return rendererSwapRBHolder[0]; }
                 public void setRendererSwapRB(boolean val) { rendererSwapRBHolder[0] = val; }
-            }, rendererNativeHolder[0]).show());
+            }).show());
         }
 
         final Spinner sAudioDriver = findViewById(R.id.SAudioDriver);
@@ -466,8 +460,6 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
             shortcut.putExtra("dxwrapper", dxwrapper);
             shortcut.putExtra("dxwrapperConfig", dxwrapperConfig);
             shortcut.putExtra("audioDriver", audioDriver);
-            shortcut.setRendererNative(rendererNativeHolder[0]);
-            shortcut.setUseDisplayX(useDisplayXHolder[0]);
             shortcut.setRendererPresentMode(rendererPresentModeHolder[0]);
             shortcut.setRendererDriverId(rendererDriverHolder[0]);
             shortcut.setRendererFilterMode(rendererFilterHolder[0]);

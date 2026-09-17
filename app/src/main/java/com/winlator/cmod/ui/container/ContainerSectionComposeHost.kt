@@ -407,7 +407,6 @@ private fun ContainerSectionScreen(
                             ) { rendererOptionsExpanded = !rendererOptionsExpanded }
                             if (rendererOptionsExpanded) {
                                 RendererOptionsPanel(
-                                    nativeRenderer = renderer.equals("EGL", true),
                                     presentMode = presentMode,
                                     onPresentMode = { presentMode = it },
                                     driverEntries = rendererDriverEntries,
@@ -788,7 +787,6 @@ private fun ActionSetting(
 
 @Composable
 private fun RendererOptionsPanel(
-    nativeRenderer: Boolean,
     presentMode: String,
     onPresentMode: (String) -> Unit,
     driverEntries: Array<String>,
@@ -802,16 +800,12 @@ private fun RendererOptionsPanel(
 ) {
     val presentEntries = arrayOf("Mailbox", "Fifo")
     val presentIds = arrayOf("mailbox", "fifo")
-    val filterEntries = if (nativeRenderer) {
-        arrayOf("Bilinear", "Nearest neighbor")
-    } else {
-        arrayOf(
-            "Bilinear",
-            "Nearest neighbor",
-            "Snapdragon Super Resolution",
-            "AMD FidelityFX Super Resolution"
-        )
-    }
+    val filterEntries = arrayOf(
+        "Bilinear",
+        "Nearest neighbor",
+        "Snapdragon Super Resolution",
+        "AMD FidelityFX Super Resolution"
+    )
     Surface(
         modifier = Modifier.padding(start = 65.dp, end = 12.dp, bottom = 10.dp),
         shape = RoundedCornerShape(12.dp),
@@ -819,24 +813,22 @@ private fun RendererOptionsPanel(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
     ) {
         Column(Modifier.padding(vertical = 4.dp)) {
-            if (!nativeRenderer) {
-                InlineChoice(
-                    label = "Present Mode",
-                    selected = presentEntries[presentIds.indexOf(presentMode).coerceAtLeast(0)],
-                    entries = presentEntries
-                ) { value -> onPresentMode(presentIds[presentEntries.indexOf(value)]) }
-                ThinDivider()
-                val selectedDriver = driverIds.indexOf(driverId).takeIf { it >= 0 } ?: 0
-                InlineChoice(
-                    label = "Renderer Driver",
-                    selected = driverEntries.getOrElse(selectedDriver) { "System" },
-                    entries = driverEntries
-                ) { value ->
-                    val index = driverEntries.indexOf(value).coerceAtLeast(0)
-                    onDriverId(driverIds.getOrElse(index) { "system" })
-                }
-                ThinDivider()
+            InlineChoice(
+                label = "Present Mode",
+                selected = presentEntries[presentIds.indexOf(presentMode).coerceAtLeast(0)],
+                entries = presentEntries
+            ) { value -> onPresentMode(presentIds[presentEntries.indexOf(value)]) }
+            ThinDivider()
+            val selectedDriver = driverIds.indexOf(driverId).takeIf { it >= 0 } ?: 0
+            InlineChoice(
+                label = "Renderer Driver",
+                selected = driverEntries.getOrElse(selectedDriver) { "System" },
+                entries = driverEntries
+            ) { value ->
+                val index = driverEntries.indexOf(value).coerceAtLeast(0)
+                onDriverId(driverIds.getOrElse(index) { "system" })
             }
+            ThinDivider()
             InlineChoice(
                 label = "Texture Filter",
                 selected = filterEntries.getOrElse(filterMode) { filterEntries[0] },

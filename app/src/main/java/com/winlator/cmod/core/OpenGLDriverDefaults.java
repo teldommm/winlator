@@ -39,8 +39,7 @@ public final class OpenGLDriverDefaults {
             data.put("graphicsDriverConfig", putConfigValue(config, "version", selectedVersion));
             data.put("envVars", environment.toString());
             if (!extraData.has("surfaceFormat")) {
-                extraData.put("surfaceFormat",
-                        "1".equals(extraData.optString("useDisplayX", "0")) ? "rgba8" : "bgra8");
+                extraData.put("surfaceFormat", "rgba8");
             }
             extraData.put(INITIALIZED, "1");
             extraData.put(AUTO_MESA_OVERRIDE, automaticOverride ? "1" : "0");

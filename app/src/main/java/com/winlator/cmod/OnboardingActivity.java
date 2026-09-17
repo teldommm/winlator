@@ -897,7 +897,6 @@ public class OnboardingActivity extends AppCompatActivity {
             data.put("envVars", Container.DEFAULT_ENV_VARS);
             data.put("graphicsDriver", Container.DEFAULT_GRAPHICS_DRIVER);
             data.put("graphicsDriverConfig", Container.DEFAULT_GRAPHICSDRIVERCONFIG);
-            data.put("rendererNative", false);
             data.put("rendererPresentMode", "fifo");
             data.put("dxwrapper", Container.DEFAULT_DXWRAPPER);
             data.put("dxwrapperConfig", Container.DEFAULT_DXWRAPPERCONFIG);

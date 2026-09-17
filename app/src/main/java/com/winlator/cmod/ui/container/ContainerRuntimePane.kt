@@ -57,7 +57,7 @@ internal fun ContainerRuntimePane(
     val fexPresets = remember { FEXCorePresetManager.getPresets(context).associate { it.id to it.name } }
     val boxPresets = remember { Box64PresetManager.getPresets("box64", context).associate { it.id to it.name } }
 
-    var renderer by remember { mutableStateOf(if (container.isRendererNative()) "EGL" else "Vulkan") }
+    var renderer by remember { mutableStateOf("Vulkan") }
     var screen by remember { mutableStateOf(normalizeResolution(container.getScreenSize())) }
     var screenChoice by remember {
         mutableStateOf(screenEntries.firstOrNull { normalizeResolution(it).equals(screen, true) } ?: "Custom")
@@ -160,8 +160,8 @@ internal fun ContainerRuntimePane(
 
         ContainerOverviewComposeHost.SECTION_VIDEO -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SettingsCard {
-                SettingChoice("Renderer", renderer, listOf("Vulkan", "EGL")) {
-                    renderer = it; container.setRendererNative(it == "EGL"); container.saveData()
+                SettingChoice("Renderer", renderer, listOf("Vulkan")) {
+                    renderer = it
                 }
                 SettingsDivider()
                 SettingChoice("Present Mode", presentMode, listOf("mailbox", "fifo")) {
@@ -174,7 +174,7 @@ internal fun ContainerRuntimePane(
                     }
                 }
                 SettingsDivider()
-                val filters = if (renderer == "EGL") listOf("Bilinear", "Nearest neighbor") else listOf("Bilinear", "Nearest neighbor", "Snapdragon Super Resolution", "AMD FidelityFX Super Resolution")
+                val filters = listOf("Bilinear", "Nearest neighbor", "Snapdragon Super Resolution", "AMD FidelityFX Super Resolution")
                 SettingChoice("Texture Filter", filters.getOrElse(filterMode) { filters.first() }, filters) {
                     filterMode = filters.indexOf(it).coerceAtLeast(0); container.setRendererFilterMode(filterMode); container.saveData()
                 }

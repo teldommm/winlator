@@ -461,38 +461,29 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             execEnvVars.putAll(this.envVars);
         }
 
-        boolean useDisplayX = shortcut != null
-                ? shortcut.getUseDisplayX()
-                : container != null && container.getUseDisplayX();
-        boolean trueDisplayX = shortcut != null
-                ? shortcut.getTrueDisplayX()
-                : container != null && container.getTrueDisplayX();
         String surfaceFormat = shortcut != null
                 ? shortcut.getSurfaceFormat()
                 : container != null ? container.getSurfaceFormat() : "rgba8";
 
         execEnvVars.put("WRAPPER_SURFACE_FORMAT", surfaceFormat);
-        if (useDisplayX) execEnvVars.put("DISPLAYX_SURFACE_FORMAT", surfaceFormat);
-        else execEnvVars.remove("DISPLAYX_SURFACE_FORMAT");
 
+        // DisplayX has been removed (Vulkan is the only renderer), so its guest-side
+        // present layer must never be injected; strip it out if an old saved config
+        // still lists it among VK_INSTANCE_LAYERS.
         final String displayXLayer = "VK_LAYER_DISPLAYX_display_x";
         String enabledLayers = execEnvVars.get("VK_INSTANCE_LAYERS");
-        if (useDisplayX && trueDisplayX) {
-            execEnvVars.put("VK_INSTANCE_LAYERS", displayXLayer);
+        StringBuilder filteredLayers = new StringBuilder();
+        if (enabledLayers != null && !enabledLayers.isEmpty()) {
+            for (String layer : enabledLayers.split(":")) {
+                if (layer.isEmpty() || layer.equals(displayXLayer)) continue;
+                if (filteredLayers.length() > 0) filteredLayers.append(':');
+                filteredLayers.append(layer);
+            }
+        }
+        if (filteredLayers.length() > 0) {
+            execEnvVars.put("VK_INSTANCE_LAYERS", filteredLayers.toString());
         } else {
-            StringBuilder filteredLayers = new StringBuilder();
-            if (enabledLayers != null && !enabledLayers.isEmpty()) {
-                for (String layer : enabledLayers.split(":")) {
-                    if (layer.isEmpty() || layer.equals(displayXLayer)) continue;
-                    if (filteredLayers.length() > 0) filteredLayers.append(':');
-                    filteredLayers.append(layer);
-                }
-            }
-            if (filteredLayers.length() > 0) {
-                execEnvVars.put("VK_INSTANCE_LAYERS", filteredLayers.toString());
-            } else {
-                execEnvVars.remove("VK_INSTANCE_LAYERS");
-            }
+            execEnvVars.remove("VK_INSTANCE_LAYERS");
         }
 
         FrameGenManager.applyLaunchEnv(execEnvVars);

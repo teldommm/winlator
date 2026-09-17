@@ -125,8 +125,7 @@ public class GameDetailFragment extends Fragment {
             if (version.endsWith(".0")) version = version.substring(0, version.length() - 2);
             runtime = ("proton".equalsIgnoreCase(info.type) ? "Proton " : "Wine ") + version + " " + info.getArch();
         } catch (Exception ignored) {}
-        String renderer = shortcut.getUseDisplayX() ? "DisplayX" : shortcut.getRendererNative() ? "EGL" : "Vulkan";
-        return runtime + "  •  " + renderer;
+        return runtime + "  •  Vulkan";
     }
 
     private void runShortcut() {
@@ -137,7 +136,6 @@ public class GameDetailFragment extends Fragment {
             intent.putExtra("shortcut_path", shortcut.file.getPath());
             intent.putExtra("shortcut_name", shortcut.name);
             intent.putExtra("disableXinput", shortcut.getExtra("disableXinput", "0"));
-            intent.putExtra("native_rendering", shortcut.getRendererNative());
             activity.startActivity(intent);
         } else {
             XrActivity.openIntent(activity, shortcut.container.id, shortcut.file.getPath());

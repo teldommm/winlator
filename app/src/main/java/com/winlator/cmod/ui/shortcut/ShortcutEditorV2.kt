@@ -156,16 +156,11 @@ private class ShortcutEditorStateV2(val shortcut: Shortcut) {
 
     var name by mutableStateOf(shortcut.name)
     var screen by mutableStateOf(normalizeResolution(shortcut.getExtra("screenSize", container.getScreenSize())))
-    var renderer by mutableStateOf(if (shortcut.getUseDisplayX()) "DisplayX" else if (shortcut.getRendererNative()) "EGL" else "Vulkan")
+    var renderer by mutableStateOf("Vulkan")
     var presentMode by mutableStateOf(shortcut.getRendererPresentMode())
     var rendererDriver by mutableStateOf(shortcut.getRendererDriverId())
     var filterMode by mutableIntStateOf(shortcut.getRendererFilterMode())
     var surfaceFormat by mutableStateOf(shortcut.getSurfaceFormat())
-    var trueDisplayX by mutableStateOf(shortcut.getTrueDisplayX())
-    var displayXPerformanceMode by mutableStateOf(shortcut.getDisplayXPerformanceMode())
-    var displayXPresentAtRefreshRate by mutableStateOf(shortcut.getDisplayXPresentAtRefreshRate())
-    var displayXBackPressure by mutableStateOf(shortcut.getDisplayXBackPressure())
-    var displayXPrecisePresentation by mutableStateOf(shortcut.getDisplayXPrecisePresentation())
     var graphicsDriver by mutableStateOf(StringUtils.parseIdentifier(shortcut.getExtra("graphicsDriver", container.getGraphicsDriver())))
     private val defaultDriverVersion = runCatching {
         val context = container.manager.context
@@ -365,17 +360,10 @@ private class ShortcutEditorStateV2(val shortcut: Shortcut) {
     }
 
     fun saveRenderer() {
-        shortcut.setRendererNative(renderer == "EGL")
-        shortcut.setUseDisplayX(renderer == "DisplayX")
         shortcut.setRendererPresentMode(presentMode)
         shortcut.setRendererDriverId(rendererDriver)
         shortcut.setRendererFilterMode(filterMode)
         shortcut.setSurfaceFormat(surfaceFormat)
-        shortcut.setTrueDisplayX(trueDisplayX)
-        shortcut.setDisplayXPerformanceMode(displayXPerformanceMode)
-        shortcut.setDisplayXPresentAtRefreshRate(displayXPresentAtRefreshRate)
-        shortcut.setDisplayXBackPressure(displayXBackPressure)
-        shortcut.setDisplayXPrecisePresentation(displayXPrecisePresentation)
         save()
     }
 
@@ -762,10 +750,8 @@ private fun ShortcutCategoryV2(
                     }
                 }
                 SettingsDivider()
-                SettingChoice("Renderer", s.renderer, listOf("Vulkan", "EGL", "DisplayX")) {
+                SettingChoice("Renderer", s.renderer, listOf("Vulkan")) {
                     s.renderer = it
-                    s.surfaceFormat = if (it == "DisplayX") "rgba8" else "bgra8"
-                    if (it == "EGL" && s.filterMode > 1) s.filterMode = 0
                     s.saveRenderer()
                 }
                 SettingsDivider()
@@ -777,54 +763,23 @@ private fun ShortcutCategoryV2(
                     s.surfaceFormat = if (it == "BGRA") "bgra8" else "rgba8"
                     s.saveRenderer()
                 }
-                if (s.renderer == "DisplayX") {
+                SettingsDivider()
+                SettingChoice("Present Mode", s.presentMode, listOf("mailbox", "fifo")) {
+                    s.presentMode = it
+                    s.saveRenderer()
+                }
+                catalog?.let { c ->
                     SettingsDivider()
-                    SettingToggle("Bypass X11", s.trueDisplayX) {
-                        s.trueDisplayX = it
+                    SettingMappedChoice("Renderer Driver", s.rendererDriver, c.rendererDrivers) {
+                        s.rendererDriver = it
                         s.saveRenderer()
                     }
-                    SettingsDivider()
-                    SettingToggle("Performance mode", s.displayXPerformanceMode) {
-                        s.displayXPerformanceMode = it
-                        s.saveRenderer()
-                    }
-                    SettingsDivider()
-                    SettingToggle("Present at refresh rate", s.displayXPresentAtRefreshRate) {
-                        s.displayXPresentAtRefreshRate = it
-                        s.saveRenderer()
-                    }
-                    SettingsDivider()
-                    SettingToggle("Submit every buffer", s.displayXBackPressure) {
-                        s.displayXBackPressure = it
-                        s.saveRenderer()
-                    }
-                    SettingsDivider()
-                    SettingToggle("Precise presentation", s.displayXPrecisePresentation) {
-                        s.displayXPrecisePresentation = it
-                        s.saveRenderer()
-                    }
-                } else {
-                    if (s.renderer != "EGL") {
-                        SettingsDivider()
-                        SettingChoice("Present Mode", s.presentMode, listOf("mailbox", "fifo")) {
-                            s.presentMode = it
-                            s.saveRenderer()
-                        }
-                        catalog?.let { c ->
-                            SettingsDivider()
-                            SettingMappedChoice("Renderer Driver", s.rendererDriver, c.rendererDrivers) {
-                                s.rendererDriver = it
-                                s.saveRenderer()
-                            }
-                        }
-                    }
-                    SettingsDivider()
-                    val filters = if (s.renderer == "EGL") listOf("Bilinear", "Nearest neighbor")
-                    else listOf("Bilinear", "Nearest neighbor", "Snapdragon Super Resolution", "AMD FidelityFX Super Resolution", "Lanczos 2 (16-tap)", "Color Boost")
-                    SettingChoice("Texture Filter", filters.getOrElse(s.filterMode) { filters.first() }, filters) {
-                        s.filterMode = filters.indexOf(it).coerceAtLeast(0)
-                        s.saveRenderer()
-                    }
+                }
+                SettingsDivider()
+                val filters = listOf("Bilinear", "Nearest neighbor", "Snapdragon Super Resolution", "AMD FidelityFX Super Resolution", "Lanczos 2 (16-tap)", "Color Boost")
+                SettingChoice("Texture Filter", filters.getOrElse(s.filterMode) { filters.first() }, filters) {
+                    s.filterMode = filters.indexOf(it).coerceAtLeast(0)
+                    s.saveRenderer()
                 }
             }
             SettingsCard {

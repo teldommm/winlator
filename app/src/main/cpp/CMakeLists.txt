@@ -10,6 +10,10 @@ add_subdirectory(adrenotools)
 add_subdirectory(thirdparty/dxbc)
 
 # Add Winlator shared library
+# NOTE: the DisplayX and EGL X-server renderer path (winlator/renderer/{egl,window,shader,
+# cursor,xform,view_transformation,displayx,renderer_jni}.* and renderer/effectcomposer/*)
+# was removed. Vulkan (vulkan_renderer, below) is now the only X-server presentation path.
+# xr/*.c (OpenXR/VR) keeps its own independent EGL/GLES usage and is unaffected.
 add_library(winlator SHARED
         xr/engine.c
         xr/framebuffer.c
@@ -24,19 +28,9 @@ add_library(winlator SHARED
         winlator/xconnector_epoll.c
         winlator/alsa_client.c
         winlator/vulkan.c
-        winlator/renderer/egl.cpp
-        winlator/renderer/renderer_jni.cpp
-        winlator/renderer/shader.cpp
-        winlator/renderer/window.cpp
-        winlator/renderer/cursor.cpp
-        winlator/renderer/xform.cpp
-        winlator/renderer/view_transformation.cpp
-        winlator/renderer/displayx.cpp
-        winlator/renderer/effectcomposer/effect_composer.cpp
 )
 
 target_compile_options(winlator PRIVATE -Wall -Wextra)
-target_include_directories(winlator PRIVATE winlator/renderer winlator/renderer/effectcomposer)
 
 target_link_libraries(winlator
         log
@@ -63,9 +57,8 @@ target_link_libraries(fakeinput
         dl
 )
 
-# Keep the Pypetto DisplayX/EGL target above untouched.  The optional Vulkan
-# renderer is a separate JNI library so selecting it cannot change the native
-# presentation path used by DisplayX or EGL.
+# Vulkan renderer: the sole X-server presentation path (see note above the
+# `winlator` target). Still built as its own JNI library (vulkan_renderer.so).
 set(VULKAN_RENDERER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/winlator/renderer/vulkan)
 
 add_custom_command(

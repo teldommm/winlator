@@ -625,7 +625,6 @@ public class ShortcutsFragment extends Fragment {
             intent.putExtra("shortcut_path", shortcut.file.getPath());
             intent.putExtra("shortcut_name", shortcut.name);
             intent.putExtra("disableXinput", shortcut.getExtra("disableXinput", "0"));
-            intent.putExtra("native_rendering", shortcut.getRendererNative());
             activity.startActivity(intent);
         } else {
             XrActivity.openIntent(activity, shortcut.container.id, shortcut.file.getPath());

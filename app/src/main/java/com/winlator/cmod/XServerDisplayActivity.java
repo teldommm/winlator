@@ -101,7 +101,6 @@ import com.winlator.cmod.widget.LogView;
 import com.winlator.cmod.widget.MagnifierView;
 import com.winlator.cmod.widget.TouchpadView;
 import com.winlator.cmod.widget.XServerRendererView;
-import com.winlator.cmod.widget.XServerView;
 import com.winlator.cmod.widget.VulkanXServerView;
 import com.winlator.cmod.winhandler.MouseEventFlags;
 import com.winlator.cmod.winhandler.TaskManagerSidebar;
@@ -190,12 +189,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private boolean softStretchEnabled = false;
     private DebugDialog debugDialog;
     private String rendererLogPath;
-    private KeyValueSet displayxConfig;
-    public boolean performanceMode;
-    public boolean presentRR;
-    public boolean backPressure;
-    public boolean precisePresentation;
-    public int textureFilter;
     private short taskAffinityMask = 0;
     private short taskAffinityMaskWoW64 = 0;
     private String wineCpuTopologyValue = "";
@@ -550,27 +543,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (!removeLoadingBarWhenBootingGames) preloaderDialog.show(R.string.starting_up);
 
         inputControlsManager = new InputControlsManager(this);
-        boolean useDisplayX = isDisplayXEnabled();
-        performanceMode = shortcut != null
-                ? shortcut.getDisplayXPerformanceMode() : container.getDisplayXPerformanceMode();
-        presentRR = shortcut != null
-                ? shortcut.getDisplayXPresentAtRefreshRate() : container.getDisplayXPresentAtRefreshRate();
-        backPressure = shortcut != null
-                ? shortcut.getDisplayXBackPressure() : container.getDisplayXBackPressure();
-        precisePresentation = shortcut != null
-                ? shortcut.getDisplayXPrecisePresentation() : container.getDisplayXPrecisePresentation();
-        textureFilter = shortcut != null
-                ? shortcut.getRendererFilterMode() : container.getRendererFilterMode();
-        if (textureFilter != 1) textureFilter = 0;
-        displayxConfig = new KeyValueSet();
-        displayxConfig.put("trueDisplayX", (shortcut != null
-                ? shortcut.getTrueDisplayX() : container.getTrueDisplayX()) ? "1" : "0");
-        displayxConfig.put("performanceMode", performanceMode ? "1" : "0");
-        displayxConfig.put("surfaceFormat", getSelectedSurfaceFormat());
-        displayxConfig.put("presentRR", presentRR ? "1" : "0");
-        displayxConfig.put("backPressure", backPressure ? "1" : "0");
-        displayxConfig.put("precisePresentation", precisePresentation ? "1" : "0");
-        xServer = new XServer(new ScreenInfo(screenSize), useDisplayX ? "displayx" : "egl", displayxConfig);
+        // Vulkan is now the only X-server renderer; XServer only needs the surface format
+        // (still driven by the container/shortcut's surfaceFormat setting).
+        xServer = new XServer(new ScreenInfo(screenSize), getSelectedSurfaceFormat());
         xServer.setWinHandler(winHandler);
         xServer.setRelativeMouseMovement(isRelativeMouseMovement);
         advertisePanelRefreshRates();
@@ -1194,11 +1169,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
         scriptFile.setExecutable(true);
     }
 
-    private boolean isDisplayXEnabled() {
-        if (shortcut != null) return shortcut.getUseDisplayX();
-        return container != null && container.getUseDisplayX();
-    }
-
     private String getSelectedSurfaceFormat() {
         if (shortcut != null) return shortcut.getSurfaceFormat();
         return container != null ? container.getSurfaceFormat() : "rgba8";
@@ -1207,21 +1177,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private void setupUI() {
         FrameLayout rootView = findViewById(R.id.FLXServerDisplay);
 
-        boolean useDisplayX = isDisplayXEnabled();
-
-        boolean useEGL = !useDisplayX && (shortcut != null ? shortcut.getRendererNative()
-                : (container != null && container.getRendererNative()));
-
-        if (useDisplayX || useEGL) {
-            xServerView = new XServerView(this, xServer);
-        } else {
-            VulkanXServerView.loadNativeLibrary();
-            xServerView = new VulkanXServerView(this, xServer);
-        }
+        VulkanXServerView.loadNativeLibrary();
+        xServerView = new VulkanXServerView(this, xServer);
         final XServerRendererView renderer = xServerView;
         renderer.setCursorVisible(false);
 
-        if (renderer instanceof VulkanXServerView) {
+        {
             VulkanXServerView vkRenderer = (VulkanXServerView) renderer;
 
             String rendererDriverId = shortcut != null ? shortcut.getRendererDriverId()
@@ -1408,10 +1369,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         int active = Color.rgb(76, 175, 80);
         int warning = Color.rgb(255, 152, 0);
 
-        boolean displayX = xServer != null && xServer.isDisplayX();
-        String renderer = xServerView instanceof VulkanXServerView ? "Vulkan"
-                : displayX ? "DisplayX" : "EGL";
-        setRuntimeStatus(R.id.TVRuntimeRendererStatus, "Renderer", renderer + " active", active);
+        setRuntimeStatus(R.id.TVRuntimeRendererStatus, "Renderer", "Vulkan active", active);
 
         boolean dxvkActive = dxwrapper != null && dxwrapper.contains("dxvk");
         boolean vkd3dActive = dxvkActive && dxwrapper.contains("vkd3d")
@@ -1443,8 +1401,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         Switch upscaler = findViewById(R.id.SWEnableFSR);
         Spinner upscalerMode = findViewById(R.id.SPUpscalerMode);
-        boolean upscalerAvailable = xServerView instanceof VulkanXServerView
-                || xServerView instanceof XServerView && !displayX;
+        // Vulkan is the only renderer now, so xServerView (when set) is always a
+        // VulkanXServerView; upscaling/framegen are simply unavailable before it's created.
+        VulkanXServerView vkStatusRenderer = xServerView != null ? (VulkanXServerView) xServerView : null;
+        boolean upscalerAvailable = vkStatusRenderer != null;
         boolean upscalerActive = upscalerAvailable && upscaler != null && upscaler.isChecked();
         String upscalerStatus = !upscalerAvailable ? "Unavailable"
                 : upscalerActive && upscalerMode != null ? upscalerMode.getSelectedItem() + " active"
@@ -1452,8 +1412,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         setRuntimeStatus(R.id.TVRuntimeUpscalerStatus, "Upscaler", upscalerStatus,
                 upscalerActive ? active : normal);
 
-        VulkanXServerView framegenRenderer = xServerView instanceof VulkanXServerView
-                ? (VulkanXServerView) xServerView : null;
+        VulkanXServerView framegenRenderer = vkStatusRenderer;
         boolean framegenAvailable = framegenRenderer != null;
         boolean framegenActive = framegenAvailable && activeLsfgMultiplier >= 2;
         String framegenError = framegenAvailable ? framegenRenderer.getFrameGenError() : "";
@@ -1628,11 +1587,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
         View btItemMagnifier = findViewById(R.id.BTItemMagnifier);
         if (btItemMagnifier != null) {
             btItemMagnifier.setOnClickListener(v -> {
-                if (xServer != null && xServer.isDisplayX()) {
-                    showToast(this, R.string.magnifier_not_available);
-                    drawerLayout.closeDrawers();
-                    return;
-                }
                 if (xServerView != null) {
                     final XServerRendererView renderer = xServerView;
                     if (magnifierView == null) {
@@ -1665,9 +1619,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         rendererRef.toggleFullscreen();
                         if (touchpadView != null) touchpadView.toggleFullscreen();
                     }
-                    if (rendererRef instanceof VulkanXServerView) {
-                        ((VulkanXServerView) rendererRef).setStretchMode(softStretchEnabled ? 1 : 0);
-                    }
+                    // Vulkan is the only renderer now, so rendererRef is always a VulkanXServerView.
+                    ((VulkanXServerView) rendererRef).setStretchMode(softStretchEnabled ? 1 : 0);
                     btItemSoftStretch.setSelected(softStretchEnabled);
                 }
                 drawerLayout.closeDrawers();
@@ -1965,31 +1918,26 @@ public class XServerDisplayActivity extends AppCompatActivity {
         container.putExtra("hudMode", String.valueOf(mode));
         container.setShowFPS(mode != 0);
         container.saveData();
-        if (xServerView instanceof XServerView) {
-            ((XServerView) xServerView).setShowFPS(mode != 0);
-        }
     }
 
     private void setupSidebarGraphicsControls() {
-        final boolean isVulkanRenderer = xServerView instanceof VulkanXServerView;
-
         View reshadePanel = findViewById(R.id.LLSubReshade);
         View postFxDivider = findViewById(R.id.VPostFXDivider);
         View postFxOptions = findViewById(R.id.LLPostFXOptions);
 
         if (reshadePanel != null) {
-            reshadePanel.setVisibility(isVulkanRenderer ? View.VISIBLE : View.GONE);
+            reshadePanel.setVisibility(View.VISIBLE);
         }
         if (postFxDivider != null) {
-            postFxDivider.setVisibility(isVulkanRenderer ? View.VISIBLE : View.GONE);
+            postFxDivider.setVisibility(View.VISIBLE);
         }
         if (postFxOptions != null) {
-            postFxOptions.setVisibility(isVulkanRenderer ? View.VISIBLE : View.GONE);
+            postFxOptions.setVisibility(View.VISIBLE);
         }
 
+        // Vulkan is the only renderer now, so renderer (when set) is always a VulkanXServerView.
         final XServerRendererView renderer = xServerView;
-        final VulkanXServerView  vkRenderer = renderer instanceof VulkanXServerView ? (VulkanXServerView) renderer : null;
-        final XServerView nativeRenderer = renderer instanceof XServerView ? (XServerView) renderer : null;
+        final VulkanXServerView  vkRenderer = renderer != null ? (VulkanXServerView) renderer : null;
 
         Spinner spNativeFPS        = findViewById(R.id.SPNativeFPS);
         View    llStandardOptions  = findViewById(R.id.LLStandardOptions);
@@ -2008,15 +1956,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (spFrameGenFPS  != null) spFrameGenFPS.setVisibility(View.GONE);
         if (sbFrameGenFlowScale != null) sbFrameGenFlowScale.setVisibility(View.GONE);
         if (spColorMode    != null) spColorMode.setVisibility(View.GONE);
-        if (llStandardOptions != null) llStandardOptions.setVisibility(isVulkanRenderer ? View.VISIBLE : View.GONE);
-        if (btSaveGraphicsPreset != null) btSaveGraphicsPreset.setVisibility(isVulkanRenderer ? View.VISIBLE : View.GONE);
-        if (nativeRenderer != null) {
-            if (swEnableFSR        != null) swEnableFSR.setVisibility(View.GONE);
-            if (spUpscalerMode     != null) spUpscalerMode.setVisibility(View.GONE);
-            if (lblSharpnessHeader != null) lblSharpnessHeader.setVisibility(View.GONE);
-            if (sbSharpness        != null) sbSharpness.setVisibility(View.GONE);
-            if (spPostFXMode       != null) spPostFXMode.setVisibility(View.GONE);
-        }
+        if (llStandardOptions != null) llStandardOptions.setVisibility(View.VISIBLE);
+        if (btSaveGraphicsPreset != null) btSaveGraphicsPreset.setVisibility(View.VISIBLE);
 
         final int[]    fpsValues = {0, 30, 60, 90, 120};
         final String[] fpsLabels = {"Off", "30 FPS", "60 FPS", "90 FPS", "120 FPS"};
@@ -2031,17 +1972,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
             spNativeFPS.setSelection(savedFpsPos);
             int initialFpsLimit = savedFpsPos < fpsValues.length ? fpsValues[savedFpsPos] : 0;
             if (vkRenderer != null) vkRenderer.setFpsLimit(initialFpsLimit);
-            if (nativeRenderer != null) nativeRenderer.setFpsLimit(initialFpsLimit);
             spNativeFPS.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
-                    if (llStandardOptions != null) llStandardOptions.setVisibility(isVulkanRenderer ? View.VISIBLE : View.GONE);
+                    if (llStandardOptions != null) llStandardOptions.setVisibility(View.VISIBLE);
                     int fpsLimit = pos < fpsValues.length ? fpsValues[pos] : 0;
                     if (vkRenderer != null) vkRenderer.setFpsLimit(fpsLimit);
-                    if (nativeRenderer != null) nativeRenderer.setFpsLimit(fpsLimit);
-                    if (!isVulkanRenderer && container != null) {
-                        container.putExtra("graphicsFpsPreset", String.valueOf(pos));
-                        container.saveData();
-                    }
                 }
                 @Override public void onNothingSelected(AdapterView<?> p) {}
             });

@@ -56,7 +56,6 @@ public class Container {
     private String drives = DEFAULT_DRIVES;
     private String wineVersion = WineInfo.MAIN_WINE_VERSION.identifier();
     private boolean showFPS;
-    private boolean rendererNative = false;
     private String rendererPresentMode = "fifo";
     private String rendererDriverId = "system";
     private int rendererFilterMode = 0;
@@ -139,9 +138,6 @@ public class Container {
         this.graphicsDriverConfig = graphicsDriverConfig;
     }
 
-    public boolean isRendererNative() { return rendererNative; }
-    public boolean getRendererNative() { return rendererNative; }
-    public void setRendererNative(boolean v) { this.rendererNative = v; }
     public String getRendererPresentMode() { return rendererPresentMode; }
     public void setRendererPresentMode(String v) { this.rendererPresentMode = v != null ? v : "fifo"; }
     public String getRendererDriverId() { return rendererDriverId; }
@@ -151,55 +147,13 @@ public class Container {
     public boolean getRendererSwapRB() { return rendererSwapRB; }
     public void setRendererSwapRB(boolean v) { this.rendererSwapRB = v; }
 
-    public boolean getUseDisplayX() {
-        return "1".equals(getExtra("useDisplayX", "0"));
-    }
-    public void setUseDisplayX(boolean v) {
-        putExtra("useDisplayX", v ? "1" : "0");
-    }
-
-    public boolean getTrueDisplayX() {
-        return "1".equals(getExtra("trueDisplayX", "0"));
-    }
-    public void setTrueDisplayX(boolean v) {
-        putExtra("trueDisplayX", v ? "1" : "0");
-    }
-
     public String getSurfaceFormat() {
         String value = getExtra("surfaceFormat", null);
-        if (value == null || value.isEmpty()) value = getUseDisplayX() ? "rgba8" : "bgra8";
+        if (value == null || value.isEmpty()) value = "rgba8";
         return "bgra8".equalsIgnoreCase(value) ? "bgra8" : "rgba8";
     }
     public void setSurfaceFormat(String value) {
         putExtra("surfaceFormat", "bgra8".equalsIgnoreCase(value) ? "bgra8" : "rgba8");
-    }
-
-    public boolean getDisplayXPerformanceMode() {
-        return "1".equals(getExtra("displayXPerformanceMode", "1"));
-    }
-    public void setDisplayXPerformanceMode(boolean v) {
-        putExtra("displayXPerformanceMode", v ? "1" : "0");
-    }
-
-    public boolean getDisplayXPresentAtRefreshRate() {
-        return "1".equals(getExtra("displayXPresentAtRefreshRate", "1"));
-    }
-    public void setDisplayXPresentAtRefreshRate(boolean v) {
-        putExtra("displayXPresentAtRefreshRate", v ? "1" : "0");
-    }
-
-    public boolean getDisplayXBackPressure() {
-        return "1".equals(getExtra("displayXBackPressure", "0"));
-    }
-    public void setDisplayXBackPressure(boolean v) {
-        putExtra("displayXBackPressure", v ? "1" : "0");
-    }
-
-    public boolean getDisplayXPrecisePresentation() {
-        return "1".equals(getExtra("displayXPrecisePresentation", "0"));
-    }
-    public void setDisplayXPrecisePresentation(boolean v) {
-        putExtra("displayXPrecisePresentation", v ? "1" : "0");
     }
 
     public int getLsfgMultiplier() {
@@ -515,7 +469,6 @@ public class Container {
             if (syncCpuTopology) data.put("syncCpuTopology", true);
             data.put("graphicsDriver", graphicsDriver);
             data.put("graphicsDriverConfig", getGraphicsDriverConfig());
-            data.put("rendererNative", rendererNative);
             data.put("rendererPresentMode", rendererPresentMode);
             if (!rendererDriverId.isEmpty()) data.put("rendererDriverId", rendererDriverId);
             if (rendererFilterMode != 0) data.put("rendererFilterMode", rendererFilterMode);
@@ -579,9 +532,6 @@ public class Container {
                     break;
                 case "graphicsDriverConfig" :
                     setGraphicsDriverConfig(data.getString(key));
-                    break;
-                case "rendererNative" :
-                    rendererNative = data.getBoolean(key);
                     break;
                 case "rendererPresentMode" :
                     rendererPresentMode = data.getString(key);

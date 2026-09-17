@@ -6,7 +6,6 @@ import android.os.Environment;
 import android.util.Log;
 
 import com.winlator.cmod.core.FileUtils;
-import com.winlator.cmod.core.KeyValueSet;
 import com.winlator.cmod.core.StringUtils;
 
 import java.io.IOException;
@@ -283,86 +282,13 @@ public class Shortcut {
         return exe;
     }
 
-    public boolean getRendererNative() {
-        String v = getExtra("rendererNative", null);
-        return v != null ? v.equals("1") : container.isRendererNative();
-    }
-    public void setRendererNative(boolean v) { putExtra("rendererNative", v ? "1" : "0"); }
-
-    public boolean getUseDisplayX() {
-        String v = getExtra("useDisplayX", null);
-        if (v != null) return v.equals("1");
-        String legacyDriver = getExtra("displayDriver", null);
-        if (legacyDriver != null) return legacyDriver.equalsIgnoreCase("displayx");
-        return container.getUseDisplayX();
-    }
-    public void setUseDisplayX(boolean v) { putExtra("useDisplayX", v ? "1" : "0"); }
-
-    public boolean getTrueDisplayX() {
-        String v = getExtra("trueDisplayX", null);
-        if (v != null) return v.equals("1");
-        v = getLegacyDisplayXValue("trueDisplayX");
-        return v != null ? v.equals("1") : container.getTrueDisplayX();
-    }
-    public void setTrueDisplayX(boolean v) { putExtra("trueDisplayX", v ? "1" : "0"); }
-
     public String getSurfaceFormat() {
         String v = getExtra("surfaceFormat", null);
-        if (v == null || v.isEmpty()) v = getLegacyDisplayXValue("surfaceFormat");
-        if (v == null || v.isEmpty()) {
-            boolean overridesRenderer = getExtra("rendererNative", null) != null
-                    || getExtra("useDisplayX", null) != null
-                    || getExtra("displayDriver", null) != null;
-            if (!overridesRenderer) return container.getSurfaceFormat();
-            return getUseDisplayX() ? "rgba8" : "bgra8";
-        }
+        if (v == null || v.isEmpty()) return container.getSurfaceFormat();
         return "bgra8".equalsIgnoreCase(v) ? "bgra8" : "rgba8";
     }
     public void setSurfaceFormat(String value) {
         putExtra("surfaceFormat", "bgra8".equalsIgnoreCase(value) ? "bgra8" : "rgba8");
-    }
-
-    public boolean getDisplayXPerformanceMode() {
-        String v = getExtra("displayXPerformanceMode", null);
-        if (v == null) v = getLegacyDisplayXValue("performanceMode");
-        return v != null ? v.equals("1") : container.getDisplayXPerformanceMode();
-    }
-    public void setDisplayXPerformanceMode(boolean v) {
-        putExtra("displayXPerformanceMode", v ? "1" : "0");
-    }
-
-    public boolean getDisplayXPresentAtRefreshRate() {
-        String v = getExtra("displayXPresentAtRefreshRate", null);
-        if (v == null) v = getLegacyDisplayXValue("presentRR");
-        return v != null ? v.equals("1") : container.getDisplayXPresentAtRefreshRate();
-    }
-    public void setDisplayXPresentAtRefreshRate(boolean v) {
-        putExtra("displayXPresentAtRefreshRate", v ? "1" : "0");
-    }
-
-    public boolean getDisplayXBackPressure() {
-        String v = getExtra("displayXBackPressure", null);
-        if (v == null) v = getLegacyDisplayXValue("backPressure");
-        return v != null ? v.equals("1") : container.getDisplayXBackPressure();
-    }
-    public void setDisplayXBackPressure(boolean v) {
-        putExtra("displayXBackPressure", v ? "1" : "0");
-    }
-
-    public boolean getDisplayXPrecisePresentation() {
-        String v = getExtra("displayXPrecisePresentation", null);
-        if (v == null) v = getLegacyDisplayXValue("precisePresentation");
-        return v != null ? v.equals("1") : container.getDisplayXPrecisePresentation();
-    }
-    public void setDisplayXPrecisePresentation(boolean v) {
-        putExtra("displayXPrecisePresentation", v ? "1" : "0");
-    }
-
-    private String getLegacyDisplayXValue(String key) {
-        String config = getExtra("displayxConfig", null);
-        if (config == null || config.isEmpty()) return null;
-        String value = new KeyValueSet(config).get(key);
-        return value.isEmpty() ? null : value;
     }
 
     public String getRendererPresentMode() {

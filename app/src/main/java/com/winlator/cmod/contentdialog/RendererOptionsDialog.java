@@ -16,8 +16,6 @@ import java.util.List;
 
 public class RendererOptionsDialog extends ContentDialog {
 
-    private final boolean isNativeMode;
-
     private void setGroupVisibility(int id, int vis) {
         View v = findViewById(id);
         if (v != null) v.setVisibility(vis);
@@ -52,14 +50,8 @@ public class RendererOptionsDialog extends ContentDialog {
         "Color Boost"
     };
 
-    private static final String[] FILTER_LABELS_EGL = {
-        "Bilinear",
-        "Nearest neighbor"
-    };
-
-    public RendererOptionsDialog(View anchorView, Config config, boolean isNativeMode) {
+    public RendererOptionsDialog(View anchorView, Config config) {
         super(anchorView.getContext(), R.layout.renderer_options_dialog);
-        this.isNativeMode = isNativeMode;
 
         Context ctx = anchorView.getContext();
         findViewById(R.id.FrameLayout).getLayoutParams().width = Math.min(AppUtils.getPreferredDialogWidth(ctx), Math.round(UnitUtils.dpToPx(260)));
@@ -69,8 +61,8 @@ public class RendererOptionsDialog extends ContentDialog {
         Spinner  spFilter  = findViewById(R.id.SPRendererFilter);
         CheckBox cbSwapRB  = findViewById(R.id.CBRendererSwapRB);
 
-        setGroupVisibility(R.id.GroupPresentMode, isNativeMode ? View.GONE : View.VISIBLE);
-        setGroupVisibility(R.id.GroupDriver,      isNativeMode ? View.GONE : View.VISIBLE);
+        setGroupVisibility(R.id.GroupPresentMode, View.VISIBLE);
+        setGroupVisibility(R.id.GroupDriver,      View.VISIBLE);
         setGroupVisibility(R.id.GroupFilter,      View.VISIBLE);
         cbSwapRB.setVisibility(View.VISIBLE);
 
@@ -100,18 +92,15 @@ public class RendererOptionsDialog extends ContentDialog {
         }
         spDriver.setSelection(drvSel);
 
-        String[] filterLabels = isNativeMode ? FILTER_LABELS_EGL : FILTER_LABELS_VULKAN;
-        setAmoledAdapter(ctx, spFilter, filterLabels);
+        setAmoledAdapter(ctx, spFilter, FILTER_LABELS_VULKAN);
         int filterSel = config.getRendererFilterMode();
-        if (filterSel < 0 || filterSel >= filterLabels.length) filterSel = 0;
+        if (filterSel < 0 || filterSel >= FILTER_LABELS_VULKAN.length) filterSel = 0;
         spFilter.setSelection(filterSel);
         cbSwapRB.setChecked(config.getRendererSwapRB());
 
         setOnConfirmCallback(() -> {
-            if (!isNativeMode) {
-                config.setRendererPresentMode(PRESENT_MODE_IDS[spPresent.getSelectedItemPosition()]);
-                config.setRendererDriverId(driverIds.get(spDriver.getSelectedItemPosition()));
-            }
+            config.setRendererPresentMode(PRESENT_MODE_IDS[spPresent.getSelectedItemPosition()]);
+            config.setRendererDriverId(driverIds.get(spDriver.getSelectedItemPosition()));
             config.setRendererFilterMode(spFilter.getSelectedItemPosition());
             config.setRendererSwapRB(cbSwapRB.isChecked());
         });

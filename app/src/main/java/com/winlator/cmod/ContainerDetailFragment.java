@@ -435,19 +435,14 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                 : new com.winlator.cmod.container.Container(-1);
         final Spinner spRendererMode = view.findViewById(R.id.SPRendererMode);
         if (spRendererMode != null) {
+            // Vulkan is the only renderer now (EGL/DisplayX were removed); the spinner
+            // stays for layout consistency but no longer offers a choice.
             ArrayAdapter<String> rendererModeAdapter = new ArrayAdapter<>(context, R.layout.spinner_item_amoled,
-                    new String[]{"Vulkan", "EGL"});
+                    new String[]{"Vulkan"});
             rendererModeAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item_amoled_compact);
             spRendererMode.setAdapter(rendererModeAdapter);
-            spRendererMode.setSelection(rendererCfgHolder.isRendererNative() ? 1 : 0);
-            spRendererMode.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
-                public void onItemSelected(android.widget.AdapterView<?> parent, View v, int position, long id) {
-                    rendererCfgHolder.setRendererNative(position == 1);
-                    if (isEditMode())
-                        rendererCfgHolder.saveData();
-                }
-                public void onNothingSelected(android.widget.AdapterView<?> parent) {}
-            });
+            spRendererMode.setSelection(0);
+            spRendererMode.setEnabled(false);
         }
         View btRendererOptions = view.findViewById(R.id.BTRendererOptions);
         if (btRendererOptions != null) {
@@ -493,7 +488,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                                 if (isEditMode())
                                     rendererCfgHolder.saveData();
                             }
-                        }, rendererCfgHolder.isRendererNative()).show();
+                        }).show();
             });
         }
 
@@ -769,7 +764,6 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                     container.setGraphicsDriver(graphicsDriver);
                     container.setGraphicsDriverConfig(graphicsDriverConfig);
                     container.setDXWrapper(dxwrapper);
-                    container.setRendererNative(rendererCfgHolder.isRendererNative());
                     container.setRendererPresentMode(rendererCfgHolder.getRendererPresentMode());
                     container.setRendererDriverId(rendererCfgHolder.getRendererDriverId());
                     container.setRendererFilterMode(rendererCfgHolder.getRendererFilterMode());
@@ -809,7 +803,6 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                     data.put("graphicsDriver", graphicsDriver);
                     data.put("graphicsDriverConfig", graphicsDriverConfig);
                     data.put("dxwrapper", dxwrapper);
-                    data.put("rendererNative", rendererCfgHolder.isRendererNative());
                     data.put("rendererPresentMode", rendererCfgHolder.getRendererPresentMode());
                     if (!rendererCfgHolder.getRendererDriverId().isEmpty())
                         data.put("rendererDriverId", rendererCfgHolder.getRendererDriverId());

@@ -121,7 +121,7 @@ public class ContainerOverviewFragment extends Fragment {
                 container.id,
                 container.getName(),
                 container.getWineVersion(),
-                container.isRendererNative() ? "EGL" : "Vulkan",
+                "Vulkan",
                 container.getScreenSize(),
                 container.getAudioDriver().toUpperCase(),
                 container.getDXWrapper(),

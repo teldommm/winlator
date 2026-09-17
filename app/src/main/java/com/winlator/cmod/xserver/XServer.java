@@ -4,7 +4,6 @@ import android.hardware.HardwareBuffer;
 import android.util.SparseArray;
 
 import com.winlator.cmod.core.CursorLocker;
-import com.winlator.cmod.core.KeyValueSet;
 import com.winlator.cmod.widget.XServerRendererView;
 import com.winlator.cmod.winhandler.WinHandler;
 import com.winlator.cmod.xserver.extensions.BigReqExtension;
@@ -40,7 +39,6 @@ public class XServer {
     public final InputDeviceManager inputDeviceManager;
     public final GrabManager grabManager;
     public final CursorLocker cursorLocker;
-    private String displayDriver;
     private SHMSegmentManager shmSegmentManager;
     private WinHandler winHandler;
     private final EnumMap<Lockable, ReentrantLock> locks = new EnumMap<>(Lockable.class);
@@ -52,17 +50,13 @@ public class XServer {
     private XServerRendererView xServerView;
     private XClient grabbingClient = null;
 
-    public XServer(ScreenInfo screenInfo, String displayDriver, KeyValueSet displayxConfig) {
+    public XServer(ScreenInfo screenInfo, String surfaceFormat) {
         this.screenInfo = screenInfo;
-        this.displayDriver = displayDriver;
-        if (displayxConfig != null) {
-            String surfaceFormat = displayxConfig.get("surfaceFormat");
-            if (surfaceFormat.equals("rgba8"))
-                this.surfaceFormat = HardwareBuffer.RGBA_8888;
-            else 
-                this.surfaceFormat = Drawable.HAL_PIXEL_FORMAT_BGRA_8888;        
-        }    
-            
+        if ("rgba8".equals(surfaceFormat))
+            this.surfaceFormat = HardwareBuffer.RGBA_8888;
+        else
+            this.surfaceFormat = Drawable.HAL_PIXEL_FORMAT_BGRA_8888;
+
         cursorLocker = new CursorLocker(this);
         for (Lockable lockable : Lockable.values()) locks.put(lockable, new ReentrantLock());
 
@@ -78,20 +72,8 @@ public class XServer {
         setupExtensions();
     }
     
-    public String getDisplayDriver() {
-        return this.displayDriver;
-    }
-    
-    public void setDisplayDriver(String displayDriver) {
-        this.displayDriver = displayDriver;
-    }
-   
     public int getSurfaceFormat() {
         return this.surfaceFormat;
-    }
-    
-    public boolean isDisplayX() {
-        return this.displayDriver.toLowerCase().equals("displayx");
     }
 
     public boolean isRelativeMouseMovement() {

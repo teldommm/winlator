@@ -198,7 +198,6 @@ private fun prepareInitialContainer(
             put("envVars", cleanContainerEnvironment(Container.DEFAULT_ENV_VARS))
             put("graphicsDriver", Container.DEFAULT_GRAPHICS_DRIVER)
             put("graphicsDriverConfig", graphicsConfig)
-            put("rendererNative", false)
             put("rendererPresentMode", "fifo")
             put("dxwrapper", Container.DEFAULT_DXWRAPPER)
             put("dxwrapperConfig", Container.DEFAULT_DXWRAPPERCONFIG)

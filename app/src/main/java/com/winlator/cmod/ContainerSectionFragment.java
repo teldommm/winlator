@@ -81,7 +81,7 @@ public class ContainerSectionFragment extends Fragment {
     }
 
     private View buildSectionView(ContentsManager contentsManager) {
-        String[] rendererEntries = new String[]{"Vulkan", "EGL"};
+        String[] rendererEntries = new String[]{"Vulkan"};
         String[] screenEntries = getResources().getStringArray(R.array.screen_size_entries);
         String[] graphicsEntries = getResources().getStringArray(R.array.graphics_driver_entries);
         String[] audioEntries = getResources().getStringArray(R.array.audio_driver_entries);
@@ -200,7 +200,7 @@ public class ContainerSectionFragment extends Fragment {
                 section,
                 description,
                 rendererEntries,
-                container.isRendererNative() ? "EGL" : "Vulkan",
+                "Vulkan",
                 screenEntries,
                 findScreenEntry(screenEntries, container.getScreenSize()),
                 container.getScreenSize(),
@@ -280,7 +280,6 @@ public class ContainerSectionFragment extends Fragment {
                             container.setScreenSize(normalizeScreenSize(screenSize));
                             container.setGraphicsDriver(StringUtils.parseIdentifier(graphicsDriver));
                             container.setGraphicsDriverConfig(graphicsDriverConfig);
-                            container.setRendererNative(renderer.equalsIgnoreCase("EGL"));
                             container.setRendererPresentMode(rendererPresentMode);
                             container.setRendererDriverId(rendererDriverId);
                             container.setRendererFilterMode(rendererFilterMode);
