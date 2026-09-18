@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import com.winlator.cmod.R
 import com.winlator.cmod.ui.theme.WinZTheme
 import com.winlator.cmod.ui.theme.controlAccentColor
+import com.winlator.cmod.ui.theme.accentSwitchColors
 
 data class PresetEditorVariable(
     val name: String,
@@ -230,6 +231,8 @@ private fun PresetEditorScreen(
                         modifier = Modifier.padding(vertical = 8.dp)
                     )
                     variable.values.forEach { option ->
+                        val isSelected = values[variable.name] == option
+                        val accent = controlAccentColor()
                         Surface(
                             onClick = {
                                 values[variable.name] = option
@@ -242,9 +245,15 @@ private fun PresetEditorScreen(
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 13.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(option, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-                                if (values[variable.name] == option) {
-                                    Icon(Icons.Outlined.Check, null)
+                                Text(
+                                    option,
+                                    modifier = Modifier.weight(1f),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = if (isSelected) accent else MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                )
+                                if (isSelected) {
+                                    Icon(Icons.Outlined.Check, null, tint = accent)
                                 }
                             }
                         }
@@ -300,7 +309,7 @@ private fun PresetVariableRow(
                     checked = value == "1",
                     enabled = !readOnly,
                     onCheckedChange = { onValueChange(if (it) "1" else "0") },
-                    colors = SwitchDefaults.colors(checkedTrackColor = controlAccentColor(), checkedThumbColor = androidx.compose.ui.graphics.Color.White)
+                    colors = accentSwitchColors()
                 )
             }
         }

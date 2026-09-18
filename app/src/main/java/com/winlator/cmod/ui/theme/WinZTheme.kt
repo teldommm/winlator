@@ -12,6 +12,8 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SwitchColors
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -115,6 +117,22 @@ internal fun controlAccentFor(theme: WinlatorThemeType): Color =
 
 @Composable
 fun controlAccentColor(): Color = controlAccentFor(WinlatorThemeManager.currentTheme())
+
+// Shared Switch styling for the whole app — matches claude.ai's own switch look:
+// no visible border/outline when off, thumb stays white in both states (never gray).
+@Composable
+fun accentSwitchColors(): SwitchColors {
+    val accent = controlAccentColor()
+    val trackOff = MaterialTheme.colorScheme.surfaceVariant
+    return SwitchDefaults.colors(
+        checkedThumbColor = Color.White,
+        checkedTrackColor = accent,
+        checkedBorderColor = accent,
+        uncheckedThumbColor = Color.White,
+        uncheckedTrackColor = trackOff,
+        uncheckedBorderColor = trackOff
+    )
+}
 
 private val AmoledColors = darkColorScheme(
     primary = Color.White, onPrimary = Color.Black,

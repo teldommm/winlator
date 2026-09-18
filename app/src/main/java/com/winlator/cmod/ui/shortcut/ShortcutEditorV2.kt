@@ -39,6 +39,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -1073,7 +1074,8 @@ private fun ShortcutVulkanExtensionsV2(context: Context, driver: String, blackli
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Checkbox(
                                 checked = extension in selected,
-                                onCheckedChange = { checked -> if (checked) { if (extension !in selected) selected.add(extension) } else selected.remove(extension) }
+                                onCheckedChange = { checked -> if (checked) { if (extension !in selected) selected.add(extension) } else selected.remove(extension) },
+                                colors = CheckboxDefaults.colors(checkedColor = controlAccentColor())
                             )
                             Text(extension, modifier = Modifier.weight(1f).padding(vertical = 10.dp))
                         }

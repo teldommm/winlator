@@ -47,6 +47,7 @@ import com.winlator.cmod.container.ContainerManager
 import com.winlator.cmod.core.FileUtils
 import com.winlator.cmod.core.WineRegistryEditor
 import com.winlator.cmod.core.WineThemeManager
+import com.winlator.cmod.ui.theme.controlAccentColor
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Locale
@@ -278,11 +279,18 @@ private fun SSChoice(label: String, selected: String, entries: Array<String>, on
                 Icon(Icons.Outlined.KeyboardArrowDown, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        DropdownMenu(
+            expanded = open,
+            onDismissRequest = { open = false },
+            shape = RoundedCornerShape(14.dp),
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
+            val accent = controlAccentColor()
             entries.forEach { value ->
+                val isSelected = value.equals(selected, true)
                 DropdownMenuItem(
-                    text = { Text(value) },
-                    trailingIcon = { if (value.equals(selected, true)) Icon(Icons.Outlined.Check, null) },
+                    text = { Text(value, color = if (isSelected) accent else MaterialTheme.colorScheme.onSurface, fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal) },
+                    trailingIcon = { if (isSelected) Icon(Icons.Outlined.Check, null, tint = accent) },
                     onClick = { open = false; onSelected(value) }
                 )
             }
@@ -309,11 +317,18 @@ private fun SSCompactChoice(selected: String, entries: Array<String>, onSelected
                 Icon(Icons.Outlined.KeyboardArrowDown, null, modifier = Modifier.size(18.dp))
             }
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        DropdownMenu(
+            expanded = open,
+            onDismissRequest = { open = false },
+            shape = RoundedCornerShape(14.dp),
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
+            val accent = controlAccentColor()
             entries.forEach { value ->
+                val isSelected = value == selected
                 DropdownMenuItem(
-                    text = { Text(value) },
-                    trailingIcon = { if (value == selected) Icon(Icons.Outlined.Check, null) },
+                    text = { Text(value, color = if (isSelected) accent else MaterialTheme.colorScheme.onSurface, fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal) },
+                    trailingIcon = { if (isSelected) Icon(Icons.Outlined.Check, null, tint = accent) },
                     onClick = { open = false; onSelected(value) }
                 )
             }

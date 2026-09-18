@@ -82,6 +82,7 @@ import androidx.compose.ui.unit.dp
 import com.winlator.cmod.MainActivity
 import com.winlator.cmod.R
 import com.winlator.cmod.ui.theme.controlAccentColor
+import com.winlator.cmod.ui.theme.accentSwitchColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -276,7 +277,7 @@ private fun OrientationToggleMenuItem(label: String, checked: Boolean, onClick: 
             Switch(
                 checked = checked,
                 onCheckedChange = null,
-                colors = SwitchDefaults.colors(checkedTrackColor = controlAccentColor(), checkedThumbColor = Color.White)
+                colors = accentSwitchColors()
             )
         },
         onClick = onClick

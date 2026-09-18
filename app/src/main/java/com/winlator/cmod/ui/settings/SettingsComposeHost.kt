@@ -26,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Dns
@@ -40,6 +41,7 @@ import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
@@ -82,6 +84,7 @@ import com.winlator.cmod.R
 import com.winlator.cmod.ui.LandscapeMainNavigation
 import com.winlator.cmod.ui.theme.WinZTheme
 import com.winlator.cmod.ui.theme.controlAccentColor
+import com.winlator.cmod.ui.theme.accentSwitchColors
 import com.winlator.cmod.ui.theme.WinlatorThemePreferenceCard
 import kotlin.math.roundToInt
 
@@ -370,7 +373,7 @@ private fun ToggleRow(title: String, checked: Boolean, onChecked: (Boolean) -> U
         Switch(
             checked = checked,
             onCheckedChange = onChecked,
-            colors = SwitchDefaults.colors(checkedTrackColor = controlAccentColor(), checkedThumbColor = androidx.compose.ui.graphics.Color.White)
+            colors = accentSwitchColors()
         )
     }
 }
@@ -472,7 +475,9 @@ private fun PresetChoiceRow(
 
         if (expanded) {
             HorizontalDivider(Modifier.padding(horizontal = 14.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .55f))
+            val accent = controlAccentColor()
             choices.forEach { choice ->
+                val isSelected = choice.id == selectedId
                 Surface(
                     onClick = {
                         onSelected(choice.id)
@@ -488,10 +493,10 @@ private fun PresetChoiceRow(
                         Text(
                             choice.name,
                             modifier = Modifier.weight(1f),
-                            color = if (choice.id == selectedId) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = if (choice.id == selectedId) FontWeight.SemiBold else FontWeight.Normal
+                            color = if (isSelected) accent else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                         )
-                        if (choice.id == selectedId) Text("✓", fontWeight = FontWeight.Bold)
+                        if (isSelected) Icon(Icons.Outlined.Check, null, tint = accent)
                     }
                 }
             }
@@ -625,7 +630,11 @@ private fun SoundFontCard(choices: List<SettingChoice>, onInstall: () -> Unit, o
             }
             if (index != choices.lastIndex) GroupDivider()
         }
-        Button(onClick = onInstall, modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+        Button(
+            onClick = onInstall,
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = androidx.compose.ui.graphics.Color.White)
+        ) {
             Icon(Icons.Outlined.Add, null)
             Spacer(Modifier.width(7.dp))
             Text("Install SoundFont")
@@ -643,7 +652,11 @@ private fun EditableInlineValue(label: String, initial: String, onSave: (String)
     var value by remember(initial) { mutableStateOf(initial) }
     Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedTextField(value = value, onValueChange = { value = it }, label = { Text(label) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-        Button(onClick = { onSave(value) }, modifier = Modifier.align(Alignment.End)) { Text("Save") }
+        Button(
+            onClick = { onSave(value) },
+            modifier = Modifier.align(Alignment.End),
+            colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = androidx.compose.ui.graphics.Color.White)
+        ) { Text("Save") }
     }
 }
 

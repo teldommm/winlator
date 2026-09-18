@@ -45,6 +45,7 @@ import com.winlator.cmod.core.StringUtils
 import com.winlator.cmod.core.WineInfo
 import com.winlator.cmod.fexcore.FEXCorePresetManager
 import com.winlator.cmod.ui.theme.controlAccentColor
+import com.winlator.cmod.ui.theme.accentSwitchColors
 
 @Composable
 internal fun ContainerWrapperInline(containerId: Int, callbacks: ContainerInlineCallbacks) {
@@ -231,11 +232,18 @@ private fun VCChoice(label: String, selected: String, entries: Array<String>, on
                 Icon(Icons.Outlined.KeyboardArrowDown, null)
             }
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        DropdownMenu(
+            expanded = open,
+            onDismissRequest = { open = false },
+            shape = RoundedCornerShape(14.dp),
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
+            val accent = controlAccentColor()
             entries.forEach { value ->
+                val isSelected = value.equals(selected, true)
                 DropdownMenuItem(
-                    text = { Text(value) },
-                    trailingIcon = { if (value.equals(selected, true)) Icon(Icons.Outlined.Check, null) },
+                    text = { Text(value, color = if (isSelected) accent else MaterialTheme.colorScheme.onSurface, fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal) },
+                    trailingIcon = { if (isSelected) Icon(Icons.Outlined.Check, null, tint = accent) },
                     onClick = { open = false; onSelected(value) }
                 )
             }
@@ -301,7 +309,7 @@ private fun VCToggle(label: String, checked: Boolean, onChange: (Boolean) -> Uni
         Switch(
             checked = checked,
             onCheckedChange = onChange,
-            colors = SwitchDefaults.colors(checkedTrackColor = controlAccentColor(), checkedThumbColor = Color.White)
+            colors = accentSwitchColors()
         )
     }
 }

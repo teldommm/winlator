@@ -27,6 +27,7 @@ import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.InsertDriveFile
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -48,6 +49,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.core.ProtonPackageManager
+import com.winlator.cmod.ui.theme.controlAccentColor
 
 private val bundledRuntimeId = "bundled:${ProtonPackageManager.DEFAULT_IDENTIFIER}"
 private val bundledRuntimeName = ProtonPackageManager.getPackage(ProtonPackageManager.DEFAULT_IDENTIFIER)?.title
@@ -413,12 +415,22 @@ private fun CoreComponentCard(
             }
             when {
                 busy || (!ready.value && !installed) -> CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 3.dp)
-                installed -> OutlinedButton(onClick = onRemove, enabled = !locked && !inUse) {
+                installed -> OutlinedButton(
+                    onClick = onRemove,
+                    enabled = !locked && !inUse,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error)
+                ) {
                     Icon(Icons.Outlined.DeleteOutline, null)
                     Spacer(Modifier.width(5.dp))
                     Text(if (inUse) "In use" else "Delete")
                 }
-                else -> OutlinedButton(onClick = onInstall, enabled = !locked) {
+                else -> OutlinedButton(
+                    onClick = onInstall,
+                    enabled = !locked,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = controlAccentColor()),
+                    border = BorderStroke(1.dp, controlAccentColor())
+                ) {
                     Icon(Icons.Outlined.Download, null)
                     Spacer(Modifier.width(5.dp))
                     Text("Install")
@@ -464,13 +476,23 @@ private fun ComponentCard(
                 }
                 if (busy) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 3.dp)
                 else if (item.installed && item.removable) {
-                    OutlinedButton(onClick = { cb.onRemove(item.id) }, enabled = !locked && !item.inUse) {
+                    OutlinedButton(
+                        onClick = { cb.onRemove(item.id) },
+                        enabled = !locked && !item.inUse,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error)
+                    ) {
                         Icon(Icons.Outlined.DeleteOutline, null)
                         Spacer(Modifier.width(5.dp))
                         Text(if (item.inUse) "In use" else "Delete")
                     }
                 } else if (!item.installed) {
-                    OutlinedButton(onClick = { cb.onInstall(item.id) }, enabled = !locked) { Text("Download") }
+                    OutlinedButton(
+                        onClick = { cb.onInstall(item.id) },
+                        enabled = !locked,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = controlAccentColor()),
+                        border = BorderStroke(1.dp, controlAccentColor())
+                    ) { Text("Download") }
                 } else Icon(Icons.Outlined.Check, null)
             }
             if (busy) {
@@ -559,13 +581,18 @@ private fun ComponentsFooter(
             OutlinedButton(
                 onClick = back,
                 modifier = Modifier.weight(1f).height(48.dp),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) { Text("Back") }
             Button(
                 onClick = next,
                 enabled = nextEnabled,
                 modifier = Modifier.weight(1f).height(48.dp),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                colors = if (nextLabel == "Done")
+                    ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
+                else ButtonDefaults.buttonColors()
             ) { Text(nextLabel) }
         }
     }

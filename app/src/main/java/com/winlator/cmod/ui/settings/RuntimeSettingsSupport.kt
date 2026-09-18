@@ -61,6 +61,7 @@ import com.winlator.cmod.core.WineInfo
 import com.winlator.cmod.core.WineRuntimeGuard
 import com.winlator.cmod.core.WineThemeManager
 import com.winlator.cmod.ui.theme.controlAccentColor
+import com.winlator.cmod.ui.theme.accentSwitchColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -490,12 +491,24 @@ internal fun SettingChoice(
             DropdownMenu(
                 expanded = expanded,
                 onDismissRequest = { expanded = false },
-                modifier = Modifier.widthIn(min = 220.dp, max = 420.dp).heightIn(max = 480.dp)
+                modifier = Modifier.widthIn(min = 220.dp, max = 420.dp).heightIn(max = 480.dp),
+                shape = RoundedCornerShape(14.dp),
+                containerColor = MaterialTheme.colorScheme.surface
             ) {
+                val accent = controlAccentColor()
                 displayEntries.distinct().forEach { value ->
+                    val isSelected = value == displaySelected
                     DropdownMenuItem(
-                        text = { Text(settingDisplayLabel(value), maxLines = 2, overflow = TextOverflow.Ellipsis) },
-                        trailingIcon = { if (value == displaySelected) Icon(Icons.Outlined.Check, null) },
+                        text = {
+                            Text(
+                                settingDisplayLabel(value),
+                                color = if (isSelected) accent else MaterialTheme.colorScheme.onSurface,
+                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        },
+                        trailingIcon = { if (isSelected) Icon(Icons.Outlined.Check, null, tint = accent) },
                         onClick = {
                             expanded = false
                             onSelected(value)
@@ -556,14 +569,22 @@ internal fun SettingWineRuntimeChoice(
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            modifier = Modifier.widthIn(min = 260.dp, max = 460.dp).heightIn(max = 500.dp)
+            modifier = Modifier.widthIn(min = 260.dp, max = 460.dp).heightIn(max = 500.dp),
+            shape = RoundedCornerShape(14.dp),
+            containerColor = MaterialTheme.colorScheme.surface
         ) {
+            val accent = controlAccentColor()
             options.forEach { option ->
                 val busy = "wine:${option.id}" in installing
+                val isSelected = option.installed && option.id == selectedId
                 DropdownMenuItem(
                     text = {
                         Column {
-                            Text(option.label, color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (option.installed) 1f else .52f))
+                            Text(
+                                option.label,
+                                color = if (isSelected) accent else MaterialTheme.colorScheme.onSurface.copy(alpha = if (option.installed) 1f else .52f),
+                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                            )
                             Text(
                                 if (option.installed) option.type else if (busy) "${option.type} • Downloading…" else "${option.type} • Download",
                                 style = MaterialTheme.typography.labelSmall,
@@ -573,7 +594,7 @@ internal fun SettingWineRuntimeChoice(
                     },
                     trailingIcon = {
                         if (busy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                        else if (option.installed && option.id == selectedId) Icon(Icons.Outlined.Check, null)
+                        else if (isSelected) Icon(Icons.Outlined.Check, null, tint = accent)
                     },
                     onClick = {
                         if (option.installed) {
@@ -616,21 +637,29 @@ internal fun SettingInstallChoice(
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            modifier = Modifier.widthIn(min = 240.dp, max = 440.dp).heightIn(max = 480.dp)
+            modifier = Modifier.widthIn(min = 240.dp, max = 440.dp).heightIn(max = 480.dp),
+            shape = RoundedCornerShape(14.dp),
+            containerColor = MaterialTheme.colorScheme.surface
         ) {
+            val accent = controlAccentColor()
             catalog.all.forEach { value ->
                 val available = catalog.installed.any { it.equals(value, ignoreCase = true) } || value == selected
                 val busy = "$prefix:$value" in installing
+                val isSelected = value == selected
                 DropdownMenuItem(
                     text = {
                         Column {
-                            Text(value, color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (available) 1f else .52f))
+                            Text(
+                                value,
+                                color = if (isSelected) accent else MaterialTheme.colorScheme.onSurface.copy(alpha = if (available) 1f else .52f),
+                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                            )
                             if (!available) Text(if (busy) "Downloading…" else "Download", style = MaterialTheme.typography.labelSmall)
                         }
                     },
                     trailingIcon = {
                         if (busy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                        else if (value == selected) Icon(Icons.Outlined.Check, null)
+                        else if (isSelected) Icon(Icons.Outlined.Check, null, tint = accent)
                     },
                     onClick = {
                         if (available) {
@@ -679,20 +708,28 @@ internal fun SettingDriverChoice(
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            modifier = Modifier.widthIn(min = 260.dp, max = 460.dp).heightIn(max = 500.dp)
+            modifier = Modifier.widthIn(min = 260.dp, max = 460.dp).heightIn(max = 500.dp),
+            shape = RoundedCornerShape(14.dp),
+            containerColor = MaterialTheme.colorScheme.surface
         ) {
+            val accent = controlAccentColor()
             options.forEach { option ->
                 val busy = "driver:${option.remoteUrl ?: option.id}" in installing
+                val isSelected = option.installed && option.id.equals(selected, ignoreCase = true)
                 DropdownMenuItem(
                     text = {
                         Column {
-                            Text(option.label, color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (option.installed) 1f else .52f))
+                            Text(
+                                option.label,
+                                color = if (isSelected) accent else MaterialTheme.colorScheme.onSurface.copy(alpha = if (option.installed) 1f else .52f),
+                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                            )
                             if (!option.installed) Text(if (busy) "Downloading…" else "Download", style = MaterialTheme.typography.labelSmall)
                         }
                     },
                     trailingIcon = {
                         if (busy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                        else if (option.installed && option.id.equals(selected, ignoreCase = true)) Icon(Icons.Outlined.Check, null)
+                        else if (isSelected) Icon(Icons.Outlined.Check, null, tint = accent)
                     },
                     onClick = {
                         if (option.installed) {
@@ -724,7 +761,7 @@ internal fun SettingToggle(
             checked = checked,
             onCheckedChange = onChanged,
             enabled = enabled,
-            colors = SwitchDefaults.colors(checkedTrackColor = controlAccentColor(), checkedThumbColor = Color.White)
+            colors = accentSwitchColors()
         )
     }
 }

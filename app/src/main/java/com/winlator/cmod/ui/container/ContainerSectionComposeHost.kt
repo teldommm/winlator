@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import com.winlator.cmod.core.DefaultVersion
 import com.winlator.cmod.ui.theme.WinZTheme
 import com.winlator.cmod.ui.theme.controlAccentColor
+import com.winlator.cmod.ui.theme.accentSwitchColors
 
 @Stable
 interface ContainerSectionCallbacks {
@@ -715,9 +716,11 @@ private fun ChoiceSetting(
                     modifier = Modifier.padding(horizontal = 8.dp).padding(bottom = 10.dp)
                 )
                 LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
+                    val accent = controlAccentColor()
                     items(entries.toList(), key = { it }) { value ->
                         val installed = installedEntries.any { it.equals(value, ignoreCase = true) }
                                 || value.equals(selected, ignoreCase = true)
+                        val isSelected = value == selected
                         Surface(
                             onClick = {
                                 expanded = false
@@ -726,17 +729,23 @@ private fun ChoiceSetting(
                             },
                             modifier = Modifier.fillMaxWidth().alpha(if (installed) 1f else 0.48f),
                             shape = RoundedCornerShape(10.dp),
-                            color = if (value == selected)
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)
+                            color = if (isSelected)
+                                accent.copy(alpha = 0.16f)
                             else Color.Transparent
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 13.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(value, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-                                if (value == selected) {
-                                    Icon(Icons.Outlined.Check, null)
+                                Text(
+                                    value,
+                                    modifier = Modifier.weight(1f),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = if (isSelected) accent else MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                )
+                                if (isSelected) {
+                                    Icon(Icons.Outlined.Check, null, tint = accent)
                                 } else if (!installed) {
                                     Text(
                                         "Download",
@@ -845,7 +854,7 @@ private fun RendererOptionsPanel(
                 Switch(
                     checked = swapRB,
                     onCheckedChange = onSwapRB,
-                    colors = SwitchDefaults.colors(checkedTrackColor = controlAccentColor(), checkedThumbColor = Color.White)
+                    colors = accentSwitchColors()
                 )
             }
         }
@@ -1078,7 +1087,7 @@ private fun ToggleSetting(label: String, checked: Boolean, onCheckedChange: (Boo
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(checkedTrackColor = controlAccentColor(), checkedThumbColor = Color.White)
+            colors = accentSwitchColors()
         )
     }
 }

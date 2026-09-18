@@ -31,6 +31,7 @@ import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -110,6 +111,7 @@ import com.winlator.cmod.ui.settings.normalizeLocaleValue
 import com.winlator.cmod.ui.settings.normalizeResolution
 import com.winlator.cmod.ui.settings.readConfig
 import com.winlator.cmod.ui.settings.writeConfig
+import com.winlator.cmod.ui.theme.controlAccentColor
 import com.winlator.cmod.winhandler.WinHandler
 import kotlinx.coroutines.launch
 import org.json.JSONArray
@@ -1080,7 +1082,8 @@ private fun ContainerVulkanExtensionsV2(
                                 checked = extension in selected,
                                 onCheckedChange = { checked ->
                                     if (checked) { if (extension !in selected) selected.add(extension) } else selected.remove(extension)
-                                }
+                                },
+                                colors = CheckboxDefaults.colors(checkedColor = controlAccentColor())
                             )
                             Text(extension, modifier = Modifier.weight(1f).padding(vertical = 10.dp))
                         }

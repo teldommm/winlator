@@ -37,6 +37,7 @@ import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -70,6 +71,7 @@ import com.winlator.cmod.R
 import com.winlator.cmod.container.ContainerManager
 import com.winlator.cmod.ui.theme.WinZTheme
 import com.winlator.cmod.ui.theme.controlAccentColor
+import com.winlator.cmod.ui.theme.accentSwitchColors
 import com.winlator.cmod.winhandler.WinHandler
 
 private data class AdvancedEnvEntry(val name: String, val value: String)
@@ -339,7 +341,7 @@ private fun AdvancedEnvRow(item: AdvancedEnvEntry, onValue: (String) -> Unit, on
                 Switch(
                     checked = item.value == on,
                     onCheckedChange = { onValue(if (it) on else off) },
-                    colors = SwitchDefaults.colors(checkedTrackColor = controlAccentColor(), checkedThumbColor = Color.White)
+                    colors = accentSwitchColors()
                 )
             }
         }
@@ -459,7 +461,7 @@ private fun AdvancedToggle(label: String, checked: Boolean, enabled: Boolean, on
             checked = checked,
             enabled = enabled,
             onCheckedChange = onChange,
-            colors = SwitchDefaults.colors(checkedTrackColor = controlAccentColor(), checkedThumbColor = Color.White)
+            colors = accentSwitchColors()
         )
     }
 }
@@ -480,11 +482,18 @@ private fun AdvancedChoice(label: String, selected: String, entries: List<String
                 Icon(Icons.Outlined.KeyboardArrowDown, null)
             }
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            shape = RoundedCornerShape(14.dp),
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
+            val accent = controlAccentColor()
             entries.forEach { value ->
+                val isSelected = value == selected
                 DropdownMenuItem(
-                    text = { Text(value) },
-                    trailingIcon = { if (value == selected) Icon(Icons.Outlined.Check, null) },
+                    text = { Text(value, color = if (isSelected) accent else MaterialTheme.colorScheme.onSurface, fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal) },
+                    trailingIcon = { if (isSelected) Icon(Icons.Outlined.Check, null, tint = accent) },
                     onClick = { expanded = false; onSelected(value) }
                 )
             }
@@ -524,7 +533,8 @@ private fun AdvancedMultiChoice(selected: String, entries: List<String>, onSelec
                         ) {
                             Checkbox(
                                 checked = option in draft,
-                                onCheckedChange = { enabled -> if (enabled) { if (option !in draft) draft.add(option) } else draft.remove(option) }
+                                onCheckedChange = { enabled -> if (enabled) { if (option !in draft) draft.add(option) } else draft.remove(option) },
+                                colors = CheckboxDefaults.colors(checkedColor = controlAccentColor())
                             )
                             Text(option, modifier = Modifier.weight(1f))
                         }
