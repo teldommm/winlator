@@ -112,15 +112,40 @@ public class FileManagerFragment extends Fragment {
             }
 
             @Override
-            public void onItemClick(String path, boolean isDirectory) {
-                File file = new File(path);
-                if (isDirectory) loadDirectory(file);
-                else showFileOptions(file);
+            public void onOpenDirectory(String path) {
+                loadDirectory(new File(path));
             }
 
             @Override
-            public void onItemLongClick(String path) {
-                showFileOptions(new File(path));
+            public void onRunFile(String path) {
+                File file = new File(path);
+                performContainerAction(file, container -> runFileDirectly(file, container));
+            }
+
+            @Override
+            public void onAddGame(String path) {
+                File file = new File(path);
+                performContainerAction(file, container -> createShortcutDirectly(file, container));
+            }
+
+            @Override
+            public void onCopyFile(String path) {
+                copyToClipboard(new File(path), false);
+            }
+
+            @Override
+            public void onCutFile(String path) {
+                copyToClipboard(new File(path), true);
+            }
+
+            @Override
+            public void onRenameFile(String path) {
+                renameFile(new File(path));
+            }
+
+            @Override
+            public void onDeleteFile(String path) {
+                confirmDelete(new File(path));
             }
 
             @Override
@@ -391,25 +416,21 @@ public class FileManagerFragment extends Fragment {
     }
 
     private void handleDriveCSelection() {
+        AppCompatActivity activity = (AppCompatActivity) requireActivity();
         ArrayList<Container> containers = containerManager.getContainers();
         if (containers == null || containers.isEmpty()) {
-            new AlertDialog.Builder(getContext())
-                    .setTitle("No Containers")
-                    .setMessage("You need to create a container first to access Drive C:.")
-                    .setPositiveButton("OK", null)
-                    .show();
+            ThemedAlertHost.info(activity, "No Containers", "You need to create a container first to access Drive C:.");
             return;
         }
 
         if (containers.size() == 1) {
             navigateToContainerDriveC(containers.get(0));
         } else {
-            String[] names = new String[containers.size()];
-            for (int i = 0; i < containers.size(); i++) names[i] = containers.get(i).getName();
-            new AlertDialog.Builder(getContext())
-                    .setTitle("Select Container Drive C:")
-                    .setItems(names, (dialog, which) -> navigateToContainerDriveC(containers.get(which)))
-                    .show();
+            List<ThemedAlertHost.ActionItem> items = new ArrayList<>();
+            for (Container container : containers) {
+                items.add(new ThemedAlertHost.ActionItem(container.getName(), () -> navigateToContainerDriveC(container)));
+            }
+            ThemedAlertHost.actions(activity, "Select Container Drive C:", items);
         }
     }
 
@@ -420,12 +441,10 @@ public class FileManagerFragment extends Fragment {
             openDrive(driveC, driveC);
             Toast.makeText(getContext(), "Opened C: (" + container.getName() + ")", Toast.LENGTH_SHORT).show();
         } else {
-            new AlertDialog.Builder(getContext())
-                    .setTitle("Drive C: Not Initialized")
-                    .setMessage("The Wine system files (Drive C:) for '" + container.getName() + "' are missing.\n\n" +
-                            "Please RUN this container once to generate the filesystem.")
-                    .setPositiveButton("OK", null)
-                    .show();
+            AppCompatActivity activity = (AppCompatActivity) requireActivity();
+            ThemedAlertHost.info(activity, "Drive C: Not Initialized",
+                    "The Wine system files (Drive C:) for '" + container.getName() + "' are missing.\n\n" +
+                            "Please RUN this container once to generate the filesystem.");
         }
     }
 
@@ -464,12 +483,12 @@ public class FileManagerFragment extends Fragment {
         if (containers.size() == 1) {
             action.onContainerSelected(containers.get(0));
         } else {
-            String[] names = new String[containers.size()];
-            for (int i = 0; i < containers.size(); i++) names[i] = containers.get(i).getName();
-            new AlertDialog.Builder(getContext())
-                    .setTitle("Select Container")
-                    .setItems(names, (dialog, which) -> action.onContainerSelected(containers.get(which)))
-                    .show();
+            AppCompatActivity activity = (AppCompatActivity) requireActivity();
+            List<ThemedAlertHost.ActionItem> items = new ArrayList<>();
+            for (Container container : containers) {
+                items.add(new ThemedAlertHost.ActionItem(container.getName(), () -> action.onContainerSelected(container)));
+            }
+            ThemedAlertHost.actions(activity, "Select Container", items);
         }
     }
 
@@ -937,24 +956,6 @@ public class FileManagerFragment extends Fragment {
     private boolean isExecutable(File f) {
         String name = f.getName().toLowerCase(Locale.ENGLISH);
         return name.endsWith(".exe") || name.endsWith(".msi") || name.endsWith(".bat");
-    }
-
-    private void showFileOptions(File file) {
-        AppCompatActivity activity = (AppCompatActivity) requireActivity();
-        List<ThemedAlertHost.ActionItem> items = new ArrayList<>();
-
-        if (isExecutable(file)) {
-            items.add(new ThemedAlertHost.ActionItem("Run / Open", () ->
-                    performContainerAction(file, container -> runFileDirectly(file, container)), R.drawable.ui_ic_play, false));
-            items.add(new ThemedAlertHost.ActionItem("Add this game", () ->
-                    performContainerAction(file, container -> createShortcutDirectly(file, container)), R.drawable.ui_ic_add, false));
-        }
-        items.add(new ThemedAlertHost.ActionItem("Copy", () -> copyToClipboard(file, false), R.drawable.ui_ic_copy, false));
-        items.add(new ThemedAlertHost.ActionItem("Cut (Move)", () -> copyToClipboard(file, true)));
-        items.add(new ThemedAlertHost.ActionItem("Rename", () -> renameFile(file), R.drawable.ui_ic_edit, false));
-        items.add(new ThemedAlertHost.ActionItem("Delete", () -> confirmDelete(file), R.drawable.ui_ic_delete, true));
-
-        ThemedAlertHost.actions(activity, null, items);
     }
 
     private void confirmDelete(File file) {

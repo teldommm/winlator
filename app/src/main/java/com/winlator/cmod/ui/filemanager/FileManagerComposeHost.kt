@@ -19,15 +19,19 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.ContentCut
 import androidx.compose.material.icons.outlined.ContentPaste
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -59,6 +63,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.MainActivity
+import com.winlator.cmod.R
 import com.winlator.cmod.core.ExeIconExtractor
 import com.winlator.cmod.ui.LandscapeMainNavigation
 import com.winlator.cmod.ui.theme.WinZTheme
@@ -109,8 +114,13 @@ data class FileManagerModel(
 interface FileManagerCallbacks {
     fun onUpDir()
     fun onDriveOptionSelected(id: String)
-    fun onItemClick(path: String, isDirectory: Boolean)
-    fun onItemLongClick(path: String)
+    fun onOpenDirectory(path: String)
+    fun onRunFile(path: String)
+    fun onAddGame(path: String)
+    fun onCopyFile(path: String)
+    fun onCutFile(path: String)
+    fun onRenameFile(path: String)
+    fun onDeleteFile(path: String)
     fun onPasteClick()
 }
 
@@ -218,11 +228,7 @@ private fun FileManagerScreen(model: FileManagerModel, callbacks: FileManagerCal
                     contentPadding = PaddingValues(bottom = 92.dp)
                 ) {
                     items(model.entries, key = { it.path }) { entry ->
-                        FileRow(
-                            entry = entry,
-                            onClick = { callbacks.onItemClick(entry.path, entry.isDirectory) },
-                            onLongClick = { callbacks.onItemLongClick(entry.path) }
-                        )
+                        FileRow(entry = entry, callbacks = callbacks)
                         HorizontalDivider(
                             modifier = Modifier.padding(start = 73.dp),
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
@@ -284,35 +290,90 @@ private fun StorageMeter(usedText: String, percent: Int, modifier: Modifier = Mo
     }
 }
 
+// The file's action menu, anchored right on its row (same DropdownMenu/DropdownMenuItem
+// technique as SettingChoice's audio-driver picker) rather than a full-screen dialog: tapping a
+// file, or long-pressing any row, opens a small list right where it was tapped.
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun FileRow(entry: FileEntryUiModel, onClick: () -> Unit, onLongClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .padding(horizontal = 14.dp, vertical = 11.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
-            FileIcon(entry, Modifier.size(30.dp))
+private fun FileRow(entry: FileEntryUiModel, callbacks: FileManagerCallbacks) {
+    var menuExpanded by remember { mutableStateOf(false) }
+
+    Box(Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .combinedClickable(
+                    onClick = {
+                        if (entry.isDirectory) callbacks.onOpenDirectory(entry.path) else menuExpanded = true
+                    },
+                    onLongClick = { menuExpanded = true }
+                )
+                .padding(horizontal = 14.dp, vertical = 11.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
+                FileIcon(entry, Modifier.size(30.dp))
+            }
+            Spacer(Modifier.width(13.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    entry.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.MiddleEllipsis
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    entryDetails(entry),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
-        Spacer(Modifier.width(13.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                entry.name,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.MiddleEllipsis
+
+        DropdownMenu(
+            expanded = menuExpanded,
+            onDismissRequest = { menuExpanded = false },
+            modifier = Modifier.widthIn(min = 200.dp, max = 320.dp),
+            shape = RoundedCornerShape(14.dp),
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
+            if (entry.isExecutable) {
+                DropdownMenuItem(
+                    text = { Text("Run / Open") },
+                    leadingIcon = { Icon(painterResource(R.drawable.ui_ic_play), null) },
+                    onClick = { menuExpanded = false; callbacks.onRunFile(entry.path) }
+                )
+                DropdownMenuItem(
+                    text = { Text("Add this game") },
+                    leadingIcon = { Icon(painterResource(R.drawable.ui_ic_add), null) },
+                    onClick = { menuExpanded = false; callbacks.onAddGame(entry.path) }
+                )
+            }
+            DropdownMenuItem(
+                text = { Text("Copy") },
+                leadingIcon = { Icon(painterResource(R.drawable.ui_ic_copy), null) },
+                onClick = { menuExpanded = false; callbacks.onCopyFile(entry.path) }
             )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                entryDetails(entry),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+            DropdownMenuItem(
+                text = { Text("Cut (Move)") },
+                leadingIcon = { Icon(Icons.Outlined.ContentCut, null) },
+                onClick = { menuExpanded = false; callbacks.onCutFile(entry.path) }
+            )
+            DropdownMenuItem(
+                text = { Text("Rename") },
+                leadingIcon = { Icon(painterResource(R.drawable.ui_ic_edit), null) },
+                onClick = { menuExpanded = false; callbacks.onRenameFile(entry.path) }
+            )
+            DropdownMenuItem(
+                text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+                leadingIcon = {
+                    Icon(painterResource(R.drawable.ui_ic_delete), null, tint = MaterialTheme.colorScheme.error)
+                },
+                onClick = { menuExpanded = false; callbacks.onDeleteFile(entry.path) }
             )
         }
     }
