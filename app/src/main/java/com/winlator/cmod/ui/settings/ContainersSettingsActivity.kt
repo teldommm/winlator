@@ -5,7 +5,6 @@ import android.os.Bundle
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.Toast
-import androidx.appcompat.app.AlertDialog as AppCompatAlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -76,6 +75,7 @@ import com.winlator.cmod.core.FileUtils
 import com.winlator.cmod.core.StringUtils
 import com.winlator.cmod.ui.applyAppFullscreen
 import com.winlator.cmod.ui.container.ContainerCreateComposeFragment
+import com.winlator.cmod.ui.ThemedAlertHost
 import com.winlator.cmod.ui.theme.WinZTheme
 import com.winlator.cmod.ui.theme.controlAccentColor
 import com.winlator.cmod.ui.theme.ThemedDialog
@@ -164,17 +164,17 @@ class ContainersSettingsActivity : AppCompatActivity() {
     private fun removeContainer(id: Int) {
         val manager = ContainerManager(this)
         val container = manager.getContainerById(id) ?: return
-        AppCompatAlertDialog.Builder(this)
-            .setTitle("Remove container?")
-            .setMessage("${container.name} and its container files will be deleted.")
-            .setNegativeButton(android.R.string.cancel, null)
-            .setPositiveButton("Remove") { _, _ ->
-                manager.removeContainerAsync(container) {
-                    refresh()
-                    Toast.makeText(this, "Container removed", Toast.LENGTH_SHORT).show()
-                }
+        ThemedAlertHost.confirm(
+            this,
+            "Remove container?",
+            "${container.name} and its container files will be deleted.",
+            "Remove"
+        ) {
+            manager.removeContainerAsync(container) {
+                refresh()
+                Toast.makeText(this, "Container removed", Toast.LENGTH_SHORT).show()
             }
-            .show()
+        }
     }
 
     private fun runContainer(id: Int) {

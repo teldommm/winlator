@@ -1,6 +1,5 @@
 package com.winlator.cmod;
 
-import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
@@ -12,9 +11,6 @@ import android.text.format.Formatter;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.LinearLayout;
-import android.widget.ProgressBar;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -30,6 +26,7 @@ import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.StringUtils;
 import com.winlator.cmod.core.WineUtils;
 import com.winlator.cmod.ui.ThemedAlertHost;
+import com.winlator.cmod.ui.ThemedProgressHost;
 import com.winlator.cmod.ui.filemanager.DriveOptionUiModel;
 import com.winlator.cmod.ui.filemanager.FileEntryUiModel;
 import com.winlator.cmod.ui.filemanager.FileManagerCallbacks;
@@ -63,10 +60,7 @@ public class FileManagerFragment extends Fragment {
     private ContainerManager containerManager;
     private File clipboardFile = null;
     private boolean isCutOperation = false;
-    private AlertDialog progressDialog;
-    private ProgressBar progressBar;
-    private TextView progressText;
-    private TextView progressPercent;
+    private View progressOverlay;
     private boolean isOperationCancelled = false;
 
     private interface ContainerAction {
@@ -841,48 +835,19 @@ public class FileManagerFragment extends Fragment {
     }
 
     private void showProgressDialog(String title) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
-        builder.setTitle(title);
-        builder.setCancelable(false);
-
-        LinearLayout layout = new LinearLayout(getContext());
-        layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(50, 40, 50, 20);
-
-        progressPercent = new TextView(getContext());
-        progressPercent.setText("0%");
-        progressPercent.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
-        progressPercent.setTextSize(18);
-        layout.addView(progressPercent);
-
-        progressBar = new ProgressBar(getContext(), null, android.R.attr.progressBarStyleHorizontal);
-        progressBar.setIndeterminate(false);
-        progressBar.setMax(100);
-        layout.addView(progressBar);
-
-        progressText = new TextView(getContext());
-        progressText.setText("Calculating...");
-        progressText.setPadding(0, 20, 0, 0);
-        layout.addView(progressText);
-
-        builder.setView(layout);
-        builder.setNegativeButton("Cancel", (d, w) -> isOperationCancelled = true);
-        progressDialog = builder.create();
-        progressDialog.show();
+        AppCompatActivity activity = (AppCompatActivity) requireActivity();
+        progressOverlay = ThemedProgressHost.show(activity, title, () -> isOperationCancelled = true);
     }
 
     private void dismissProgressDialog() {
-        if (progressDialog != null && progressDialog.isShowing()) progressDialog.dismiss();
+        ThemedProgressHost.dismiss(progressOverlay);
+        progressOverlay = null;
     }
 
     private void updateProgress(long current, long total) {
         int percent = total > 0 ? (int) ((current * 100) / total) : 0;
         final String status = formatSize(current) + " / " + formatSize(total);
-        new Handler(Looper.getMainLooper()).post(() -> {
-            if (progressBar != null) progressBar.setProgress(percent);
-            if (progressPercent != null) progressPercent.setText(percent + "%");
-            if (progressText != null) progressText.setText(status);
-        });
+        new Handler(Looper.getMainLooper()).post(() -> ThemedProgressHost.update(progressOverlay, percent, status));
     }
 
     private long getFolderSize(File file) {
