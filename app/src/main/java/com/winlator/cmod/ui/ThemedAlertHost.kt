@@ -1,10 +1,10 @@
 package com.winlator.cmod.ui
 
-import android.app.Activity
 import android.app.Dialog
 import android.graphics.Color as AndroidColor
 import android.graphics.drawable.ColorDrawable
 import android.view.ViewGroup
+import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ColumnScope
@@ -24,6 +24,9 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewTreeLifecycleOwner
+import androidx.lifecycle.ViewTreeViewModelStoreOwner
+import androidx.savedstate.ViewTreeSavedStateRegistryOwner
 import com.winlator.cmod.ui.theme.ThemedDialogSurface
 import com.winlator.cmod.ui.theme.WinZTheme
 import com.winlator.cmod.ui.theme.controlAccentColor
@@ -33,7 +36,7 @@ import com.winlator.cmod.ui.theme.controlAccentColor
 // Compose-triggered dialog, instead of the stock (unthemed) android.app.AlertDialog.Builder.
 object ThemedAlertHost {
     @JvmStatic
-    fun confirm(activity: Activity, title: String, message: String, confirmLabel: String, onConfirm: Runnable) {
+    fun confirm(activity: AppCompatActivity, title: String, message: String, confirmLabel: String, onConfirm: Runnable) {
         showDialog(activity) { dismiss ->
             DialogBody(title, message) {
                 OutlinedButton(
@@ -50,7 +53,7 @@ object ThemedAlertHost {
     }
 
     @JvmStatic
-    fun info(activity: Activity, title: String, message: String) {
+    fun info(activity: AppCompatActivity, title: String, message: String) {
         showDialog(activity) { dismiss ->
             DialogBody(title, message) {
                 Button(
@@ -61,10 +64,15 @@ object ThemedAlertHost {
         }
     }
 
-    private fun showDialog(activity: Activity, content: @Composable ColumnScope.(dismiss: () -> Unit) -> Unit) {
+    private fun showDialog(activity: AppCompatActivity, content: @Composable ColumnScope.(dismiss: () -> Unit) -> Unit) {
         val dialog = Dialog(activity)
         dialog.window?.setBackgroundDrawable(ColorDrawable(AndroidColor.TRANSPARENT))
         dialog.window?.setLayout(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        dialog.window?.decorView?.let { decorView ->
+            ViewTreeLifecycleOwner.set(decorView, activity)
+            ViewTreeViewModelStoreOwner.set(decorView, activity)
+            ViewTreeSavedStateRegistryOwner.set(decorView, activity)
+        }
         val composeView = ComposeView(activity).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {

@@ -42,6 +42,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewTreeLifecycleOwner
+import androidx.lifecycle.ViewTreeViewModelStoreOwner
+import androidx.savedstate.ViewTreeSavedStateRegistryOwner
 import com.winlator.cmod.MainActivity
 import com.winlator.cmod.R
 import com.winlator.cmod.ui.theme.WinZTheme
@@ -55,6 +58,11 @@ object AboutDialogHost {
         val dialog = Dialog(activity)
         dialog.window?.setBackgroundDrawable(ColorDrawable(AndroidColor.TRANSPARENT))
         dialog.window?.setLayout(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        dialog.window?.decorView?.let { decorView ->
+            ViewTreeLifecycleOwner.set(decorView, activity)
+            ViewTreeViewModelStoreOwner.set(decorView, activity)
+            ViewTreeSavedStateRegistryOwner.set(decorView, activity)
+        }
         val composeView = ComposeView(activity).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent { WinZTheme { AboutDialogContent(onDismiss = { dialog.dismiss() }) } }
