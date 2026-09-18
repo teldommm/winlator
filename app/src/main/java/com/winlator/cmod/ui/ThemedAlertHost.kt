@@ -23,10 +23,16 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +43,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -240,6 +247,62 @@ object ThemedAlertHost {
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                     }
                 }
+            }
+        }
+    }
+
+    // Scrollable checkbox list plus Cancel/confirmLabel buttons, e.g. picking which downloadable
+    // input-control profiles to fetch. entries has no default (it precedes the required
+    // onConfirm parameter) — Java call sites always pass it. Capped at ~5 visible rows
+    // (heightIn) so a long server-provided list doesn't push the buttons off-card.
+    @JvmStatic
+    fun multiChoice(
+        activity: AppCompatActivity,
+        title: String,
+        entries: List<String>,
+        confirmLabel: String,
+        onConfirm: Consumer<List<Int>>
+    ) {
+        showOverlay(activity) { dismiss ->
+            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(12.dp))
+            val checked = remember { mutableStateListOf(*BooleanArray(entries.size).toTypedArray()) }
+            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp)) {
+                items(entries.size) { index ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(
+                                indication = null,
+                                interactionSource = remember { MutableInteractionSource() }
+                            ) { checked[index] = !checked[index] }
+                            .padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = checked[index],
+                            onCheckedChange = { checked[index] = it },
+                            colors = CheckboxDefaults.colors(checkedColor = controlAccentColor())
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(entries[index], style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+            Row(Modifier.align(Alignment.End), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(
+                    onClick = dismiss,
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) { Text("Cancel") }
+                Button(
+                    onClick = {
+                        dismiss()
+                        onConfirm.accept(checked.indices.filter { checked[it] })
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
+                ) { Text(confirmLabel) }
             }
         }
     }

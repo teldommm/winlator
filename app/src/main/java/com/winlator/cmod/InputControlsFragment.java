@@ -1,7 +1,6 @@
 package com.winlator.cmod;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -17,7 +16,6 @@ import androidx.compose.ui.platform.ComposeView;
 import androidx.fragment.app.Fragment;
 import androidx.preference.PreferenceManager;
 
-import com.winlator.cmod.contentdialog.ContentDialog;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.FileUtils;
@@ -25,6 +23,7 @@ import com.winlator.cmod.core.HttpUtils;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.ExternalController;
 import com.winlator.cmod.inputcontrols.InputControlsManager;
+import com.winlator.cmod.ui.ThemedAlertHost;
 import com.winlator.cmod.ui.inputcontrols.InputControllerItem;
 import com.winlator.cmod.ui.inputcontrols.InputControlsCallbacks;
 import com.winlator.cmod.ui.inputcontrols.InputControlsComposeHost;
@@ -37,6 +36,8 @@ import org.json.JSONObject;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class InputControlsFragment extends Fragment {
@@ -144,8 +145,10 @@ public class InputControlsFragment extends Fragment {
 
             @Override
             public void onAddProfile() {
-                ContentDialog.prompt(requireContext(), R.string.profile_name, null, name -> {
-                    currentProfile = manager.createProfile(name);
+                ThemedAlertHost.prompt(activity(), "Profile Name", "", "Add", name -> {
+                    String trimmed = name.trim();
+                    if (trimmed.isEmpty()) return;
+                    currentProfile = manager.createProfile(trimmed);
                     refreshCompose();
                 });
             }
@@ -156,12 +159,15 @@ public class InputControlsFragment extends Fragment {
                     showNoProfileToast();
                     return;
                 }
-                ContentDialog.prompt(
-                        requireContext(),
-                        R.string.profile_name,
+                ThemedAlertHost.prompt(
+                        activity(),
+                        "Profile Name",
                         currentProfile.getName(),
+                        "Save",
                         name -> {
-                            currentProfile.setName(name);
+                            String trimmed = name.trim();
+                            if (trimmed.isEmpty()) return;
+                            currentProfile.setName(trimmed);
                             currentProfile.save();
                             refreshCompose();
                         }
@@ -174,9 +180,11 @@ public class InputControlsFragment extends Fragment {
                     showNoProfileToast();
                     return;
                 }
-                ContentDialog.confirm(
-                        requireContext(),
-                        R.string.do_you_want_to_duplicate_this_profile,
+                ThemedAlertHost.confirm(
+                        activity(),
+                        "Duplicate Profile?",
+                        "Do you want to duplicate this profile?",
+                        "Duplicate",
                         () -> {
                             currentProfile = manager.duplicateProfile(currentProfile);
                             refreshCompose();
@@ -190,14 +198,17 @@ public class InputControlsFragment extends Fragment {
                     showNoProfileToast();
                     return;
                 }
-                ContentDialog.confirm(
-                        requireContext(),
-                        R.string.do_you_want_to_remove_this_profile,
+                ThemedAlertHost.confirm(
+                        activity(),
+                        "Remove Profile?",
+                        "Do you want to remove this profile?",
+                        "Remove",
                         () -> {
                             manager.removeProfile(currentProfile);
                             currentProfile = null;
                             refreshCompose();
-                        }
+                        },
+                        true
                 );
             }
 
@@ -278,15 +289,15 @@ public class InputControlsFragment extends Fragment {
         AppUtils.showToast(requireContext(), R.string.no_profile_selected);
     }
 
+    private AppCompatActivity activity() {
+        return (AppCompatActivity) requireActivity();
+    }
+
     private void showImportOptions() {
-        String[] options = {"Open local profile", "Download profiles"};
-        new AlertDialog.Builder(requireContext())
-                .setTitle(R.string.import_profile)
-                .setItems(options, (dialog, which) -> {
-                    if (which == 0) openProfileFile();
-                    else downloadProfileList();
-                })
-                .show();
+        ThemedAlertHost.actions(activity(), "Import Profile", Arrays.asList(
+                new ThemedAlertHost.ActionItem("Open Local Profile", this::openProfileFile),
+                new ThemedAlertHost.ActionItem("Download Profiles", this::downloadProfileList)
+        ));
     }
 
     private void openProfileFile() {
@@ -346,18 +357,21 @@ public class InputControlsFragment extends Fragment {
     private void removeController(int index) {
         if (currentProfile == null || index < 0 || index >= visibleControllers.size()) return;
         ExternalController controller = visibleControllers.get(index);
-        ContentDialog.confirm(
-                requireContext(),
-                R.string.do_you_want_to_remove_this_controller,
+        ThemedAlertHost.confirm(
+                activity(),
+                "Remove Controller?",
+                "Do you want to remove this controller?",
+                "Remove",
                 () -> {
                     currentProfile.removeController(controller);
                     currentProfile.save();
                     refreshCompose();
-                }
+                },
+                true
         );
     }
 
-    private void downloadSelectedProfiles(String[] items, ArrayList<Integer> positions) {
+    private void downloadSelectedProfiles(String[] items, List<Integer> positions) {
         MainActivity activity = (MainActivity) requireActivity();
         activity.preloaderDialog.show(R.string.downloading_file);
         currentProfile = null;
@@ -391,15 +405,18 @@ public class InputControlsFragment extends Fragment {
                         return;
                     }
                     String[] items = content.split("\\n");
-                    ContentDialog.showMultipleChoiceList(
+                    ThemedAlertHost.multiChoice(
                             activity,
-                            R.string.import_profile,
-                            items,
+                            "Import Profile",
+                            Arrays.asList(items),
+                            "Download",
                             positions -> {
                                 if (!positions.isEmpty()) {
-                                    ContentDialog.confirm(
+                                    ThemedAlertHost.confirm(
                                             activity,
-                                            R.string.do_you_want_to_download_the_selected_profiles,
+                                            "Download Profiles?",
+                                            "Do you want to download the selected profiles?",
+                                            "Download",
                                             () -> downloadSelectedProfiles(items, positions)
                                     );
                                 }
