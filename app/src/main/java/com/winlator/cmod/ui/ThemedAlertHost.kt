@@ -61,7 +61,7 @@ object ThemedAlertHost {
         }
     }
 
-    private fun showDialog(activity: MainActivity, content: @Composable (dismiss: () -> Unit) -> Unit) {
+    private fun showDialog(activity: MainActivity, content: @Composable ColumnScope.(dismiss: () -> Unit) -> Unit) {
         val dialog = Dialog(activity)
         dialog.window?.setBackgroundDrawable(ColorDrawable(AndroidColor.TRANSPARENT))
         dialog.window?.setLayout(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
