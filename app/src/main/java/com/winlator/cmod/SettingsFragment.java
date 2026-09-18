@@ -30,6 +30,7 @@ import android.widget.RadioGroup;
 import android.widget.SeekBar;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -527,15 +528,15 @@ public class SettingsFragment extends Fragment {
             @Override
             public void onRemoveSoundFont(@NonNull String name) {
                 if (MidiManager.DEFAULT_SF2_FILE.equals(name)) {
-                    AppUtils.showToast(requireContext(), R.string.cannot_remove_default_sound_font);
+                    Toast.makeText(requireContext(), R.string.cannot_remove_default_sound_font, Toast.LENGTH_SHORT).show();
                     return;
                 }
                 ContentDialog.confirm(requireContext(), R.string.do_you_want_to_remove_this_sound_font, () -> {
                     if (MidiManager.removeSF2File(requireContext(), name)) {
-                        AppUtils.showToast(requireContext(), R.string.sound_font_removed_success);
+                        Toast.makeText(requireContext(), R.string.sound_font_removed_success, Toast.LENGTH_SHORT).show();
                         refreshCompose();
                     } else {
-                        AppUtils.showToast(requireContext(), R.string.sound_font_removed_failed);
+                        Toast.makeText(requireContext(), R.string.sound_font_removed_failed, Toast.LENGTH_SHORT).show();
                     }
                 });
             }
@@ -669,7 +670,7 @@ public class SettingsFragment extends Fragment {
                                         }
                                     }
                                     refreshCompose();
-                                    AppUtils.showToast(context, "Preset removed");
+                                    Toast.makeText(context, "Preset removed", Toast.LENGTH_SHORT).show();
                                 },
                                 true
                         );

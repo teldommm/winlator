@@ -271,7 +271,8 @@ public class OnboardingActivity extends AppCompatActivity {
                 "Delete " + BUNDLED_RUNTIME_NAME + "?",
                 "The bundled Proton files will be removed. You can install them again later.",
                 "Delete",
-                this::removeBundledRuntime
+                this::removeBundledRuntime,
+                true
         );
     }
 
@@ -636,7 +637,8 @@ public class OnboardingActivity extends AppCompatActivity {
                     "Delete driver?",
                     "The installed driver files will be removed.",
                     "Delete",
-                    () -> removeDriver(driverId)
+                    () -> removeDriver(driverId),
+                    true
             );
             return;
         }
@@ -661,7 +663,8 @@ public class OnboardingActivity extends AppCompatActivity {
                 "Delete component?",
                 "The installed files will be removed from WinZ.",
                 "Delete",
-                () -> removeContent(profile, componentId)
+                () -> removeContent(profile, componentId),
+                true
         );
     }
 
@@ -693,7 +696,8 @@ public class OnboardingActivity extends AppCompatActivity {
                             Toast.makeText(this, "Component removed", Toast.LENGTH_SHORT).show();
                         });
                     });
-                }
+                },
+                true
         );
     }
 

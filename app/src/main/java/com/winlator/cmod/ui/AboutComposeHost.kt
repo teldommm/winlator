@@ -4,6 +4,13 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.ViewGroup
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -29,6 +36,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -69,20 +77,39 @@ object AboutDialogHost {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
                 WinZOverlayTheme {
-                    val dismiss: () -> Unit = { root.removeView(composeView) }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.5f))
-                            .clickable(
-                                indication = null,
-                                interactionSource = remember { MutableInteractionSource() },
-                                onClick = dismiss
-                            ),
-                        contentAlignment = Alignment.Center
+                    val visibleState = remember { MutableTransitionState(false) }
+                    LaunchedEffect(Unit) { visibleState.targetState = true }
+                    LaunchedEffect(visibleState.currentState) {
+                        if (!visibleState.currentState && !visibleState.targetState) {
+                            (composeView.parent as? ViewGroup)?.removeView(composeView)
+                        }
+                    }
+                    val dismiss: () -> Unit = { visibleState.targetState = false }
+                    AnimatedVisibility(
+                        visibleState = visibleState,
+                        enter = fadeIn(tween(180)),
+                        exit = fadeOut(tween(150))
                     ) {
-                        Box(modifier = Modifier.clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {}) {
-                            AboutDialogContent(onDismiss = dismiss)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.5f))
+                                .clickable(
+                                    indication = null,
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    onClick = dismiss
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            AnimatedVisibility(
+                                visibleState = visibleState,
+                                enter = fadeIn(tween(200)) + scaleIn(initialScale = 0.9f, animationSpec = tween(200)),
+                                exit = fadeOut(tween(150)) + scaleOut(targetScale = 0.9f, animationSpec = tween(150))
+                            ) {
+                                Box(modifier = Modifier.clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {}) {
+                                    AboutDialogContent(onDismiss = dismiss)
+                                }
+                            }
                         }
                     }
                 }

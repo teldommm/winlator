@@ -175,7 +175,7 @@ private fun LandscapeDetail(title: String, subtitle: String, artwork: Bitmap?, f
                     Spacer(Modifier.height(10.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         DetailAction(Icons.Outlined.Settings, "Configure", Modifier.weight(1f), callbacks::onConfigure)
-                        DetailAction(Icons.Outlined.PlayArrow, "Enter container", Modifier.weight(1f), callbacks::onArguments, accent = true)
+                        DetailAction(Icons.Outlined.PlayArrow, "Enter container", Modifier.weight(1f), callbacks::onArguments)
                     }
                     Spacer(Modifier.height(10.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -211,7 +211,7 @@ private fun PortraitDetail(title: String, subtitle: String, artwork: Bitmap?, fa
                 colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
             ) { Icon(Icons.Outlined.PlayArrow, null); Spacer(Modifier.size(8.dp)); Text("Play", fontWeight = FontWeight.Bold) }
             DetailAction(Icons.Outlined.Settings, "Configure", Modifier.fillMaxWidth(), callbacks::onConfigure)
-            DetailAction(Icons.Outlined.PlayArrow, "Enter container", Modifier.fillMaxWidth(), callbacks::onArguments, accent = true)
+            DetailAction(Icons.Outlined.PlayArrow, "Enter container", Modifier.fillMaxWidth(), callbacks::onArguments)
             DetailAction(Icons.Outlined.Folder, "Game folder", Modifier.fillMaxWidth(), callbacks::onGameFolder)
             DetailAction(Icons.Outlined.DeleteOutline, "Remove", Modifier.fillMaxWidth(), callbacks::onRemove, true)
             Spacer(Modifier.height(12.dp))
