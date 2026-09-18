@@ -176,9 +176,6 @@ dependencies {
     implementation 'androidx.compose.material3:material3'
     implementation 'androidx.compose.material:material-icons-extended'
     debugImplementation 'androidx.compose.ui:ui-tooling'
-    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.2'
-    implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.2'
-    implementation 'androidx.savedstate:savedstate-ktx:1.2.1'
 
     // Winlator’s dependencies
     implementation 'androidx.appcompat:appcompat:1.4.0'
