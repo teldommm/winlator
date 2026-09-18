@@ -152,14 +152,24 @@ fun ThemedDialog(
     content: @Composable ColumnScope.() -> Unit
 ) {
     Dialog(onDismissRequest = onDismissRequest) {
-        Surface(
-            modifier = modifier.widthIn(min = 280.dp, max = 420.dp),
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-        ) {
-            Column(Modifier.padding(20.dp), content = content)
-        }
+        ThemedDialogSurface(modifier, content)
+    }
+}
+
+// Same card look as ThemedDialog, without the Compose Dialog wrapper — for call sites
+// that are already hosted inside a native android.app.Dialog (see ThemedAlertHost).
+@Composable
+fun ThemedDialogSurface(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Surface(
+        modifier = modifier.widthIn(min = 280.dp, max = 420.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(Modifier.padding(20.dp), content = content)
     }
 }
 
