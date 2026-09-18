@@ -117,7 +117,7 @@
                     android:id="@+id/BTCancel" />
 
                 <Button
-                    style="@style/ButtonNeutral"
+                    style="@style/ButtonPositive"
                     android:layout_weight="1"
                     android:text="@string/ok"
                     android:id="@+id/BTConfirm" />

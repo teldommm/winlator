@@ -36,6 +36,7 @@ import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -44,6 +45,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -437,7 +439,7 @@ private fun ContainerPropertiesDialog(container: Container, onDismiss: () -> Uni
             }
         },
         dismissButton = {
-            TextButton(
+            OutlinedButton(
                 enabled = !clearing,
                 onClick = {
                     if (!clearing) {
@@ -452,7 +454,9 @@ private fun ContainerPropertiesDialog(container: Container, onDismiss: () -> Uni
                             refreshKey++
                         }
                     }
-                }
+                },
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 if (clearing) {
                     CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
@@ -464,7 +468,11 @@ private fun ContainerPropertiesDialog(container: Container, onDismiss: () -> Uni
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Close") }
+            OutlinedButton(
+                onClick = onDismiss,
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) { Text("Close") }
         }
     )
 }

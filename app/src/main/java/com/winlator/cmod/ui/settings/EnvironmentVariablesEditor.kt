@@ -16,6 +16,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,8 +34,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.winlator.cmod.ui.theme.controlAccentColor
 
 enum class EnvValueKind { CHECKBOX, SELECT, MULTI, TEXT, NUMBER }
 
@@ -253,20 +257,29 @@ private fun AddEnvironmentVariableDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
-            TextButton(onClick = {
-                val finalName = if (selected == "Custom…") customName.trim().replace(" ", "") else name
-                if (finalName.isNotBlank() && finalName !in existing) {
-                    val spec = knownEnvironmentVariables.firstOrNull { it.name == finalName }
-                    val initial = when (spec?.kind) {
-                        EnvValueKind.CHECKBOX -> spec.options.firstOrNull().orEmpty()
-                        EnvValueKind.SELECT -> spec.options.firstOrNull().orEmpty()
-                        else -> ""
+            Button(
+                onClick = {
+                    val finalName = if (selected == "Custom…") customName.trim().replace(" ", "") else name
+                    if (finalName.isNotBlank() && finalName !in existing) {
+                        val spec = knownEnvironmentVariables.firstOrNull { it.name == finalName }
+                        val initial = when (spec?.kind) {
+                            EnvValueKind.CHECKBOX -> spec.options.firstOrNull().orEmpty()
+                            EnvValueKind.SELECT -> spec.options.firstOrNull().orEmpty()
+                            else -> ""
+                        }
+                        onAdd(finalName, initial)
                     }
-                    onAdd(finalName, initial)
-                }
-            }) { Text("Add") }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
+            ) { Text("Add") }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = {
+            OutlinedButton(
+                onClick = onDismiss,
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) { Text("Cancel") }
+        },
         title = { Text("Add environment variable") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

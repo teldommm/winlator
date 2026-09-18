@@ -36,6 +36,7 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DropdownMenu
@@ -303,13 +304,22 @@ private fun AdvancedEnvironmentPage(rows: MutableList<AdvancedEnvEntry>) {
         AlertDialog(
             onDismissRequest = { addOpen = false },
             confirmButton = {
-                TextButton(onClick = {
-                    val clean = name.trim().replace(" ", "")
-                    if (clean.isNotEmpty() && rows.none { it.name == clean }) rows.add(AdvancedEnvEntry(clean, value.trim()))
-                    addOpen = false
-                }) { Text("Add") }
+                Button(
+                    onClick = {
+                        val clean = name.trim().replace(" ", "")
+                        if (clean.isNotEmpty() && rows.none { it.name == clean }) rows.add(AdvancedEnvEntry(clean, value.trim()))
+                        addOpen = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
+                ) { Text("Add") }
             },
-            dismissButton = { TextButton(onClick = { addOpen = false }) { Text("Cancel") } },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { addOpen = false },
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) { Text("Cancel") }
+            },
             title = { Text("Add environment variable") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
