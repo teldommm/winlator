@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -632,6 +633,7 @@ private fun WineDebugChannelsDialog(
     ThemedDialog(onDismissRequest = onDismiss) {
         Text("Wine debug channels", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(14.dp))
+        val accent = controlAccentColor()
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinedTextField(
                 value = query,
@@ -640,7 +642,6 @@ private fun WineDebugChannelsDialog(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
-            val accent = controlAccentColor()
             LazyColumn(Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
                 items(filtered, key = { it }) { channel ->
                     Row(
