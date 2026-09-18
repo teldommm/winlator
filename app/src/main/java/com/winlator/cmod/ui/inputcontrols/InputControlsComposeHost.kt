@@ -234,14 +234,14 @@ private fun TransferActions(callbacks: InputControlsCallbacks) {
             onClick = callbacks::onImportProfile,
             modifier = Modifier.weight(1f).height(48.dp),
             shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = accent),
+            colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = accent),
             border = BorderStroke(1.dp, accent)
         ) { Icon(Icons.Outlined.FileDownload, null); Spacer(Modifier.width(8.dp)); Text("Import") }
         OutlinedButton(
             onClick = callbacks::onExportProfile,
             modifier = Modifier.weight(1f).height(48.dp),
             shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = accent),
+            colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = accent),
             border = BorderStroke(1.dp, accent)
         ) { Icon(Icons.Outlined.FileUpload, null); Spacer(Modifier.width(8.dp)); Text("Export") }
     }

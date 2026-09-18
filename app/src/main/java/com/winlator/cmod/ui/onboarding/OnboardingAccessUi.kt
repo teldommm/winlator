@@ -51,7 +51,7 @@ internal fun OnboardingAccessScreen(back: () -> Unit, next: () -> Unit) {
             OutlinedButton(
                 onClick = back,
                 modifier = Modifier.fillMaxWidth().height(48.dp),
-                colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) { Text("Back") }
         }

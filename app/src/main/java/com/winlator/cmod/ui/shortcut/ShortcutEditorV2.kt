@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.Gamepad
 import androidx.compose.material.icons.outlined.Monitor
@@ -1027,12 +1028,26 @@ private fun ExecArgumentsEditorV2(value: String, onChanged: (String) -> Unit) {
             )
             Box {
                 TextButton(onClick = { open = true }) { Text("⋮", style = MaterialTheme.typography.headlineSmall) }
-                DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                DropdownMenu(
+                    expanded = open,
+                    onDismissRequest = { open = false },
+                    shape = RoundedCornerShape(14.dp),
+                    containerColor = MaterialTheme.colorScheme.surface
+                ) {
+                    val accent = controlAccentColor()
                     execArgumentPresetsV2.forEach { arg ->
+                        val alreadyAdded = value.split(' ').contains(arg)
                         DropdownMenuItem(
-                            text = { Text(arg) },
+                            text = {
+                                Text(
+                                    arg,
+                                    color = if (alreadyAdded) accent else MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = if (alreadyAdded) FontWeight.SemiBold else FontWeight.Normal
+                                )
+                            },
+                            trailingIcon = { if (alreadyAdded) Icon(Icons.Outlined.Check, null, tint = accent) },
                             onClick = {
-                                if (!value.split(' ').contains(arg)) onChanged(listOf(value.trim(), arg).filter(String::isNotBlank).joinToString(" "))
+                                if (!alreadyAdded) onChanged(listOf(value.trim(), arg).filter(String::isNotBlank).joinToString(" "))
                                 open = false
                             }
                         )
