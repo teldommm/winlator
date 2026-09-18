@@ -41,7 +41,6 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.drawerlayout.widget.DrawerLayout
 import androidx.preference.PreferenceManager
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.navigation.NavigationView
@@ -124,6 +123,17 @@ internal fun controlAccentFor(theme: WinlatorThemeType): Color =
 
 @Composable
 fun controlAccentColor(): Color = controlAccentFor(WinlatorThemeManager.currentTheme())
+
+// Danger/destructive red for Remove/Delete-style confirm buttons and the components manager's
+// Delete/In-use rows. Scoped to Black only, same as controlAccentColor above — every other
+// theme keeps using its own `error` color as before (unchanged behavior).
+private val BlackDestructive = Color(0xFFD03B3B)
+
+internal fun destructiveFor(theme: WinlatorThemeType): Color =
+    if (theme == WinlatorThemeType.BLACK) BlackDestructive else winlatorColorScheme(theme).error
+
+@Composable
+fun destructiveColor(): Color = destructiveFor(WinlatorThemeManager.currentTheme())
 
 // Shared Switch styling for the whole app — matches claude.ai's own switch look:
 // no visible border/outline when off, thumb stays white in both states (never gray).
@@ -356,10 +366,10 @@ private fun ApplyLegacyChrome(colors: ColorScheme) {
             val onSurface = colors.onSurface.toArgb()
 
             host.window.decorView.setBackgroundColor(background)
-            host.findViewById<DrawerLayout>(R.id.DrawerLayout)?.let { drawerLayout ->
-                drawerLayout.setBackgroundColor(background)
-                if (drawerLayout.childCount > 0) {
-                    drawerLayout.getChildAt(0)?.setBackgroundColor(background)
+            host.findViewById<View>(R.id.DrawerLayout)?.let { rootLayout ->
+                rootLayout.setBackgroundColor(background)
+                if (rootLayout is android.view.ViewGroup && rootLayout.childCount > 0) {
+                    rootLayout.getChildAt(0)?.setBackgroundColor(background)
                 }
             }
             host.findViewById<View>(R.id.FLFragmentContainer)?.setBackgroundColor(background)

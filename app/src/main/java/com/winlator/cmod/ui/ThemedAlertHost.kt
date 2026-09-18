@@ -3,6 +3,13 @@ package com.winlator.cmod.ui
 import android.view.ViewGroup
 import androidx.annotation.DrawableRes
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -28,6 +35,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import com.winlator.cmod.ui.theme.ThemedDialogSurface
 import com.winlator.cmod.ui.theme.WinZOverlayTheme
 import com.winlator.cmod.ui.theme.controlAccentColor
+import com.winlator.cmod.ui.theme.destructiveColor
 import java.util.function.Consumer
 
 // Native bridge so plain Java call sites (component/driver/runtime delete confirmations,
@@ -55,7 +64,15 @@ import java.util.function.Consumer
 // finds its lifecycle/viewmodel/saved-state owners for free — no extra dependency needed.
 object ThemedAlertHost {
     @JvmStatic
-    fun confirm(activity: AppCompatActivity, title: String, message: String, confirmLabel: String, onConfirm: Runnable) {
+    @JvmOverloads
+    fun confirm(
+        activity: AppCompatActivity,
+        title: String,
+        message: String,
+        confirmLabel: String,
+        onConfirm: Runnable,
+        destructive: Boolean = false
+    ) {
         showOverlay(activity) { dismiss ->
             DialogBody(title, message) {
                 OutlinedButton(
@@ -65,7 +82,10 @@ object ThemedAlertHost {
                 ) { Text("Cancel") }
                 Button(
                     onClick = { dismiss(); onConfirm.run() },
-                    colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (destructive) destructiveColor() else controlAccentColor(),
+                        contentColor = Color.White
+                    )
                 ) { Text(confirmLabel) }
             }
         }
@@ -231,20 +251,43 @@ object ThemedAlertHost {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
                 WinZOverlayTheme {
-                    val dismiss: () -> Unit = { root.removeView(composeView) }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.5f))
-                            .clickable(
-                                indication = null,
-                                interactionSource = remember { MutableInteractionSource() },
-                                onClick = dismiss
-                            ),
-                        contentAlignment = Alignment.Center
+                    // Animates in/out like a real Dialog window (e.g. ThemedDialog's reinstall-
+                    // imagefs confirm) instead of the ComposeView just appearing/disappearing
+                    // instantly. currentState only catches up to targetState once the exit
+                    // animation actually finishes — that's the signal it's safe to detach.
+                    val visibleState = remember { MutableTransitionState(false) }
+                    LaunchedEffect(Unit) { visibleState.targetState = true }
+                    LaunchedEffect(visibleState.currentState) {
+                        if (!visibleState.currentState && !visibleState.targetState) {
+                            (composeView.parent as? ViewGroup)?.removeView(composeView)
+                        }
+                    }
+                    val dismiss: () -> Unit = { visibleState.targetState = false }
+                    AnimatedVisibility(
+                        visibleState = visibleState,
+                        enter = fadeIn(tween(180)),
+                        exit = fadeOut(tween(150))
                     ) {
-                        ThemedDialogSurface(modifier = Modifier.clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {}) {
-                            content(dismiss)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.5f))
+                                .clickable(
+                                    indication = null,
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    onClick = dismiss
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            AnimatedVisibility(
+                                visibleState = visibleState,
+                                enter = fadeIn(tween(200)) + scaleIn(initialScale = 0.9f, animationSpec = tween(200)),
+                                exit = fadeOut(tween(150)) + scaleOut(targetScale = 0.9f, animationSpec = tween(150))
+                            ) {
+                                ThemedDialogSurface(modifier = Modifier.clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {}) {
+                                    content(dismiss)
+                                }
+                            }
                         }
                     }
                 }

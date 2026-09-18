@@ -50,6 +50,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.core.ProtonPackageManager
 import com.winlator.cmod.ui.theme.controlAccentColor
+import com.winlator.cmod.ui.theme.destructiveColor
 
 private val bundledRuntimeId = "bundled:${ProtonPackageManager.DEFAULT_IDENTIFIER}"
 private val bundledRuntimeName = ProtonPackageManager.getPackage(ProtonPackageManager.DEFAULT_IDENTIFIER)?.title
@@ -417,19 +418,17 @@ private fun CoreComponentCard(
             }
             when {
                 busy || (!ready.value && !installed) -> CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 3.dp)
-                installed -> OutlinedButton(
+                installed -> Button(
                     onClick = onRemove,
                     enabled = !locked && !inUse,
-                    colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.error),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error)
+                    colors = ButtonDefaults.buttonColors(containerColor = destructiveColor(), contentColor = Color.White)
                 ) {
                     Text(if (inUse) "In use" else "Delete")
                 }
-                else -> OutlinedButton(
+                else -> Button(
                     onClick = onInstall,
                     enabled = !locked,
-                    colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = controlAccentColor()),
-                    border = BorderStroke(1.dp, controlAccentColor())
+                    colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
                 ) {
                     Icon(Icons.Outlined.Download, null)
                     Spacer(Modifier.width(5.dp))
@@ -476,20 +475,18 @@ private fun ComponentCard(
                 }
                 if (busy) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 3.dp)
                 else if (item.installed && item.removable) {
-                    OutlinedButton(
+                    Button(
                         onClick = { cb.onRemove(item.id) },
                         enabled = !locked && !item.inUse,
-                        colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.error),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error)
+                        colors = ButtonDefaults.buttonColors(containerColor = destructiveColor(), contentColor = Color.White)
                     ) {
                         Text(if (item.inUse) "In use" else "Delete")
                     }
                 } else if (!item.installed) {
-                    OutlinedButton(
+                    Button(
                         onClick = { cb.onInstall(item.id) },
                         enabled = !locked,
-                        colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = controlAccentColor()),
-                        border = BorderStroke(1.dp, controlAccentColor())
+                        colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
                     ) { Text("Download") }
                 } else Icon(Icons.Outlined.Check, null)
             }

@@ -159,13 +159,14 @@ class ContainersSettingsActivity : AppCompatActivity() {
             this,
             "Duplicate container?",
             "A copy of ${container.name} and its container files will be created.",
-            "Duplicate"
-        ) {
-            manager.duplicateContainerAsync(container) {
-                refresh()
-                Toast.makeText(this, "Container duplicated", Toast.LENGTH_SHORT).show()
+            "Duplicate",
+            onConfirm = {
+                manager.duplicateContainerAsync(container) {
+                    refresh()
+                    Toast.makeText(this, "Container duplicated", Toast.LENGTH_SHORT).show()
+                }
             }
-        }
+        )
     }
 
     private fun removeContainer(id: Int) {
@@ -175,13 +176,15 @@ class ContainersSettingsActivity : AppCompatActivity() {
             this,
             "Remove container?",
             "${container.name} and its container files will be deleted.",
-            "Remove"
-        ) {
-            manager.removeContainerAsync(container) {
-                refresh()
-                Toast.makeText(this, "Container removed", Toast.LENGTH_SHORT).show()
-            }
-        }
+            "Remove",
+            onConfirm = {
+                manager.removeContainerAsync(container) {
+                    refresh()
+                    Toast.makeText(this, "Container removed", Toast.LENGTH_SHORT).show()
+                }
+            },
+            destructive = true
+        )
     }
 
     private fun runContainer(id: Int) {

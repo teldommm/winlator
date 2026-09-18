@@ -4,6 +4,13 @@ import android.app.Activity
 import android.content.Context
 import android.view.View
 import android.view.ViewGroup
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -44,6 +51,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -97,26 +105,45 @@ object PresetEditorComposeDialog {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
                 WinZOverlayTheme {
-                    val dismiss: () -> Unit = { (composeView.parent as? ViewGroup)?.removeView(composeView) }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.5f))
-                            .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { dismiss() },
-                        contentAlignment = Alignment.Center
+                    val visibleState = remember { MutableTransitionState(false) }
+                    LaunchedEffect(Unit) { visibleState.targetState = true }
+                    LaunchedEffect(visibleState.currentState) {
+                        if (!visibleState.currentState && !visibleState.targetState) {
+                            (composeView.parent as? ViewGroup)?.removeView(composeView)
+                        }
+                    }
+                    val dismiss: () -> Unit = { visibleState.targetState = false }
+                    AnimatedVisibility(
+                        visibleState = visibleState,
+                        enter = fadeIn(tween(180)),
+                        exit = fadeOut(tween(150))
                     ) {
-                        ThemedDialogSurface(modifier = Modifier.heightIn(max = 560.dp)) {
-                            PresetEditorScreen(
-                                title = title,
-                                initialName = initialName,
-                                readOnly = readOnly,
-                                variables = variables,
-                                onCancel = dismiss,
-                                onSave = { name, values ->
-                                    listener.onSave(name, values)
-                                    dismiss()
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.5f))
+                                .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { dismiss() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            AnimatedVisibility(
+                                visibleState = visibleState,
+                                enter = fadeIn(tween(200)) + scaleIn(initialScale = 0.9f, animationSpec = tween(200)),
+                                exit = fadeOut(tween(150)) + scaleOut(targetScale = 0.9f, animationSpec = tween(150))
+                            ) {
+                                ThemedDialogSurface(modifier = Modifier.heightIn(max = 560.dp)) {
+                                    PresetEditorScreen(
+                                        title = title,
+                                        initialName = initialName,
+                                        readOnly = readOnly,
+                                        variables = variables,
+                                        onCancel = dismiss,
+                                        onSave = { name, values ->
+                                            listener.onSave(name, values)
+                                            dismiss()
+                                        }
+                                    )
                                 }
-                            )
+                            }
                         }
                     }
                 }

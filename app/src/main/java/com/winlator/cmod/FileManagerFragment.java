@@ -928,7 +928,7 @@ public class FileManagerFragment extends Fragment {
         ThemedAlertHost.confirm(activity, "Delete", "Are you sure you want to delete " + file.getName() + "?", "Delete", () -> {
             deleteRecursive(file);
             loadDirectory(currentDir);
-        });
+        }, true);
     }
 
     private String getSmartDisplayName(File file) {

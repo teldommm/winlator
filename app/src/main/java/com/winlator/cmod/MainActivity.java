@@ -36,8 +36,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import androidx.core.view.GravityCompat;
-import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.preference.PreferenceManager;
@@ -71,7 +69,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private static final String ORIENTATION_MODE_AUTO = "auto";
     private static final String ORIENTATION_MODE_VERTICAL = "vertical";
     private static final String ORIENTATION_MODE_HORIZONTAL = "horizontal";
-    private DrawerLayout drawerLayout;
     private NavigationView navigationView;
     private BottomNavigationView bottomNavigation;
     private View mainToolbar;
@@ -138,11 +135,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
         setContentView(R.layout.main_activity);
 
-        drawerLayout = findViewById(R.id.DrawerLayout);
         navigationView = findViewById(R.id.NavigationView);
         navigationView.setNavigationItemSelectedListener(this);
         navigationView.setBackgroundColor(Color.parseColor("#0B0D12"));
-        drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED);
 
         bottomNavigation = findViewById(R.id.BottomNavigation);
         bottomNavigation.setOnItemSelectedListener(item -> {
@@ -361,9 +356,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         }
     }
 
-    public void toggleDrawer() {
-    }
-
     @Override
     public boolean onNavigationItemSelected(@NonNull MenuItem item) {
         setDetailMode(false);
@@ -465,8 +457,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                     .replace(R.id.FLFragmentContainer, fragment)
                     .commit();
         }
-
-        drawerLayout.closeDrawer(GravityCompat.START);
     }
 
     public void showAboutDialog() {

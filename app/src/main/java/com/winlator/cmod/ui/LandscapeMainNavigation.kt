@@ -36,7 +36,6 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.drawerlayout.widget.DrawerLayout
 import com.winlator.cmod.MainActivity
 import com.winlator.cmod.R
 import com.winlator.cmod.ui.theme.controlAccentColor
@@ -70,14 +69,12 @@ fun KeepLandscapeChromeHidden(activity: MainActivity?, restoreChromeOnPortrait: 
     DisposableEffect(activity, restoreChromeOnPortrait) {
         val toolbar = activity?.findViewById<View>(R.id.Toolbar)
         val bottomNavigation = activity?.findViewById<View>(R.id.BottomNavigation)
-        val drawer = activity?.findViewById<DrawerLayout>(R.id.DrawerLayout)
         val decor = activity?.window?.decorView
 
         fun forceLandscapeChrome() {
             if (activity?.resources?.configuration?.orientation == Configuration.ORIENTATION_LANDSCAPE) {
                 toolbar?.visibility = View.GONE
                 bottomNavigation?.visibility = View.GONE
-                drawer?.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
             }
         }
 
@@ -99,7 +96,6 @@ fun KeepLandscapeChromeHidden(activity: MainActivity?, restoreChromeOnPortrait: 
             ) {
                 toolbar?.visibility = View.VISIBLE
                 bottomNavigation?.visibility = View.VISIBLE
-                drawer?.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
             }
         }
     }

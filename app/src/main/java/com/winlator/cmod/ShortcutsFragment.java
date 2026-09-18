@@ -43,7 +43,7 @@ import com.winlator.cmod.bigpicture.steamgrid.SteamGridSearchResponse;
 import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.container.Shortcut;
-import com.winlator.cmod.contentdialog.ContentDialog;
+import com.winlator.cmod.ui.ThemedAlertHost;
 import com.winlator.cmod.ui.shortcut.ShortcutSettingsComposeDialog;
 import com.winlator.cmod.core.ExeIconExtractor;
 import com.winlator.cmod.core.FileUtils;
@@ -645,20 +645,27 @@ public class ShortcutsFragment extends Fragment {
             iconPickerLauncher.launch("image/*");
         }
         else if (LibraryComposeHost.ACTION_REMOVE.equals(action)) {
-            ContentDialog.confirm(context, R.string.do_you_want_to_remove_this_shortcut, () -> {
-                boolean fileDeleted = shortcut.file.delete();
-                try {
-                    String basePath = shortcut.file.getPath().substring(0, shortcut.file.getPath().lastIndexOf("."));
-                    new File(basePath + ".lnk").delete();
-                    new File(basePath + ".bat").delete();
-                } catch (Exception ignored) {}
+            ThemedAlertHost.confirm(
+                    (AppCompatActivity) requireActivity(),
+                    "Remove shortcut?",
+                    "Do you want to remove this shortcut?",
+                    "Remove",
+                    () -> {
+                        boolean fileDeleted = shortcut.file.delete();
+                        try {
+                            String basePath = shortcut.file.getPath().substring(0, shortcut.file.getPath().lastIndexOf("."));
+                            new File(basePath + ".lnk").delete();
+                            new File(basePath + ".bat").delete();
+                        } catch (Exception ignored) {}
 
-                if (fileDeleted) {
-                    disableShortcutOnScreen(requireContext(), shortcut);
-                    loadShortcutsList();
-                    Toast.makeText(context, "Shortcut removed.", Toast.LENGTH_SHORT).show();
-                }
-            });
+                        if (fileDeleted) {
+                            disableShortcutOnScreen(requireContext(), shortcut);
+                            loadShortcutsList();
+                            Toast.makeText(context, "Shortcut removed.", Toast.LENGTH_SHORT).show();
+                        }
+                    },
+                    true
+            );
         }
         else if (LibraryComposeHost.ACTION_CLONE.equals(action)) {
             ContainerManager containerManager = new ContainerManager(context);

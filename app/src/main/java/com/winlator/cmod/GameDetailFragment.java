@@ -19,10 +19,10 @@ import androidx.fragment.app.Fragment;
 
 import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.container.Shortcut;
-import com.winlator.cmod.contentdialog.ContentDialog;
 import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.WineInfo;
+import com.winlator.cmod.ui.ThemedAlertHost;
 import com.winlator.cmod.ui.library.GameDetailCallbacks;
 import com.winlator.cmod.ui.library.GameDetailComposeHost;
 import com.winlator.cmod.ui.shortcut.ShortcutSettingsComposeDialog;
@@ -105,9 +105,16 @@ public class GameDetailFragment extends Fragment {
 
                     @Override
                     public void onRemove() {
-                        ContentDialog.confirm(requireContext(), R.string.do_you_want_to_remove_this_shortcut, () -> {
-                            if (shortcut.file.delete()) getParentFragmentManager().popBackStack();
-                        });
+                        ThemedAlertHost.confirm(
+                                (AppCompatActivity) requireActivity(),
+                                "Remove shortcut?",
+                                "Do you want to remove this shortcut?",
+                                "Remove",
+                                () -> {
+                                    if (shortcut.file.delete()) getParentFragmentManager().popBackStack();
+                                },
+                                true
+                        );
                     }
                 }
         );

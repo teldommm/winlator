@@ -32,7 +32,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
@@ -50,9 +49,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.drawerlayout.widget.DrawerLayout
 import com.winlator.cmod.MainActivity
-import com.winlator.cmod.R
 import com.winlator.cmod.ui.KeepLandscapeChromeHidden
 import com.winlator.cmod.ui.theme.controlAccentColor
 import kotlinx.coroutines.Dispatchers
@@ -80,16 +77,6 @@ internal fun LandscapePagerCore(
     val activity = LocalContext.current as? MainActivity
 
     KeepLandscapeChromeHidden(activity)
-
-    DisposableEffect(activity) {
-        val drawer = activity?.findViewById<DrawerLayout>(R.id.DrawerLayout)
-        drawer?.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
-        onDispose {
-            if (activity?.resources?.configuration?.orientation != android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
-                drawer?.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
-            }
-        }
-    }
 
     LaunchedEffect(items.map { it.id }, selectedShortcutPath.value) {
         val selectedPage = items.indexOfFirst { it.shortcutPath == selectedShortcutPath.value }

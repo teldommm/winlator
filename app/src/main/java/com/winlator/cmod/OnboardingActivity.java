@@ -688,7 +688,10 @@ public class OnboardingActivity extends AppCompatActivity {
                     io.execute(() -> {
                         ProtonPackageManager.deletePackage(this, identifier);
                         rebuildCatalog();
-                        runOnUiThread(() -> finishInstall(componentId, null));
+                        runOnUiThread(() -> {
+                            finishInstall(componentId, null);
+                            Toast.makeText(this, "Component removed", Toast.LENGTH_SHORT).show();
+                        });
                     });
                 }
         );
@@ -702,7 +705,10 @@ public class OnboardingActivity extends AppCompatActivity {
             contentsManager.removeContent(profile);
             contentsManager.syncContents();
             rebuildCatalog();
-            runOnUiThread(() -> finishInstall(id, null));
+            runOnUiThread(() -> {
+                finishInstall(id, null);
+                Toast.makeText(this, "Component removed", Toast.LENGTH_SHORT).show();
+            });
         });
     }
 
@@ -716,6 +722,7 @@ public class OnboardingActivity extends AppCompatActivity {
                 installBusy = false;
                 composeController.setInstallBusy(null, false);
                 syncComposeCatalog();
+                Toast.makeText(this, "Driver removed", Toast.LENGTH_SHORT).show();
             });
         });
     }

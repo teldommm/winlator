@@ -669,7 +669,9 @@ public class SettingsFragment extends Fragment {
                                         }
                                     }
                                     refreshCompose();
-                                }
+                                    AppUtils.showToast(context, "Preset removed");
+                                },
+                                true
                         );
                         break;
                     case "import":
