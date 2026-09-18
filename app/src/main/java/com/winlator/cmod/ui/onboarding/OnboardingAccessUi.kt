@@ -1,6 +1,7 @@
 package com.winlator.cmod.ui.onboarding
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -13,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -20,8 +22,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.winlator.cmod.ui.theme.controlAccentColor
 
 @Composable
 internal fun OnboardingAccessScreen(back: () -> Unit, next: () -> Unit) {
@@ -34,13 +38,22 @@ internal fun OnboardingAccessScreen(back: () -> Unit, next: () -> Unit) {
             Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Text("Winlator needs storage and notification access to manage games and keep sessions running.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(20.dp))
-            Button(onClick = next, modifier = Modifier.fillMaxWidth().height(50.dp)) {
+            Button(
+                onClick = next,
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
+            ) {
                 Icon(Icons.Outlined.NotificationsNone, null)
                 Spacer(Modifier.size(8.dp))
                 Text(action)
             }
             Spacer(Modifier.height(8.dp))
-            OutlinedButton(onClick = back, modifier = Modifier.fillMaxWidth().height(48.dp)) { Text("Back") }
+            OutlinedButton(
+                onClick = back,
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) { Text("Back") }
         }
     }
 }

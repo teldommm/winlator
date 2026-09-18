@@ -343,17 +343,19 @@ private fun SourceSelector(local: () -> Unit) {
     ) {
         Row(Modifier.height(56.dp)) {
             SourcePart(Icons.Outlined.Dns, "Winlator servers", true, {}, Modifier.weight(1f))
-            SourcePart(Icons.Outlined.Folder, "Local package", false, local, Modifier.weight(1f))
+            SourcePart(Icons.Outlined.Folder, "Local package", false, local, Modifier.weight(1f), accent = true)
         }
     }
 }
 
 @Composable
-private fun SourcePart(icon: ImageVector, label: String, selected: Boolean, click: () -> Unit, modifier: Modifier) {
+private fun SourcePart(icon: ImageVector, label: String, selected: Boolean, click: () -> Unit, modifier: Modifier, accent: Boolean = false) {
+    val accentColor = controlAccentColor()
     Surface(
         onClick = click,
         modifier = modifier.fillMaxHeight(),
-        color = if (selected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent
+        color = if (accent) accentColor else if (selected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
+        contentColor = if (accent) Color.White else MaterialTheme.colorScheme.onSurface
     ) {
         Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, null)
@@ -590,9 +592,7 @@ private fun ComponentsFooter(
                 enabled = nextEnabled,
                 modifier = Modifier.weight(1f).height(48.dp),
                 shape = RoundedCornerShape(12.dp),
-                colors = if (nextLabel == "Done")
-                    ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
-                else ButtonDefaults.buttonColors()
+                colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
             ) { Text(nextLabel) }
         }
     }

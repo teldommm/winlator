@@ -1,5 +1,6 @@
 package com.winlator.cmod.ui.onboarding
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,18 +13,21 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.ui.theme.WinlatorThemeChoices
 import com.winlator.cmod.ui.theme.WinlatorThemeManager
+import com.winlator.cmod.ui.theme.controlAccentColor
 
 @Composable
 internal fun OnboardingThemeScreen(
@@ -110,11 +114,20 @@ private fun ThemeNavigationButtons(
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         if (onBack != null) {
-            OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f)) {
+            OutlinedButton(
+                onClick = onBack,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
                 Text("Back")
             }
         }
-        Button(onClick = onContinue, modifier = Modifier.weight(1f)) {
+        Button(
+            onClick = onContinue,
+            modifier = Modifier.weight(1f),
+            colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
+        ) {
             Text("Continue")
         }
     }

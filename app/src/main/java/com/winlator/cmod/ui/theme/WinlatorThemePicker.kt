@@ -63,6 +63,7 @@ private fun ThemeChoiceRow(
     onClick: () -> Unit
 ) {
     val preview = winlatorThemePreview(theme)
+    val accent = controlAccentColor()
     Surface(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
@@ -71,8 +72,7 @@ private fun ThemeChoiceRow(
         contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(
             1.dp,
-            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.70f)
-            else MaterialTheme.colorScheme.outlineVariant
+            if (selected) accent else MaterialTheme.colorScheme.outlineVariant
         ),
         tonalElevation = 0.dp
     ) {
@@ -92,7 +92,7 @@ private fun ThemeChoiceRow(
                 )
             }
             if (selected) {
-                Icon(Icons.Outlined.Check, contentDescription = null, modifier = Modifier.size(22.dp))
+                Icon(Icons.Outlined.Check, contentDescription = null, modifier = Modifier.size(22.dp), tint = accent)
             }
         }
     }
