@@ -423,8 +423,6 @@ private fun CoreComponentCard(
                     colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.error),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.error)
                 ) {
-                    Icon(Icons.Outlined.DeleteOutline, null)
-                    Spacer(Modifier.width(5.dp))
                     Text(if (inUse) "In use" else "Delete")
                 }
                 else -> OutlinedButton(
@@ -484,8 +482,6 @@ private fun ComponentCard(
                         colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.error),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.error)
                     ) {
-                        Icon(Icons.Outlined.DeleteOutline, null)
-                        Spacer(Modifier.width(5.dp))
                         Text(if (item.inUse) "In use" else "Delete")
                     }
                 } else if (!item.installed) {
