@@ -186,7 +186,8 @@ internal fun LibraryRoot(
                             Surface(
                                 modifier = Modifier.size(72.dp),
                                 shape = RoundedCornerShape(20.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant
+                                color = controlAccentColor(),
+                                contentColor = Color.White
                             ) {
                                 Box(contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Add, null, modifier = Modifier.size(34.dp)) }
                             }

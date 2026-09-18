@@ -51,6 +51,7 @@ import com.winlator.cmod.R
 import com.winlator.cmod.ui.LandscapeMainNavigation
 import com.winlator.cmod.ui.applyAppFullscreen
 import com.winlator.cmod.ui.theme.WinZTheme
+import com.winlator.cmod.ui.theme.controlAccentColor
 
 class ContainerUiModel(
     val id: Int,
@@ -121,6 +122,7 @@ private fun ContainersScreen(
                 title = "Containers",
                 actionIcon = Icons.Outlined.Add,
                 actionDescription = "Add container",
+                actionAccent = true,
                 onAction = callbacks::onAdd
             )
         }
@@ -243,8 +245,8 @@ private fun ContainerCard(
                     onClick = { callbacks.onRun(container.id) },
                     modifier = Modifier.size(if (compact) 44.dp else 48.dp),
                     shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
+                    color = controlAccentColor(),
+                    contentColor = androidx.compose.ui.graphics.Color.White
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(Icons.Outlined.PlayArrow, "Run", modifier = Modifier.size(27.dp))

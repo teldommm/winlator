@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
@@ -292,11 +293,39 @@ private fun ProfilePicker(model: InputControlsModel, selectedName: String, callb
                 Icon(Icons.Outlined.KeyboardArrowDown, null)
             }
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, modifier = Modifier.fillMaxWidth(0.82f)) {
-            DropdownMenuItem(text = { Text("-- Select Profile --") }, onClick = { expanded = false; callbacks.onProfileSelected(0) })
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.fillMaxWidth(0.82f),
+            shape = RoundedCornerShape(14.dp),
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
+            val accent = controlAccentColor()
+            val nonePicked = selectedName.isBlank() || model.profiles.none { it.name == selectedName }
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        "-- Select Profile --",
+                        color = if (nonePicked) accent else MaterialTheme.colorScheme.onSurface,
+                        fontWeight = if (nonePicked) FontWeight.SemiBold else FontWeight.Normal
+                    )
+                },
+                trailingIcon = { if (nonePicked) Icon(Icons.Outlined.Check, null, tint = accent) },
+                onClick = { expanded = false; callbacks.onProfileSelected(0) }
+            )
             model.profiles.forEach { profile ->
+                val isSelected = profile.name == selectedName
                 DropdownMenuItem(
-                    text = { Text(profile.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    text = {
+                        Text(
+                            profile.name,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = if (isSelected) accent else MaterialTheme.colorScheme.onSurface,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                        )
+                    },
+                    trailingIcon = { if (isSelected) Icon(Icons.Outlined.Check, null, tint = accent) },
                     onClick = { expanded = false; callbacks.onProfileSelected(profile.id) }
                 )
             }

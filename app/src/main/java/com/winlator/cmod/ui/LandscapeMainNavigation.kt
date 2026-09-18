@@ -39,6 +39,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import com.winlator.cmod.MainActivity
 import com.winlator.cmod.R
+import com.winlator.cmod.ui.theme.controlAccentColor
 
 fun applyAppFullscreen(activity: Activity?) {
     if (activity == null) return
@@ -122,6 +123,7 @@ fun LandscapeMainNavigation(
     modifier: Modifier = Modifier,
     actionIcon: ImageVector? = null,
     actionDescription: String = "Action",
+    actionAccent: Boolean = false,
     onAction: (() -> Unit)? = null
 ) {
     KeepLandscapeChromeHidden(activity)
@@ -140,7 +142,7 @@ fun LandscapeMainNavigation(
         )
         Spacer(Modifier.weight(1f))
         if (actionIcon != null && onAction != null) {
-            Destination(actionIcon, actionDescription, false, onAction)
+            Destination(actionIcon, actionDescription, false, accent = actionAccent, onClick = onAction)
         }
         Destination(Icons.Outlined.Home, "Library", selected == R.id.main_menu_shortcuts) {
             activity?.navigateToMainDestination(R.id.main_menu_shortcuts)
@@ -159,14 +161,15 @@ private fun Destination(
     icon: ImageVector,
     description: String,
     selected: Boolean,
+    accent: Boolean = false,
     onClick: () -> Unit
 ) {
     val whiteTheme = MaterialTheme.colorScheme.background.luminance() > .65f
     val normalIcon = if (selected) MaterialTheme.colorScheme.primary
         else MaterialTheme.colorScheme.onBackground.copy(alpha = .68f)
-    val iconColor = if (whiteTheme) Color.White else normalIcon
+    val iconColor = if (accent) Color.White else if (whiteTheme) Color.White else normalIcon
     val selectedBackground = MaterialTheme.colorScheme.primary.copy(alpha = .12f)
-    val background = if (whiteTheme) {
+    val background = if (accent) controlAccentColor() else if (whiteTheme) {
         Color.Black.copy(alpha = if (selected) .90f else .78f)
     } else if (selected) selectedBackground else Color.Transparent
 

@@ -166,7 +166,7 @@ private fun LandscapeDetail(title: String, subtitle: String, artwork: Bitmap?, f
                         onClick = callbacks::onPlay,
                         modifier = Modifier.fillMaxWidth().height(52.dp),
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
+                        colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
                     ) {
                         Icon(Icons.Outlined.PlayArrow, null)
                         Spacer(Modifier.size(8.dp))
@@ -208,7 +208,7 @@ private fun PortraitDetail(title: String, subtitle: String, artwork: Bitmap?, fa
                 onClick = callbacks::onPlay,
                 modifier = Modifier.fillMaxWidth().height(54.dp),
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
+                colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
             ) { Icon(Icons.Outlined.PlayArrow, null); Spacer(Modifier.size(8.dp)); Text("Play", fontWeight = FontWeight.Bold) }
             DetailAction(Icons.Outlined.Settings, "Configure", Modifier.fillMaxWidth(), callbacks::onConfigure)
             DetailAction(Icons.Outlined.PlayArrow, "Enter container", Modifier.fillMaxWidth(), callbacks::onArguments, accent = true)

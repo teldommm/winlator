@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.MainActivity
 import com.winlator.cmod.R
+import com.winlator.cmod.ui.theme.controlAccentColor
 
 @Composable
 internal fun LibraryRootWithoutEmptyDescription(
@@ -73,7 +74,8 @@ internal fun LibraryRootWithoutEmptyDescription(
                     Surface(
                         modifier = Modifier.size(72.dp),
                         shape = RoundedCornerShape(20.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant
+                        color = controlAccentColor(),
+                        contentColor = androidx.compose.ui.graphics.Color.White
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(Icons.Outlined.Add, null, modifier = Modifier.size(34.dp))

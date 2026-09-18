@@ -74,6 +74,7 @@ import com.winlator.cmod.core.StringUtils
 import com.winlator.cmod.ui.applyAppFullscreen
 import com.winlator.cmod.ui.container.ContainerCreateComposeFragment
 import com.winlator.cmod.ui.theme.WinZTheme
+import com.winlator.cmod.ui.theme.controlAccentColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -207,7 +208,11 @@ private fun ContainersSettingsScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onAdd) { Icon(Icons.Outlined.Add, "New container") }
+            FloatingActionButton(
+                onClick = onAdd,
+                containerColor = controlAccentColor(),
+                contentColor = androidx.compose.ui.graphics.Color.White
+            ) { Icon(Icons.Outlined.Add, "New container") }
         }
     ) { padding ->
         if (containers.isEmpty()) {
@@ -272,8 +277,8 @@ private fun SettingsContainerCard(
                     onClick = { onRun(container.id) },
                     modifier = Modifier.size(46.dp),
                     shape = RoundedCornerShape(13.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
+                    color = controlAccentColor(),
+                    contentColor = androidx.compose.ui.graphics.Color.White
                 ) {
                     Box(contentAlignment = Alignment.Center) { Icon(Icons.Outlined.PlayArrow, null) }
                 }
@@ -323,7 +328,12 @@ private fun ContainerMoreButton(
     var expanded by remember { mutableStateOf(false) }
     Box(modifier) {
         ActionButton(Icons.Outlined.MoreVert, "More", Modifier.fillMaxWidth()) { expanded = true }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            shape = RoundedCornerShape(14.dp),
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
             DropdownMenuItem(
                 text = { Text("Duplicate") },
                 leadingIcon = { Icon(Icons.Outlined.ContentCopy, null) },
@@ -333,8 +343,8 @@ private fun ContainerMoreButton(
                 }
             )
             DropdownMenuItem(
-                text = { Text("Remove") },
-                leadingIcon = { Icon(Icons.Outlined.DeleteOutline, null) },
+                text = { Text("Remove", color = MaterialTheme.colorScheme.error) },
+                leadingIcon = { Icon(Icons.Outlined.DeleteOutline, null, tint = MaterialTheme.colorScheme.error) },
                 onClick = {
                     expanded = false
                     onRemove()

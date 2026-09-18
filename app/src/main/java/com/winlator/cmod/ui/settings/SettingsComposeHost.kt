@@ -434,7 +434,12 @@ private fun PresetChoiceRow(
                 IconButton(onClick = { actionsOpen = true }) {
                     Icon(Icons.Outlined.MoreVert, "Preset actions")
                 }
-                DropdownMenu(expanded = actionsOpen, onDismissRequest = { actionsOpen = false }) {
+                DropdownMenu(
+                    expanded = actionsOpen,
+                    onDismissRequest = { actionsOpen = false },
+                    shape = RoundedCornerShape(14.dp),
+                    containerColor = MaterialTheme.colorScheme.surface
+                ) {
                     DropdownMenuItem(
                         text = { Text("Create new") },
                         leadingIcon = { Icon(Icons.Outlined.Add, null) },
@@ -461,8 +466,8 @@ private fun PresetChoiceRow(
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("Delete") },
-                            leadingIcon = { Icon(Icons.Outlined.DeleteOutline, null) },
+                            text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+                            leadingIcon = { Icon(Icons.Outlined.DeleteOutline, null, tint = MaterialTheme.colorScheme.error) },
                             onClick = {
                                 actionsOpen = false
                                 onAction(kind, selectedId, "remove")
