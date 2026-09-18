@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Favorite
@@ -253,7 +254,12 @@ private fun LibraryOrientationMenu(activity: MainActivity?) {
 
     Box {
         LibraryTopIcon(Icons.Outlined.MoreVert, false) { expanded = true }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            shape = RoundedCornerShape(14.dp),
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
             OrientationToggleMenuItem("Lock screen orientation", orientationState.first) {
                 activity?.toggleOrientationLock()
                 orientationRevision++
@@ -272,15 +278,16 @@ private fun LibraryOrientationMenu(activity: MainActivity?) {
 
 @Composable
 private fun OrientationToggleMenuItem(label: String, checked: Boolean, onClick: () -> Unit) {
+    val accent = controlAccentColor()
     DropdownMenuItem(
-        text = { Text(label) },
-        trailingIcon = {
-            Switch(
-                checked = checked,
-                onCheckedChange = null,
-                colors = accentSwitchColors()
+        text = {
+            Text(
+                label,
+                color = if (checked) accent else MaterialTheme.colorScheme.onSurface,
+                fontWeight = if (checked) FontWeight.SemiBold else FontWeight.Normal
             )
         },
+        trailingIcon = { if (checked) Icon(Icons.Outlined.Check, null, tint = accent) },
         onClick = onClick
     )
 }
@@ -409,8 +416,8 @@ private fun PlayCompat(item: LibraryItem, cb: LibraryCallbacks, overlay: Boolean
         onClick = { cb.onRun(item.shortcutPath) },
         modifier = Modifier.size(42.dp),
         shape = CircleShape,
-        color = if (overlay) Color.Black.copy(.72f) else MaterialTheme.colorScheme.surfaceVariant,
-        contentColor = if (overlay) Color.White else MaterialTheme.colorScheme.onSurface
+        color = controlAccentColor(),
+        contentColor = Color.White
     ) { Box(contentAlignment = Alignment.Center) { Icon(Icons.Outlined.PlayArrow, "Play") } }
 }
 

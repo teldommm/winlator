@@ -54,6 +54,7 @@ import androidx.drawerlayout.widget.DrawerLayout
 import com.winlator.cmod.MainActivity
 import com.winlator.cmod.R
 import com.winlator.cmod.ui.KeepLandscapeChromeHidden
+import com.winlator.cmod.ui.theme.controlAccentColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.withContext
@@ -179,7 +180,7 @@ internal fun LandscapePagerCore(
                             onClick = { callbacks.onRun(item.shortcutPath) },
                             modifier = Modifier.size(44.dp),
                             shape = CircleShape,
-                            color = Color.Black.copy(.62f),
+                            color = controlAccentColor(),
                             contentColor = Color.White
                         ) { Box(contentAlignment = Alignment.Center) { Icon(Icons.Outlined.PlayArrow, "Play") } }
                         footerActions(item)

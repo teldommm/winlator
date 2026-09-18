@@ -107,12 +107,13 @@ internal fun OnboardingRuntimeSelectionScreen(
             }
             items(runtimes, key = { it.runtimeIdentifier ?: it.id }) { runtime ->
                 val id = runtime.runtimeIdentifier.orEmpty()
+                val accent = controlAccentColor()
                 Surface(
                     onClick = { if (!preparing) selected = id },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),
                     color = if (selected == id) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(1.dp, if (selected == id) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant)
+                    border = BorderStroke(1.dp, if (selected == id) accent else MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Outlined.Computer, null, modifier = Modifier.size(28.dp))
@@ -121,7 +122,7 @@ internal fun OnboardingRuntimeSelectionScreen(
                             Text(runtime.name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(runtime.type, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        if (selected == id) Icon(Icons.Outlined.CheckCircle, null, tint = MaterialTheme.colorScheme.primary)
+                        if (selected == id) Icon(Icons.Outlined.CheckCircle, null, tint = accent)
                     }
                 }
             }
@@ -144,7 +145,7 @@ internal fun OnboardingRuntimeSelectionScreen(
                     enabled = !preparing,
                     modifier = Modifier.weight(1f).height(48.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Text("Back")

@@ -420,7 +420,7 @@ private fun CoreComponentCard(
                 installed -> OutlinedButton(
                     onClick = onRemove,
                     enabled = !locked && !inUse,
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.error),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.error)
                 ) {
                     Icon(Icons.Outlined.DeleteOutline, null)
@@ -430,7 +430,7 @@ private fun CoreComponentCard(
                 else -> OutlinedButton(
                     onClick = onInstall,
                     enabled = !locked,
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = controlAccentColor()),
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = controlAccentColor()),
                     border = BorderStroke(1.dp, controlAccentColor())
                 ) {
                     Icon(Icons.Outlined.Download, null)
@@ -481,7 +481,7 @@ private fun ComponentCard(
                     OutlinedButton(
                         onClick = { cb.onRemove(item.id) },
                         enabled = !locked && !item.inUse,
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.error),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.error)
                     ) {
                         Icon(Icons.Outlined.DeleteOutline, null)
@@ -492,7 +492,7 @@ private fun ComponentCard(
                     OutlinedButton(
                         onClick = { cb.onInstall(item.id) },
                         enabled = !locked,
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = controlAccentColor()),
+                        colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = controlAccentColor()),
                         border = BorderStroke(1.dp, controlAccentColor())
                     ) { Text("Download") }
                 } else Icon(Icons.Outlined.Check, null)
@@ -584,7 +584,7 @@ private fun ComponentsFooter(
                 onClick = back,
                 modifier = Modifier.weight(1f).height(48.dp),
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) { Text("Back") }
             Button(

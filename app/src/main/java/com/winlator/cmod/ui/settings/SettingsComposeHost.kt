@@ -46,10 +46,12 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -58,6 +60,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
@@ -396,6 +399,7 @@ private fun CursorSpeedRow(value: Int, onChanged: (Int) -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PresetChoiceRow(
     icon: ImageVector,
@@ -410,98 +414,121 @@ private fun PresetChoiceRow(
     var actionsOpen by remember { mutableStateOf(false) }
     val selected = choices.firstOrNull { it.id == selectedId } ?: choices.firstOrNull()
 
-    Column(Modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Surface(
-                onClick = { expanded = !expanded },
-                modifier = Modifier.weight(1f),
-                color = androidx.compose.ui.graphics.Color.Transparent
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Surface(
+            onClick = { expanded = true },
+            modifier = Modifier.weight(1f),
+            color = androidx.compose.ui.graphics.Color.Transparent
+        ) {
+            Row(
+                Modifier.fillMaxWidth().padding(start = 14.dp, top = 11.dp, bottom = 11.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    Modifier.fillMaxWidth().padding(start = 14.dp, top = 11.dp, bottom = 11.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    SmallIcon(icon)
-                    Spacer(Modifier.width(11.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(title, fontWeight = FontWeight.Medium)
-                        Text(selected?.name.orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Icon(Icons.Outlined.KeyboardArrowDown, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                SmallIcon(icon)
+                Spacer(Modifier.width(11.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(title, fontWeight = FontWeight.Medium)
+                    Text(selected?.name.orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+                Icon(Icons.Outlined.KeyboardArrowDown, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Box {
-                IconButton(onClick = { actionsOpen = true }) {
-                    Icon(Icons.Outlined.MoreVert, "Preset actions")
-                }
-                DropdownMenu(
-                    expanded = actionsOpen,
-                    onDismissRequest = { actionsOpen = false },
-                    shape = RoundedCornerShape(14.dp),
-                    containerColor = MaterialTheme.colorScheme.surface
-                ) {
+        }
+        Box {
+            IconButton(onClick = { actionsOpen = true }) {
+                Icon(Icons.Outlined.MoreVert, "Preset actions")
+            }
+            DropdownMenu(
+                expanded = actionsOpen,
+                onDismissRequest = { actionsOpen = false },
+                shape = RoundedCornerShape(14.dp),
+                containerColor = MaterialTheme.colorScheme.surface
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Create new") },
+                    leadingIcon = { Icon(Icons.Outlined.Add, null) },
+                    onClick = {
+                        actionsOpen = false
+                        onAction(kind, "", "add")
+                    }
+                )
+                if (selectedId.isNotBlank()) {
                     DropdownMenuItem(
-                        text = { Text("Create new") },
-                        leadingIcon = { Icon(Icons.Outlined.Add, null) },
+                        text = { Text("Clone") },
+                        leadingIcon = { Icon(Icons.Outlined.ContentCopy, null) },
                         onClick = {
                             actionsOpen = false
-                            onAction(kind, "", "add")
+                            onAction(kind, selectedId, "duplicate")
                         }
                     )
-                    if (selectedId.isNotBlank()) {
-                        DropdownMenuItem(
-                            text = { Text("Clone") },
-                            leadingIcon = { Icon(Icons.Outlined.ContentCopy, null) },
-                            onClick = {
-                                actionsOpen = false
-                                onAction(kind, selectedId, "duplicate")
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Edit") },
-                            leadingIcon = { Icon(Icons.Outlined.Edit, null) },
-                            onClick = {
-                                actionsOpen = false
-                                onAction(kind, selectedId, "edit")
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
-                            leadingIcon = { Icon(Icons.Outlined.DeleteOutline, null, tint = MaterialTheme.colorScheme.error) },
-                            onClick = {
-                                actionsOpen = false
-                                onAction(kind, selectedId, "remove")
-                            }
-                        )
-                    }
+                    DropdownMenuItem(
+                        text = { Text("Edit") },
+                        leadingIcon = { Icon(Icons.Outlined.Edit, null) },
+                        onClick = {
+                            actionsOpen = false
+                            onAction(kind, selectedId, "edit")
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+                        leadingIcon = { Icon(Icons.Outlined.DeleteOutline, null, tint = MaterialTheme.colorScheme.error) },
+                        onClick = {
+                            actionsOpen = false
+                            onAction(kind, selectedId, "remove")
+                        }
+                    )
                 }
             }
         }
+    }
 
-        if (expanded) {
-            HorizontalDivider(Modifier.padding(horizontal = 14.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .55f))
-            val accent = controlAccentColor()
-            choices.forEach { choice ->
-                val isSelected = choice.id == selectedId
-                Surface(
-                    onClick = {
-                        onSelected(choice.id)
-                        expanded = false
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    color = androidx.compose.ui.graphics.Color.Transparent
-                ) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(start = 62.dp, end = 16.dp, top = 10.dp, bottom = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            choice.name,
-                            modifier = Modifier.weight(1f),
-                            color = if (isSelected) accent else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
-                        )
-                        if (isSelected) Icon(Icons.Outlined.Check, null, tint = accent)
+    if (expanded) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { expanded = false },
+            sheetState = sheetState,
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 0.dp
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp).padding(bottom = 20.dp)) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+                )
+                Text(
+                    "Choose an option",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 8.dp).padding(bottom = 10.dp)
+                )
+                val accent = controlAccentColor()
+                LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
+                    items(choices, key = { it.id }) { choice ->
+                        val isSelected = choice.id == selectedId
+                        Surface(
+                            onClick = {
+                                onSelected(choice.id)
+                                expanded = false
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isSelected) accent.copy(alpha = 0.16f) else androidx.compose.ui.graphics.Color.Transparent
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 13.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    choice.name,
+                                    modifier = Modifier.weight(1f),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = if (isSelected) accent else MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                )
+                                if (isSelected) Icon(Icons.Outlined.Check, null, tint = accent)
+                            }
+                        }
                     }
                 }
             }
