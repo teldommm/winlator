@@ -1,7 +1,7 @@
 package com.winlator.cmod.box64;
 
-import android.app.Dialog;
 import android.content.Context;
+import android.view.View;
 
 import androidx.annotation.NonNull;
 
@@ -27,7 +27,7 @@ public class Box64EditPresetDialog {
     private final Context context;
     private final String prefix;
     private final Box64Preset preset;
-    private final Dialog dialog;
+    private final View view;
     private Runnable onConfirmCallback;
 
     public Box64EditPresetDialog(@NonNull Context context, String prefix, String presetId) {
@@ -41,7 +41,7 @@ public class Box64EditPresetDialog {
                 : context.getString(R.string.preset) + "-" + Box64PresetManager.getNextPresetId(context, prefix);
 
         List<PresetEditorVariable> variables = loadVariables();
-        dialog = PresetEditorComposeDialog.create(
+        view = PresetEditorComposeDialog.create(
                 context,
                 StringUtils.getString(context, prefix + "_preset"),
                 initialName,
@@ -66,7 +66,7 @@ public class Box64EditPresetDialog {
     }
 
     public void show() {
-        dialog.show();
+        PresetEditorComposeDialog.show(context, view);
     }
 
     private List<PresetEditorVariable> loadVariables() {

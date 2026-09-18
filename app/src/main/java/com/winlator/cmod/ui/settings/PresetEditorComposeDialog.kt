@@ -1,49 +1,48 @@
 package com.winlator.cmod.ui.settings
 
-import android.app.Dialog
+import android.app.Activity
 import android.content.Context
-import android.graphics.Color
-import android.graphics.drawable.ColorDrawable
+import android.view.View
 import android.view.ViewGroup
-import androidx.activity.ComponentDialog
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.HelpOutline
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -52,14 +51,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.winlator.cmod.R
+import com.winlator.cmod.ui.theme.ThemedDialog
+import com.winlator.cmod.ui.theme.ThemedDialogSurface
 import com.winlator.cmod.ui.theme.WinZOverlayTheme
-import com.winlator.cmod.ui.theme.controlAccentColor
 import com.winlator.cmod.ui.theme.accentSwitchColors
+import com.winlator.cmod.ui.theme.controlAccentColor
 
 data class PresetEditorVariable(
     val name: String,
@@ -74,6 +76,12 @@ fun interface PresetEditorSaveListener {
     fun onSave(name: String, values: Map<String, String>)
 }
 
+// Same hosting technique as ThemedAlertHost/ThemedProgressHost/ThemedDownloadProgressHost: a
+// ComposeView added straight onto the activity's content root, not a real android.app.Dialog —
+// so it gets the exact same WinZOverlayTheme + single scrim + ThemedDialogSurface shell as every
+// other themed dialog in the app, instead of looking like its own, slightly different kind of
+// window. create() builds the view without attaching it (so callers can still wire
+// setOnConfirmCallback before anything is shown); show() attaches it.
 object PresetEditorComposeDialog {
     @JvmStatic
     fun create(
@@ -83,40 +91,50 @@ object PresetEditorComposeDialog {
         readOnly: Boolean,
         variables: List<PresetEditorVariable>,
         listener: PresetEditorSaveListener
-    ): Dialog {
-        val dialog: Dialog = ComponentDialog(context, R.style.ContentDialog_Dark)
-        val composeView = ComposeView(context).apply {
-            setBackgroundColor(Color.TRANSPARENT)
+    ): View {
+        lateinit var composeView: ComposeView
+        composeView = ComposeView(context).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
                 WinZOverlayTheme {
-                    PresetEditorScreen(
-                        title = title,
-                        initialName = initialName,
-                        readOnly = readOnly,
-                        variables = variables,
-                        onCancel = dialog::dismiss,
-                        onSave = { name, values ->
-                            listener.onSave(name, values)
-                            dialog.dismiss()
+                    val dismiss: () -> Unit = { (composeView.parent as? ViewGroup)?.removeView(composeView) }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.5f))
+                            .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { dismiss() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        ThemedDialogSurface(modifier = Modifier.heightIn(max = 560.dp)) {
+                            PresetEditorScreen(
+                                title = title,
+                                initialName = initialName,
+                                readOnly = readOnly,
+                                variables = variables,
+                                onCancel = dismiss,
+                                onSave = { name, values ->
+                                    listener.onSave(name, values)
+                                    dismiss()
+                                }
+                            )
                         }
-                    )
+                    }
                 }
             }
         }
-        dialog.setContentView(composeView)
-        dialog.window?.apply {
-            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-        }
-        dialog.setOnShowListener {
-            dialog.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-        }
-        return dialog
+        return composeView
+    }
+
+    @JvmStatic
+    fun show(context: Context, view: View) {
+        if (view.parent != null) return
+        val root = (context as Activity).findViewById<ViewGroup>(android.R.id.content)
+        root.addView(view, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PresetEditorScreen(
+private fun ColumnScope.PresetEditorScreen(
     title: String,
     initialName: String,
     readOnly: Boolean,
@@ -130,152 +148,90 @@ private fun PresetEditorScreen(
             variables.forEach { put(it.name, it.value) }
         }
     }
-    var pickerIndex by remember { mutableStateOf<Int?>(null) }
     var helpText by remember { mutableStateOf<String?>(null) }
 
-    Box(
-        modifier = Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.5f)).padding(18.dp),
-        contentAlignment = Alignment.Center
+    Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+    Text(
+        if (readOnly) "Bundled preset · read only" else "Edit the preset name and environment variables",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
+    )
+    OutlinedTextField(
+        value = name,
+        onValueChange = { name = it },
+        enabled = !readOnly,
+        singleLine = true,
+        label = { Text("Preset") },
+        modifier = Modifier.fillMaxWidth()
+    )
+    Text(
+        "Environment variables",
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 18.dp, bottom = 7.dp)
+    )
+    Surface(
+        modifier = Modifier.fillMaxWidth().weight(1f),
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
     ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth().widthIn(max = 440.dp).heightIn(max = 540.dp),
-            shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(vertical = 4.dp)
         ) {
-            Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp)) {
-                Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-                Text(
-                    if (readOnly) "Bundled preset · read only" else "Edit the preset name and environment variables",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
+            items(variables, key = { it.name }) { variable ->
+                PresetVariableRow(
+                    variable = variable,
+                    value = values[variable.name] ?: variable.value,
+                    readOnly = readOnly,
+                    onValueChange = { values[variable.name] = it },
+                    onHelp = { variable.help?.let { helpText = it } }
                 )
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    enabled = !readOnly,
-                    singleLine = true,
-                    label = { Text("Preset") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Text(
-                    "Environment variables",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 18.dp, bottom = 7.dp)
-                )
-                Surface(
-                    modifier = Modifier.fillMaxWidth().weight(1f),
-                    shape = RoundedCornerShape(10.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
-                ) {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 4.dp)
-                    ) {
-                        itemsIndexed(variables, key = { _, item -> item.name }) { index, variable ->
-                            PresetVariableRow(
-                                variable = variable,
-                                value = values[variable.name] ?: variable.value,
-                                readOnly = readOnly,
-                                onValueChange = { values[variable.name] = it },
-                                onChoose = { pickerIndex = index },
-                                onHelp = { variable.help?.let { helpText = it } }
-                            )
-                            if (index != variables.lastIndex) {
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(horizontal = 12.dp),
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
-                                )
-                            }
-                        }
-                    }
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = onCancel,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                    ) { Text("Cancel") }
-                    Button(
-                        onClick = {
-                            val cleanName = name.trim().replace(Regex("[,|]+"), "")
-                            if (cleanName.isNotEmpty()) onSave(cleanName, values.toMap())
-                        },
-                        enabled = !readOnly && name.isNotBlank(),
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = androidx.compose.ui.graphics.Color.White)
-                    ) { Text("Save") }
+                if (variable != variables.last()) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+                    )
                 }
             }
         }
     }
-
-    pickerIndex?.let { index ->
-        val variable = variables.getOrNull(index)
-        if (variable != null) {
-            val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-            ModalBottomSheet(
-                onDismissRequest = { pickerIndex = null },
-                sheetState = sheetState,
-                containerColor = MaterialTheme.colorScheme.surface
-            ) {
-                Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp).padding(bottom = 20.dp)) {
-                    Text(
-                        variable.name,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
-                    variable.values.forEach { option ->
-                        val isSelected = values[variable.name] == option
-                        val accent = controlAccentColor()
-                        Surface(
-                            onClick = {
-                                values[variable.name] = option
-                                pickerIndex = null
-                            },
-                            color = androidx.compose.ui.graphics.Color.Transparent,
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 13.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    option,
-                                    modifier = Modifier.weight(1f),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = if (isSelected) accent else MaterialTheme.colorScheme.onSurface,
-                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
-                                )
-                                if (isSelected) {
-                                    Icon(Icons.Outlined.Check, null, tint = accent)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        OutlinedButton(
+            onClick = onCancel,
+            modifier = Modifier.weight(1f),
+            colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) { Text("Cancel") }
+        Button(
+            onClick = {
+                val cleanName = name.trim().replace(Regex("[,|]+"), "")
+                if (cleanName.isNotEmpty()) onSave(cleanName, values.toMap())
+            },
+            enabled = !readOnly && name.isNotBlank(),
+            modifier = Modifier.weight(1f),
+            colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
+        ) { Text("Save") }
     }
 
     helpText?.let { message ->
-        AlertDialog(
-            onDismissRequest = { helpText = null },
-            confirmButton = {
-                TextButton(onClick = { helpText = null }) { Text("OK") }
-            },
-            text = { Text(message) }
-        )
+        ThemedDialog(onDismissRequest = { helpText = null }) {
+            Text("Help", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(12.dp))
+            Text(message, style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(18.dp))
+            Row(Modifier.align(Alignment.End)) {
+                Button(
+                    onClick = { helpText = null },
+                    colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
+                ) { Text("OK") }
+            }
+        }
     }
 }
 
@@ -285,9 +241,10 @@ private fun PresetVariableRow(
     value: String,
     readOnly: Boolean,
     onValueChange: (String) -> Unit,
-    onChoose: () -> Unit,
     onHelp: () -> Unit
 ) {
+    var expanded by remember { mutableStateOf(false) }
+
     Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -329,20 +286,53 @@ private fun PresetVariableRow(
                     modifier = Modifier.fillMaxWidth()
                 )
             } else {
-                Surface(
-                    onClick = onChoose,
-                    enabled = !readOnly,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(9.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 11.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                Box(Modifier.fillMaxWidth()) {
+                    Surface(
+                        onClick = { expanded = true },
+                        enabled = !readOnly,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(9.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                     ) {
-                        Text(value, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-                        Icon(Icons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 11.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(value, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                            Icon(Icons.Outlined.KeyboardArrowDown, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    // Small anchored DropdownMenu, same as SettingChoice (audio driver, wine
+                    // version, etc. in container settings) — not the big ModalBottomSheet this
+                    // used to open.
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false },
+                        modifier = Modifier.widthIn(min = 220.dp, max = 380.dp).heightIn(max = 420.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ) {
+                        val accent = controlAccentColor()
+                        variable.values.distinct().forEach { option ->
+                            val isSelected = option == value
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        option,
+                                        color = if (isSelected) accent else MaterialTheme.colorScheme.onSurface,
+                                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                },
+                                trailingIcon = { if (isSelected) Icon(Icons.Outlined.Check, null, tint = accent) },
+                                onClick = {
+                                    expanded = false
+                                    onValueChange(option)
+                                }
+                            )
+                        }
                     }
                 }
             }

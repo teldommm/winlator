@@ -1,7 +1,7 @@
 package com.winlator.cmod.fexcore;
 
-import android.app.Dialog;
 import android.content.Context;
+import android.view.View;
 
 import androidx.annotation.NonNull;
 
@@ -26,7 +26,7 @@ import java.util.Map;
 public class FEXCoreEditPresetDialog {
     private final Context context;
     private final FEXCorePreset preset;
-    private final Dialog dialog;
+    private final View view;
     private Runnable onConfirmCallback;
 
     public FEXCoreEditPresetDialog(@NonNull Context context, String presetId) {
@@ -39,7 +39,7 @@ public class FEXCoreEditPresetDialog {
                 : context.getString(R.string.preset) + "-" + FEXCorePresetManager.getNextPresetId(context);
 
         List<PresetEditorVariable> variables = loadVariables();
-        dialog = PresetEditorComposeDialog.create(
+        view = PresetEditorComposeDialog.create(
                 context,
                 StringUtils.getString(context, "fexcore_preset"),
                 initialName,
@@ -63,7 +63,7 @@ public class FEXCoreEditPresetDialog {
     }
 
     public void show() {
-        dialog.show();
+        PresetEditorComposeDialog.show(context, view);
     }
 
     private List<PresetEditorVariable> loadVariables() {
