@@ -1,6 +1,5 @@
 package com.winlator.cmod.ui.library
 
-import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.BorderStroke
@@ -76,10 +75,8 @@ import androidx.compose.ui.graphics.asImageBitmap as composeAsImageBitmap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -87,7 +84,6 @@ import com.winlator.cmod.MainActivity
 import com.winlator.cmod.R
 import com.winlator.cmod.ui.theme.controlAccentColor
 import com.winlator.cmod.ui.theme.accentSwitchColors
-import com.winlator.cmod.ui.theme.WinZTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -249,17 +245,6 @@ private fun LibraryOrientationMenu(activity: MainActivity?) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         LibraryTopIcon(Icons.Outlined.MoreVert, false) { expanded = true }
-        LibraryOrientationDropdown(activity, expanded) { expanded = false }
-    }
-}
-
-@Composable
-internal fun LibraryOrientationMenuToolbarIcon(activity: MainActivity?) {
-    var expanded by remember { mutableStateOf(false) }
-    Box {
-        IconButton(onClick = { expanded = true }) {
-            Icon(Icons.Outlined.MoreVert, "More options", tint = MaterialTheme.colorScheme.onSurface)
-        }
         LibraryOrientationDropdown(activity, expanded) { expanded = false }
     }
 }
@@ -579,18 +564,6 @@ private fun LibraryActionTileCompat(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-        }
-    }
-}
-
-// Bridge so the classic (portrait) Toolbar's "More" action view can host the exact same
-// Compose orientation menu used in the landscape header — one implementation, no desync.
-object LibraryOrientationMenuHost {
-    @JvmStatic
-    fun create(context: Context, activity: MainActivity?): ComposeView {
-        return ComposeView(context).apply {
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-            setContent { WinZTheme { LibraryOrientationMenuToolbarIcon(activity) } }
         }
     }
 }

@@ -17,10 +17,10 @@ import android.widget.TextView;
 
 import androidx.appcompat.widget.AppCompatImageButton;
 import androidx.core.widget.CompoundButtonCompat;
-import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.MainActivity;
 import com.winlator.cmod.R;
+import com.winlator.cmod.ui.theme.WinlatorLegacyTheme;
 
 public final class OrientationOverflowView extends AppCompatImageButton {
     private final MainActivity activity;
@@ -142,52 +142,11 @@ public final class OrientationOverflowView extends AppCompatImageButton {
     }
 
     private void refreshPalette() {
-        String theme = PreferenceManager.getDefaultSharedPreferences(getContext().getApplicationContext())
-                .getString("winlator_ui_theme", "black");
-        switch (theme) {
-            case "white":
-                surface = Color.rgb(255, 255, 255);
-                onSurface = Color.rgb(24, 25, 29);
-                onSurfaceVariant = Color.rgb(96, 99, 107);
-                primary = Color.rgb(35, 37, 43);
-                outline = Color.rgb(209, 211, 216);
-                break;
-            case "amoled":
-                surface = Color.rgb(5, 5, 5);
-                onSurface = Color.rgb(247, 247, 247);
-                onSurfaceVariant = Color.rgb(170, 170, 170);
-                primary = Color.WHITE;
-                outline = Color.rgb(32, 32, 32);
-                break;
-            case "blue":
-                surface = Color.rgb(12, 19, 32);
-                onSurface = Color.rgb(242, 246, 252);
-                onSurfaceVariant = Color.rgb(169, 185, 205);
-                primary = Color.rgb(130, 184, 255);
-                outline = Color.rgb(37, 56, 79);
-                break;
-            case "red":
-                surface = Color.rgb(22, 11, 13);
-                onSurface = Color.rgb(255, 242, 242);
-                onSurfaceVariant = Color.rgb(205, 176, 178);
-                primary = Color.rgb(255, 138, 143);
-                outline = Color.rgb(69, 41, 44);
-                break;
-            case "purple":
-                surface = Color.rgb(23, 17, 30);
-                onSurface = Color.rgb(233, 225, 236);
-                onSurfaceVariant = Color.rgb(204, 194, 220);
-                primary = Color.rgb(208, 188, 255);
-                outline = Color.rgb(73, 65, 81);
-                break;
-            default:
-                surface = Color.rgb(0x15, 0x15, 0x15);
-                onSurface = Color.rgb(0xF9, 0xF9, 0xF7);
-                onSurfaceVariant = Color.rgb(0x97, 0x95, 0x8D);
-                primary = Color.rgb(0x3B, 0x82, 0xF6);
-                outline = Color.rgb(0x3D, 0x3D, 0x3A);
-                break;
-        }
+        surface = WinlatorLegacyTheme.surface(getContext());
+        onSurface = WinlatorLegacyTheme.onSurface(getContext());
+        onSurfaceVariant = WinlatorLegacyTheme.onSurfaceVariant(getContext());
+        primary = WinlatorLegacyTheme.controlAccent(getContext());
+        outline = WinlatorLegacyTheme.outlineVariant(getContext());
     }
 
     private int dp(int value) {
