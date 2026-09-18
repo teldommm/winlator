@@ -1,5 +1,6 @@
 package com.winlator.cmod.ui
 
+import android.app.Activity
 import android.app.Dialog
 import android.graphics.Color as AndroidColor
 import android.graphics.drawable.ColorDrawable
@@ -23,7 +24,6 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.winlator.cmod.MainActivity
 import com.winlator.cmod.ui.theme.ThemedDialogSurface
 import com.winlator.cmod.ui.theme.WinZTheme
 import com.winlator.cmod.ui.theme.controlAccentColor
@@ -33,7 +33,7 @@ import com.winlator.cmod.ui.theme.controlAccentColor
 // Compose-triggered dialog, instead of the stock (unthemed) android.app.AlertDialog.Builder.
 object ThemedAlertHost {
     @JvmStatic
-    fun confirm(activity: MainActivity, title: String, message: String, confirmLabel: String, onConfirm: Runnable) {
+    fun confirm(activity: Activity, title: String, message: String, confirmLabel: String, onConfirm: Runnable) {
         showDialog(activity) { dismiss ->
             DialogBody(title, message) {
                 OutlinedButton(
@@ -50,7 +50,7 @@ object ThemedAlertHost {
     }
 
     @JvmStatic
-    fun info(activity: MainActivity, title: String, message: String) {
+    fun info(activity: Activity, title: String, message: String) {
         showDialog(activity) { dismiss ->
             DialogBody(title, message) {
                 Button(
@@ -61,7 +61,7 @@ object ThemedAlertHost {
         }
     }
 
-    private fun showDialog(activity: MainActivity, content: @Composable ColumnScope.(dismiss: () -> Unit) -> Unit) {
+    private fun showDialog(activity: Activity, content: @Composable ColumnScope.(dismiss: () -> Unit) -> Unit) {
         val dialog = Dialog(activity)
         dialog.window?.setBackgroundDrawable(ColorDrawable(AndroidColor.TRANSPARENT))
         dialog.window?.setLayout(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
