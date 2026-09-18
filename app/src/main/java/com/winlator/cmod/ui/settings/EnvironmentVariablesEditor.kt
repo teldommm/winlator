@@ -19,6 +19,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -38,6 +39,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.ui.theme.controlAccentColor
+import com.winlator.cmod.ui.theme.ThemedDialog
 
 enum class EnvValueKind { CHECKBOX, SELECT, MULTI, TEXT, NUMBER }
 
@@ -209,36 +211,44 @@ private fun MultiEnvironmentChoice(options: List<String>, value: String, onChang
                 addAll(value.split(',').map(String::trim).filter(String::isNotEmpty))
             }
         }
-        AlertDialog(
-            onDismissRequest = { open = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    onChanged(selected.joinToString(","))
-                    open = false
-                }) { Text("Done") }
-            },
-            dismissButton = { TextButton(onClick = { open = false }) { Text("Cancel") } },
-            title = { Text("Select values") },
-            text = {
-                LazyColumn(Modifier.heightIn(max = 420.dp)) {
-                    items(options) { option ->
-                        Row(
-                            Modifier.fillMaxWidth().padding(vertical = 3.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Checkbox(
-                                checked = option in selected,
-                                onCheckedChange = { enabled ->
-                                    if (enabled) { if (option !in selected) selected.add(option) }
-                                    else selected.remove(option)
-                                }
-                            )
-                            Text(option, modifier = Modifier.weight(1f))
-                        }
+        ThemedDialog(onDismissRequest = { open = false }) {
+            Text("Select values", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(12.dp))
+            val accent = controlAccentColor()
+            LazyColumn(Modifier.heightIn(max = 420.dp)) {
+                items(options) { option ->
+                    Row(
+                        Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = option in selected,
+                            onCheckedChange = { enabled ->
+                                if (enabled) { if (option !in selected) selected.add(option) }
+                                else selected.remove(option)
+                            },
+                            colors = CheckboxDefaults.colors(checkedColor = accent)
+                        )
+                        Text(option, modifier = Modifier.weight(1f))
                     }
                 }
             }
-        )
+            Spacer(Modifier.height(16.dp))
+            Row(Modifier.align(Alignment.End), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(
+                    onClick = { open = false },
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) { Text("Cancel") }
+                Button(
+                    onClick = {
+                        onChanged(selected.joinToString(","))
+                        open = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = Color.White)
+                ) { Text("Done") }
+            }
+        }
     }
 }
 
@@ -254,9 +264,24 @@ private fun AddEnvironmentVariableDialog(
     val options = available + "Custom…"
     val selected = if (name in available) name else "Custom…"
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
+    ThemedDialog(onDismissRequest = onDismiss) {
+        Text("Add environment variable", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(14.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            SettingChoice("Variable", selected, options) { picked ->
+                name = if (picked == "Custom…") "" else picked
+            }
+            if (selected == "Custom…") {
+                SettingText("Name", customName) { customName = it }
+            }
+        }
+        Spacer(Modifier.height(18.dp))
+        Row(Modifier.align(Alignment.End), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedButton(
+                onClick = onDismiss,
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) { Text("Cancel") }
             Button(
                 onClick = {
                     val finalName = if (selected == "Custom…") customName.trim().replace(" ", "") else name
@@ -272,24 +297,6 @@ private fun AddEnvironmentVariableDialog(
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
             ) { Text("Add") }
-        },
-        dismissButton = {
-            OutlinedButton(
-                onClick = onDismiss,
-                colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-            ) { Text("Cancel") }
-        },
-        title = { Text("Add environment variable") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SettingChoice("Variable", selected, options) { picked ->
-                    name = if (picked == "Custom…") "" else picked
-                }
-                if (selected == "Custom…") {
-                    SettingText("Name", customName) { customName = it }
-                }
-            }
         }
-    )
+    }
 }

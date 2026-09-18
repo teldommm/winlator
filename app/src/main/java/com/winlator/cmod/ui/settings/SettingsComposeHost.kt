@@ -44,6 +44,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -52,6 +53,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -87,6 +89,7 @@ import com.winlator.cmod.R
 import com.winlator.cmod.ui.LandscapeMainNavigation
 import com.winlator.cmod.ui.theme.WinZTheme
 import com.winlator.cmod.ui.theme.controlAccentColor
+import com.winlator.cmod.ui.theme.ThemedDialog
 import com.winlator.cmod.ui.theme.accentSwitchColors
 import com.winlator.cmod.ui.theme.WinlatorThemePreferenceCard
 import kotlin.math.roundToInt
@@ -168,6 +171,7 @@ private fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) {
     val configuration = LocalConfiguration.current
     val landscape = configuration.screenWidthDp > configuration.screenHeightDp
     val activity = context as? MainActivity
+    var confirmReinstallImageFs by remember { mutableStateOf(false) }
 
     DisposableEffect(activity, landscape) {
         if (landscape) {
@@ -305,11 +309,34 @@ private fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) {
             item("contents-url") { EditableValueCard("Downloadable Contents URL", model.contentsUrl, callbacks::onContentsUrlChanged) }
 
             item("imagefs-title") { SectionTitle(stringResource(R.string.imagefs)) }
-            item("imagefs") { NavigationRow(Icons.Outlined.Refresh, stringResource(R.string.reinstall_imagefs), null, callbacks::onReinstallImageFs) }
+            item("imagefs") { NavigationRow(Icons.Outlined.Refresh, stringResource(R.string.reinstall_imagefs), null) { confirmReinstallImageFs = true } }
 
             item("about-title") { SectionTitle("ABOUT") }
             item("about") {
                 NavigationRow(Icons.Outlined.Info, "About", null) { activity?.showAboutDialog() }
+            }
+        }
+    }
+
+    if (confirmReinstallImageFs) {
+        ThemedDialog(onDismissRequest = { confirmReinstallImageFs = false }) {
+            Text(stringResource(R.string.reinstall_imagefs), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(12.dp))
+            Text(stringResource(R.string.do_you_want_to_reinstall_imagefs), style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(18.dp))
+            Row(Modifier.align(Alignment.End), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(
+                    onClick = { confirmReinstallImageFs = false },
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) { Text(stringResource(R.string.cancel)) }
+                Button(
+                    onClick = {
+                        confirmReinstallImageFs = false
+                        callbacks.onReinstallImageFs()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = androidx.compose.ui.graphics.Color.White)
+                ) { Text(stringResource(R.string.ok)) }
             }
         }
     }
@@ -602,52 +629,58 @@ private fun WineDebugChannelsDialog(
         if (query.isBlank()) allOptions else allOptions.filter { it.contains(query.trim(), ignoreCase = true) }
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Wine debug channels") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    label = { Text("Search channels") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-                LazyColumn(Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
-                    items(filtered, key = { it }) { channel ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    selected = selected.toMutableSet().apply {
-                                        if (!add(channel)) remove(channel)
-                                    }
+    ThemedDialog(onDismissRequest = onDismiss) {
+        Text("Wine debug channels", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(14.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                label = { Text("Search channels") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            val accent = controlAccentColor()
+            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
+                items(filtered, key = { it }) { channel ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                selected = selected.toMutableSet().apply {
+                                    if (!add(channel)) remove(channel)
                                 }
-                                .padding(vertical = 3.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Checkbox(
-                                checked = channel in selected,
-                                onCheckedChange = { checked ->
-                                    selected = selected.toMutableSet().apply {
-                                        if (checked) add(channel) else remove(channel)
-                                    }
+                            }
+                            .padding(vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = channel in selected,
+                            onCheckedChange = { checked ->
+                                selected = selected.toMutableSet().apply {
+                                    if (checked) add(channel) else remove(channel)
                                 }
-                            )
-                            Text(channel, modifier = Modifier.weight(1f))
-                        }
+                            },
+                            colors = CheckboxDefaults.colors(checkedColor = accent)
+                        )
+                        Text(channel, modifier = Modifier.weight(1f))
                     }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = { onApply(allOptions.filter { it in selected }.joinToString(",")) }) {
-                Text("Apply")
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
-    )
+        }
+        Spacer(Modifier.height(18.dp))
+        Row(Modifier.align(Alignment.End), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedButton(
+                onClick = onDismiss,
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) { Text("Cancel") }
+            Button(
+                onClick = { onApply(allOptions.filter { it in selected }.joinToString(",")) },
+                colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = androidx.compose.ui.graphics.Color.White)
+            ) { Text("Apply") }
+        }
+    }
 }
 
 @Composable

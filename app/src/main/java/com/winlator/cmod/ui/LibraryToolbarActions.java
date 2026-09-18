@@ -8,11 +8,13 @@ import android.view.ViewGroup;
 import androidx.appcompat.view.menu.ActionMenuItemView;
 import androidx.appcompat.widget.ActionMenuView;
 import androidx.appcompat.widget.Toolbar;
+import androidx.compose.ui.platform.ComposeView;
 import androidx.fragment.app.Fragment;
 
 import com.winlator.cmod.MainActivity;
 import com.winlator.cmod.R;
 import com.winlator.cmod.ShortcutsFragment;
+import com.winlator.cmod.ui.library.LibraryOrientationMenuHost;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -65,8 +67,8 @@ public final class LibraryToolbarActions {
         MenuItem more = menu.findItem(MENU_MORE);
         if (search == null || add == null || view == null || more == null) return;
 
-        if (!(more.getActionView() instanceof OrientationOverflowView)) {
-            more.setActionView(new OrientationOverflowView(activity));
+        if (!(more.getActionView() instanceof ComposeView)) {
+            more.setActionView(LibraryOrientationMenuHost.create(activity, activity));
             more.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
             toolbar.post(() -> reorder(toolbar));
         } else {
@@ -117,7 +119,7 @@ public final class LibraryToolbarActions {
     private static View findActionView(ActionMenuView actionMenu, int itemId) {
         for (int i = 0; i < actionMenu.getChildCount(); i++) {
             View child = actionMenu.getChildAt(i);
-            if (itemId == MENU_MORE && child instanceof OrientationOverflowView) return child;
+            if (itemId == MENU_MORE && child instanceof ComposeView) return child;
             if (child instanceof ActionMenuItemView) {
                 ActionMenuItemView itemView = (ActionMenuItemView) child;
                 if (itemView.getItemData() != null && itemView.getItemData().getItemId() == itemId) {

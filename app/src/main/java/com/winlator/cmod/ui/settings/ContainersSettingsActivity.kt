@@ -36,6 +36,7 @@ import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -77,6 +78,7 @@ import com.winlator.cmod.ui.applyAppFullscreen
 import com.winlator.cmod.ui.container.ContainerCreateComposeFragment
 import com.winlator.cmod.ui.theme.WinZTheme
 import com.winlator.cmod.ui.theme.controlAccentColor
+import com.winlator.cmod.ui.theme.ThemedDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -390,56 +392,63 @@ private fun ContainerPropertiesDialog(container: Container, onDismiss: () -> Uni
         .toInt()
         .coerceIn(0, 100)
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Outlined.Storage, null) },
-        title = { Text("Container properties") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Text(
-                    container.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                if (loading) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(vertical = 18.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp)
-                        Spacer(Modifier.width(12.dp))
-                        Text("Calculating storage…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    ThemedDialog(onDismissRequest = onDismiss) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.Storage, null)
+            Spacer(Modifier.width(10.dp))
+            Text("Container properties", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+        }
+        Spacer(Modifier.height(14.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text(
+                container.name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            if (loading) {
+                Row(
+                    Modifier.fillMaxWidth().padding(vertical = 18.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp)
+                    Spacer(Modifier.width(12.dp))
+                    Text("Calculating storage…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            } else {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        StorageValue("Drive C", driveSize)
+                        StorageValue("Cache", cacheSize)
+                        StorageValue("Total", totalSize, emphasize = true)
                     }
-                } else {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            StorageValue("Drive C", driveSize)
-                            StorageValue("Cache", cacheSize)
-                            StorageValue("Total", totalSize, emphasize = true)
-                        }
-                        Surface(
-                            modifier = Modifier.size(90.dp),
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("$usedPercent%", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-                                    Text("storage", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
+                    Surface(
+                        modifier = Modifier.size(90.dp),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("$usedPercent%", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                                Text("storage", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
                 }
             }
-        },
-        dismissButton = {
+        }
+        Spacer(Modifier.height(18.dp))
+        Row(Modifier.align(Alignment.End), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinedButton(
+                onClick = onDismiss,
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) { Text("Close") }
+            Button(
                 enabled = !clearing,
                 onClick = {
                     if (!clearing) {
@@ -455,8 +464,7 @@ private fun ContainerPropertiesDialog(container: Container, onDismiss: () -> Uni
                         }
                     }
                 },
-                colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = androidx.compose.ui.graphics.Color.White)
             ) {
                 if (clearing) {
                     CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
@@ -466,15 +474,8 @@ private fun ContainerPropertiesDialog(container: Container, onDismiss: () -> Uni
                     Text("Clear cache")
                 }
             }
-        },
-        confirmButton = {
-            OutlinedButton(
-                onClick = onDismiss,
-                colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-            ) { Text("Close") }
         }
-    )
+    }
 }
 
 @Composable

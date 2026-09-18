@@ -7,6 +7,11 @@ import android.content.ContextWrapper
 import android.content.res.ColorStateList
 import android.view.View
 import androidx.appcompat.widget.Toolbar
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
@@ -20,6 +25,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -30,6 +36,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -132,6 +139,28 @@ fun accentSwitchColors(): SwitchColors {
         uncheckedTrackColor = trackOff,
         uncheckedBorderColor = trackOff
     )
+}
+
+// Shared dialog shell for the whole app: same transparent surface + outline border as
+// every unified list/card (GroupCard, the Box64/FEX preset sheet, etc). Use this instead
+// of the stock Material3 AlertDialog, which defaults to a different (opaque, borderless)
+// surfaceContainerHigh look that doesn't match the rest of the app.
+@Composable
+fun ThemedDialog(
+    onDismissRequest: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Dialog(onDismissRequest = onDismissRequest) {
+        Surface(
+            modifier = modifier.widthIn(min = 280.dp, max = 420.dp),
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Column(Modifier.padding(20.dp), content = content)
+        }
+    }
 }
 
 private val AmoledColors = darkColorScheme(

@@ -72,6 +72,7 @@ import com.winlator.cmod.R
 import com.winlator.cmod.container.ContainerManager
 import com.winlator.cmod.ui.theme.WinZTheme
 import com.winlator.cmod.ui.theme.controlAccentColor
+import com.winlator.cmod.ui.theme.ThemedDialog
 import com.winlator.cmod.ui.theme.accentSwitchColors
 import com.winlator.cmod.winhandler.WinHandler
 
@@ -301,9 +302,20 @@ private fun AdvancedEnvironmentPage(rows: MutableList<AdvancedEnvEntry>) {
     if (addOpen) {
         var name by remember { mutableStateOf("") }
         var value by remember { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = { addOpen = false },
-            confirmButton = {
+        ThemedDialog(onDismissRequest = { addOpen = false }) {
+            Text("Add environment variable", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(14.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true)
+                OutlinedTextField(value, { value = it }, label = { Text("Value") }, singleLine = true)
+            }
+            Spacer(Modifier.height(18.dp))
+            Row(Modifier.align(Alignment.End), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(
+                    onClick = { addOpen = false },
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) { Text("Cancel") }
                 Button(
                     onClick = {
                         val clean = name.trim().replace(" ", "")
@@ -312,22 +324,8 @@ private fun AdvancedEnvironmentPage(rows: MutableList<AdvancedEnvEntry>) {
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
                 ) { Text("Add") }
-            },
-            dismissButton = {
-                OutlinedButton(
-                    onClick = { addOpen = false },
-                    colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                ) { Text("Cancel") }
-            },
-            title = { Text("Add environment variable") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                    OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true)
-                    OutlinedTextField(value, { value = it }, label = { Text("Value") }, singleLine = true)
-                }
             }
-        )
+        }
     }
 }
 
@@ -530,28 +528,38 @@ private fun AdvancedMultiChoice(selected: String, entries: List<String>, onSelec
         val draft = remember(selected, open) {
             mutableStateListOf<String>().apply { addAll(selected.split(',').map { it.trim() }.filter { it.isNotEmpty() }) }
         }
-        AlertDialog(
-            onDismissRequest = { open = false },
-            confirmButton = { TextButton(onClick = { onSelected(draft.joinToString(",")); open = false }) { Text("Done") } },
-            dismissButton = { TextButton(onClick = { open = false }) { Text("Cancel") } },
-            text = {
-                LazyColumn(Modifier.heightIn(max = 430.dp)) {
-                    items(entries) { option ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Checkbox(
-                                checked = option in draft,
-                                onCheckedChange = { enabled -> if (enabled) { if (option !in draft) draft.add(option) } else draft.remove(option) },
-                                colors = CheckboxDefaults.colors(checkedColor = controlAccentColor())
-                            )
-                            Text(option, modifier = Modifier.weight(1f))
-                        }
+        ThemedDialog(onDismissRequest = { open = false }) {
+            Text("Select values", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(12.dp))
+            val accent = controlAccentColor()
+            LazyColumn(Modifier.heightIn(max = 430.dp)) {
+                items(entries) { option ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = option in draft,
+                            onCheckedChange = { enabled -> if (enabled) { if (option !in draft) draft.add(option) } else draft.remove(option) },
+                            colors = CheckboxDefaults.colors(checkedColor = accent)
+                        )
+                        Text(option, modifier = Modifier.weight(1f))
                     }
                 }
             }
-        )
+            Spacer(Modifier.height(16.dp))
+            Row(Modifier.align(Alignment.End), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(
+                    onClick = { open = false },
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) { Text("Cancel") }
+                Button(
+                    onClick = { onSelected(draft.joinToString(",")); open = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = Color.White)
+                ) { Text("Done") }
+            }
+        }
     }
 }
 
