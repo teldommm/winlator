@@ -715,8 +715,8 @@ private fun ChoiceSetting(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 8.dp).padding(bottom = 10.dp)
                 )
+                val accent = controlAccentColor()
                 LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
-                    val accent = controlAccentColor()
                     items(entries.toList(), key = { it }) { value ->
                         val installed = installedEntries.any { it.equals(value, ignoreCase = true) }
                                 || value.equals(selected, ignoreCase = true)
