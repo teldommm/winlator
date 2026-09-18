@@ -155,9 +155,16 @@ class ContainersSettingsActivity : AppCompatActivity() {
     private fun duplicateContainer(id: Int) {
         val manager = ContainerManager(this)
         val container = manager.getContainerById(id) ?: return
-        manager.duplicateContainerAsync(container) {
-            refresh()
-            Toast.makeText(this, "Container duplicated", Toast.LENGTH_SHORT).show()
+        ThemedAlertHost.confirm(
+            this,
+            "Duplicate container?",
+            "A copy of ${container.name} and its container files will be created.",
+            "Duplicate"
+        ) {
+            manager.duplicateContainerAsync(container) {
+                refresh()
+                Toast.makeText(this, "Container duplicated", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 

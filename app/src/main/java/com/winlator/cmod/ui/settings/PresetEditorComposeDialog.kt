@@ -5,7 +5,6 @@ import android.content.Context
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.view.ViewGroup
-import android.view.WindowManager
 import androidx.activity.ComponentDialog
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -30,12 +29,14 @@ import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.HelpOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -56,7 +57,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.R
-import com.winlator.cmod.ui.theme.WinZTheme
+import com.winlator.cmod.ui.theme.WinZOverlayTheme
 import com.winlator.cmod.ui.theme.controlAccentColor
 import com.winlator.cmod.ui.theme.accentSwitchColors
 
@@ -87,7 +88,7 @@ object PresetEditorComposeDialog {
         val composeView = ComposeView(context).apply {
             setBackgroundColor(Color.TRANSPARENT)
             setContent {
-                WinZTheme {
+                WinZOverlayTheme {
                     PresetEditorScreen(
                         title = title,
                         initialName = initialName,
@@ -105,8 +106,6 @@ object PresetEditorComposeDialog {
         dialog.setContentView(composeView)
         dialog.window?.apply {
             setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-            addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-            attributes = attributes.apply { dimAmount = 0.76f }
         }
         dialog.setOnShowListener {
             dialog.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
@@ -135,11 +134,11 @@ private fun PresetEditorScreen(
     var helpText by remember { mutableStateOf<String?>(null) }
 
     Box(
-        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.12f)).padding(18.dp),
+        modifier = Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.5f)).padding(18.dp),
         contentAlignment = Alignment.Center
     ) {
         Surface(
-            modifier = Modifier.fillMaxWidth().widthIn(max = 560.dp).heightIn(max = 760.dp),
+            modifier = Modifier.fillMaxWidth().widthIn(max = 440.dp).heightIn(max = 540.dp),
             shape = RoundedCornerShape(14.dp),
             color = MaterialTheme.colorScheme.surface,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
@@ -198,14 +197,20 @@ private fun PresetEditorScreen(
                     modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    TextButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Cancel") }
+                    OutlinedButton(
+                        onClick = onCancel,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) { Text("Cancel") }
                     Button(
                         onClick = {
                             val cleanName = name.trim().replace(Regex("[,|]+"), "")
                             if (cleanName.isNotEmpty()) onSave(cleanName, values.toMap())
                         },
                         enabled = !readOnly && name.isNotBlank(),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = androidx.compose.ui.graphics.Color.White)
                     ) { Text("Save") }
                 }
             }

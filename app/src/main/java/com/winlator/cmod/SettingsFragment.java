@@ -61,6 +61,7 @@ import com.winlator.cmod.inputcontrols.ExternalController;
 import com.winlator.cmod.midi.MidiManager;
 import com.winlator.cmod.widget.InputControlsView;
 import com.winlator.cmod.xenvironment.ImageFsInstaller;
+import com.winlator.cmod.ui.ThemedAlertHost;
 import com.winlator.cmod.ui.settings.SettingChoice;
 import com.winlator.cmod.ui.settings.SettingsCallbacks;
 import com.winlator.cmod.ui.settings.SettingsComposeHost;
@@ -630,11 +631,17 @@ public class SettingsFragment extends Fragment {
                         }
                         break;
                     case "duplicate":
-                        ContentDialog.confirm(context, R.string.do_you_want_to_duplicate_this_preset, () -> {
-                            if (box64) Box64PresetManager.duplicatePreset("box64", context, id);
-                            else FEXCorePresetManager.duplicatePreset(context, id);
-                            refreshCompose();
-                        });
+                        ThemedAlertHost.confirm(
+                                (AppCompatActivity) requireActivity(),
+                                "Clone Preset",
+                                "Do you want to duplicate this preset?",
+                                "Clone",
+                                () -> {
+                                    if (box64) Box64PresetManager.duplicatePreset("box64", context, id);
+                                    else FEXCorePresetManager.duplicatePreset(context, id);
+                                    refreshCompose();
+                                }
+                        );
                         break;
                     case "remove":
                         boolean custom = box64
@@ -644,20 +651,26 @@ public class SettingsFragment extends Fragment {
                             AppUtils.showToast(context, R.string.you_cannot_remove_this_preset);
                             return;
                         }
-                        ContentDialog.confirm(context, R.string.do_you_want_to_remove_this_preset, () -> {
-                            if (box64) {
-                                Box64PresetManager.removePreset("box64", context, id);
-                                if (id.equals(preferences.getString("box64_preset", ""))) {
-                                    preferences.edit().putString("box64_preset", Box64Preset.COMPATIBILITY).apply();
+                        ThemedAlertHost.confirm(
+                                (AppCompatActivity) requireActivity(),
+                                "Remove Preset",
+                                "Do you want to remove this preset?",
+                                "Remove",
+                                () -> {
+                                    if (box64) {
+                                        Box64PresetManager.removePreset("box64", context, id);
+                                        if (id.equals(preferences.getString("box64_preset", ""))) {
+                                            preferences.edit().putString("box64_preset", Box64Preset.COMPATIBILITY).apply();
+                                        }
+                                    } else {
+                                        FEXCorePresetManager.removePreset(context, id);
+                                        if (id.equals(preferences.getString("fexcore_preset", ""))) {
+                                            preferences.edit().putString("fexcore_preset", FEXCorePreset.COMPATIBILITY).apply();
+                                        }
+                                    }
+                                    refreshCompose();
                                 }
-                            } else {
-                                FEXCorePresetManager.removePreset(context, id);
-                                if (id.equals(preferences.getString("fexcore_preset", ""))) {
-                                    preferences.edit().putString("fexcore_preset", FEXCorePreset.COMPATIBILITY).apply();
-                                }
-                            }
-                            refreshCompose();
-                        });
+                        );
                         break;
                     case "import":
                         openFile(box64 ? REQUEST_CODE_IMPORT_BOX64_PRESET : REQUEST_CODE_IMPORT_FEXCORE_PRESET);
