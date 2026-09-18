@@ -28,7 +28,7 @@ import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.ui.theme.ThemedDialogSurface
-import com.winlator.cmod.ui.theme.WinZTheme
+import com.winlator.cmod.ui.theme.WinZOverlayTheme
 import com.winlator.cmod.ui.theme.controlAccentColor
 
 // Native bridge so plain Java call sites (component/driver/runtime delete confirmations,
@@ -75,7 +75,7 @@ object ThemedAlertHost {
         composeView = ComposeView(activity).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
-                WinZTheme {
+                WinZOverlayTheme {
                     val dismiss: () -> Unit = { root.removeView(composeView) }
                     Box(
                         modifier = Modifier

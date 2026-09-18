@@ -279,6 +279,20 @@ fun WinlatorTheme(content: @Composable () -> Unit) {
 @Composable
 fun WinZTheme(content: @Composable () -> Unit) = WinlatorTheme(content)
 
+// Lightweight variant for floating overlays added directly into an existing screen
+// (see AboutDialogHost / ThemedAlertHost): gives the same color scheme/typography/shapes
+// as WinZTheme, but skips the opaque full-screen Surface, system-bar and focus setup that
+// WinlatorTheme applies for full-screen hosts — those would paint over/hide the screen
+// the overlay is meant to float on top of.
+@Composable
+fun WinZOverlayTheme(content: @Composable () -> Unit) {
+    val theme = WinlatorThemeManager.currentTheme()
+    val colors = winlatorColorScheme(theme)
+    MaterialTheme(colorScheme = colors, typography = WinlatorTypography, shapes = WinlatorShapes) {
+        content()
+    }
+}
+
 @Composable
 private fun ConfigureComposeHostFocus() {
     val owner = LocalView.current

@@ -1,6 +1,8 @@
 package com.winlator.cmod.ui
 
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.view.ViewGroup
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -31,10 +33,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.ViewCompositionStrategy
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
@@ -45,9 +47,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.winlator.cmod.MainActivity
 import com.winlator.cmod.R
-import com.winlator.cmod.ui.theme.WinZTheme
+import com.winlator.cmod.ui.theme.WinZOverlayTheme
 import com.winlator.cmod.ui.theme.controlAccentColor
 
 // Native bridge so any Java call site (nav-drawer "About" item, Settings row) shows
@@ -65,7 +68,7 @@ object AboutDialogHost {
         composeView = ComposeView(activity).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
-                WinZTheme {
+                WinZOverlayTheme {
                     val dismiss: () -> Unit = { root.removeView(composeView) }
                     Box(
                         modifier = Modifier
@@ -120,7 +123,16 @@ private fun AboutDialogContent(onDismiss: () -> Unit) {
                     )
                 }
                 Spacer(Modifier.width(12.dp))
-                Image(painterResource(R.mipmap.ic_launcher), null, Modifier.size(56.dp))
+                val appIcon = remember {
+                    val drawable = ContextCompat.getDrawable(context, R.mipmap.ic_launcher)
+                    val size = 108
+                    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+                    val canvas = Canvas(bitmap)
+                    drawable?.setBounds(0, 0, size, size)
+                    drawable?.draw(canvas)
+                    bitmap.asImageBitmap()
+                }
+                Image(appIcon, null, Modifier.size(56.dp))
             }
 
             HorizontalDivider(Modifier.padding(vertical = 14.dp), color = MaterialTheme.colorScheme.outlineVariant)
