@@ -2,6 +2,7 @@ package com.winlator.cmod.xenvironment;
 
 import android.content.Context;
 import android.os.SystemClock;
+import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -138,7 +139,7 @@ public abstract class ImageFsInstaller {
                 FileUtils.symlink("libSDL2-2.0.so", new File(imageFs.getLibDir(), "libSDL2-2.0.so.0").getAbsolutePath());
                 resetContainerImgVersions(activity);
             }
-            else AppUtils.showToast(activity, R.string.unable_to_install_system_files);
+            else Toast.makeText(activity, "Unable to install system files", Toast.LENGTH_SHORT).show();
             
             dialog.closeOnUiThread();
             activity.runOnUiThread(() -> {if (callback != null) callback.call();});
@@ -191,7 +192,7 @@ public abstract class ImageFsInstaller {
                         new File(imageFs.getLibDir(), "libSDL2-2.0.so.0").getAbsolutePath());
                 resetContainerImgVersions(activity);
             } else {
-                AppUtils.showToast(activity, R.string.unable_to_install_system_files);
+                Toast.makeText(activity, "Unable to install system files", Toast.LENGTH_SHORT).show();
             }
 
             final boolean completed = success;

@@ -6,12 +6,12 @@ import android.net.Uri;
 import android.widget.ArrayAdapter;
 import android.widget.Spinner;
 import android.widget.SpinnerAdapter;
+import android.widget.Toast;
 
 import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.SettingsFragment;
-import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
 
@@ -217,9 +217,9 @@ public class FEXCorePresetManager {
             }
         }
         if (presetFile != null && presetFile.exists())
-            AppUtils.showToast(context, "Preset " + presetFile.getName() + " exported successfully at " + presetFile.getParentFile().getPath());
+            Toast.makeText(context, "Preset " + presetFile.getName() + " exported successfully at " + presetFile.getParentFile().getPath(), Toast.LENGTH_LONG).show();
         else
-            AppUtils.showToast(context, "Failed to export preset");
+            Toast.makeText(context, "Failed to export preset", Toast.LENGTH_SHORT).show();
     }
 
     public static void importPreset(Context context, InputStream stream) {

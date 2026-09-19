@@ -12,6 +12,7 @@ import android.util.Log;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.io.File;
 import java.io.IOException;
@@ -74,7 +75,7 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
         profile = InputControlsManager.loadProfile(this, ControlsProfile.getProfileFile(this, getIntent().getIntExtra("profile_id", 0)));
         if (profile == null) {
             Log.e("ControlsEditor", "Profile not found for id=" + getIntent().getIntExtra("profile_id", 0));
-            AppUtils.showToast(this, R.string.no_profile_selected);
+            Toast.makeText(this, "No profile selected", Toast.LENGTH_SHORT).show();
             finish();
             return;
         }
@@ -111,12 +112,12 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
         switch (v.getId()) {
             case R.id.BTAddElement:
                 if (!inputControlsView.addElement()) {
-                    AppUtils.showToast(this, R.string.no_profile_selected);
+                    Toast.makeText(this, "No profile selected", Toast.LENGTH_SHORT).show();
                 }
                 break;
             case R.id.BTRemoveElement:
                 if (!inputControlsView.removeElement()) {
-                    AppUtils.showToast(this, R.string.no_control_element_selected);
+                    Toast.makeText(this, "No control element selected", Toast.LENGTH_SHORT).show();
                 }
                 break;
             case R.id.BTElementSettings:
@@ -124,7 +125,7 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
                 if (selectedElement != null) {
                     showControlElementSettings();
                 }
-                else AppUtils.showToast(this, R.string.no_control_element_selected);
+                else Toast.makeText(this, "No control element selected", Toast.LENGTH_SHORT).show();
                 break;
             case R.id.BTSchemeColor:
                 showSchemeColorPicker();
@@ -570,7 +571,7 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
                 if (loaded == null) {
                     dest.delete();
                     Log.w("Icons", "Picked file is not a valid image or could not be decoded: " + uri);
-                    AppUtils.showToast(this, R.string.unable_to_set_icon);
+                    Toast.makeText(this, "Unable to set icon", Toast.LENGTH_SHORT).show();
                     pendingIconElement = null;
                     return;
                 }
@@ -595,7 +596,7 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
                 Log.e("Icons", "Error saving picked icon: " + e.getMessage());
                 pendingIconElement = null;
                 pendingBuiltinOverrideId = -1;
-                AppUtils.showToast(this, R.string.unable_to_set_icon);
+                Toast.makeText(this, "Unable to set icon", Toast.LENGTH_SHORT).show();
             }
         }
     }

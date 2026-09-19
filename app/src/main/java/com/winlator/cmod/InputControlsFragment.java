@@ -8,6 +8,7 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -16,7 +17,6 @@ import androidx.compose.ui.platform.ComposeView;
 import androidx.fragment.app.Fragment;
 import androidx.preference.PreferenceManager;
 
-import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.HttpUtils;
@@ -121,7 +121,7 @@ public class InputControlsFragment extends Fragment {
             if (importProfileCallback != null) importProfileCallback.call(importedProfile);
         }
         catch (Exception e) {
-            AppUtils.showToast(requireContext(), R.string.unable_to_import_profile);
+            Toast.makeText(requireContext(), "Unable to import profile", Toast.LENGTH_SHORT).show();
         }
         finally {
             importProfileCallback = null;
@@ -286,7 +286,7 @@ public class InputControlsFragment extends Fragment {
     }
 
     private void showNoProfileToast() {
-        AppUtils.showToast(requireContext(), R.string.no_profile_selected);
+        Toast.makeText(requireContext(), "No profile selected", Toast.LENGTH_SHORT).show();
     }
 
     private AppCompatActivity activity() {
@@ -322,10 +322,11 @@ public class InputControlsFragment extends Fragment {
         }
         File exportedFile = manager.exportProfile(currentProfile);
         if (exportedFile != null) {
-            AppUtils.showToast(
+            Toast.makeText(
                     requireContext(),
-                    getString(R.string.profile_exported_to) + " " + exportedFile.getPath()
-            );
+                    "Profile exported to " + exportedFile.getPath(),
+                    Toast.LENGTH_LONG
+            ).show();
         }
     }
 
@@ -401,7 +402,7 @@ public class InputControlsFragment extends Fragment {
                 activity.runOnUiThread(() -> {
                     activity.preloaderDialog.close();
                     if (content == null) {
-                        AppUtils.showToast(activity, R.string.unable_to_load_profile_list);
+                        Toast.makeText(activity, "Unable to load profile list", Toast.LENGTH_SHORT).show();
                         return;
                     }
                     String[] items = content.split("\\n");
