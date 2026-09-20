@@ -175,13 +175,11 @@ private fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) {
     val activity = context as? MainActivity
     var confirmReinstallImageFs by remember { mutableStateOf(false) }
 
+    // See BitmapComposeCompat.LibraryRoot for why onDispose doesn't restore visibility.
     DisposableEffect(activity, landscape) {
         activity?.setBottomNavigationVisible(!landscape)
         activity?.setMainToolbarVisible(false)
-        onDispose {
-            activity?.setBottomNavigationVisible(true)
-            activity?.setMainToolbarVisible(true)
-        }
+        onDispose { }
     }
 
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {

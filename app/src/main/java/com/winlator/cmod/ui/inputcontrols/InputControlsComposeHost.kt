@@ -132,13 +132,11 @@ private fun InputControlsScreen(model: InputControlsModel, callbacks: InputContr
     val landscape = configuration.screenWidthDp > configuration.screenHeightDp
     val activity = LocalContext.current as? MainActivity
 
+    // See BitmapComposeCompat.LibraryRoot for why onDispose doesn't restore visibility.
     DisposableEffect(activity, landscape) {
         activity?.setBottomNavigationVisible(!landscape)
         activity?.setMainToolbarVisible(false)
-        onDispose {
-            activity?.setBottomNavigationVisible(true)
-            activity?.setMainToolbarVisible(true)
-        }
+        onDispose { }
     }
 
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {

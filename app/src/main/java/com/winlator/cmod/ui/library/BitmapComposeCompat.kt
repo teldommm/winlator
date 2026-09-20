@@ -114,13 +114,18 @@ internal fun LibraryRoot(
     val configuration = LocalConfiguration.current
     val landscape = configuration.screenWidthDp > configuration.screenHeightDp
     val activity = LocalContext.current as? MainActivity
+    // No restore-to-visible in onDispose: with animated fragment transitions
+    // (setCustomAnimations in MainActivity.show()), the outgoing fragment's ComposeView
+    // isn't detached — and this dispose doesn't fire — until the exit animation finishes,
+    // by which point the incoming screen has already hidden the Toolbar itself. A restore
+    // here would fire late and re-show it on top of whichever screen is now active
+    // (this was the cause of the duplicated "Library"/"Settings"/etc. header bug). Every
+    // screen that reaches this composable sets its own Toolbar/BottomNavigation state fresh
+    // on entry, so nothing needs to hand it back on the way out.
     DisposableEffect(activity, landscape) {
         activity?.setBottomNavigationVisible(!landscape)
         activity?.setMainToolbarVisible(false)
-        onDispose {
-            activity?.setBottomNavigationVisible(true)
-            activity?.setMainToolbarVisible(true)
-        }
+        onDispose { }
     }
 
     if (landscape && visible.isNotEmpty() && !grid) {
