@@ -9,6 +9,7 @@
         <item name="ingameSidebarPrimary">#23252B</item>
         <item name="ingameSidebarPrimaryContainer">#E1E3E8</item>
         <item name="ingameSidebarOutline">#9FA5B1</item>
+        <item name="ingameSidebarPanelTranslucent">#E6F5F6F8</item>
         <item name="android:textColorPrimary">#18191D</item>
         <item name="android:textColorSecondary">#60636B</item>
         <item name="android:colorAccent">#23252B</item>
@@ -26,6 +27,7 @@
         <item name="ingameSidebarPrimary">#D9DDE3</item>
         <item name="ingameSidebarPrimaryContainer">#1A1B1F</item>
         <item name="ingameSidebarOutline">#454850</item>
+        <item name="ingameSidebarPanelTranslucent">#E60A0A0D</item>
         <item name="android:textColorPrimary">#F2F2F4</item>
         <item name="android:textColorSecondary">#85878C</item>
         <item name="android:colorAccent">#D9DDE3</item>
@@ -43,6 +45,7 @@
         <item name="ingameSidebarPrimary">#EDEDED</item>
         <item name="ingameSidebarPrimaryContainer">#101010</item>
         <item name="ingameSidebarOutline">#303030</item>
+        <item name="ingameSidebarPanelTranslucent">#E6000000</item>
         <item name="android:textColorPrimary">#F7F7F7</item>
         <item name="android:textColorSecondary">#858585</item>
         <item name="android:colorAccent">#EDEDED</item>

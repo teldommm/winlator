@@ -51,6 +51,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
+import androidx.compose.ui.platform.ComposeView;
 import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.preference.PreferenceManager;
@@ -93,6 +94,8 @@ import com.winlator.cmod.math.Mathf;
 import com.winlator.cmod.math.XForm;
 import com.winlator.cmod.midi.MidiHandler;
 import com.winlator.cmod.midi.MidiManager;
+import com.winlator.cmod.ui.ScreenPanelCallbacks;
+import com.winlator.cmod.ui.ScreenSidebarPanelHost;
 import com.winlator.cmod.widget.FrameRating;
 import com.winlator.cmod.widget.SeekBar;
 import com.winlator.cmod.widget.WinlatorHUD;
@@ -186,7 +189,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private float globalCursorSpeed = 1.0f;
     private float refreshRate = 60.0f;
     private MagnifierView magnifierView;
-    private boolean softStretchEnabled = false;
     private DebugDialog debugDialog;
     private String rendererLogPath;
     private short taskAffinityMask = 0;
@@ -1568,66 +1570,60 @@ public class XServerDisplayActivity extends AppCompatActivity {
             });
         }
 
-        View btItemPipMode = findViewById(R.id.BTItemPipMode);
-        if (btItemPipMode != null) {
-            btItemPipMode.setOnClickListener(v -> {
-                enterPipMode();
-                drawerLayout.closeDrawers();
-            });
-        }
-
-        View btItemToggleFullscreen = findViewById(R.id.BTItemToggleFullscreen);
-        if (btItemToggleFullscreen != null) {
-            btItemToggleFullscreen.setOnClickListener(v -> {
-                if (xServerView != null) {
-                    xServerView.toggleFullscreen();
-                    if (touchpadView != null)
-                        touchpadView.toggleFullscreen();
+        ComposeView screenPanel = findViewById(R.id.LLSubScreen);
+        if (screenPanel != null) {
+            ScreenSidebarPanelHost.attach(screenPanel, new ScreenPanelCallbacks() {
+                @Override
+                public void onPipMode() {
+                    enterPipMode();
+                    drawerLayout.closeDrawers();
                 }
-                drawerLayout.closeDrawers();
-            });
-        }
 
-        View btItemMagnifier = findViewById(R.id.BTItemMagnifier);
-        if (btItemMagnifier != null) {
-            btItemMagnifier.setOnClickListener(v -> {
-                if (xServerView != null) {
-                    final XServerRendererView renderer = xServerView;
-                    if (magnifierView == null) {
-                        FrameLayout flContainer = findViewById(R.id.FLXServerDisplay);
-                        magnifierView = new MagnifierView(this);
-                        magnifierView.setZoomButtonCallback(value -> {
-                            renderer.setMagnifierZoom(Mathf.clamp(renderer.getMagnifierZoom() + value, 1.0f, 3.0f));
+                @Override
+                public void onToggleFullscreen() {
+                    if (xServerView != null) {
+                        xServerView.toggleFullscreen();
+                        if (touchpadView != null)
+                            touchpadView.toggleFullscreen();
+                    }
+                    drawerLayout.closeDrawers();
+                }
+
+                @Override
+                public void onMagnifier() {
+                    if (xServerView != null) {
+                        final XServerRendererView renderer = xServerView;
+                        if (magnifierView == null) {
+                            FrameLayout flContainer = findViewById(R.id.FLXServerDisplay);
+                            magnifierView = new MagnifierView(XServerDisplayActivity.this);
+                            magnifierView.setZoomButtonCallback(value -> {
+                                renderer.setMagnifierZoom(Mathf.clamp(renderer.getMagnifierZoom() + value, 1.0f, 3.0f));
+                                magnifierView.setZoomValue(renderer.getMagnifierZoom());
+                            });
                             magnifierView.setZoomValue(renderer.getMagnifierZoom());
-                        });
-                        magnifierView.setZoomValue(renderer.getMagnifierZoom());
-                        magnifierView.setHideButtonCallback(() -> {
-                            flContainer.removeView(magnifierView);
-                            magnifierView = null;
-                        });
-                        flContainer.addView(magnifierView);
+                            magnifierView.setHideButtonCallback(() -> {
+                                flContainer.removeView(magnifierView);
+                                magnifierView = null;
+                            });
+                            flContainer.addView(magnifierView);
+                        }
                     }
+                    drawerLayout.closeDrawers();
                 }
-                drawerLayout.closeDrawers();
-            });
-        }
 
-        View btItemSoftStretch = findViewById(R.id.BTItemSoftStretch);
-        if (btItemSoftStretch != null) {
-            btItemSoftStretch.setOnClickListener(v -> {
-                if (xServerView != null) {
-                    softStretchEnabled = !softStretchEnabled;
-                    XServerRendererView rendererRef = xServerView;
-
-                    if (softStretchEnabled && !rendererRef.isFullscreen()) {
-                        rendererRef.toggleFullscreen();
-                        if (touchpadView != null) touchpadView.toggleFullscreen();
+                @Override
+                public void onSoftStretch(boolean enabled) {
+                    if (xServerView != null) {
+                        XServerRendererView rendererRef = xServerView;
+                        if (enabled && !rendererRef.isFullscreen()) {
+                            rendererRef.toggleFullscreen();
+                            if (touchpadView != null) touchpadView.toggleFullscreen();
+                        }
+                        // Vulkan is the only renderer now, so rendererRef is always a VulkanXServerView.
+                        ((VulkanXServerView) rendererRef).setStretchMode(enabled ? 1 : 0);
                     }
-                    // Vulkan is the only renderer now, so rendererRef is always a VulkanXServerView.
-                    ((VulkanXServerView) rendererRef).setStretchMode(softStretchEnabled ? 1 : 0);
-                    btItemSoftStretch.setSelected(softStretchEnabled);
+                    drawerLayout.closeDrawers();
                 }
-                drawerLayout.closeDrawers();
             });
         }
 

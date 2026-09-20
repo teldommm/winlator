@@ -68,7 +68,7 @@ private fun ThemeChoiceRow(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.90f) else MaterialTheme.colorScheme.surface,
         contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(
             1.dp,
@@ -164,7 +164,7 @@ fun WinlatorThemePreferenceCard(modifier: Modifier = Modifier) {
         ModalBottomSheet(
             onDismissRequest = { expanded = false },
             sheetState = sheetState,
-            containerColor = MaterialTheme.colorScheme.background,
+            containerColor = MaterialTheme.colorScheme.surface,
             tonalElevation = 0.dp
         ) {
             Column(

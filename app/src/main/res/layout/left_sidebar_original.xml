@@ -4,7 +4,9 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="horizontal"
-    android:background="#000000">
+    android:background="@android:color/transparent"
+    android:clipChildren="false"
+    android:clipToPadding="false">
 
     <LinearLayout
         android:layout_width="64dp"
@@ -160,7 +162,12 @@
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_weight="1"
-        android:background="#000000"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginEnd="10dp"
+        android:layout_marginBottom="10dp"
+        android:background="@drawable/sidebar_panel_bg"
+        android:elevation="8dp"
         android:paddingStart="18dp"
         android:paddingEnd="20dp"
         android:paddingTop="18dp"
@@ -490,97 +497,11 @@
             </LinearLayout>
         </ScrollView>
 
-        <ScrollView
+        <androidx.compose.ui.platform.ComposeView
             android:id="@+id/LLSubScreen"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:visibility="gone"
-            android:scrollbars="none">
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical">
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Display and Effects"
-                    android:textColor="#FFFFFF"
-                    android:textSize="24sp"
-                    android:textStyle="bold" />
-                <LinearLayout
-                    android:id="@+id/BTItemPipMode"
-                    android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:layout_marginTop="18dp"
-                    android:gravity="center_vertical"
-                    android:background="@drawable/sidebar_card"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:clickable="true"
-                    android:focusable="true">
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Picture in Picture"
-                        android:textColor="#FFFFFF"
-                        android:textSize="15sp" />
-                </LinearLayout>
-                <LinearLayout
-                    android:id="@+id/BTItemToggleFullscreen"
-                    android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:layout_marginTop="10dp"
-                    android:gravity="center_vertical"
-                    android:background="@drawable/sidebar_card"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:clickable="true"
-                    android:focusable="true">
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Toggle Fullscreen"
-                        android:textColor="#FFFFFF"
-                        android:textSize="15sp" />
-                </LinearLayout>
-                <LinearLayout
-                    android:id="@+id/BTItemMagnifier"
-                    android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:layout_marginTop="10dp"
-                    android:gravity="center_vertical"
-                    android:background="@drawable/sidebar_card"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:clickable="true"
-                    android:focusable="true">
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Magnifier"
-                        android:textColor="#FFFFFF"
-                        android:textSize="15sp" />
-                </LinearLayout>
-                <LinearLayout
-                    android:id="@+id/BTItemSoftStretch"
-                    android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:layout_marginTop="10dp"
-                    android:gravity="center_vertical"
-                    android:background="@drawable/sidebar_card"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:clickable="true"
-                    android:focusable="true">
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Soft Stretch"
-                        android:textColor="#FFFFFF"
-                        android:textSize="15sp" />
-                </LinearLayout>
-            </LinearLayout>
-        </ScrollView>
+            android:visibility="gone" />
 
         <ScrollView
             android:id="@+id/LLSubInput"

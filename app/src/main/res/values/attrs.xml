@@ -31,4 +31,5 @@
     <attr name="ingameSidebarPrimary" format="color" />
     <attr name="ingameSidebarPrimaryContainer" format="color" />
     <attr name="ingameSidebarOutline" format="color" />
+    <attr name="ingameSidebarPanelTranslucent" format="color" />
 </resources>

@@ -13,10 +13,10 @@
 
     <ScrollView
         android:id="@+id/SidebarScrollView"
-        android:layout_width="320dp"
+        android:layout_width="344dp"
         android:layout_height="match_parent"
         android:layout_gravity="start"
-        android:background="@color/ingame_sidebar_background"
+        android:background="@android:color/transparent"
         android:scrollbars="none"
         android:fillViewport="true">
 

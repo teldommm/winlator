@@ -65,10 +65,16 @@ public class IngameSidebarThemeLayout extends FrameLayout {
     protected void onFinishInflate() {
         super.onFinishInflate();
         readPalette();
-        setBackgroundColor(background);
+        setBackgroundColor(Color.TRANSPARENT);
 
         if (getChildCount() > 1 && getChildAt(1) instanceof ViewGroup) {
             ViewGroup legacyRoot = (ViewGroup) getChildAt(1);
+            // legacyRoot itself used to be one big opaque rectangle spanning the whole
+            // sidebar width (the "solid slab" behind both the rail and the content).
+            // The rail now paints its own floating pill and the content panel paints its
+            // own floating rounded card (see sidebar_panel_bg), so this wrapper is left
+            // transparent to show the game through the gap between them and the margins.
+            legacyRoot.setBackgroundColor(Color.TRANSPARENT);
             if (legacyRoot.getChildCount() >= 3) {
                 legacyRoot.getChildAt(0).setVisibility(View.GONE);
                 legacyRoot.getChildAt(1).setVisibility(View.GONE);
