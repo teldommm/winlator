@@ -33,10 +33,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
-import android.widget.CheckBox;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.Switch;
 import android.widget.TextView;
@@ -94,8 +92,19 @@ import com.winlator.cmod.math.Mathf;
 import com.winlator.cmod.math.XForm;
 import com.winlator.cmod.midi.MidiHandler;
 import com.winlator.cmod.midi.MidiManager;
+import com.winlator.cmod.ui.HudPanelCallbacks;
+import com.winlator.cmod.ui.HudPanelState;
+import com.winlator.cmod.ui.HudSidebarPanelHost;
+import com.winlator.cmod.ui.InputPanelCallbacks;
+import com.winlator.cmod.ui.InputPanelState;
+import com.winlator.cmod.ui.InputProfileOption;
+import com.winlator.cmod.ui.InputSidebarPanelHost;
 import com.winlator.cmod.ui.ScreenPanelCallbacks;
 import com.winlator.cmod.ui.ScreenSidebarPanelHost;
+import com.winlator.cmod.ui.TaskManagerCallbacks;
+import com.winlator.cmod.ui.TaskManagerPanelHost;
+import com.winlator.cmod.ui.TaskManagerPanelState;
+import com.winlator.cmod.ui.ThemedAlertHost;
 import com.winlator.cmod.widget.FrameRating;
 import com.winlator.cmod.widget.SeekBar;
 import com.winlator.cmod.widget.WinlatorHUD;
@@ -106,6 +115,7 @@ import com.winlator.cmod.widget.TouchpadView;
 import com.winlator.cmod.widget.XServerRendererView;
 import com.winlator.cmod.widget.VulkanXServerView;
 import com.winlator.cmod.winhandler.MouseEventFlags;
+import com.winlator.cmod.winhandler.ProcessInfo;
 import com.winlator.cmod.winhandler.TaskManagerSidebar;
 import com.winlator.cmod.winhandler.WinHandler;
 import com.winlator.cmod.xconnector.UnixSocketConfig;
@@ -137,8 +147,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
@@ -167,6 +179,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private FrameRating classicHud = null;
     private WinlatorHUD modernHud = null;
     private Runnable editInputControlsCallback;
+    private Runnable refreshInputPanel;
     private Shortcut shortcut;
     private int activeLsfgMultiplier;
     private java.io.File activeLsfgDll;
@@ -959,7 +972,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             initiallyChecked.add(winHandler.isVibrationEnabledForSlot(i));
         }
 
-        com.winlator.cmod.ui.ThemedAlertHost.multiChoice(
+        ThemedAlertHost.multiChoice(
                 this,
                 getString(R.string.vibration),
                 items,
@@ -1505,10 +1518,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     private void wireSidebarListeners(boolean enableLogs) {
 
-        View btItemLogs = findViewById(R.id.BTItemLogs);
-        if (btItemLogs != null)
-            btItemLogs.setVisibility(enableLogs ? View.VISIBLE : View.GONE);
-
         toggleOnClick(R.id.BTItemInput, R.id.LLSubInput);
         toggleOnClick(R.id.BTItemMouse, R.id.LLSubMouse);
         toggleOnClick(R.id.BTItemFPS, R.id.LLSubFPS);
@@ -1532,43 +1541,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
             });
         }
 
-        View btSubKeyboard = findViewById(R.id.BTSubKeyboard);
-        if (btSubKeyboard != null) {
-            btSubKeyboard.setOnClickListener(v -> {
-                AppUtils.showKeyboard(this);
-                drawerLayout.closeDrawers();
-            });
-        }
-
         setupSidebarInputControls();
 
-        View btSubVibration = findViewById(R.id.BTSubVibration);
-        if (btSubVibration != null) {
-            btSubVibration.setOnClickListener(v -> {
-                showVibrationDialog();
-                drawerLayout.closeDrawers();
-            });
-        }
-
-        Switch swRelativeMouse = findViewById(R.id.SWRelativeMouse);
-        if (swRelativeMouse != null) {
-            swRelativeMouse.setChecked(isRelativeMouseMovement);
-            swRelativeMouse.setOnCheckedChangeListener((btn, checked) -> {
-                isRelativeMouseMovement = checked;
-                if (xServer != null)
-                    xServer.setRelativeMouseMovement(isRelativeMouseMovement);
-            });
-        }
-
-        Switch swDisableMouse = findViewById(R.id.SWDisableMouse);
-        if (swDisableMouse != null) {
-            swDisableMouse.setChecked(isMouseDisabled);
-            swDisableMouse.setOnCheckedChangeListener((btn, checked) -> {
-                isMouseDisabled = checked;
-                if (touchpadView != null)
-                    touchpadView.setMouseEnabled(!isMouseDisabled);
-            });
-        }
 
         ComposeView screenPanel = findViewById(R.id.LLSubScreen);
         if (screenPanel != null) {
@@ -1627,24 +1601,64 @@ public class XServerDisplayActivity extends AppCompatActivity {
             });
         }
 
+        ComposeView taskManagerPanel = findViewById(R.id.LLSubTaskManager);
+        if (taskManagerPanel != null) {
+            TaskManagerPanelState taskManagerState = TaskManagerPanelHost.attach(taskManagerPanel, new TaskManagerCallbacks() {
+                @Override
+                public void onNewTask() {
+                    ThemedAlertHost.prompt(XServerDisplayActivity.this, getString(R.string.new_task), "taskmgr.exe",
+                            getString(R.string.ok), command -> winHandler.exec(command));
+                }
+
+                @Override
+                public void onBringToFront(int pid, String name) {
+                    winHandler.bringToFront(name);
+                }
+
+                @Override
+                public void onEndProcess(int pid, String name) {
+                    ThemedAlertHost.confirm(XServerDisplayActivity.this, getString(R.string.end_process),
+                            getString(R.string.do_you_want_to_end_this_process), getString(R.string.ok),
+                            () -> winHandler.killProcess(name), true);
+                }
+
+                @Override
+                public void onProcessorAffinity(int pid, String name, int affinityMask) {
+                    // Same fallback the old dialog used: Wine's reported affinity mask is
+                    // unreliable after SetProcessAffinityMask, so prefer the Linux /proc read
+                    // whenever it returns something.
+                    String cpuList = new ProcessInfo(pid, name, 0, affinityMask, false).getCPUList();
+                    int linuxMask = ProcessHelper.getProcessAffinityMask(pid);
+                    if (linuxMask != 0) {
+                        cpuList = new ProcessInfo(pid, "", 0, linuxMask, false).getCPUList();
+                    }
+
+                    int numProcessors = Runtime.getRuntime().availableProcessors();
+                    List<String> checkedCpus = Arrays.asList(cpuList.split(","));
+                    List<String> entries = new ArrayList<>();
+                    List<Boolean> initiallyChecked = new ArrayList<>();
+                    for (int i = 0; i < numProcessors; i++) {
+                        entries.add("CPU" + i);
+                        initiallyChecked.add(checkedCpus.contains(String.valueOf(i)));
+                    }
+
+                    ThemedAlertHost.multiChoice(XServerDisplayActivity.this, getString(R.string.processor_affinity),
+                            entries, getString(R.string.ok), positions -> {
+                                int mask = 0;
+                                for (int position : positions) mask |= (1 << position);
+                                winHandler.setProcessAffinity(pid, mask);
+                                if (taskManagerSidebar != null) taskManagerSidebar.updateNow();
+                            }, initiallyChecked);
+                }
+            });
+            taskManagerSidebar = new TaskManagerSidebar(this, taskManagerState);
+        }
+
         View btItemTaskManager = findViewById(R.id.BTItemTaskManager);
         if (btItemTaskManager != null) {
             btItemTaskManager.setOnClickListener(v -> {
                 openSidebarPanel(R.id.BTItemTaskManager, R.id.LLSubTaskManager);
-                View taskPanel = findViewById(R.id.LLSubTaskManager);
-                if (taskPanel != null) {
-                    if (taskManagerSidebar == null)
-                        taskManagerSidebar = new TaskManagerSidebar(this, taskPanel);
-                    taskManagerSidebar.start();
-                }
-            });
-        }
-
-        if (btItemLogs != null) {
-            btItemLogs.setOnClickListener(v -> {
-                if (debugDialog != null)
-                    debugDialog.show();
-                drawerLayout.closeDrawers();
+                if (taskManagerSidebar != null) taskManagerSidebar.start();
             });
         }
 
@@ -1757,20 +1771,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     private void setupSidebarHudControls() {
-        Switch       swHudMaster     = findViewById(R.id.SWHudMaster);
-        Spinner      spHudStyle      = findViewById(R.id.SPHudStyle);
-        LinearLayout llHudStyleRow   = findViewById(R.id.LLHudStyleRow);
-        LinearLayout llModernOptions = findViewById(R.id.LLModernHudOptions);
-        CheckBox     cbFps           = findViewById(R.id.CBHudFps);
-        CheckBox     cbGpu           = findViewById(R.id.CBHudGpu);
-        CheckBox     cbCpuRam        = findViewById(R.id.CBHudCpuRam);
-        CheckBox     cbRam           = findViewById(R.id.CBHudRam);
-        CheckBox     cbBattTemp      = findViewById(R.id.CBHudBattTemp);
-        CheckBox     cbGraph         = findViewById(R.id.CBHudGraph);
-        CheckBox     cbRenderer      = findViewById(R.id.CBHudRenderer);
-        SeekBar      sbScale         = findViewById(R.id.SBHudScale);
-        SeekBar      sbAlpha         = findViewById(R.id.SBHudAlpha);
-        View         btResetHud      = findViewById(R.id.BTResetHud);
+        ComposeView hudPanel = findViewById(R.id.LLSubFPS);
+        if (hudPanel == null) return;
+
+        boolean enableLogs = preferences.getBoolean("enable_wine_debug", false)
+                || preferences.getBoolean("enable_box64_logs", false);
 
         int currentMode = 0;
         if      (modernHud  != null) currentMode = 2;
@@ -1784,78 +1789,53 @@ public class XServerDisplayActivity extends AppCompatActivity {
         boolean hudOn    = currentMode != 0;
         boolean isModern = currentMode == 2;
 
-        if (spHudStyle != null) {
-            ArrayAdapter<String> styleAdapter = createSidebarSpinnerAdapter(new String[]{"Classic", "Modern"});
-            styleAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-            spHudStyle.setAdapter(styleAdapter);
-            spHudStyle.setSelection(isModern ? 1 : 0, false);
-        }
-        if (llHudStyleRow  != null) llHudStyleRow.setVisibility(hudOn ? View.VISIBLE : View.GONE);
-        if (llModernOptions != null) llModernOptions.setVisibility(isModern ? View.VISIBLE : View.GONE);
-
-        if (modernHud != null) {
-            modernHud.syncCheckboxes(cbFps, cbGpu, cbCpuRam, cbBattTemp, cbGraph, cbRenderer);
-            if (cbRam != null) cbRam.setChecked(true);
-            bindModernHudCheckboxes(cbFps, cbGpu, cbCpuRam, cbRam, cbBattTemp, cbRenderer);
-        }
-        if (sbScale != null) sbScale.setOnValueChangeListener((sb, v) -> {
-            if (modernHud != null) modernHud.setHudScale(1f + (v - 50f) / 50f);
-        });
-        if (sbAlpha != null) sbAlpha.setOnValueChangeListener((sb, v) -> {
-            if (modernHud != null) modernHud.setHudAlpha(v / 100f);
-        });
-        if (btResetHud != null) btResetHud.setOnClickListener(v -> {
-            if (modernHud != null) modernHud.forceReset();
-        });
-
-        if (swHudMaster != null) {
-            swHudMaster.setChecked(hudOn);
-            swHudMaster.setOnCheckedChangeListener((btn, checked) -> {
-                int style = resolveSelectedStyle(spHudStyle);
-                if (checked) {
+        HudPanelCallbacks callbacks = new HudPanelCallbacks() {
+            @Override
+            public void onHudMasterToggled(boolean enabled, boolean styleIsModern) {
+                if (enabled) {
+                    int style = styleIsModern ? 2 : 1;
                     enableHudLazily(style);
-                    if (llHudStyleRow  != null) llHudStyleRow.setVisibility(View.VISIBLE);
-                    if (llModernOptions != null)
-                        llModernOptions.setVisibility(style == 2 ? View.VISIBLE : View.GONE);
-                    if (style == 2 && modernHud != null) {
-                        modernHud.syncCheckboxes(cbFps, cbGpu, cbCpuRam, cbBattTemp, cbGraph, cbRenderer);
-                        if (cbRam != null) cbRam.setChecked(true);
-                        bindModernHudCheckboxes(cbFps, cbGpu, cbCpuRam, cbRam, cbBattTemp, cbRenderer);
-                    }
                     saveHudModeToContainer(style);
                 } else {
                     if (classicHud != null) classicHud.disableByUser();
                     if (modernHud  != null) modernHud.disableByUser();
-                    if (llHudStyleRow  != null) llHudStyleRow.setVisibility(View.GONE);
-                    if (llModernOptions != null) llModernOptions.setVisibility(View.GONE);
                     saveHudModeToContainer(0);
                 }
-            });
-        }
+            }
 
-        if (spHudStyle != null) {
-            spHudStyle.post(() -> spHudStyle.setOnItemSelectedListener(
-                new AdapterView.OnItemSelectedListener() {
-                    @Override
-                    public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
-                        if (swHudMaster == null || !swHudMaster.isChecked()) return;
-                        int newStyle = (pos == 1) ? 2 : 1;
-                        if (classicHud != null) classicHud.disableByUser(false);
-                        if (modernHud  != null) modernHud.disableByUser(false);
-                        enableHudLazily(newStyle);
-                        if (llModernOptions != null)
-                            llModernOptions.setVisibility(newStyle == 2 ? View.VISIBLE : View.GONE);
-                        if (newStyle == 2 && modernHud != null) {
-                            modernHud.syncCheckboxes(cbFps, cbGpu, cbCpuRam, cbBattTemp, cbGraph, cbRenderer);
-                            if (cbRam != null) cbRam.setChecked(true);
-                            bindModernHudCheckboxes(cbFps, cbGpu, cbCpuRam, cbRam, cbBattTemp, cbRenderer);
-                        }
-                        saveHudModeToContainer(newStyle);
-                    }
-                    @Override public void onNothingSelected(AdapterView<?> p) {}
-                }
-            ));
-        }
+            @Override
+            public void onStyleChanged(boolean isModern) {
+                int newStyle = isModern ? 2 : 1;
+                if (classicHud != null) classicHud.disableByUser(false);
+                if (modernHud  != null) modernHud.disableByUser(false);
+                enableHudLazily(newStyle);
+                saveHudModeToContainer(newStyle);
+            }
+
+            @Override
+            public void onHudScale(int percent) {
+                if (modernHud != null) modernHud.setHudScale(1f + (percent - 50f) / 50f);
+            }
+
+            @Override
+            public void onHudAlpha(int percent) {
+                if (modernHud != null) modernHud.setHudAlpha(percent / 100f);
+            }
+
+            @Override
+            public void onResetHud() {
+                if (modernHud != null) modernHud.forceReset();
+            }
+
+            @Override
+            public void onShowLogs() {
+                if (debugDialog != null) debugDialog.show();
+                drawerLayout.closeDrawers();
+            }
+        };
+
+        HudPanelState state = new HudPanelState(hudOn, isModern, 0, 0, enableLogs);
+        HudSidebarPanelHost.attach(hudPanel, state, callbacks);
     }
 
     private void enableHudLazily(int style) {
@@ -1895,22 +1875,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
             classicHud.enableByUser();
         }
-    }
-
-    private void bindModernHudCheckboxes(CheckBox cbFps, CheckBox cbGpu, CheckBox cbCpuRam,
-            CheckBox cbRam, CheckBox cbBattTemp, CheckBox cbRenderer) {
-        if (modernHud == null) return;
-        if (cbFps      != null) cbFps.setOnCheckedChangeListener((b, v) -> modernHud.toggleElement(0, v));
-        if (cbGpu      != null) cbGpu.setOnCheckedChangeListener((b, v) -> modernHud.toggleElement(2, v));
-        if (cbCpuRam   != null) cbCpuRam.setOnCheckedChangeListener((b, v) -> modernHud.toggleElement(3, v));
-        if (cbRam      != null) cbRam.setOnCheckedChangeListener((b, v) -> modernHud.toggleElement(7, v));
-        if (cbBattTemp != null) cbBattTemp.setOnCheckedChangeListener((b, v) -> modernHud.toggleElement(4, v));
-        if (cbRenderer != null) cbRenderer.setOnCheckedChangeListener((b, v) -> modernHud.toggleElement(6, v));
-    }
-
-    private int resolveSelectedStyle(Spinner spHudStyle) {
-        if (spHudStyle == null) return 1;
-        return spHudStyle.getSelectedItemPosition() == 1 ? 2 : 1;
     }
 
     private void saveHudModeToContainer(int mode) {
@@ -2128,116 +2092,126 @@ public class XServerDisplayActivity extends AppCompatActivity {
         private void setupSidebarInputControls() {
         if (inputControlsView == null || inputControlsManager == null) return;
 
-        Spinner spInputControlsProfile = findViewById(R.id.SPInputControlsProfile);
-        Switch swShowTouchscreenControls = findViewById(R.id.SWShowTouchscreenControls);
-        Switch swEnableTimeout = findViewById(R.id.SWEnableTouchscreenTimeout);
-        Switch swEnableHaptics = findViewById(R.id.SWEnableTouchscreenHaptics);
-        View btInputControlsSettings = findViewById(R.id.BTInputControlsSettings);
-        SeekBar sbControlsOpacity = findViewById(R.id.SBControlsOpacity);
+        ComposeView inputPanel = findViewById(R.id.LLSubInput);
+        if (inputPanel == null) return;
 
-        if (spInputControlsProfile == null)
-            return;
-
-        Runnable loadProfileSpinner = () -> {
-            ArrayList<ControlsProfile> profiles = inputControlsManager.getProfiles(true);
-            ArrayList<String> profileItems = new ArrayList<>();
-            int selectedPosition = 0;
-            profileItems.add("-- " + getString(R.string.disabled) + " --");
-            for (int i = 0; i < profiles.size(); i++) {
-                ControlsProfile profile = profiles.get(i);
-                if (inputControlsView.getProfile() != null && profile.id == inputControlsView.getProfile().id)
-                    selectedPosition = i + 1;
-                profileItems.add(profile.getName());
-            }
-
-            ArrayAdapter<String> adapter = createSidebarSpinnerAdapter(profileItems.toArray(new String[0]));
-            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-            spInputControlsProfile.setAdapter(adapter);
-            spInputControlsProfile.setSelection(selectedPosition, false);
-        };
-        loadProfileSpinner.run();
-
-        if (swShowTouchscreenControls != null)
-            swShowTouchscreenControls.setChecked(inputControlsView.isShowTouchscreenControls());
-        if (swEnableTimeout != null)
-            swEnableTimeout.setChecked(preferences.getBoolean("touchscreen_timeout_enabled", false));
-        if (swEnableHaptics != null)
-            swEnableHaptics.setChecked(preferences.getBoolean("touchscreen_haptics_enabled", false));
-
-        if (sbControlsOpacity != null) {
-            sbControlsOpacity.setValue(preferences.getFloat("overlay_opacity", InputControlsView.DEFAULT_OVERLAY_OPACITY) * 100f);
-            sbControlsOpacity.setOnValueChangeListener((sb, v) -> {
-                float opacity = v / 100f;
-                preferences.edit().putFloat("overlay_opacity", opacity).apply();
-                inputControlsView.setOverlayOpacity(opacity);
-                inputControlsView.invalidate();
-            });
-        }
-
-        Runnable applySidebarInputControls = () -> {
-            if (swShowTouchscreenControls != null) {
-                boolean showControls = swShowTouchscreenControls.isChecked();
-                inputControlsView.setShowTouchscreenControls(showControls);
-                preferences.edit().putBoolean("show_touchscreen_controls_enabled", showControls).apply();
-            }
-
-            boolean isTimeoutEnabled = swEnableTimeout != null && swEnableTimeout.isChecked();
-            boolean isHapticsEnabled = swEnableHaptics != null && swEnableHaptics.isChecked();
-            SharedPreferences.Editor editor = preferences.edit();
-            editor.putBoolean("touchscreen_timeout_enabled", isTimeoutEnabled);
-            editor.putBoolean("touchscreen_haptics_enabled", isHapticsEnabled);
-            editor.putInt("selected_profile_index", spInputControlsProfile.getSelectedItemPosition() - 1);
-            editor.apply();
-
-            int position = spInputControlsProfile.getSelectedItemPosition();
-            ArrayList<ControlsProfile> profiles = inputControlsManager.getProfiles();
-            if (position > 0 && position - 1 < profiles.size()) {
-                showInputControls(profiles.get(position - 1));
-            } else {
-                hideInputControls();
-            }
-
-            if (isTimeoutEnabled && inputControlsView.getVisibility() == View.VISIBLE) {
-                startTouchscreenTimeout();
-            } else if (touchpadView != null) {
-                touchpadView.setOnTouchListener(null);
-            }
-        };
-
-        spInputControlsProfile.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+        InputPanelCallbacks callbacks = new InputPanelCallbacks() {
+            // Mirrors the old applySidebarInputControls(): always re-reads/re-persists the
+            // full snapshot of profile + all three switches, whichever one just changed.
             @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                applySidebarInputControls.run();
+            public void onControlsSettingsChanged(int profileId, boolean showTouchscreenControls,
+                                                   boolean touchscreenTimeout, boolean touchscreenHaptics) {
+                inputControlsView.setShowTouchscreenControls(showTouchscreenControls);
+
+                ArrayList<ControlsProfile> profiles = inputControlsManager.getProfiles();
+                int position = -1;
+                for (int i = 0; i < profiles.size(); i++) {
+                    if (profiles.get(i).id == profileId) {
+                        position = i;
+                        break;
+                    }
+                }
+
+                SharedPreferences.Editor editor = preferences.edit();
+                editor.putBoolean("show_touchscreen_controls_enabled", showTouchscreenControls);
+                editor.putBoolean("touchscreen_timeout_enabled", touchscreenTimeout);
+                editor.putBoolean("touchscreen_haptics_enabled", touchscreenHaptics);
+                editor.putInt("selected_profile_index", position);
+                editor.apply();
+
+                if (position >= 0) {
+                    showInputControls(profiles.get(position));
+                } else {
+                    hideInputControls();
+                }
+
+                if (touchscreenTimeout && inputControlsView.getVisibility() == View.VISIBLE) {
+                    startTouchscreenTimeout();
+                } else if (touchpadView != null) {
+                    touchpadView.setOnTouchListener(null);
+                }
             }
 
             @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-            }
-        });
-
-        if (swShowTouchscreenControls != null)
-            swShowTouchscreenControls.setOnCheckedChangeListener((buttonView, isChecked) -> applySidebarInputControls.run());
-        if (swEnableTimeout != null)
-            swEnableTimeout.setOnCheckedChangeListener((buttonView, isChecked) -> applySidebarInputControls.run());
-        if (swEnableHaptics != null)
-            swEnableHaptics.setOnCheckedChangeListener((buttonView, isChecked) -> applySidebarInputControls.run());
-
-        if (btInputControlsSettings != null) {
-            btInputControlsSettings.setOnClickListener(v -> {
-                int position = spInputControlsProfile.getSelectedItemPosition();
-                Intent intent = new Intent(this, MainActivity.class);
+            public void onEditProfiles(int selectedProfileId) {
+                Intent intent = new Intent(XServerDisplayActivity.this, MainActivity.class);
                 intent.putExtra("edit_input_controls", true);
-                intent.putExtra("selected_profile_id",
-                        position > 0 ? inputControlsManager.getProfiles().get(position - 1).id : 0);
+                intent.putExtra("selected_profile_id", selectedProfileId >= 0 ? selectedProfileId : 0);
                 editInputControlsCallback = () -> {
                     hideInputControls();
                     inputControlsManager.loadProfiles(true);
-                    loadProfileSpinner.run();
-                    applySidebarInputControls.run();
+                    // Same as before: after editing, the active profile always resets to
+                    // Disabled (hideInputControls() above already cleared it), so re-apply
+                    // and persist that with the switches' current, unchanged values.
+                    onControlsSettingsChanged(
+                            -1,
+                            inputControlsView.isShowTouchscreenControls(),
+                            preferences.getBoolean("touchscreen_timeout_enabled", false),
+                            preferences.getBoolean("touchscreen_haptics_enabled", false)
+                    );
+                    refreshInputPanel.run();
                 };
                 controlsEditorActivityResultLauncher.launch(intent);
-            });
-        }
+            }
+
+            @Override
+            public void onControlsOpacity(int percent) {
+                float opacity = percent / 100f;
+                preferences.edit().putFloat("overlay_opacity", opacity).apply();
+                inputControlsView.setOverlayOpacity(opacity);
+                inputControlsView.invalidate();
+            }
+
+            @Override
+            public void onShowKeyboard() {
+                AppUtils.showKeyboard(XServerDisplayActivity.this);
+                drawerLayout.closeDrawers();
+            }
+
+            @Override
+            public void onVibration() {
+                showVibrationDialog();
+                drawerLayout.closeDrawers();
+            }
+
+            @Override
+            public void onRelativeMouse(boolean enabled) {
+                isRelativeMouseMovement = enabled;
+                if (xServer != null)
+                    xServer.setRelativeMouseMovement(isRelativeMouseMovement);
+            }
+
+            @Override
+            public void onDisableMouse(boolean enabled) {
+                isMouseDisabled = enabled;
+                if (touchpadView != null)
+                    touchpadView.setMouseEnabled(!isMouseDisabled);
+            }
+        };
+
+        refreshInputPanel = () -> {
+            ArrayList<ControlsProfile> profiles = inputControlsManager.getProfiles(true);
+            ArrayList<InputProfileOption> profileOptions = new ArrayList<>();
+            int selectedProfileId = -1;
+            for (ControlsProfile profile : profiles) {
+                profileOptions.add(new InputProfileOption(profile.id, profile.getName()));
+                if (inputControlsView.getProfile() != null && profile.id == inputControlsView.getProfile().id)
+                    selectedProfileId = profile.id;
+            }
+
+            InputPanelState state = new InputPanelState(
+                    profileOptions,
+                    selectedProfileId,
+                    inputControlsView.isShowTouchscreenControls(),
+                    preferences.getBoolean("touchscreen_timeout_enabled", false),
+                    preferences.getBoolean("touchscreen_haptics_enabled", false),
+                    Math.round(preferences.getFloat("overlay_opacity", InputControlsView.DEFAULT_OVERLAY_OPACITY) * 100f),
+                    isRelativeMouseMovement,
+                    isMouseDisabled
+            );
+            InputSidebarPanelHost.attach(inputPanel, state, callbacks);
+        };
+        refreshInputPanel.run();
     }
 
     private void simulateConfirmInputControlsDialog() {
