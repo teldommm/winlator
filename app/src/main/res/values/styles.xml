@@ -96,9 +96,6 @@
         <item name="android:popupBackground">@drawable/dialog_background_dark_blue</item>
     </style>
 
-    <style name="MultiSelectionComboBox" parent="ComboBox"/>
-    <style name="MultiSelectionComboBox.Dark" parent="ComboBox.Dark"/>
-
     <!-- Popup Styles -->
     <style name="ListPopupWindow" parent="@android:style/Widget.ListPopupWindow">
         <item name="android:popupBackground">@drawable/dialog_background_dark_blue</item>

@@ -21,9 +21,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -45,12 +47,39 @@ internal fun LibraryRootWithoutEmptyDescription(
     }
 
     val activity = LocalContext.current as? MainActivity
+    val configuration = LocalConfiguration.current
+    val landscape = configuration.screenWidthDp > configuration.screenHeightDp
+    DisposableEffect(activity, landscape) {
+        activity?.setBottomNavigationVisible(!landscape)
+        activity?.setMainToolbarVisible(false)
+        onDispose {
+            activity?.setBottomNavigationVisible(true)
+            activity?.setMainToolbarVisible(true)
+        }
+    }
     Column(
         Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .padding(horizontal = 14.dp)
     ) {
+        if (landscape) {
+            LibraryLandscapeHeader(
+                activity = activity,
+                grid = grid,
+                onArtwork = false,
+                onGridViewChanged = callbacks::onGridViewChanged
+            )
+        } else {
+            LibraryPortraitHeader(
+                activity = activity,
+                grid = grid,
+                query = query,
+                onGridViewChanged = callbacks::onGridViewChanged,
+                onSearchQueryChanged = callbacks::onSearchQueryChanged,
+                onOpenFileManager = callbacks::onOpenFileManager
+            )
+        }
         Row(
             Modifier.padding(vertical = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)

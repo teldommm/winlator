@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.DeleteOutline
@@ -39,6 +40,7 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Photo
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SportsEsports
 import androidx.compose.material.icons.outlined.ViewList
@@ -50,6 +52,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -113,7 +116,7 @@ internal fun LibraryRoot(
     val activity = LocalContext.current as? MainActivity
     DisposableEffect(activity, landscape) {
         activity?.setBottomNavigationVisible(!landscape)
-        activity?.setMainToolbarVisible(!landscape)
+        activity?.setMainToolbarVisible(false)
         onDispose {
             activity?.setBottomNavigationVisible(true)
             activity?.setMainToolbarVisible(true)
@@ -157,6 +160,15 @@ internal fun LibraryRoot(
                 onGridViewChanged = cb::onGridViewChanged
             )
             Spacer(Modifier.height(7.dp))
+        } else {
+            LibraryPortraitHeader(
+                activity = activity,
+                grid = grid,
+                query = query,
+                onGridViewChanged = cb::onGridViewChanged,
+                onSearchQueryChanged = cb::onSearchQueryChanged,
+                onOpenFileManager = cb::onOpenFileManager
+            )
         }
         Row(Modifier.padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             LibraryFilter.values().forEach { option ->
@@ -215,7 +227,7 @@ internal fun LibraryRoot(
 }
 
 @Composable
-private fun LibraryLandscapeHeader(
+internal fun LibraryLandscapeHeader(
     activity: MainActivity?,
     grid: Boolean,
     onArtwork: Boolean,
@@ -237,6 +249,56 @@ private fun LibraryLandscapeHeader(
         LibraryTopIcon(Icons.Outlined.SportsEsports, false) { activity?.navigateToMainDestination(R.id.main_menu_input_controls) }
         LibraryTopIcon(Icons.Outlined.Settings, false) { activity?.navigateToMainDestination(R.id.main_menu_settings) }
         LibraryOrientationMenu(activity)
+    }
+}
+
+// Portrait counterpart to LibraryLandscapeHeader: replaces the old native Toolbar options-menu
+// (grid/list toggle, collapsible SearchView, "Open File Manager", and the orientation "More"
+// submenu) now that ShortcutsFragment no longer implements onCreateOptionsMenu. Home/Input
+// Controls/Settings icons aren't needed here (unlike the landscape header) because portrait
+// keeps the app's BottomNavigation visible for those destinations.
+@Composable
+internal fun LibraryPortraitHeader(
+    activity: MainActivity?,
+    grid: Boolean,
+    query: String,
+    onGridViewChanged: (Boolean) -> Unit,
+    onSearchQueryChanged: (String) -> Unit,
+    onOpenFileManager: () -> Unit
+) {
+    var searchActive by rememberSaveable { mutableStateOf(false) }
+
+    if (searchActive) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            LibraryTopIcon(Icons.Outlined.ArrowBack, false) {
+                searchActive = false
+                onSearchQueryChanged("")
+            }
+            OutlinedTextField(
+                value = query,
+                onValueChange = onSearchQueryChanged,
+                modifier = Modifier.weight(1f).padding(start = 4.dp),
+                placeholder = { Text("Search games") },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp)
+            )
+        }
+    } else {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "Library",
+                color = MaterialTheme.colorScheme.onBackground,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Medium
+            )
+            Spacer(Modifier.weight(1f))
+            LibraryTopIcon(Icons.Outlined.Search, false) { searchActive = true }
+            LibraryTopIcon(if (grid) Icons.Outlined.ViewList else Icons.Outlined.GridView, false) {
+                onGridViewChanged(!grid)
+            }
+            LibraryTopIcon(Icons.Outlined.Add, false) { onOpenFileManager() }
+            LibraryOrientationMenu(activity)
+        }
     }
 }
 

@@ -11,7 +11,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import com.winlator.cmod.MainActivity
-import com.winlator.cmod.ui.LibraryToolbarActions
 import com.winlator.cmod.ui.applyAppFullscreen
 import com.winlator.cmod.ui.theme.WinZTheme
 import java.util.concurrent.atomic.AtomicInteger
@@ -37,6 +36,8 @@ interface LibraryCallbacks {
     fun onGridViewChanged(gridView: Boolean)
     fun onAction(shortcutPath: String, action: String)
     fun onArtworkNeeded(shortcutPath: String, kind: String)
+    fun onSearchQueryChanged(query: String)
+    fun onOpenFileManager()
 }
 
 class LibraryComposeController internal constructor(
@@ -96,7 +97,6 @@ object LibraryComposeHost {
     ): LibraryComposeBinding {
         val activity = context as? MainActivity
         applyAppFullscreen(activity)
-        activity?.let(LibraryToolbarActions::install)
 
         val items = mutableStateOf<List<LibraryItem>>(emptyList())
         val grid = mutableStateOf(initialGridView)

@@ -948,23 +948,27 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (winHandler == null)
             return;
 
-        Context context = this;
         int maxControllers = winHandler.getMaxControllers();
-        boolean[] checkedItems = new boolean[maxControllers];
-        String[] items = new String[maxControllers];
+        ArrayList<String> items = new ArrayList<>();
+        ArrayList<Boolean> initiallyChecked = new ArrayList<>();
 
         for (int i = 0; i < maxControllers; i++) {
-            items[i] = getString(R.string.vibration_slot, i + 1);
-            checkedItems[i] = winHandler.isVibrationEnabledForSlot(i);
+            items.add(getString(R.string.vibration_slot, i + 1));
+            initiallyChecked.add(winHandler.isVibrationEnabledForSlot(i));
         }
 
-        new androidx.appcompat.app.AlertDialog.Builder(context)
-                .setTitle(R.string.vibration)
-                .setMultiChoiceItems(items, checkedItems, (dialog, which, isChecked) -> {
-                    winHandler.setVibrationEnabledForSlot(which, isChecked);
-                })
-                .setPositiveButton(R.string.ok, null)
-                .show();
+        com.winlator.cmod.ui.ThemedAlertHost.multiChoice(
+                this,
+                getString(R.string.vibration),
+                items,
+                getString(R.string.ok),
+                positions -> {
+                    for (int i = 0; i < maxControllers; i++) {
+                        winHandler.setVibrationEnabledForSlot(i, positions.contains(i));
+                    }
+                },
+                initiallyChecked
+        );
     }
 
     @Override

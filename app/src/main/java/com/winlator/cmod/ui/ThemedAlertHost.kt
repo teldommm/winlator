@@ -255,18 +255,25 @@ object ThemedAlertHost {
     // input-control profiles to fetch. entries has no default (it precedes the required
     // onConfirm parameter) — Java call sites always pass it. Capped at ~5 visible rows
     // (heightIn) so a long server-provided list doesn't push the buttons off-card.
+    // initiallyChecked is trailing (defaults to all-unchecked) so @JvmOverloads keeps every
+    // existing 5-arg call site (a fresh pick-from-scratch list) compiling unchanged; pass it
+    // when the dialog needs to reopen showing the current on/off state (e.g. per-slot toggles).
     @JvmStatic
+    @JvmOverloads
     fun multiChoice(
         activity: AppCompatActivity,
         title: String,
         entries: List<String>,
         confirmLabel: String,
-        onConfirm: Consumer<List<Int>>
+        onConfirm: Consumer<List<Int>>,
+        initiallyChecked: List<Boolean> = emptyList()
     ) {
         showOverlay(activity) { dismiss ->
             Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(12.dp))
-            val checked = remember { mutableStateListOf(*BooleanArray(entries.size).toTypedArray()) }
+            val checked = remember {
+                mutableStateListOf(*Array(entries.size) { i -> initiallyChecked.getOrElse(i) { false } })
+            }
             LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp)) {
                 items(entries.size) { index ->
                     Row(

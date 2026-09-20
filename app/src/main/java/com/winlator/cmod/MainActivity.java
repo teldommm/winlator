@@ -1,7 +1,6 @@
 package com.winlator.cmod;
 
 import android.Manifest;
-import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
@@ -50,6 +49,7 @@ import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.container.Shortcut;
 import com.winlator.cmod.core.WineThemeManager;
+import com.winlator.cmod.ui.ThemedAlertHost;
 import com.winlator.cmod.xenvironment.ImageFsInstaller;
 import com.winlator.cmod.services.NotificationService;
 
@@ -224,16 +224,17 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     }
 
     private void showAllFilesAccessDialog() {
-        new AlertDialog.Builder(this)
-                .setTitle("All Files Access Required")
-                .setMessage("In order to grant access to additional storage devices such as USB storage device, the All Files Access permission must be granted. Press Okay to grant All Files Access in your Android Settings.")
-                .setPositiveButton("Okay", (dialog, which) -> {
+        ThemedAlertHost.confirm(
+                this,
+                "All Files Access Required",
+                "In order to grant access to additional storage devices such as USB storage device, the All Files Access permission must be granted. Press Okay to grant All Files Access in your Android Settings.",
+                "Okay",
+                () -> {
                     Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
                     intent.setData(Uri.parse("package:" + getPackageName()));
                     startActivity(intent);
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
+                }
+        );
     }
 
     @Override

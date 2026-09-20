@@ -3,7 +3,6 @@ package com.winlator.cmod;
 import static androidx.core.content.ContextCompat.getSystemService;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -18,10 +17,6 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.util.Log;
 import android.view.LayoutInflater;
-import android.view.Menu;
-import android.view.MenuInflater;
-import android.view.MenuItem;
-import android.view.SubMenu;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Toast;
@@ -31,7 +26,6 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.SearchView;
 import androidx.documentfile.provider.DocumentFile;
 import androidx.fragment.app.Fragment;
 import androidx.preference.PreferenceManager;
@@ -81,15 +75,6 @@ import java.util.concurrent.Executors;
 
 public class ShortcutsFragment extends Fragment {
     private static final String TAG = "ShortcutsFragment";
-    private static final int MENU_VIEW_MODE = 1;
-    private static final int MENU_SEARCH = 2;
-    private static final int MENU_FILE_MANAGER = 3;
-    private static final int MENU_MORE = 4;
-    private static final int MENU_LOCK_ORIENTATION = 5;
-    private static final int MENU_VERTICAL_MODE = 6;
-    private static final int MENU_HORIZONTAL_MODE = 7;
-    private static final int MENU_GROUP_LOCK = 8;
-    private static final int MENU_GROUP_ORIENTATION_MODE = 9;
     private static final String STEAMGRID_BASE_URL = "https://www.steamgriddb.com/api/v2/";
     private static String STEAMGRID_API_KEY = "0324c52513634547a7b32d6d323635d0";
 
@@ -111,7 +96,6 @@ public class ShortcutsFragment extends Fragment {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setHasOptionsMenu(true);
 
         iconPickerLauncher = registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
             if (uri != null && shortcutForIconUpdate != null) {
@@ -197,99 +181,30 @@ public class ShortcutsFragment extends Fragment {
                         Shortcut shortcut = findShortcut(shortcutPath);
                         if (shortcut != null) requestArtwork(shortcut, kind);
                     }
+
+                    @Override
+                    public void onSearchQueryChanged(@NonNull String query) {
+                        if (libraryController != null) libraryController.setSearchQuery(query);
+                    }
+
+                    @Override
+                    public void onOpenFileManager() {
+                        getParentFragmentManager().beginTransaction()
+                                .setCustomAnimations(R.anim.slide_in_up, R.anim.slide_out_down)
+                                .addToBackStack(null)
+                                .replace(R.id.FLFragmentContainer, new FileManagerFragment())
+                                .commit();
+                    }
                 }
         );
         libraryController = binding.getController();
         return binding.getView();
     }
 
-    @Override
-    public void onCreateOptionsMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
-        super.onCreateOptionsMenu(menu, inflater);
-
-        MenuItem viewItem = menu.add(0, MENU_VIEW_MODE, 0, isGridView ? "List View" : "Grid View");
-        viewItem.setIcon(R.drawable.ui_ic_view);
-        viewItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
-
-        MenuItem searchItem = menu.add(0, MENU_SEARCH, 1, "Search");
-        searchItem.setIcon(R.drawable.ui_ic_search);
-        searchItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS |
-                MenuItem.SHOW_AS_ACTION_COLLAPSE_ACTION_VIEW);
-        SearchView searchView = new SearchView(requireContext());
-        searchView.setQueryHint("Search games");
-        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
-            @Override
-            public boolean onQueryTextSubmit(String query) {
-                if (libraryController != null) libraryController.setSearchQuery(query);
-                return true;
-            }
-
-            @Override
-            public boolean onQueryTextChange(String query) {
-                if (libraryController != null) libraryController.setSearchQuery(query);
-                return true;
-            }
-        });
-        searchItem.setActionView(searchView);
-
-        MenuItem addItem = menu.add(0, MENU_FILE_MANAGER, 2, "Open File Manager");
-        addItem.setIcon(R.drawable.ui_ic_add);
-        addItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
-
-        MainActivity activity = (MainActivity) requireActivity();
-        SubMenu moreMenu = menu.addSubMenu(0, MENU_MORE, 3, "More");
-        MenuItem moreItem = moreMenu.getItem();
-        moreItem.setIcon(R.drawable.ui_ic_more);
-        moreItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
-
-        moreMenu.add(MENU_GROUP_LOCK, MENU_LOCK_ORIENTATION, 0, "Lock screen orientation")
-                .setCheckable(true)
-                .setChecked(activity.isOrientationLocked());
-        moreMenu.add(MENU_GROUP_ORIENTATION_MODE, MENU_VERTICAL_MODE, 1, "Vertical mode")
-                .setCheckable(true)
-                .setChecked(activity.isVerticalModeEnabled());
-        moreMenu.add(MENU_GROUP_ORIENTATION_MODE, MENU_HORIZONTAL_MODE, 2, "Horizontal mode")
-                .setCheckable(true)
-                .setChecked(activity.isHorizontalModeEnabled());
-        moreMenu.setGroupCheckable(MENU_GROUP_LOCK, true, false);
-        moreMenu.setGroupCheckable(MENU_GROUP_ORIENTATION_MODE, true, true);
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        if (item.getItemId() == MENU_VIEW_MODE) {
-            setGridView(!isGridView);
-            return true;
-        }
-        if (item.getItemId() == MENU_FILE_MANAGER) {
-            getParentFragmentManager().beginTransaction()
-                    .setCustomAnimations(R.anim.slide_in_up, R.anim.slide_out_down)
-                    .addToBackStack(null)
-                    .replace(R.id.FLFragmentContainer, new FileManagerFragment())
-                    .commit();
-            return true;
-        }
-        MainActivity activity = (MainActivity) requireActivity();
-        if (item.getItemId() == MENU_LOCK_ORIENTATION) {
-            activity.toggleOrientationLock();
-            return true;
-        }
-        if (item.getItemId() == MENU_VERTICAL_MODE) {
-            activity.toggleVerticalMode();
-            return true;
-        }
-        if (item.getItemId() == MENU_HORIZONTAL_MODE) {
-            activity.toggleHorizontalMode();
-            return true;
-        }
-        return super.onOptionsItemSelected(item);
-    }
-
     private void setGridView(boolean gridView) {
         isGridView = gridView;
         preferences.edit().putBoolean("shortcuts_grid_view", isGridView).apply();
         if (libraryController != null) libraryController.setGridView(isGridView);
-        requireActivity().invalidateOptionsMenu();
     }
 
     private void fetchCoverFromSteamGrid(Shortcut shortcut, File destFile,
@@ -670,19 +585,16 @@ public class ShortcutsFragment extends Fragment {
         else if (LibraryComposeHost.ACTION_CLONE.equals(action)) {
             ContainerManager containerManager = new ContainerManager(context);
             ArrayList<Container> containers = containerManager.getContainers();
-            AlertDialog.Builder builder = new AlertDialog.Builder(context);
-            builder.setTitle("Select a container");
-            String[] containerNames = new String[containers.size()];
-            for (int i = 0; i < containers.size(); i++) {
-                containerNames[i] = containers.get(i).getName();
+            List<ThemedAlertHost.ActionItem> items = new ArrayList<>();
+            for (Container container : containers) {
+                items.add(new ThemedAlertHost.ActionItem(container.getName(), () -> {
+                    if (shortcut.cloneToContainer(container)) {
+                        Toast.makeText(context, "Cloned successfully.", Toast.LENGTH_SHORT).show();
+                        loadShortcutsList();
+                    }
+                }));
             }
-            builder.setItems(containerNames, (dialog, which) -> {
-                if (shortcut.cloneToContainer(containers.get(which))) {
-                    Toast.makeText(context, "Cloned successfully.", Toast.LENGTH_SHORT).show();
-                    loadShortcutsList();
-                }
-            });
-            builder.show();
+            ThemedAlertHost.actions((AppCompatActivity) requireActivity(), "Select Container", items);
         }
         else if (LibraryComposeHost.ACTION_HOME.equals(action)) {
             if (shortcut.getExtra("uuid").equals("")) shortcut.genUUID();
