@@ -4,7 +4,6 @@ import android.content.Context;
 import android.content.res.ColorStateList;
 import android.database.DataSetObserver;
 import android.graphics.Color;
-import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
@@ -14,7 +13,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.SpinnerAdapter;
 import android.widget.Switch;
@@ -22,11 +20,9 @@ import android.widget.TextView;
 
 import androidx.annotation.Nullable;
 import androidx.core.widget.ImageViewCompat;
-import androidx.core.widget.TextViewCompat;
 import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.R;
-import com.winlator.cmod.ui.FpsLimiterControl;
 
 public class IngameSidebarThemeLayout extends FrameLayout {
     private int background;
@@ -83,173 +79,20 @@ public class IngameSidebarThemeLayout extends FrameLayout {
             }
         }
 
-        replaceLegacyFpsLimiter();
-        applyCompactPremiumLayout();
+        // replaceLegacyFpsLimiter(), applyCompactPremiumLayout(), forceKnownLegacyIconTints()
+        // and fitMetricText() used to run here too — all of them only ever reached ids
+        // belonging to the legacy Screen/Input/HUD/Graphics/TaskManager panels, which are
+        // now Compose (see the sidebar Compose port). An id with no remaining @+id/
+        // declaration removes R.id.<name> itself, so those findViewById(R.id.X) calls
+        // would fail to compile, not just resolve to null at runtime, once every panel's
+        // XML was gone — hence removed rather than left dormant.
         normalizeLegacyTree(this);
-        forceKnownLegacyIconTints();
-        fitMetricText();
 
-        post(() -> {
-            normalizeLegacyTree(this);
-            forceKnownLegacyIconTints();
-        });
+        post(() -> normalizeLegacyTree(this));
         postDelayed(() -> {
             normalizeLegacyTree(this);
-            forceKnownLegacyIconTints();
             wrapLegacySpinnerAdapters(this);
         }, 500);
-    }
-
-    private void replaceLegacyFpsLimiter() {
-        View oldSpinner = findViewById(R.id.SPNativeFPS);
-        if (oldSpinner == null) return;
-        if (!(oldSpinner.getParent() instanceof ViewGroup)) return;
-
-        ViewGroup oldRow = (ViewGroup) oldSpinner.getParent();
-        if (!(oldRow.getParent() instanceof ViewGroup)) return;
-        ViewGroup holder = (ViewGroup) oldRow.getParent();
-        int index = holder.indexOfChild(oldRow);
-
-        int topMargin = 0;
-        ViewGroup.LayoutParams oldParams = oldRow.getLayoutParams();
-        if (oldParams instanceof ViewGroup.MarginLayoutParams) {
-            topMargin = ((ViewGroup.MarginLayoutParams) oldParams).topMargin;
-        }
-
-        holder.removeView(oldRow);
-        FpsLimiterControl control = new FpsLimiterControl(getContext());
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        params.topMargin = topMargin;
-        holder.addView(control, Math.max(0, index), params);
-    }
-
-    private void applyCompactPremiumLayout() {
-        FpsLimiterControl fps = findFirstFpsLimiter(this);
-        insertSectionLabelBefore(fps, "PERFORMANCE");
-
-        View imageQuality = findViewById(R.id.LLStandardOptions);
-        insertSectionLabelBefore(imageQuality, "IMAGE QUALITY");
-        flattenSection(imageQuality);
-
-        View frameGen = findViewById(R.id.LLFrameGenOptions);
-        flattenSection(frameGen);
-
-        View savePreset = findViewById(R.id.BTSaveGraphicsPreset);
-        insertSectionLabelBefore(savePreset, "PRESETS");
-        compactActionRow(savePreset);
-
-        View hudStyle = findViewById(R.id.LLHudStyleRow);
-        if (hudStyle != null && hudStyle.getParent() instanceof LinearLayout) {
-            LinearLayout hudParent = (LinearLayout) hudStyle.getParent();
-            int styleIndex = hudParent.indexOfChild(hudStyle);
-            View enableHud = previousContentChild(hudParent, styleIndex);
-            insertSectionLabelBefore(enableHud, "GENERAL");
-            insertSectionLabelBefore(hudStyle, "APPEARANCE");
-
-            flattenSection(enableHud);
-            flattenSection(hudStyle);
-
-            TextView resetText = findTextView(this, "Reset HUD");
-            View resetRow = directChildUnder(hudParent, resetText);
-            insertSectionLabelBefore(resetRow, "ACTIONS");
-            compactActionRow(resetRow);
-        }
-    }
-
-    private void flattenSection(View view) {
-        if (view == null) return;
-        view.setBackground(null);
-        if (view instanceof ViewGroup) {
-            ViewGroup group = (ViewGroup) view;
-            group.setPadding(0, group.getPaddingTop() > 0 ? dp(2) : 0,
-                    0, group.getPaddingBottom() > 0 ? dp(2) : 0);
-        }
-    }
-
-    private View previousContentChild(LinearLayout parent, int beforeIndex) {
-        for (int i = beforeIndex - 1; i >= 0; i--) {
-            View child = parent.getChildAt(i);
-            if (child.getVisibility() != GONE) return child;
-        }
-        return null;
-    }
-
-    private void insertSectionLabelBefore(View target, String label) {
-        if (target == null || !(target.getParent() instanceof LinearLayout)) return;
-        LinearLayout parent = (LinearLayout) target.getParent();
-        int index = parent.indexOfChild(target);
-        if (index < 0) return;
-
-        if (index > 0) {
-            Object tag = parent.getChildAt(index - 1).getTag();
-            if (("winz-section-" + label).equals(tag)) return;
-        }
-
-        TextView section = new TextView(getContext());
-        section.setTag("winz-section-" + label);
-        section.setText(label);
-        section.setTextColor(onSurfaceVariant);
-        section.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
-        section.setTypeface(Typeface.DEFAULT, Typeface.NORMAL);
-        section.setLetterSpacing(0.08f);
-        section.setAllCaps(false);
-
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        params.topMargin = dp(18);
-        params.bottomMargin = dp(8);
-        parent.addView(section, index, params);
-
-        ViewGroup.LayoutParams targetParams = target.getLayoutParams();
-        if (targetParams instanceof ViewGroup.MarginLayoutParams) {
-            ((ViewGroup.MarginLayoutParams) targetParams).topMargin = 0;
-            target.setLayoutParams(targetParams);
-        }
-    }
-
-    private void compactActionRow(View row) {
-        if (row instanceof LinearLayout) {
-            LinearLayout layout = (LinearLayout) row;
-            layout.setGravity(Gravity.CENTER_VERTICAL);
-            layout.setPadding(dp(16), layout.getPaddingTop(), dp(16), layout.getPaddingBottom());
-        }
-    }
-
-    private FpsLimiterControl findFirstFpsLimiter(View view) {
-        if (view instanceof FpsLimiterControl) return (FpsLimiterControl) view;
-        if (view instanceof ViewGroup) {
-            ViewGroup group = (ViewGroup) view;
-            for (int i = 0; i < group.getChildCount(); i++) {
-                FpsLimiterControl found = findFirstFpsLimiter(group.getChildAt(i));
-                if (found != null) return found;
-            }
-        }
-        return null;
-    }
-
-    private TextView findTextView(View view, String text) {
-        if (view instanceof TextView && text.contentEquals(((TextView) view).getText())) {
-            return (TextView) view;
-        }
-        if (view instanceof ViewGroup) {
-            ViewGroup group = (ViewGroup) view;
-            for (int i = 0; i < group.getChildCount(); i++) {
-                TextView found = findTextView(group.getChildAt(i), text);
-                if (found != null) return found;
-            }
-        }
-        return null;
-    }
-
-    private View directChildUnder(ViewGroup ancestor, View descendant) {
-        if (ancestor == null || descendant == null) return null;
-        View current = descendant;
-        while (current != null && current.getParent() instanceof View) {
-            if (current.getParent() == ancestor) return current;
-            current = (View) current.getParent();
-        }
-        return null;
     }
 
     private void readPalette() {
@@ -324,13 +167,6 @@ public class IngameSidebarThemeLayout extends FrameLayout {
         }
     }
 
-    private void forceKnownLegacyIconTints() {
-        ImageView inputSettings = findViewById(R.id.BTInputControlsSettings);
-        if (inputSettings != null) {
-            ImageViewCompat.setImageTintList(inputSettings, ColorStateList.valueOf(primary));
-        }
-    }
-
     private void wrapLegacySpinnerAdapters(View view) {
         if (view instanceof Spinner) {
             Spinner spinner = (Spinner) view;
@@ -401,25 +237,6 @@ public class IngameSidebarThemeLayout extends FrameLayout {
                 || color == Color.rgb(64, 196, 255)
                 || color == Color.rgb(143, 216, 255)
                 || color == Color.rgb(130, 184, 255);
-    }
-
-    private void fitMetricText() {
-        TextView cpu = findViewById(R.id.TVCPUInfoCompact);
-        if (cpu != null) {
-            cpu.setSingleLine(true);
-            cpu.setTextColor(primary);
-            TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
-                    cpu, 14, 24, 1, TypedValue.COMPLEX_UNIT_SP);
-        }
-
-        TextView memory = findViewById(R.id.TVMemoryInfo);
-        if (memory != null) {
-            memory.setSingleLine(true);
-            memory.setEllipsize(null);
-            memory.setTextColor(primary);
-            TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
-                    memory, 10, 18, 1, TypedValue.COMPLEX_UNIT_SP);
-        }
     }
 
     private int dp(int value) {
