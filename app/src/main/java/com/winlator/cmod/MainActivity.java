@@ -47,14 +47,12 @@ import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.ImageUtils;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.container.ContainerManager;
-import com.winlator.cmod.container.Shortcut;
 import com.winlator.cmod.core.WineThemeManager;
 import com.winlator.cmod.ui.ThemedAlertHost;
 import com.winlator.cmod.xenvironment.ImageFsInstaller;
 import com.winlator.cmod.services.NotificationService;
 
 import java.io.File;
-import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
     public static final @IntRange(from = 1, to = 19) byte CONTAINER_PATTERN_COMPRESSION_LEVEL = 9;
@@ -144,7 +142,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             if (syncingBottomNavigation) return true;
             int target;
             if (item.getItemId() == R.id.bottom_nav_library) target = R.id.main_menu_shortcuts;
-            else if (item.getItemId() == R.id.bottom_nav_containers) target = R.id.main_menu_containers;
             else if (item.getItemId() == R.id.bottom_nav_controls) target = R.id.main_menu_input_controls;
             else if (item.getItemId() == R.id.bottom_nav_settings) target = R.id.main_menu_settings;
             else return false;
@@ -189,10 +186,8 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             if (selectedMenuItemId > 0) {
                 menuItemId = selectedMenuItemId;
             } else {
-                List<Shortcut> shortcuts = containerManager.loadShortcuts();
-                menuItemId = (shortcuts != null && !shortcuts.isEmpty())
-                        ? R.id.main_menu_shortcuts
-                        : R.id.main_menu_containers;
+                containerManager.loadShortcuts();
+                menuItemId = R.id.main_menu_shortcuts;
             }
 
             if (actionBar != null) actionBar.setDisplayHomeAsUpEnabled(false);
@@ -370,9 +365,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             case R.id.main_menu_shortcuts:
                 show(new ShortcutsFragment(), false);
                 break;
-            case R.id.main_menu_containers:
-                show(new ContainersFragment(), false);
-                break;
             case R.id.main_menu_input_controls:
                 show(InputControlsFragment.newInstance(selectedProfileId), false);
                 break;
@@ -394,7 +386,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         if (bottomNavigation == null) return;
         int bottomId = 0;
         if (menuItemId == R.id.main_menu_shortcuts) bottomId = R.id.bottom_nav_library;
-        else if (menuItemId == R.id.main_menu_containers) bottomId = R.id.bottom_nav_containers;
         else if (menuItemId == R.id.main_menu_input_controls) bottomId = R.id.bottom_nav_controls;
         else if (menuItemId == R.id.main_menu_settings) bottomId = R.id.bottom_nav_settings;
         if (bottomId != 0 && bottomNavigation.getSelectedItemId() != bottomId) {

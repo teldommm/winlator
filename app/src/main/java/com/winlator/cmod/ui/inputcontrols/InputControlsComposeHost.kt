@@ -3,6 +3,7 @@ package com.winlator.cmod.ui.inputcontrols
 import android.content.Context
 import android.view.View
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -67,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import com.winlator.cmod.MainActivity
 import com.winlator.cmod.R
 import com.winlator.cmod.ui.LandscapeMainNavigation
+import com.winlator.cmod.ui.PortraitMainHeader
 import com.winlator.cmod.ui.theme.WinZTheme
 import com.winlator.cmod.ui.theme.controlAccentColor
 import kotlin.math.roundToInt
@@ -131,20 +133,20 @@ private fun InputControlsScreen(model: InputControlsModel, callbacks: InputContr
     val activity = LocalContext.current as? MainActivity
 
     DisposableEffect(activity, landscape) {
-        if (landscape) {
-            activity?.setBottomNavigationVisible(false)
-            activity?.setMainToolbarVisible(false)
-        }
+        activity?.setBottomNavigationVisible(!landscape)
+        activity?.setMainToolbarVisible(false)
         onDispose {
-            if (landscape) {
-                activity?.setBottomNavigationVisible(true)
-                activity?.setMainToolbarVisible(true)
-            }
+            activity?.setBottomNavigationVisible(true)
+            activity?.setMainToolbarVisible(true)
         }
     }
 
-    Column(Modifier.fillMaxSize()) {
-        if (landscape) LandscapeMainNavigation(activity, R.id.main_menu_input_controls, "Input Controls")
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        if (landscape) {
+            LandscapeMainNavigation(activity, R.id.main_menu_input_controls, "Input Controls")
+        } else {
+            PortraitMainHeader("Input Controls")
+        }
         if (landscape) {
             Row(
                 modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 10.dp),

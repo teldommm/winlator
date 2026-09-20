@@ -7,6 +7,7 @@ import android.view.View
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,6 +45,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -66,6 +68,7 @@ import com.winlator.cmod.MainActivity
 import com.winlator.cmod.R
 import com.winlator.cmod.core.ExeIconExtractor
 import com.winlator.cmod.ui.LandscapeMainNavigation
+import com.winlator.cmod.ui.PortraitMainHeader
 import com.winlator.cmod.ui.theme.WinZTheme
 import com.winlator.cmod.ui.theme.controlAccentColor
 import kotlinx.coroutines.Dispatchers
@@ -156,9 +159,20 @@ private fun FileManagerScreen(model: FileManagerModel, callbacks: FileManagerCal
     val activity = LocalContext.current as? MainActivity
     var driveSheetOpen by remember { mutableStateOf(false) }
 
-    Column(Modifier.fillMaxSize()) {
+    DisposableEffect(activity, landscape) {
+        activity?.setBottomNavigationVisible(!landscape)
+        activity?.setMainToolbarVisible(false)
+        onDispose {
+            activity?.setBottomNavigationVisible(true)
+            activity?.setMainToolbarVisible(true)
+        }
+    }
+
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         if (landscape) {
             LandscapeMainNavigation(activity = activity, selected = 0, title = "File Manager")
+        } else {
+            PortraitMainHeader("File Manager")
         }
 
         Row(

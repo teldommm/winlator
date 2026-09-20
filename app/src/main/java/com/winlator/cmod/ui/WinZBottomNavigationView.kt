@@ -7,7 +7,6 @@ import android.util.AttributeSet
 import android.view.View
 import androidx.core.view.ViewCompat
 import com.google.android.material.bottomnavigation.BottomNavigationView
-import com.winlator.cmod.ContainersFragment
 import com.winlator.cmod.FileManagerFragment
 import com.winlator.cmod.InputControlsFragment
 import com.winlator.cmod.MainActivity
@@ -64,7 +63,6 @@ class WinZBottomNavigationView @JvmOverloads constructor(
         val activity = context.findMainActivity() ?: return
         val current = activity.supportFragmentManager.findFragmentById(R.id.FLFragmentContainer)
         val topLevel = current is ShortcutsFragment ||
-            current is ContainersFragment ||
             current is InputControlsFragment ||
             current is SettingsFragment ||
             current is FileManagerFragment

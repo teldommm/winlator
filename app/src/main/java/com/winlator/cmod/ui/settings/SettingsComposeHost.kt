@@ -88,6 +88,7 @@ import androidx.compose.ui.unit.dp
 import com.winlator.cmod.MainActivity
 import com.winlator.cmod.R
 import com.winlator.cmod.ui.LandscapeMainNavigation
+import com.winlator.cmod.ui.PortraitMainHeader
 import com.winlator.cmod.ui.theme.WinZTheme
 import com.winlator.cmod.ui.theme.controlAccentColor
 import com.winlator.cmod.ui.theme.ThemedDialog
@@ -175,20 +176,20 @@ private fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) {
     var confirmReinstallImageFs by remember { mutableStateOf(false) }
 
     DisposableEffect(activity, landscape) {
-        if (landscape) {
-            activity?.setBottomNavigationVisible(false)
-            activity?.setMainToolbarVisible(false)
-        }
+        activity?.setBottomNavigationVisible(!landscape)
+        activity?.setMainToolbarVisible(false)
         onDispose {
-            if (landscape) {
-                activity?.setBottomNavigationVisible(true)
-                activity?.setMainToolbarVisible(true)
-            }
+            activity?.setBottomNavigationVisible(true)
+            activity?.setMainToolbarVisible(true)
         }
     }
 
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        if (landscape) LandscapeMainNavigation(activity, R.id.main_menu_settings, "Settings")
+        if (landscape) {
+            LandscapeMainNavigation(activity, R.id.main_menu_settings, "Settings")
+        } else {
+            PortraitMainHeader("Settings")
+        }
         LazyColumn(
             modifier = Modifier.fillMaxWidth().weight(1f),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 30.dp),

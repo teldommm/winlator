@@ -152,6 +152,29 @@ fun LandscapeMainNavigation(
     }
 }
 
+// Portrait counterpart to LandscapeMainNavigation: in portrait the app's native Toolbar and
+// BottomNavigation are still used for chrome, but ONLY when the fragment itself keeps the
+// Toolbar visible. Screens that fully own their background (Library, and now Settings/Input
+// Controls) hide the native Toolbar unconditionally and need a plain in-Compose title instead —
+// otherwise the area behind the old Toolbar shows its @drawable/ui_glass_background gradient
+// instead of the flat MaterialTheme.colorScheme.background every other screen sits on.
+@Composable
+fun PortraitMainHeader(title: String, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            title,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+    }
+}
+
 @Composable
 private fun Destination(
     icon: ImageVector,
