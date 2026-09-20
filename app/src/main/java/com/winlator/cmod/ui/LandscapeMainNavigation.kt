@@ -29,7 +29,6 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -183,14 +182,12 @@ private fun Destination(
     accent: Boolean = false,
     onClick: () -> Unit
 ) {
-    val whiteTheme = MaterialTheme.colorScheme.background.luminance() > .65f
     val normalIcon = if (selected) MaterialTheme.colorScheme.primary
         else MaterialTheme.colorScheme.onBackground.copy(alpha = .68f)
-    val iconColor = if (accent) Color.White else if (whiteTheme) Color.White else normalIcon
+    val iconColor = if (accent) Color.White else normalIcon
     val selectedBackground = MaterialTheme.colorScheme.primary.copy(alpha = .12f)
-    val background = if (accent) controlAccentColor() else if (whiteTheme) {
-        Color.Black.copy(alpha = if (selected) .90f else .78f)
-    } else if (selected) selectedBackground else Color.Transparent
+    val background = if (accent) controlAccentColor()
+        else if (selected) selectedBackground else Color.Transparent
 
     Surface(
         onClick = onClick,

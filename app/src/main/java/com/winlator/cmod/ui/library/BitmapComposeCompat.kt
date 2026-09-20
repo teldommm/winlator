@@ -365,10 +365,9 @@ private fun OrientationToggleMenuItem(label: String, checked: Boolean, onClick: 
 
 @Composable
 private fun LibraryTopIcon(icon: ImageVector, selected: Boolean, click: () -> Unit) {
-    val whiteTheme = MaterialTheme.colorScheme.background.luminance() > .65f
-    val background = if (whiteTheme) Color.Black.copy(if (selected) .90f else .78f)
-    else if (selected) Color.White.copy(.16f) else Color.Transparent
-    val content = if (whiteTheme) Color.White else Color.White.copy(if (selected) 1f else .68f)
+    val background = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = .12f) else Color.Transparent
+    val content = if (selected) MaterialTheme.colorScheme.primary
+        else MaterialTheme.colorScheme.onBackground.copy(alpha = .68f)
     Surface(
         onClick = click,
         modifier = Modifier.padding(horizontal = 3.dp),
@@ -495,8 +494,16 @@ private fun PlayCompat(item: LibraryItem, cb: LibraryCallbacks, overlay: Boolean
 @Composable
 private fun MenuButtonCompat(item: LibraryItem, cb: LibraryCallbacks, light: Boolean) {
     var open by remember { mutableStateOf(false) }
+    // `light` = true means this sits over cover artwork (CoverArtworkCard's top-right corner),
+    // which isn't guaranteed to have the bottom-gradient scrim under it. White stays white on
+    // Black/Amoled (dark artwork scrim), but flips to a dark tint on White so it doesn't
+    // disappear against the light surfaceVariant fallback or a bright cover.
+    val whiteTheme = MaterialTheme.colorScheme.background.luminance() > .65f
+    val tint = if (!light) MaterialTheme.colorScheme.onSurfaceVariant
+        else if (whiteTheme) MaterialTheme.colorScheme.onSurface
+        else Color.White
     IconButton(onClick = { open = true }) {
-        Icon(Icons.Outlined.MoreVert, "More options", tint = if (light) Color.White else MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(Icons.Outlined.MoreVert, "More options", tint = tint)
     }
     if (open) LibraryItemMenuCompat(item, cb) { open = false }
 }
