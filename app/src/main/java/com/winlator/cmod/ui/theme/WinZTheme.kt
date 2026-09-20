@@ -53,10 +53,7 @@ enum class WinlatorThemeType(
 ) {
     WHITE("white", "White", "Bright surfaces with dark text"),
     BLACK("black", "Black", "Balanced dark theme · Default"),
-    AMOLED("amoled", "AMOLED", "Pure black background for OLED displays"),
-    BLUE("blue", "Blue", "Dark interface with cool blue accents"),
-    RED("red", "Red", "Dark interface with warm red accents"),
-    PURPLE("purple", "Purple", "Dark interface with rich purple accents");
+    AMOLED("amoled", "AMOLED", "Pure black background for OLED displays");
 
     companion object {
         fun fromId(id: String?): WinlatorThemeType = values().firstOrNull { it.id == id } ?: BLACK
@@ -207,49 +204,10 @@ private val WhiteColors = lightColorScheme(
     error = Color(0xFFBA1A1A), onError = Color.White
 )
 
-private val BlueColors = darkColorScheme(
-    primary = Color(0xFF82B8FF), onPrimary = Color(0xFF001B3A),
-    primaryContainer = Color(0xFF173A63), onPrimaryContainer = Color(0xFFD5E7FF),
-    secondary = Color(0xFFAFC9EA), onSecondary = Color(0xFF102033),
-    secondaryContainer = Color(0xFF17283D), onSecondaryContainer = Color(0xFFD3E5FF),
-    background = Color(0xFF050A12), onBackground = Color(0xFFF2F6FC),
-    surface = Color(0xFF0C1320), onSurface = Color(0xFFF2F6FC),
-    surfaceVariant = Color(0xFF121D2D), onSurfaceVariant = Color(0xFFA9B9CD),
-    outline = Color(0xFF45617F), outlineVariant = Color(0xFF25384F),
-    error = Color(0xFFFFB4AB), onError = Color(0xFF690005)
-)
-
-private val RedColors = darkColorScheme(
-    primary = Color(0xFFFF8A8F), onPrimary = Color(0xFF3C0006),
-    primaryContainer = Color(0xFF662128), onPrimaryContainer = Color(0xFFFFDADB),
-    secondary = Color(0xFFE7B7BA), onSecondary = Color(0xFF301416),
-    secondaryContainer = Color(0xFF432326), onSecondaryContainer = Color(0xFFFFDADB),
-    background = Color(0xFF0C0607), onBackground = Color(0xFFFFF2F2),
-    surface = Color(0xFF160B0D), onSurface = Color(0xFFFFF2F2),
-    surfaceVariant = Color(0xFF241214), onSurfaceVariant = Color(0xFFCDB0B2),
-    outline = Color(0xFF74454A), outlineVariant = Color(0xFF45292C),
-    error = Color(0xFFFFB4AB), onError = Color(0xFF690005)
-)
-
-private val PurpleColors = darkColorScheme(
-    primary = Color(0xFFD0BCFF), onPrimary = Color(0xFF381E72),
-    primaryContainer = Color(0xFF4F378B), onPrimaryContainer = Color(0xFFEADDFF),
-    secondary = Color(0xFFCCC2DC), onSecondary = Color(0xFF332D41),
-    secondaryContainer = Color(0xFF4A4458), onSecondaryContainer = Color(0xFFE8DEF8),
-    background = Color(0xFF0E0A13), onBackground = Color(0xFFE9E1EC),
-    surface = Color(0xFF17111E), onSurface = Color(0xFFE9E1EC),
-    surfaceVariant = Color(0xFF241C2D), onSurfaceVariant = Color(0xFFCCC2DC),
-    outline = Color(0xFF958DA0), outlineVariant = Color(0xFF494151),
-    error = Color(0xFFFFB4AB), onError = Color(0xFF690005)
-)
-
 internal fun winlatorColorScheme(theme: WinlatorThemeType): ColorScheme = when (theme) {
     WinlatorThemeType.WHITE -> WhiteColors
     WinlatorThemeType.BLACK -> BlackColors
     WinlatorThemeType.AMOLED -> AmoledColors
-    WinlatorThemeType.BLUE -> BlueColors
-    WinlatorThemeType.RED -> RedColors
-    WinlatorThemeType.PURPLE -> PurpleColors
 }
 
 private val WinlatorTypography = Typography(

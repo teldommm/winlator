@@ -212,16 +212,4 @@ internal fun winlatorThemePreview(theme: WinlatorThemeType): ThemePreviewColors 
         background = Color.Black, surface = Color(0xFF080808),
         accent = Color.White, outline = Color(0xFF2A2A2A)
     )
-    WinlatorThemeType.BLUE -> ThemePreviewColors(
-        background = Color(0xFF050A12), surface = Color(0xFF101B2B),
-        accent = Color(0xFF82B8FF), outline = Color(0xFF355174)
-    )
-    WinlatorThemeType.RED -> ThemePreviewColors(
-        background = Color(0xFF0C0607), surface = Color(0xFF211113),
-        accent = Color(0xFFFF8A8F), outline = Color(0xFF6E353A)
-    )
-    WinlatorThemeType.PURPLE -> ThemePreviewColors(
-        background = Color(0xFF0E0A13), surface = Color(0xFF241C2D),
-        accent = Color(0xFFD0BCFF), outline = Color(0xFF675A78)
-    )
 }
