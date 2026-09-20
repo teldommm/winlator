@@ -63,19 +63,18 @@ public class IngameSidebarThemeLayout extends FrameLayout {
         readPalette();
         setBackgroundColor(Color.TRANSPARENT);
 
-        if (getChildCount() > 1 && getChildAt(1) instanceof ViewGroup) {
-            ViewGroup legacyRoot = (ViewGroup) getChildAt(1);
+        ViewGroup legacyRoot = findViewById(R.id.LegacySidebarRoot);
+        if (legacyRoot != null) {
             // legacyRoot itself used to be one big opaque rectangle spanning the whole
-            // sidebar width (the "solid slab" behind both the rail and the content).
-            // The rail now paints its own floating pill and the content panel paints its
-            // own floating rounded card (see sidebar_panel_bg), so this wrapper is left
-            // transparent to show the game through the gap between them and the margins.
+            // sidebar width (the "solid slab" behind both the rail and the content), and
+            // later reserved dp(64) of left padding for the rail to float on top of it.
+            // Rail and content are now two columns of one shared card (see left_sidebar.xml
+            // / IngameSidebarCard) rather than overlapping layers, so legacyRoot needs
+            // neither: it's left fully transparent with no reserved padding.
             legacyRoot.setBackgroundColor(Color.TRANSPARENT);
             if (legacyRoot.getChildCount() >= 3) {
                 legacyRoot.getChildAt(0).setVisibility(View.GONE);
                 legacyRoot.getChildAt(1).setVisibility(View.GONE);
-                legacyRoot.setPadding(dp(64), legacyRoot.getPaddingTop(),
-                        legacyRoot.getPaddingRight(), legacyRoot.getPaddingBottom());
             }
         }
 
@@ -239,7 +238,4 @@ public class IngameSidebarThemeLayout extends FrameLayout {
                 || color == Color.rgb(130, 184, 255);
     }
 
-    private int dp(int value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
-    }
 }

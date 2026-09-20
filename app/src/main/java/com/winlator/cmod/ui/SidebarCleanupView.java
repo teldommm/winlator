@@ -1,16 +1,11 @@
 package com.winlator.cmod.ui;
 
 import android.content.Context;
-import android.graphics.drawable.GradientDrawable;
 import android.util.AttributeSet;
-import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.Nullable;
-import androidx.preference.PreferenceManager;
-
-import com.winlator.cmod.R;
 
 // Every id this view used to reach (BTSaveGraphicsPreset, SPHudStyle, LLModernHudOptions,
 // CBHud*, SPInputControlsProfile, BTInputControlsSettings, SWEnableFSR, SPUpscalerMode,
@@ -18,8 +13,10 @@ import com.winlator.cmod.R;
 // port. Removing an id's only @+id/ declaration removes R.id.<name> itself — a
 // findViewById(R.id.X) guarded by "if (view == null)" is still a compile error, not a
 // harmless runtime null, so all of that code had to come out rather than stay dormant.
-// The rail is the one target here that's still real, so tuneNeutralRail() (and the
-// section-label sweep, which matches by view tag rather than id) are all that's left.
+// tuneNeutralRail() (which used to repaint the rail with its own independent rounded
+// background/border/elevation) is gone too now for a different reason: the rail and the
+// content panel are one physical card as of left_sidebar.xml's IngameSidebarCard, so
+// nothing here should be giving the rail its own separate rounding again.
 public class SidebarCleanupView extends View {
     public SidebarCleanupView(Context context) {
         super(context);
@@ -42,38 +39,7 @@ public class SidebarCleanupView extends View {
     }
 
     private void polishUi() {
-        View root = getRootView();
-        hideRenderingSectionLabels(root);
-        tuneNeutralRail(root);
-    }
-
-    private void tuneNeutralRail(View root) {
-        String theme = PreferenceManager.getDefaultSharedPreferences(
-                getContext().getApplicationContext()).getString("winlator_ui_theme", "black");
-        if (!"black".equals(theme) && !"amoled".equals(theme)) return;
-
-        View rail = root.findViewById(R.id.IngameSidebarRail);
-        if (rail == null) return;
-
-        int surface = resolveColor(R.attr.ingameSidebarSurface,
-                "amoled".equals(theme) ? 0xFF050505 : 0xFF121216);
-        int edge = resolveColor(R.attr.ingameSidebarSurfaceVariant,
-                "amoled".equals(theme) ? 0xFF0D0D0D : 0xFF1A1A20);
-
-        GradientDrawable background = new GradientDrawable();
-        background.setShape(GradientDrawable.RECTANGLE);
-        background.setColor(surface);
-        background.setStroke(dp(1), edge);
-        background.setCornerRadius(dp(22));
-        rail.setBackground(background);
-        rail.setElevation(dp(8));
-        rail.setTranslationZ(dp(2));
-    }
-
-    private int resolveColor(int attr, int fallback) {
-        TypedValue value = new TypedValue();
-        if (getContext().getTheme().resolveAttribute(attr, value, true)) return value.data;
-        return fallback;
+        hideRenderingSectionLabels(getRootView());
     }
 
     private void hideRenderingSectionLabels(View view) {
@@ -93,9 +59,5 @@ public class SidebarCleanupView extends View {
                 hideRenderingSectionLabels(group.getChildAt(i));
             }
         }
-    }
-
-    private int dp(int value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 }
