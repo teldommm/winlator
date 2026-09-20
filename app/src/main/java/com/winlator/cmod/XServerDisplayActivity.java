@@ -31,12 +31,8 @@ import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
-import android.widget.Spinner;
-import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -92,6 +88,9 @@ import com.winlator.cmod.math.Mathf;
 import com.winlator.cmod.math.XForm;
 import com.winlator.cmod.midi.MidiHandler;
 import com.winlator.cmod.midi.MidiManager;
+import com.winlator.cmod.ui.GraphicsPanelCallbacks;
+import com.winlator.cmod.ui.GraphicsPanelState;
+import com.winlator.cmod.ui.GraphicsSidebarPanelHost;
 import com.winlator.cmod.ui.HudPanelCallbacks;
 import com.winlator.cmod.ui.HudPanelState;
 import com.winlator.cmod.ui.HudSidebarPanelHost;
@@ -99,14 +98,15 @@ import com.winlator.cmod.ui.InputPanelCallbacks;
 import com.winlator.cmod.ui.InputPanelState;
 import com.winlator.cmod.ui.InputProfileOption;
 import com.winlator.cmod.ui.InputSidebarPanelHost;
+import com.winlator.cmod.ui.RuntimeStatusState;
 import com.winlator.cmod.ui.ScreenPanelCallbacks;
 import com.winlator.cmod.ui.ScreenSidebarPanelHost;
+import com.winlator.cmod.ui.StatusLine;
 import com.winlator.cmod.ui.TaskManagerCallbacks;
 import com.winlator.cmod.ui.TaskManagerPanelHost;
 import com.winlator.cmod.ui.TaskManagerPanelState;
 import com.winlator.cmod.ui.ThemedAlertHost;
 import com.winlator.cmod.widget.FrameRating;
-import com.winlator.cmod.widget.SeekBar;
 import com.winlator.cmod.widget.WinlatorHUD;
 import com.winlator.cmod.widget.InputControlsView;
 import com.winlator.cmod.widget.LogView;
@@ -184,6 +184,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private int activeLsfgMultiplier;
     private java.io.File activeLsfgDll;
     private float activeLsfgFlowScale = 0.80f;
+    private final RuntimeStatusState runtimeStatusState = new RuntimeStatusState();
+    private boolean graphicsFsrEnabled;
+    private int graphicsUpscalerModeIndex;
+    private int graphicsPostFxModeIndex;
+    private int graphicsSharpnessPercent = 50;
+    private int graphicsReshadeStrength = 65;
     private String graphicsDriver = Container.DEFAULT_GRAPHICS_DRIVER;
     private HashMap<String, String> graphicsDriverConfig;
     private String audioDriver = Container.DEFAULT_AUDIO_DRIVER;
@@ -1394,7 +1400,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
         int active = Color.rgb(76, 175, 80);
         int warning = Color.rgb(255, 152, 0);
 
-        setRuntimeStatus(R.id.TVRuntimeRendererStatus, "Renderer", "Vulkan active", active);
+        List<StatusLine> lines = new ArrayList<>();
+        lines.add(new StatusLine("Renderer", "Vulkan active", active));
 
         boolean dxvkActive = dxwrapper != null && dxwrapper.contains("dxvk");
         boolean vkd3dActive = dxvkActive && dxwrapper.contains("vkd3d")
@@ -1414,28 +1421,27 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (d7vkActive) dxWrapperStatus.append(" · ").append(D7VKManager.getWrapperLabel(runtimeDdrawWrapper));
         else if (dd7to9Active) dxWrapperStatus.append(" · Dd7To9");
         else if (cncDdrawActive) dxWrapperStatus.append(" · CnC-DDraw");
-        setRuntimeStatus(R.id.TVRuntimeDXWrapperStatus, "DX Wrapper", dxWrapperStatus.toString(),
-                dxvkActive ? active : normal);
+        lines.add(new StatusLine("DX Wrapper", dxWrapperStatus.toString(), dxvkActive ? active : normal));
 
         // GALLIUM_DRIVER/MESA_LOADER_DRIVER_OVERRIDE are set on the whole guest
         // environment (applyOpenGLDriverEnvVars), not gated by dxwrapper - any
         // OpenGL call anywhere in the container (GDI, video codecs, wine's own
         // internals) goes through it regardless of which D3D wrapper the game
         // itself uses, so it gets its own row rather than riding on DX Wrapper.
-        setRuntimeStatus(R.id.TVRuntimeGLDriverStatus, "GL Driver", openglDriver, active);
+        lines.add(new StatusLine("GL Driver", openglDriver, active));
 
-        Switch upscaler = findViewById(R.id.SWEnableFSR);
-        Spinner upscalerMode = findViewById(R.id.SPUpscalerMode);
         // Vulkan is the only renderer now, so xServerView (when set) is always a
         // VulkanXServerView; upscaling/framegen are simply unavailable before it's created.
         VulkanXServerView vkStatusRenderer = xServerView != null ? (VulkanXServerView) xServerView : null;
         boolean upscalerAvailable = vkStatusRenderer != null;
-        boolean upscalerActive = upscalerAvailable && upscaler != null && upscaler.isChecked();
+        boolean upscalerActive = upscalerAvailable && graphicsFsrEnabled;
+        String[] upscalerLabels = {"SGSR", "FSR", "Lanczos 2", "Color Boost"};
+        String upscalerModeLabel = graphicsUpscalerModeIndex >= 0 && graphicsUpscalerModeIndex < upscalerLabels.length
+                ? upscalerLabels[graphicsUpscalerModeIndex] : "SGSR";
         String upscalerStatus = !upscalerAvailable ? "Unavailable"
-                : upscalerActive && upscalerMode != null ? upscalerMode.getSelectedItem() + " active"
+                : upscalerActive ? upscalerModeLabel + " active"
                 : "Off";
-        setRuntimeStatus(R.id.TVRuntimeUpscalerStatus, "Upscaler", upscalerStatus,
-                upscalerActive ? active : normal);
+        lines.add(new StatusLine("Upscaler", upscalerStatus, upscalerActive ? active : normal));
 
         VulkanXServerView framegenRenderer = vkStatusRenderer;
         boolean framegenAvailable = framegenRenderer != null;
@@ -1447,7 +1453,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 : "LSFG " + activeLsfgMultiplier + "x active";
         int framegenColor = framegenActive && framegenError.isEmpty() ? active
                 : framegenActive ? warning : normal;
-        setRuntimeStatus(R.id.TVRuntimeFramegenStatus, "Framegen", framegenStatus, framegenColor);
+        lines.add(new StatusLine("Framegen", framegenStatus, framegenColor));
 
         boolean arm64ec = wineInfo != null && wineInfo.isArm64EC();
         boolean fexConfigured = arm64ec && "fexcore".equalsIgnoreCase(emulator);
@@ -1458,22 +1464,17 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 : !fexConfigured ? "Off · " + emulator
                 : (version == null || version.isEmpty() ? "" : version + " ")
                         + (fexMode == RuntimeBackendProbe.FexMode.NA ? "not detected" : "active");
-        setRuntimeStatus(R.id.TVRuntimeFEXCoreStatus, "FEXCore", fexStatus,
-                fexConfigured ? (fexMode == RuntimeBackendProbe.FexMode.NA ? warning : active) : normal);
+        lines.add(new StatusLine("FEXCore", fexStatus,
+                fexConfigured ? (fexMode == RuntimeBackendProbe.FexMode.NA ? warning : active) : normal));
 
         String unixLibsStatus = !fexConfigured ? "Not applicable"
                 : fexMode == RuntimeBackendProbe.FexMode.UNIXLIB ? "Active"
                 : fexMode == RuntimeBackendProbe.FexMode.DLL ? "Off · DLL mode" : "Not detected";
-        setRuntimeStatus(R.id.TVRuntimeUnixLibsStatus, "Unixlibs", unixLibsStatus,
+        lines.add(new StatusLine("Unixlibs", unixLibsStatus,
                 fexMode == RuntimeBackendProbe.FexMode.UNIXLIB ? active
-                        : fexConfigured && fexMode == RuntimeBackendProbe.FexMode.NA ? warning : normal);
-    }
+                        : fexConfigured && fexMode == RuntimeBackendProbe.FexMode.NA ? warning : normal));
 
-    private void setRuntimeStatus(int viewId, String label, String value, int color) {
-        TextView view = findViewById(viewId);
-        if (view == null) return;
-        view.setText(label + ": " + value);
-        view.setTextColor(color);
+        runtimeStatusState.setLines(lines);
     }
 
     private ActivityResultLauncher<Intent> controlsEditorActivityResultLauncher = registerForActivityResult(
@@ -1747,28 +1748,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
     }
 
-    private ArrayAdapter<String> createSidebarSpinnerAdapter(String[] items) {
-        return new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, items) {
-            @NonNull
-            @Override
-            public View getView(int position, @Nullable View convertView, @NonNull ViewGroup parent) {
-                TextView view = (TextView) super.getView(position, convertView, parent);
-                view.setTextColor(Color.parseColor("#EEF7FF"));
-                view.setTextSize(14);
-                view.setSingleLine(true);
-                return view;
-            }
-
-            @Override
-            public View getDropDownView(int position, @Nullable View convertView, @NonNull ViewGroup parent) {
-                TextView view = (TextView) super.getDropDownView(position, convertView, parent);
-                view.setTextColor(Color.parseColor("#EEF7FF"));
-                view.setBackgroundColor(Color.parseColor("#0E2231"));
-                view.setTextSize(14);
-                return view;
-            }
-        };
-    }
 
     private void setupSidebarHudControls() {
         ComposeView hudPanel = findViewById(R.id.LLSubFPS);
@@ -1885,197 +1864,142 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     private void setupSidebarGraphicsControls() {
-        View reshadePanel = findViewById(R.id.LLSubReshade);
-        View postFxDivider = findViewById(R.id.VPostFXDivider);
-        View postFxOptions = findViewById(R.id.LLPostFXOptions);
-
-        if (reshadePanel != null) {
-            reshadePanel.setVisibility(View.VISIBLE);
-        }
-        if (postFxDivider != null) {
-            postFxDivider.setVisibility(View.VISIBLE);
-        }
-        if (postFxOptions != null) {
-            postFxOptions.setVisibility(View.VISIBLE);
-        }
+        ComposeView graphicsPanel = findViewById(R.id.LLSubGraphics);
+        if (graphicsPanel == null) return;
 
         // Vulkan is the only renderer now, so renderer (when set) is always a VulkanXServerView.
         final XServerRendererView renderer = xServerView;
-        final VulkanXServerView  vkRenderer = renderer != null ? (VulkanXServerView) renderer : null;
+        final VulkanXServerView vkRenderer = renderer != null ? (VulkanXServerView) renderer : null;
 
-        Spinner spNativeFPS        = findViewById(R.id.SPNativeFPS);
-        View    llStandardOptions  = findViewById(R.id.LLStandardOptions);
-        Switch  swEnableFSR        = findViewById(R.id.SWEnableFSR);
-        Spinner spUpscalerMode     = findViewById(R.id.SPUpscalerMode);
-        View    lblSharpnessHeader = findViewById(R.id.LBLSharpnessHeader);
-        SeekBar sbSharpness        = findViewById(R.id.SBSharpness);
-        Spinner spPostFXMode       = findViewById(R.id.SPPostFXMode);
-        Spinner spColorMode        = findViewById(R.id.SPColorMode);
-        View    btSaveGraphicsPreset = findViewById(R.id.BTSaveGraphicsPreset);
-        View    llFrameGenOptions  = findViewById(R.id.LLFrameGenOptions);
-        Spinner spFrameGenFPS      = findViewById(R.id.SPFrameGenFPS);
-        SeekBar sbFrameGenFlowScale = findViewById(R.id.SBFrameGenFlowScale);
+        int initialFpsLimit = loadFpsLimit();
+        if (vkRenderer != null) vkRenderer.setFpsLimit(initialFpsLimit);
 
-        if (llFrameGenOptions != null) llFrameGenOptions.setVisibility(View.GONE);
-        if (spFrameGenFPS  != null) spFrameGenFPS.setVisibility(View.GONE);
-        if (sbFrameGenFlowScale != null) sbFrameGenFlowScale.setVisibility(View.GONE);
-        if (spColorMode    != null) spColorMode.setVisibility(View.GONE);
-        if (llStandardOptions != null) llStandardOptions.setVisibility(View.VISIBLE);
-        if (btSaveGraphicsPreset != null) btSaveGraphicsPreset.setVisibility(View.VISIBLE);
-
-        final int[]    fpsValues = {0, 30, 60, 90, 120};
-        final String[] fpsLabels = {"Off", "30 FPS", "60 FPS", "90 FPS", "120 FPS"};
-
-        if (spNativeFPS != null) {
-            ArrayAdapter<String> a = createSidebarSpinnerAdapter(fpsLabels);
-            a.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-            spNativeFPS.setAdapter(a);
-            String savedFps = container != null ? container.getExtra("graphicsFpsPreset") : "";
-            int savedFpsPos = savedFps.isEmpty() ? 0 : Integer.parseInt(savedFps);
-            if (savedFpsPos < 0 || savedFpsPos >= fpsLabels.length) savedFpsPos = 0;
-            spNativeFPS.setSelection(savedFpsPos);
-            int initialFpsLimit = savedFpsPos < fpsValues.length ? fpsValues[savedFpsPos] : 0;
-            if (vkRenderer != null) vkRenderer.setFpsLimit(initialFpsLimit);
-            spNativeFPS.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
-                    if (llStandardOptions != null) llStandardOptions.setVisibility(View.VISIBLE);
-                    int fpsLimit = pos < fpsValues.length ? fpsValues[pos] : 0;
-                    if (vkRenderer != null) vkRenderer.setFpsLimit(fpsLimit);
-                }
-                @Override public void onNothingSelected(AdapterView<?> p) {}
-            });
-        }
-
-        if (btSaveGraphicsPreset != null) {
-            btSaveGraphicsPreset.setOnClickListener(v -> {
-                if (container == null) return;
-                container.putExtra("graphicsFpsPreset",
-                    String.valueOf(spNativeFPS != null ? spNativeFPS.getSelectedItemPosition() : 0));
-                if (vkRenderer != null) {
-                    container.putExtra("graphicsFilterMode",
-                        String.valueOf(swEnableFSR != null && swEnableFSR.isChecked()
-                            ? (spUpscalerMode != null ? spUpscalerMode.getSelectedItemPosition() + 2 : 2) : 0));
-                    container.putExtra("graphicsSharpness",
-                        String.valueOf(sbSharpness != null ? sbSharpness.getValue() : 50f));
-                    container.putExtra("graphicsPostFXMode",
-                        String.valueOf(spPostFXMode != null ? spPostFXMode.getSelectedItemPosition() : 0));
-                    container.putExtra("graphicsColorMode", "0");
-                }
-                container.saveData();
-                Toast.makeText(this, "Preset saved", Toast.LENGTH_SHORT).show();
-            });
-        }
-
-        if (vkRenderer == null) return;
-
-        final String[] upscalerLabels = {"SGSR", "FSR", "Lanczos 2", "Color Boost"};
-        if (spUpscalerMode != null) {
-            ArrayAdapter<String> a = createSidebarSpinnerAdapter(upscalerLabels);
-            a.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-            spUpscalerMode.setAdapter(a);
-            spUpscalerMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
-                    if (swEnableFSR != null && swEnableFSR.isChecked())
-                        vkRenderer.setFilterMode(pos + 2);
-                    updateRuntimeStatusUi(runtimeFexMode);
-                }
-                @Override public void onNothingSelected(AdapterView<?> p) {}
-            });
-        }
-
-        String savedSharp = container != null ? container.getExtra("graphicsSharpness") : "";
-        float  initSharp  = savedSharp.isEmpty() ? 50f : Float.parseFloat(savedSharp);
-        if (sbSharpness != null) {
-            sbSharpness.setValue(initSharp);
-            vkRenderer.setSharpness(initSharp / 100f);
-            sbSharpness.setOnValueChangeListener((sb, v) -> vkRenderer.setSharpness(v / 100f));
-        }
-
-        Runnable updateSharpnessVis = () -> {
-            boolean fsrOn = swEnableFSR  != null && swEnableFSR.isChecked();
-            boolean dlsOn = spPostFXMode != null && spPostFXMode.getSelectedItemPosition() == 1;
-            int vis = (fsrOn || dlsOn) ? View.VISIBLE : View.GONE;
-            if (lblSharpnessHeader != null) lblSharpnessHeader.setVisibility(vis);
-            if (sbSharpness        != null) sbSharpness.setVisibility(vis);
-        };
-
-        String savedFilter = container != null ? container.getExtra("graphicsFilterMode") : "";
+        // FSR/Upscaler/PostFX/Sharpness prefer the per-shortcut value over the container-wide
+        // one, exactly like SidebarCleanupView's bolted-on autosave used to (it re-read these
+        // same three keys from the Shortcut ~650ms after setup and overrode whatever the
+        // container-based read had already shown). Doing the shortcut-aware read here up
+        // front avoids that startup flicker instead of reproducing it.
+        String savedFilter = readGraphicsExtra("graphicsFilterMode");
         boolean fsrOn = !savedFilter.isEmpty() && Integer.parseInt(savedFilter) > 0;
-        if (swEnableFSR != null) {
-            swEnableFSR.setChecked(fsrOn);
-            if (spUpscalerMode != null)
-                spUpscalerMode.setVisibility(fsrOn ? View.VISIBLE : View.GONE);
-            if (fsrOn)
-                vkRenderer.setFilterMode(spUpscalerMode != null
-                    ? spUpscalerMode.getSelectedItemPosition() + 2 : 2);
-            swEnableFSR.setOnCheckedChangeListener((btn, checked) -> {
-                if (spUpscalerMode != null)
-                    spUpscalerMode.setVisibility(checked ? View.VISIBLE : View.GONE);
-                vkRenderer.setFilterMode(checked
-                    ? (spUpscalerMode != null ? spUpscalerMode.getSelectedItemPosition() + 2 : 2)
-                    : (container != null ? container.getRendererFilterMode() : 0));
-                updateSharpnessVis.run();
-                updateRuntimeStatusUi(runtimeFexMode);
-            });
-        }
+        int upscalerModeIndex = !savedFilter.isEmpty() ? Math.max(0, Integer.parseInt(savedFilter) - 2) : 0;
+        graphicsFsrEnabled = fsrOn;
+        graphicsUpscalerModeIndex = upscalerModeIndex;
 
-        final String[] pfxLabels = {"None", "DLS", "CRT", "HDR", "Natural"};
-        if (spPostFXMode != null) {
-            ArrayAdapter<String> a = createSidebarSpinnerAdapter(pfxLabels);
-            a.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-            spPostFXMode.setAdapter(a);
+        String savedSharp = readGraphicsExtra("graphicsSharpness");
+        int initSharp = savedSharp.isEmpty() ? 50 : Math.round(Float.parseFloat(savedSharp));
+        graphicsSharpnessPercent = initSharp;
 
-            String savedPFX = container != null ? container.getExtra("graphicsPostFXMode") : "";
-            int initPFX = savedPFX.isEmpty() ? 0 : Integer.parseInt(savedPFX);
-            if (initPFX < 0 || initPFX >= pfxLabels.length) initPFX = 0;
+        String savedPFX = readGraphicsExtra("graphicsPostFXMode");
+        int initPFX = savedPFX.isEmpty() ? 0 : Integer.parseInt(savedPFX);
+        if (initPFX < 0 || initPFX >= 5) initPFX = 0;
+        graphicsPostFxModeIndex = initPFX;
 
-            spPostFXMode.setSelection(initPFX, false);
+        if (vkRenderer != null) {
+            if (fsrOn) vkRenderer.setFilterMode(upscalerModeIndex + 2);
+            vkRenderer.setSharpness(initSharp / 100f);
             if (initPFX > 0) vkRenderer.setPostFXMode(initPFX);
-
-            spPostFXMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
-                    vkRenderer.setPostFXMode(pos);
-                    updateSharpnessVis.run();
-                }
-                @Override public void onNothingSelected(AdapterView<?> p) {}
-            });
-        }
-
-        String savedPFXInit = container != null ? container.getExtra("graphicsPostFXMode") : "";
-        boolean dlsRestored = !savedPFXInit.isEmpty() && Integer.parseInt(savedPFXInit) == 1;
-        int sharpVis = (fsrOn || dlsRestored) ? View.VISIBLE : View.GONE;
-        if (lblSharpnessHeader != null) lblSharpnessHeader.setVisibility(sharpVis);
-        if (sbSharpness        != null) sbSharpness.setVisibility(sharpVis);
-
-        if (llFrameGenOptions != null) llFrameGenOptions.setVisibility(View.VISIBLE);
-        if (spFrameGenFPS != null) {
-            spFrameGenFPS.setVisibility(View.VISIBLE);
-            String[] frameGenLabels = {"Off", "LSFG 2x", "LSFG 3x", "LSFG 4x"};
-            ArrayAdapter<String> a = createSidebarSpinnerAdapter(frameGenLabels);
-            a.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-            spFrameGenFPS.setAdapter(a);
-            spFrameGenFPS.setSelection(activeLsfgMultiplier < 2 ? 0 : Math.min(3, activeLsfgMultiplier - 1), false);
             vkRenderer.setFrameGenStatusListener(() -> updateRuntimeStatusUi(runtimeFexMode));
-            spFrameGenFPS.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
-                    activeLsfgMultiplier = pos < 1 ? 0 : pos + 1;
-                    if (shortcut != null) {
-                        shortcut.setLsfgMultiplier(activeLsfgMultiplier);
-                        shortcut.saveData();
-                    } else if (container != null) {
-                        container.setLsfgMultiplier(activeLsfgMultiplier);
-                        container.saveData();
-                    }
-                    vkRenderer.setFrameGenNative(activeLsfgDll, activeLsfgMultiplier, activeLsfgFlowScale);
-                }
-                @Override public void onNothingSelected(AdapterView<?> p) {}
-            });
         }
-        if (sbFrameGenFlowScale != null) {
-            sbFrameGenFlowScale.setVisibility(View.VISIBLE);
-            sbFrameGenFlowScale.setValue(activeLsfgFlowScale);
-            sbFrameGenFlowScale.setOnValueChangeListener((sb, v) -> {
-                activeLsfgFlowScale = v;
+
+        GraphicsPanelState state = new GraphicsPanelState(
+                initialFpsLimit,
+                fsrOn,
+                upscalerModeIndex,
+                initSharp,
+                initPFX,
+                0,  // ReShade never persisted anything in the original either — always starts Off
+                graphicsReshadeStrength,
+                vkRenderer != null,
+                activeLsfgMultiplier < 2 ? 0 : Math.min(3, activeLsfgMultiplier - 1),
+                activeLsfgFlowScale
+        );
+
+        GraphicsPanelCallbacks callbacks = new GraphicsPanelCallbacks() {
+            @Override
+            public void onFpsLimitChanged(int fps) {
+                saveFpsLimit(fps);
+                if (vkRenderer != null) vkRenderer.setFpsLimit(fps);
+            }
+
+            @Override
+            public void onFsrToggled(boolean enabled) {
+                graphicsFsrEnabled = enabled;
+                if (vkRenderer != null) {
+                    vkRenderer.setFilterMode(enabled
+                            ? graphicsUpscalerModeIndex + 2
+                            : (container != null ? container.getRendererFilterMode() : 0));
+                }
+                autosaveGraphicsSettings();
+                updateRuntimeStatusUi(runtimeFexMode);
+            }
+
+            @Override
+            public void onUpscalerModeChanged(int index) {
+                graphicsUpscalerModeIndex = index;
+                if (vkRenderer != null && graphicsFsrEnabled) vkRenderer.setFilterMode(index + 2);
+                autosaveGraphicsSettings();
+                updateRuntimeStatusUi(runtimeFexMode);
+            }
+
+            @Override
+            public void onSharpnessChanged(int percent) {
+                graphicsSharpnessPercent = percent;
+                if (vkRenderer != null) vkRenderer.setSharpness(percent / 100f);
+            }
+
+            @Override
+            public void onSharpnessCommitted(int percent) {
+                graphicsSharpnessPercent = percent;
+                autosaveGraphicsSettings();
+            }
+
+            @Override
+            public void onPostFxModeChanged(int index) {
+                graphicsPostFxModeIndex = index;
+                if (vkRenderer != null) vkRenderer.setPostFXMode(index);
+                autosaveGraphicsSettings();
+            }
+
+            @Override
+            public void onReshadeEffectChanged(int index) {
+                // Mirrors ReshadeSidebarPanelView.applyEffect() exactly, including the
+                // effect-mode lookup table. ReShade itself is still never persisted — the
+                // original ReshadeSidebarPanelView never wrote to Container or Shortcut
+                // either, so this is session-only by design, not an oversight.
+                if (vkRenderer == null) return;
+                int[] effectModes = {0, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20};
+                if (index <= 0 || index >= effectModes.length) {
+                    vkRenderer.setPostFXMode(0);
+                    return;
+                }
+                vkRenderer.setFilterMode(0);
+                vkRenderer.setSharpness(graphicsReshadeStrength / 100f);
+                vkRenderer.setPostFXMode(effectModes[index]);
+            }
+
+            @Override
+            public void onReshadeStrengthChanged(int percent) {
+                graphicsReshadeStrength = percent;
+                if (vkRenderer != null) vkRenderer.setSharpness(percent / 100f);
+            }
+
+            @Override
+            public void onFrameGenChanged(int multiplierIndex) {
+                activeLsfgMultiplier = multiplierIndex < 1 ? 0 : multiplierIndex + 1;
+                if (shortcut != null) {
+                    shortcut.setLsfgMultiplier(activeLsfgMultiplier);
+                    shortcut.saveData();
+                } else if (container != null) {
+                    container.setLsfgMultiplier(activeLsfgMultiplier);
+                    container.saveData();
+                }
+                if (vkRenderer != null)
+                    vkRenderer.setFrameGenNative(activeLsfgDll, activeLsfgMultiplier, activeLsfgFlowScale);
+            }
+
+            @Override
+            public void onFrameGenFlowScaleChanged(float scale) {
+                activeLsfgFlowScale = scale;
                 if (shortcut != null) {
                     shortcut.setLsfgFlowScale(activeLsfgFlowScale);
                     shortcut.saveData();
@@ -2083,10 +2007,110 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     container.setLsfgFlowScale(activeLsfgFlowScale);
                     container.saveData();
                 }
-                vkRenderer.setFrameGenNative(activeLsfgDll, activeLsfgMultiplier, activeLsfgFlowScale);
-            });
+                if (vkRenderer != null)
+                    vkRenderer.setFrameGenNative(activeLsfgDll, activeLsfgMultiplier, activeLsfgFlowScale);
+            }
+
+            @Override
+            public void onSavePreset() {
+                // Distinct from the per-shortcut autosave above: this always writes the
+                // container-wide default, matching the original Save Preset button, which
+                // only ever targeted Container regardless of whether a Shortcut existed.
+                if (container == null) return;
+                container.putExtra("graphicsFilterMode",
+                        String.valueOf(graphicsFsrEnabled ? graphicsUpscalerModeIndex + 2 : 0));
+                container.putExtra("graphicsSharpness", String.valueOf((float) graphicsSharpnessPercent));
+                container.putExtra("graphicsPostFXMode", String.valueOf(graphicsPostFxModeIndex));
+                container.putExtra("graphicsColorMode", "0");
+                container.saveData();
+                Toast.makeText(XServerDisplayActivity.this, "Preset saved", Toast.LENGTH_SHORT).show();
+            }
+        };
+
+        GraphicsSidebarPanelHost.attach(graphicsPanel, state, runtimeStatusState, callbacks);
+    }
+
+    // Shortcut-preferred, Container-fallback read — same priority SidebarCleanupView's
+    // restoreShortcutGraphics() used (only it did this ~650ms after showing the Container
+    // value first). Empty on both means "no saved value", handled by each caller's default.
+    private String readGraphicsExtra(String key) {
+        if (shortcut != null) {
+            String value = shortcut.getExtra(key, "");
+            if (!value.isEmpty()) return value;
+        }
+        return container != null ? container.getExtra(key, "") : "";
+    }
+
+    // Same shape as SidebarCleanupView's saveGraphicsState(): writes all three settings
+    // together, to the Shortcut when one exists so each shortcut keeps its own graphics
+    // preset, falling back to Container otherwise.
+    private void autosaveGraphicsSettings() {
+        String filter = String.valueOf(graphicsFsrEnabled ? graphicsUpscalerModeIndex + 2 : 0);
+        String sharp = String.valueOf(graphicsSharpnessPercent);
+        String post = String.valueOf(graphicsPostFxModeIndex);
+
+        if (shortcut != null) {
+            shortcut.putExtra("graphicsFilterMode", filter);
+            shortcut.putExtra("graphicsSharpness", sharp);
+            shortcut.putExtra("graphicsPostFXMode", post);
+            shortcut.putExtra("graphicsColorMode", "0");
+            shortcut.saveData();
+        } else if (container != null) {
+            container.putExtra("graphicsFilterMode", filter);
+            container.putExtra("graphicsSharpness", sharp);
+            container.putExtra("graphicsPostFXMode", post);
+            container.putExtra("graphicsColorMode", "0");
+            container.saveData();
+        }
+    }
+
+    private int loadFpsLimit() {
+        String savedLimit, oldPreset, oldEnabled;
+        if (shortcut != null) {
+            savedLimit = shortcut.getExtra("nativeFpsLimit", "");
+            oldPreset = shortcut.getExtra("graphicsFpsPreset", "");
+            oldEnabled = shortcut.getExtra("nativeFpsLimiterEnabled", "");
+            if (savedLimit.isEmpty() && oldPreset.isEmpty() && oldEnabled.isEmpty() && container != null) {
+                savedLimit = container.getExtra("nativeFpsLimit", "");
+                oldPreset = container.getExtra("graphicsFpsPreset", "");
+                oldEnabled = container.getExtra("nativeFpsLimiterEnabled", "");
+            }
+        } else if (container != null) {
+            savedLimit = container.getExtra("nativeFpsLimit", "");
+            oldPreset = container.getExtra("graphicsFpsPreset", "");
+            oldEnabled = container.getExtra("nativeFpsLimiterEnabled", "");
+        } else {
+            return 0;
         }
 
+        int limit = parsePositiveOrZero(savedLimit);
+        if (savedLimit.isEmpty()) {
+            int oldIndex = parsePositiveOrZero(oldPreset);
+            int[] oldValues = {0, 30, 60, 90, 120};
+            limit = oldIndex >= 0 && oldIndex < oldValues.length ? oldValues[oldIndex] : 0;
+        }
+        if ("0".equals(oldEnabled)) limit = 0;
+        return limit;
+    }
+
+    private void saveFpsLimit(int fps) {
+        if (shortcut != null) {
+            shortcut.putExtra("nativeFpsLimiterEnabled", null);
+            shortcut.putExtra("nativeFpsLimit", String.valueOf(fps));
+            shortcut.saveData();
+        } else if (container != null) {
+            container.putExtra("nativeFpsLimiterEnabled", null);
+            container.putExtra("nativeFpsLimit", String.valueOf(fps));
+            container.saveData();
+        }
+    }
+
+    private int parsePositiveOrZero(String value) {
+        try {
+            return Math.max(0, Integer.parseInt(value.trim()));
+        } catch (Exception ignored) {
+            return 0;
+        }
     }
 
         private void setupSidebarInputControls() {
