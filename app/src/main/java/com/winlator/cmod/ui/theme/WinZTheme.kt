@@ -110,24 +110,21 @@ private val BlackColors = darkColorScheme(
     error = Color(0xFFFFB4AB), onError = Color(0xFF690005)
 )
 
-// Dedicated accent for Switch/Slider controls only — intentionally NOT wired into
-// `primary`, so buttons/nav/other accents stay neutral gray. Scoped to Black only;
-// every other theme keeps using its own `primary` as before (unchanged behavior).
-private val BlackControlAccent = Color(0xFF3B82F6)
+// Dedicated accent for Switch/Slider/button controls — intentionally NOT wired into
+// `primary`, so it reads as one consistent brand blue across all three themes rather
+// than each theme's own neutral primary.
+private val ControlAccent = Color(0xFF3B82F6)
 
-internal fun controlAccentFor(theme: WinlatorThemeType): Color =
-    if (theme == WinlatorThemeType.BLACK) BlackControlAccent else winlatorColorScheme(theme).primary
+internal fun controlAccentFor(theme: WinlatorThemeType): Color = ControlAccent
 
 @Composable
 fun controlAccentColor(): Color = controlAccentFor(WinlatorThemeManager.currentTheme())
 
 // Danger/destructive red for Remove/Delete-style confirm buttons and the components manager's
-// Delete/In-use rows. Scoped to Black only, same as controlAccentColor above — every other
-// theme keeps using its own `error` color as before (unchanged behavior).
-private val BlackDestructive = Color(0xFFD03B3B)
+// Delete/In-use rows. Same red across all three themes, same treatment as controlAccentColor above.
+private val DestructiveRed = Color(0xFFD03B3B)
 
-internal fun destructiveFor(theme: WinlatorThemeType): Color =
-    if (theme == WinlatorThemeType.BLACK) BlackDestructive else winlatorColorScheme(theme).error
+internal fun destructiveFor(theme: WinlatorThemeType): Color = DestructiveRed
 
 @Composable
 fun destructiveColor(): Color = destructiveFor(WinlatorThemeManager.currentTheme())
@@ -186,7 +183,8 @@ private val AmoledColors = darkColorScheme(
     secondary = Color(0xFFD0D0D0), onSecondary = Color.Black,
     secondaryContainer = Color(0xFF101010), onSecondaryContainer = Color(0xFFECECEC),
     background = Color.Black, onBackground = Color(0xFFF7F7F7),
-    surface = Color(0xFF050505), onSurface = Color(0xFFF7F7F7),
+    // Same ~90% translucent-surface treatment as Black, over a pure black background.
+    surface = Color(0xE6050505), onSurface = Color(0xFFF7F7F7),
     surfaceVariant = Color(0xFF0D0D0D), onSurfaceVariant = Color(0xFFAAAAAA),
     outline = Color(0xFF383838), outlineVariant = Color(0xFF202020),
     error = Color(0xFFFFB4AB), onError = Color(0xFF690005)
@@ -198,7 +196,8 @@ private val WhiteColors = lightColorScheme(
     secondary = Color(0xFF555861), onSecondary = Color.White,
     secondaryContainer = Color(0xFFE7E8EC), onSecondaryContainer = Color(0xFF26282E),
     background = Color(0xFFF5F6F8), onBackground = Color(0xFF18191D),
-    surface = Color.White, onSurface = Color(0xFF18191D),
+    // Same ~90% translucent-surface treatment as Black/Amoled, over the light background.
+    surface = Color(0xE6FFFFFF), onSurface = Color(0xFF18191D),
     surfaceVariant = Color(0xFFE8E9ED), onSurfaceVariant = Color(0xFF60636B),
     outline = Color(0xFF92959D), outlineVariant = Color(0xFFD1D3D8),
     error = Color(0xFFBA1A1A), onError = Color.White
