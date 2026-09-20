@@ -5,61 +5,9 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <LinearLayout
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginTop="8dp"
-        android:background="@drawable/input_controls_toolbar"
-        android:gravity="center_vertical"
-        android:padding="4dp">
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:paddingLeft="8dp"
-            android:paddingRight="8dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textStyle="bold"
-                android:textSize="14sp"
-                android:textColor="#ffffff"
-                android:text="@string/profile" />
-
-            <TextView
-                android:id="@+id/TVProfileName"
-                android:layout_width="wrap_content"
-                android:textColor="@color/colorAccent"
-                android:textSize="14sp"
-                android:layout_height="wrap_content" />
-        </LinearLayout>
-
-        <View style="@style/VerticalLine" />
-
-        <ImageButton
-            android:id="@+id/BTAddElement"
-            style="@style/ToolButton"
-            android:src="@drawable/icon_add"  />
-
-        <ImageButton
-            android:id="@+id/BTRemoveElement"
-            style="@style/ToolButton"
-            android:src="@drawable/icon_remove"  />
-
-        <ImageButton
-            android:id="@+id/BTElementSettings"
-            style="@style/ToolButton"
-            android:src="@drawable/icon_settings"  />
-
-        <View style="@style/VerticalLine" />
-
-        <ImageButton
-            android:id="@+id/BTSchemeColor"
-            style="@style/ToolButton"
-            android:src="@android:drawable/ic_menu_edit"  />
-    </LinearLayout>
+    <!-- InputControlsView (the drag/resize canvas) and the floating toolbar are both added
+         programmatically in ControlsEditorActivity.onCreate(): the canvas via
+         `new InputControlsView(this)`, the toolbar via ControlsEditorToolbarComposeHost.create()
+         (a Compose replacement for the old native LinearLayout toolbar that used to be inlined
+         here — see git history for its XML if ever needed for reference). -->
 </FrameLayout>

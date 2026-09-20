@@ -9,9 +9,7 @@ import android.os.Bundle;
 import android.content.SharedPreferences;
 import android.os.Environment;
 import android.util.Log;
-import android.view.View;
 import android.widget.FrameLayout;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.File;
@@ -33,6 +31,7 @@ import com.winlator.cmod.ui.inputcontrols.ControlElementIconTint;
 import com.winlator.cmod.ui.inputcontrols.ControlElementSettingsCallbacks;
 import com.winlator.cmod.ui.inputcontrols.ControlElementSettingsComposeHost;
 import com.winlator.cmod.ui.inputcontrols.ControlElementSettingsModel;
+import com.winlator.cmod.ui.inputcontrols.ControlsEditorToolbarComposeHost;
 import com.winlator.cmod.ui.inputcontrols.SchemeColorComposeDialog;
 
 import com.winlator.cmod.inputcontrols.Binding;
@@ -43,7 +42,7 @@ import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.widget.InputControlsView;
 
-public class ControlsEditorActivity extends AppCompatActivity implements View.OnClickListener {
+public class ControlsEditorActivity extends AppCompatActivity {
     private InputControlsView inputControlsView;
     private ControlsProfile profile;
     private ControlElement pendingIconElement = null;
@@ -79,16 +78,34 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
             finish();
             return;
         }
-        ((TextView)findViewById(R.id.TVProfileName)).setText(profile.getName());
         inputControlsView.setProfile(profile);
 
         FrameLayout container = findViewById(R.id.FLContainer);
         container.addView(inputControlsView, 0);
 
-        container.findViewById(R.id.BTAddElement).setOnClickListener(this);
-        container.findViewById(R.id.BTRemoveElement).setOnClickListener(this);
-        container.findViewById(R.id.BTElementSettings).setOnClickListener(this);
-        container.findViewById(R.id.BTSchemeColor).setOnClickListener(this);
+        container.addView(ControlsEditorToolbarComposeHost.create(
+                this,
+                profile.getName(),
+                () -> {
+                    if (!inputControlsView.addElement()) {
+                        Toast.makeText(this, "No profile selected", Toast.LENGTH_SHORT).show();
+                    }
+                },
+                () -> {
+                    if (!inputControlsView.removeElement()) {
+                        Toast.makeText(this, "No control element selected", Toast.LENGTH_SHORT).show();
+                    }
+                },
+                () -> {
+                    ControlElement selectedElement = inputControlsView.getSelectedElement();
+                    if (selectedElement != null) {
+                        showControlElementSettings();
+                    } else {
+                        Toast.makeText(this, "No control element selected", Toast.LENGTH_SHORT).show();
+                    }
+                },
+                this::showSchemeColorPicker
+        ));
     }
 
     @Override
@@ -107,32 +124,6 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
         }, 500);
     }
 
-    @Override
-    public void onClick(View v) {
-        switch (v.getId()) {
-            case R.id.BTAddElement:
-                if (!inputControlsView.addElement()) {
-                    Toast.makeText(this, "No profile selected", Toast.LENGTH_SHORT).show();
-                }
-                break;
-            case R.id.BTRemoveElement:
-                if (!inputControlsView.removeElement()) {
-                    Toast.makeText(this, "No control element selected", Toast.LENGTH_SHORT).show();
-                }
-                break;
-            case R.id.BTElementSettings:
-                ControlElement selectedElement = inputControlsView.getSelectedElement();
-                if (selectedElement != null) {
-                    showControlElementSettings();
-                }
-                else Toast.makeText(this, "No control element selected", Toast.LENGTH_SHORT).show();
-                break;
-            case R.id.BTSchemeColor:
-                showSchemeColorPicker();
-                break;
-        }
-    }
-
     private void showSchemeColorPicker() {
         ArrayList<Integer> colors = new ArrayList<>();
         for (int color : PALETTE_COLORS) colors.add(color);
@@ -142,8 +133,6 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
             inputControlsView.invalidate();
         });
     }
-
-    // ---- Element settings panel (Compose) ----
 
     private void showControlElementSettings() {
         final ControlElement element = inputControlsView.getSelectedElement();
