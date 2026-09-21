@@ -28,140 +28,16 @@
         android:elevation="8dp"
         android:clipToOutline="true">
 
-        <LinearLayout
+        <!--
+          Rail is a Compose port of the old SidebarNavItemView column (see
+          SidebarRailPanel.kt / SidebarRailHost) — attached from
+          XServerDisplayActivity.wireSidebarListeners() same way the panel
+          ComposeViews below are.
+        -->
+        <androidx.compose.ui.platform.ComposeView
             android:id="@+id/IngameSidebarRail"
             android:layout_width="58dp"
-            android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:gravity="center_horizontal"
-            android:background="?attr/ingameSidebarSurfaceVariant"
-            android:paddingStart="5dp"
-            android:paddingEnd="5dp"
-            android:paddingTop="12dp"
-            android:paddingBottom="12dp">
-
-            <com.winlator.cmod.ui.SidebarNavItemView
-                android:id="@+id/BTItemGraphics"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:gravity="center"
-                android:clickable="true"
-                android:focusable="true"
-                android:background="@drawable/sidebar_nav_icon_bg">
-                <ImageView
-                    android:layout_width="25dp"
-                    android:layout_height="25dp"
-                    android:duplicateParentState="true"
-                    android:src="@drawable/ic_sidebar_gpu"
-                    app:tint="@color/ingame_sidebar_icon_tint" />
-            </com.winlator.cmod.ui.SidebarNavItemView>
-
-            <com.winlator.cmod.ui.SidebarNavItemView
-                android:id="@+id/BTItemScreen"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_marginTop="10dp"
-                android:gravity="center"
-                android:clickable="true"
-                android:focusable="true"
-                android:background="@drawable/sidebar_nav_icon_bg">
-                <ImageView
-                    android:layout_width="25dp"
-                    android:layout_height="25dp"
-                    android:duplicateParentState="true"
-                    android:src="@drawable/ic_sidebar_effects"
-                    app:tint="@color/ingame_sidebar_icon_tint" />
-            </com.winlator.cmod.ui.SidebarNavItemView>
-
-
-            <com.winlator.cmod.ui.SidebarNavItemView
-                android:id="@+id/BTItemInput"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_marginTop="10dp"
-                android:gravity="center"
-                android:clickable="true"
-                android:focusable="true"
-                android:background="@drawable/sidebar_nav_icon_bg">
-                <ImageView
-                    android:layout_width="26dp"
-                    android:layout_height="26dp"
-                    android:duplicateParentState="true"
-                    android:src="@drawable/icon_mouse"
-                    app:tint="@color/ingame_sidebar_icon_tint" />
-            </com.winlator.cmod.ui.SidebarNavItemView>
-
-            <com.winlator.cmod.ui.SidebarNavItemView
-                android:id="@+id/BTItemFPS"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_marginTop="10dp"
-                android:gravity="center"
-                android:clickable="true"
-                android:focusable="true"
-                android:background="@drawable/sidebar_nav_icon_bg">
-                <ImageView
-                    android:layout_width="25dp"
-                    android:layout_height="25dp"
-                    android:duplicateParentState="true"
-                    android:src="@drawable/ic_sidebar_performance"
-                    app:tint="@color/ingame_sidebar_icon_tint" />
-            </com.winlator.cmod.ui.SidebarNavItemView>
-
-            <com.winlator.cmod.ui.SidebarNavItemView
-                android:id="@+id/BTItemTaskManager"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_marginTop="16dp"
-                android:gravity="center"
-                android:clickable="true"
-                android:focusable="true"
-                android:background="@drawable/sidebar_nav_icon_bg">
-                <ImageView
-                    android:layout_width="25dp"
-                    android:layout_height="25dp"
-                    android:duplicateParentState="true"
-                    android:src="@drawable/ic_sidebar_task_manager"
-                    app:tint="@color/ingame_sidebar_icon_tint" />
-            </com.winlator.cmod.ui.SidebarNavItemView>
-
-            <com.winlator.cmod.ui.SidebarNavItemView
-                android:id="@+id/BTItemPause"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_marginTop="10dp"
-                android:gravity="center"
-                android:clickable="true"
-                android:focusable="true"
-                android:background="@drawable/sidebar_nav_icon_bg">
-                <ImageView
-                    android:layout_width="25dp"
-                    android:layout_height="25dp"
-                    android:duplicateParentState="true"
-                    android:src="@drawable/icon_pause"
-                    app:tint="@color/ingame_sidebar_icon_tint" />
-            </com.winlator.cmod.ui.SidebarNavItemView>
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1" />
-
-            <LinearLayout
-                android:id="@+id/BTItemExit"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:gravity="center"
-                android:clickable="true"
-                android:focusable="true"
-                android:background="@drawable/sidebar_exit">
-                <ImageView
-                    android:layout_width="25dp"
-                    android:layout_height="25dp"
-                    android:src="@drawable/ic_sidebar_power"
-                    app:tint="@color/ingame_sidebar_power" />
-            </LinearLayout>
-        </LinearLayout>
+            android:layout_height="match_parent" />
 
         <ScrollView
             android:layout_width="0dp"
@@ -170,8 +46,44 @@
             android:scrollbars="none"
             android:fillViewport="true">
 
-            <include layout="@layout/left_sidebar_original" />
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:paddingStart="18dp"
+                android:paddingEnd="20dp"
+                android:paddingTop="18dp"
+                android:paddingBottom="18dp">
 
+                <androidx.compose.ui.platform.ComposeView
+                    android:id="@+id/LLSubGraphics"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:visibility="visible" />
+
+                <androidx.compose.ui.platform.ComposeView
+                    android:id="@+id/LLSubScreen"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:visibility="gone" />
+
+                <androidx.compose.ui.platform.ComposeView
+                    android:id="@+id/LLSubInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:visibility="gone" />
+
+                <androidx.compose.ui.platform.ComposeView
+                    android:id="@+id/LLSubFPS"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:visibility="gone" />
+
+                <androidx.compose.ui.platform.ComposeView
+                    android:id="@+id/LLSubTaskManager"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:visibility="gone" />
+            </FrameLayout>
         </ScrollView>
     </LinearLayout>
 

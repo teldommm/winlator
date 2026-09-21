@@ -11,9 +11,7 @@ import android.app.PendingIntent;
 import android.app.PictureInPictureParams;
 import android.graphics.Rect;
 import android.graphics.Color;
-import android.graphics.drawable.GradientDrawable;
 import android.util.Rational;
-import android.util.TypedValue;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -53,7 +51,6 @@ import androidx.preference.PreferenceManager;
 import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.container.Shortcut;
-import com.winlator.cmod.contentdialog.ContentDialog;
 import com.winlator.cmod.contentdialog.DXVKConfig;
 import com.winlator.cmod.contentdialog.DebugDialog;
 import com.winlator.cmod.contentdialog.GraphicsDriverConfig;
@@ -63,6 +60,7 @@ import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.contents.AdrenotoolsManager;
 import com.winlator.cmod.contents.D7VKManager;
 import com.winlator.cmod.core.AppUtils;
+import com.winlator.cmod.core.DebugLogFile;
 import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
@@ -101,6 +99,11 @@ import com.winlator.cmod.ui.InputSidebarPanelHost;
 import com.winlator.cmod.ui.RuntimeStatusState;
 import com.winlator.cmod.ui.ScreenPanelCallbacks;
 import com.winlator.cmod.ui.ScreenSidebarPanelHost;
+import com.winlator.cmod.ui.ShutdownOverlayHost;
+import com.winlator.cmod.ui.SidebarRailCallbacks;
+import com.winlator.cmod.ui.SidebarRailHost;
+import com.winlator.cmod.ui.SidebarRailItemData;
+import com.winlator.cmod.ui.SidebarRailState;
 import com.winlator.cmod.ui.StatusLine;
 import com.winlator.cmod.ui.TaskManagerCallbacks;
 import com.winlator.cmod.ui.TaskManagerPanelHost;
@@ -109,7 +112,6 @@ import com.winlator.cmod.ui.ThemedAlertHost;
 import com.winlator.cmod.widget.FrameRating;
 import com.winlator.cmod.widget.WinlatorHUD;
 import com.winlator.cmod.widget.InputControlsView;
-import com.winlator.cmod.widget.LogView;
 import com.winlator.cmod.widget.MagnifierView;
 import com.winlator.cmod.widget.TouchpadView;
 import com.winlator.cmod.widget.XServerRendererView;
@@ -204,6 +206,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private OnExtractFileListener onExtractFileListener;
     private WinHandler winHandler;
     private TaskManagerSidebar taskManagerSidebar;
+    private SidebarRailState sidebarRailState;
     private WineRequestHandler wineRequestHandler;
     private float globalCursorSpeed = 1.0f;
     private float refreshRate = 60.0f;
@@ -383,7 +386,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         drawerLayout.addDrawerListener(new DrawerLayout.SimpleDrawerListener() {
             @Override
             public void onDrawerOpened(View drawerView) {
-                openSidebarPanel(activeSidebarItemId, activeSidebarPanelId);
+                openSidebarPanel(activeSidebarPanelId);
             }
 
             @Override
@@ -495,7 +498,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         ProcessHelper.removeAllDebugCallbacks();
         if (enableLogs) {
-            LogView.setFilename(getExecutable());
+            DebugLogFile.setFilename(getExecutable());
             ProcessHelper.addDebugCallback(debugDialog = new DebugDialog(this));
         }
 
@@ -897,7 +900,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         NotificationManagerCompat.from(this).cancel(NOTIFICATION_ID);
         boolean removeLoadingBar = PreferenceManager.getDefaultSharedPreferences(this)
                 .getBoolean("remove_loading_bar_when_booting_games", false);
-        if (!removeLoadingBar) preloaderDialog.showOnUiThread(R.string.shutdown);
+        View shutdownOverlay = removeLoadingBar ? null : ShutdownOverlayHost.show(this, getString(R.string.shutdown));
 
         if (xServerView != null) {
             xServerView.forceCleanup();
@@ -936,7 +939,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     break;
                 }
             }
-            preloaderDialog.closeOnUiThread();
+            runOnUiThread(() -> ShutdownOverlayHost.dismiss(shutdownOverlay));
             runOnUiThread(() -> AppUtils.restartApplication(getApplicationContext()));
         });
     }
@@ -1519,28 +1522,42 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     private void wireSidebarListeners(boolean enableLogs) {
 
-        toggleOnClick(R.id.BTItemInput, R.id.LLSubInput);
-        toggleOnClick(R.id.BTItemMouse, R.id.LLSubMouse);
-        toggleOnClick(R.id.BTItemFPS, R.id.LLSubFPS);
-        toggleOnClick(R.id.BTItemGraphics, R.id.LLSubGraphics);
-        toggleOnClick(R.id.BTItemScreen, R.id.LLSubScreen);
-        openSidebarPanel(R.id.BTItemFPS, R.id.LLSubFPS);
-
-        ViewGroup btItemPause = (ViewGroup) findViewById(R.id.BTItemPause);
-        if (btItemPause != null) {
-            ImageView pauseIcon = (ImageView) btItemPause.getChildAt(0);
-            btItemPause.setOnClickListener(v -> {
-                if (isPaused) {
-                    ProcessHelper.resumeAllWineProcesses();
-                    if (pauseIcon != null) pauseIcon.setImageResource(R.drawable.icon_pause);
-                } else {
-                    ProcessHelper.pauseAllWineProcesses();
-                    if (pauseIcon != null) pauseIcon.setImageResource(R.drawable.icon_play);
+        ComposeView railView = findViewById(R.id.IngameSidebarRail);
+        if (railView != null) {
+            List<SidebarRailItemData> railItems = Arrays.asList(
+                    new SidebarRailItemData(R.id.LLSubGraphics, R.drawable.ic_sidebar_gpu, "Graphics"),
+                    new SidebarRailItemData(R.id.LLSubScreen, R.drawable.ic_sidebar_effects, "Screen"),
+                    new SidebarRailItemData(R.id.LLSubInput, R.drawable.icon_mouse, "Input"),
+                    new SidebarRailItemData(R.id.LLSubFPS, R.drawable.ic_sidebar_performance, "HUD"),
+                    new SidebarRailItemData(R.id.LLSubTaskManager, R.drawable.ic_sidebar_task_manager, "Task Manager")
+            );
+            sidebarRailState = SidebarRailHost.attach(railView, railItems, R.id.LLSubFPS, new SidebarRailCallbacks() {
+                @Override
+                public void onSelect(int subId) {
+                    openSidebarPanel(subId);
+                    if (subId == R.id.LLSubTaskManager && taskManagerSidebar != null) taskManagerSidebar.start();
                 }
-                isPaused = !isPaused;
-                drawerLayout.closeDrawers();
+
+                @Override
+                public void onPauseToggle() {
+                    if (isPaused) {
+                        ProcessHelper.resumeAllWineProcesses();
+                    } else {
+                        ProcessHelper.pauseAllWineProcesses();
+                    }
+                    isPaused = !isPaused;
+                    if (sidebarRailState != null) sidebarRailState.setPaused(isPaused);
+                    drawerLayout.closeDrawers();
+                }
+
+                @Override
+                public void onExit() {
+                    drawerLayout.closeDrawers();
+                    exit();
+                }
             });
         }
+        openSidebarPanel(R.id.LLSubFPS);
 
         setupSidebarInputControls();
 
@@ -1654,43 +1671,16 @@ public class XServerDisplayActivity extends AppCompatActivity {
             });
             taskManagerSidebar = new TaskManagerSidebar(this, taskManagerState);
         }
-
-        View btItemTaskManager = findViewById(R.id.BTItemTaskManager);
-        if (btItemTaskManager != null) {
-            btItemTaskManager.setOnClickListener(v -> {
-                openSidebarPanel(R.id.BTItemTaskManager, R.id.LLSubTaskManager);
-                if (taskManagerSidebar != null) taskManagerSidebar.start();
-            });
-        }
-
-        View btItemExit = findViewById(R.id.BTItemExit);
-        if (btItemExit != null) {
-            btItemExit.setOnClickListener(v -> {
-                drawerLayout.closeDrawers();
-                exit();
-            });
-        }
     }
 
-    private int activeSidebarItemId = R.id.BTItemFPS;
     private int activeSidebarPanelId = R.id.LLSubFPS;
 
     private final int[] sidebarPanelIds = {
         R.id.LLSubInput,
-        R.id.LLSubMouse,
         R.id.LLSubFPS,
         R.id.LLSubGraphics,
         R.id.LLSubScreen,
         R.id.LLSubTaskManager
-    };
-
-    private final int[] sidebarItemIds = {
-        R.id.BTItemInput,
-        R.id.BTItemMouse,
-        R.id.BTItemFPS,
-        R.id.BTItemGraphics,
-        R.id.BTItemScreen,
-        R.id.BTItemTaskManager
     };
 
     private void hideAllSidebarPanels() {
@@ -1701,28 +1691,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
     }
 
-    private void setSidebarActiveItem(int activeId) {
-        float density = getResources().getDisplayMetrics().density;
-        for (int itemId : sidebarItemIds) {
-            View item = findViewById(itemId);
-            if (item == null) continue;
-            if (itemId == activeId) {
-                GradientDrawable background = new GradientDrawable();
-                background.setColor(Color.parseColor("#0F2D42"));
-                background.setStroke((int) (1.1f * density), Color.parseColor("#0288D1"));
-                background.setCornerRadius(density * 15);
-                item.setBackground(background);
-                item.animate().scaleX(1.025f).scaleY(1.025f).setDuration(105).start();
-            } else {
-                TypedValue outValue = new TypedValue();
-                getTheme().resolveAttribute(android.R.attr.selectableItemBackground, outValue, true);
-                item.setBackgroundResource(outValue.resourceId);
-                item.animate().scaleX(1.0f).scaleY(1.0f).setDuration(90).start();
-            }
-        }
-    }
-
-    private void openSidebarPanel(int parentId, int subId) {
+    // Selection highlight is now drawn by the Compose rail itself (see
+    // SidebarRailPanel.kt) off sidebarRailState.selectedId — no native View lookup
+    // or hand-rolled GradientDrawable/scale-animation needed here anymore.
+    private void openSidebarPanel(int subId) {
         hideAllSidebarPanels();
         View sub = findViewById(subId);
         if (sub != null) {
@@ -1732,22 +1704,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
             sub.setTranslationX(-8.0f * density);
             sub.animate().alpha(1.0f).translationX(0.0f).setDuration(130).start();
         }
-        setSidebarActiveItem(parentId);
-        if (parentId == R.id.BTItemGraphics) requestRuntimeStatusProbe();
-        if (parentId != R.id.BTItemMouse && parentId != R.id.BTItemPause) {
-            activeSidebarItemId = parentId;
-            activeSidebarPanelId = subId;
-        }
+        if (sidebarRailState != null) sidebarRailState.setSelectedId(subId);
+        if (subId == R.id.LLSubGraphics) requestRuntimeStatusProbe();
+        activeSidebarPanelId = subId;
     }
-
-    private void toggleOnClick(int parentId, int subId) {
-        View parent = findViewById(parentId);
-        View sub = findViewById(subId);
-        if (parent != null && sub != null) {
-            parent.setOnClickListener(v -> openSidebarPanel(parentId, subId));
-        }
-    }
-
 
     private void setupSidebarHudControls() {
         ComposeView hudPanel = findViewById(R.id.LLSubFPS);
