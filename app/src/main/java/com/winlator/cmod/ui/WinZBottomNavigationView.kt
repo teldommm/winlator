@@ -5,8 +5,8 @@ import android.content.ContextWrapper
 import android.content.res.Configuration
 import android.util.AttributeSet
 import android.view.View
+import android.widget.FrameLayout
 import androidx.core.view.ViewCompat
-import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.winlator.cmod.FileManagerFragment
 import com.winlator.cmod.InputControlsFragment
 import com.winlator.cmod.MainActivity
@@ -14,11 +14,14 @@ import com.winlator.cmod.R
 import com.winlator.cmod.SettingsFragment
 import com.winlator.cmod.ShortcutsFragment
 
+// Plain container for the Compose portrait bottom nav (see PortraitBottomNavigation.kt).
+// Used to be a BottomNavigationView subclass; now just keeps the orientation-visibility-restore
+// workaround below, which has nothing to do with the nav bar's own rendering.
 class WinZBottomNavigationView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
-    defStyleAttr: Int = com.google.android.material.R.attr.bottomNavigationStyle
-) : BottomNavigationView(context, attrs, defStyleAttr) {
+    defStyleAttr: Int = 0
+) : FrameLayout(context, attrs, defStyleAttr) {
 
     init {
         ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->

@@ -22,6 +22,7 @@ import android.text.style.ForegroundColorSpan;
 import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.FrameLayout;
 import android.widget.TextView;
 import android.widget.ProgressBar;
 import android.app.NotificationChannel;
@@ -40,7 +41,6 @@ import androidx.fragment.app.FragmentManager;
 import androidx.preference.PreferenceManager;
 
 import com.google.android.material.navigation.NavigationView;
-import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.winlator.cmod.FileManagerFragment;
 import com.winlator.cmod.R;
 import com.winlator.cmod.core.Callback;
@@ -48,6 +48,7 @@ import com.winlator.cmod.core.ImageUtils;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.core.WineThemeManager;
+import com.winlator.cmod.ui.PortraitBottomNavigationHost;
 import com.winlator.cmod.ui.ThemedAlertHost;
 import com.winlator.cmod.xenvironment.ImageFsInstaller;
 import com.winlator.cmod.services.NotificationService;
@@ -68,7 +69,8 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private static final String ORIENTATION_MODE_VERTICAL = "vertical";
     private static final String ORIENTATION_MODE_HORIZONTAL = "horizontal";
     private NavigationView navigationView;
-    private BottomNavigationView bottomNavigation;
+    private FrameLayout bottomNavigation;
+    private View bottomNavigationComposeView;
     private View mainToolbar;
     public final PreloaderDialog preloaderDialog = new PreloaderDialog(this);
     private boolean editInputControls = false;
@@ -77,7 +79,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private SharedPreferences sharedPreferences;
     private ContainerManager containerManager;
     private boolean isDarkMode;
-    private boolean syncingBottomNavigation;
     private boolean orientationLocked;
     private String orientationMode = ORIENTATION_MODE_AUTO;
 
@@ -138,17 +139,8 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         navigationView.setBackgroundColor(Color.parseColor("#0B0D12"));
 
         bottomNavigation = findViewById(R.id.BottomNavigation);
-        bottomNavigation.setOnItemSelectedListener(item -> {
-            if (syncingBottomNavigation) return true;
-            int target;
-            if (item.getItemId() == R.id.bottom_nav_library) target = R.id.main_menu_shortcuts;
-            else if (item.getItemId() == R.id.bottom_nav_controls) target = R.id.main_menu_input_controls;
-            else if (item.getItemId() == R.id.bottom_nav_settings) target = R.id.main_menu_settings;
-            else return false;
-            MenuItem destination = navigationView.getMenu().findItem(target);
-            navigationView.setCheckedItem(target);
-            return onNavigationItemSelected(destination);
-        });
+        bottomNavigationComposeView = PortraitBottomNavigationHost.create(this, this::navigateToMainDestination);
+        bottomNavigation.addView(bottomNavigationComposeView);
         updateStorageFooter();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             getWindow().setStatusBarColor(Color.BLACK);
@@ -383,16 +375,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
 
     private void selectBottomDestination(int menuItemId) {
-        if (bottomNavigation == null) return;
-        int bottomId = 0;
-        if (menuItemId == R.id.main_menu_shortcuts) bottomId = R.id.bottom_nav_library;
-        else if (menuItemId == R.id.main_menu_input_controls) bottomId = R.id.bottom_nav_controls;
-        else if (menuItemId == R.id.main_menu_settings) bottomId = R.id.bottom_nav_settings;
-        if (bottomId != 0 && bottomNavigation.getSelectedItemId() != bottomId) {
-            syncingBottomNavigation = true;
-            bottomNavigation.setSelectedItemId(bottomId);
-            syncingBottomNavigation = false;
-        }
+        PortraitBottomNavigationHost.updateSelected(bottomNavigationComposeView, menuItemId);
     }
 
     public void setBottomNavigationVisible(boolean visible) {

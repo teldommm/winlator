@@ -37,15 +37,7 @@
             android:layout_height="64dp"
             android:layout_marginStart="12dp"
             android:layout_marginEnd="12dp"
-            android:layout_marginBottom="12dp"
-            android:background="@drawable/ui_bottom_nav_shell"
-            app:itemBackground="@drawable/ui_bottom_nav_item_background"
-            app:itemIconSize="23dp"
-            app:itemIconTint="@color/ui_bottom_navigation_item"
-            app:itemRippleColor="#22FFFFFF"
-            app:itemTextColor="@color/ui_bottom_navigation_item"
-            app:labelVisibilityMode="labeled"
-            app:menu="@menu/enhanced_bottom_navigation" />
+            android:layout_marginBottom="12dp" />
     </LinearLayout>
 
     <LinearLayout
