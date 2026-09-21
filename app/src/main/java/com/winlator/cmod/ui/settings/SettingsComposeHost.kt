@@ -190,7 +190,13 @@ private fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) {
         }
         LazyColumn(
             modifier = Modifier.fillMaxWidth().weight(1f),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 30.dp),
+            contentPadding = PaddingValues(
+                start = 16.dp, end = 16.dp, top = 10.dp,
+                // Portrait: BottomNavigation now floats over this list (64dp + 12dp margin)
+                // instead of sitting in its own row, so the list needs room to scroll its last
+                // item clear of the nav. Landscape's own nav sits in the flow above, not overlapping.
+                bottom = if (landscape) 30.dp else 30.dp + 88.dp
+            ),
             verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             item("appearance-title") { SectionTitle("APPEARANCE") }

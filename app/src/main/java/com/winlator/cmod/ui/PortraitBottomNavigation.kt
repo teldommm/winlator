@@ -111,7 +111,6 @@ object PortraitBottomNavigationHost {
     fun create(context: Context, listener: PortraitNavListener): ComposeView {
         val selectedState = mutableStateOf(R.id.main_menu_shortcuts)
         return ComposeView(context).apply {
-            setBackgroundColor(android.graphics.Color.TRANSPARENT)
             tag = selectedState
             setContent {
                 WinZOverlayTheme {

@@ -140,8 +140,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
         bottomNavigation = findViewById(R.id.BottomNavigation);
         bottomNavigationComposeView = PortraitBottomNavigationHost.create(this, this::navigateToMainDestination);
-        bottomNavigation.addView(bottomNavigationComposeView, new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        bottomNavigation.addView(bottomNavigationComposeView);
         updateStorageFooter();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             getWindow().setStatusBarColor(Color.BLACK);

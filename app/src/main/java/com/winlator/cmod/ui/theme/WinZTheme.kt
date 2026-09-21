@@ -101,9 +101,9 @@ private val BlackColors = darkColorScheme(
     primaryContainer = Color(0xFF242423), onPrimaryContainer = Color(0xFFF9F9F7),
     secondary = Color(0xFFC3C2B7), onSecondary = Color(0xFF151515),
     secondaryContainer = Color(0xFF242423), onSecondaryContainer = Color(0xFFC3C2B7),
-    background = Color(0xFF151515), onBackground = Color(0xFFF9F9F7),
+    background = Color(0xFF1C1D23), onBackground = Color(0xFFF9F9F7),
     // Cards float slightly translucent over the background (~90% opacity), per request.
-    surface = Color(0xE620201F), onSurface = Color(0xFFF9F9F7),
+    surface = Color(0xE626272F), onSurface = Color(0xFFF9F9F7),
     surfaceVariant = Color(0xFF313130), onSurfaceVariant = Color(0xFF97958D),
     outline = Color(0xFF3D3D3A), outlineVariant = Color(0xFF242423),
     error = Color(0xFFFFB4AB), onError = Color(0xFF690005)

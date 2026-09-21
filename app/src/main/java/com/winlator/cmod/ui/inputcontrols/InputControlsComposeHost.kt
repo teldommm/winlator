@@ -188,7 +188,9 @@ private fun InputControlsScreen(model: InputControlsModel, callbacks: InputContr
 private fun PortraitContent(model: InputControlsModel, selectedName: String, callbacks: InputControlsCallbacks) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 28.dp),
+        // BottomNavigation floats over this list (64dp + 12dp margin) instead of sitting in
+        // its own row, so it needs room to scroll its last item clear of the nav.
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 28.dp + 88.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item { ProfileSection(model, selectedName, callbacks) }

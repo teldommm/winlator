@@ -27,15 +27,15 @@
     </style>
 
     <style name="IngameSidebarTheme_Black">
-        <item name="ingameSidebarBackground">#151515</item>
-        <item name="ingameSidebarSurface">#E620201F</item>
+        <item name="ingameSidebarBackground">#1C1D23</item>
+        <item name="ingameSidebarSurface">#E626272F</item>
         <item name="ingameSidebarSurfaceVariant">#1A1A20</item>
         <item name="ingameSidebarOnSurface">#F2F2F4</item>
         <item name="ingameSidebarOnSurfaceVariant">#85878C</item>
         <item name="ingameSidebarPrimary">#D9DDE3</item>
         <item name="ingameSidebarPrimaryContainer">#1A1B1F</item>
         <item name="ingameSidebarOutline">#242423</item>
-        <item name="ingameSidebarPanelTranslucent">#E620201F</item>
+        <item name="ingameSidebarPanelTranslucent">#E626272F</item>
         <item name="android:textColorPrimary">#F2F2F4</item>
         <item name="android:textColorSecondary">#85878C</item>
         <item name="android:colorAccent">#D9DDE3</item>

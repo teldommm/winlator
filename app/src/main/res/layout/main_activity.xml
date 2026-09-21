@@ -7,38 +7,47 @@
     android:layout_height="match_parent"
     android:fitsSystemWindows="false">
 
-    <LinearLayout
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@drawable/ui_glass_background"
-        android:orientation="vertical">
+        android:background="@drawable/ui_glass_background">
 
-        <androidx.appcompat.widget.Toolbar
-            android:id="@+id/Toolbar"
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="58dp"
-            android:background="@drawable/ui_glass_background"
-            android:paddingStart="6dp"
-            android:paddingEnd="12dp"
-            app:title="@string/app_name"
-            app:titleTextAppearance="@style/GlassToolbarTitle"
-            app:titleTextColor="@color/ui_text_primary" />
+            android:layout_height="match_parent"
+            android:orientation="vertical">
 
-        <FrameLayout
-            android:id="@+id/FLFragmentContainer"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:background="@drawable/ui_glass_background" />
+            <androidx.appcompat.widget.Toolbar
+                android:id="@+id/Toolbar"
+                android:layout_width="match_parent"
+                android:layout_height="58dp"
+                android:background="@drawable/ui_glass_background"
+                android:paddingStart="6dp"
+                android:paddingEnd="12dp"
+                app:title="@string/app_name"
+                app:titleTextAppearance="@style/GlassToolbarTitle"
+                app:titleTextColor="@color/ui_text_primary" />
 
+            <FrameLayout
+                android:id="@+id/FLFragmentContainer"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:background="@drawable/ui_glass_background" />
+        </LinearLayout>
+
+        <!-- Floats over FLFragmentContainer (not a sibling row below it) so scrolled screen
+             content actually extends behind the translucent nav instead of stopping at its
+             top edge — see PortraitBottomNavigation.kt for the 90%-alpha surface it renders. -->
         <com.winlator.cmod.ui.WinZBottomNavigationView
             android:id="@+id/BottomNavigation"
             android:layout_width="match_parent"
             android:layout_height="64dp"
+            android:layout_gravity="bottom"
             android:layout_marginStart="12dp"
             android:layout_marginEnd="12dp"
             android:layout_marginBottom="12dp" />
-    </LinearLayout>
+    </FrameLayout>
 
     <LinearLayout
         android:layout_width="310dp"
