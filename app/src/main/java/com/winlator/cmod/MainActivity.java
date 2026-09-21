@@ -94,6 +94,12 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // Applied before super.onCreate() so the very first layout pass already uses the
+        // right orientation, instead of the window settling briefly on the manifest's
+        // screenOrientation="sensor" default and visibly flipping a moment later once this
+        // runs.
+        AppUtils.applyOrientationMode(this);
+
         sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
         orientationMode = sharedPreferences.getString("orientation_mode", ORIENTATION_MODE_AUTO);
         orientationLocked = sharedPreferences.getBoolean("orientation_locked", false);
@@ -115,7 +121,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         }
 
         super.onCreate(savedInstanceState);
-        applyOrientationMode();
         applyImmersiveMode();
 
         if (!sharedPreferences.getBoolean(OnboardingActivity.PREF_ONBOARDING_COMPLETE, false)) {

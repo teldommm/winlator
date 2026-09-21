@@ -103,8 +103,11 @@ public class OnboardingActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+        // Before super.onCreate() so the first layout pass already uses the requested
+        // orientation instead of settling on manifest screenOrientation="sensor" first and
+        // visibly flipping a moment after this runs.
         AppUtils.applyOrientationMode(this);
+        super.onCreate(savedInstanceState);
         preferences = PreferenceManager.getDefaultSharedPreferences(this);
         contentsManager = new ContentsManager(this);
         contentsManager.syncContents();
