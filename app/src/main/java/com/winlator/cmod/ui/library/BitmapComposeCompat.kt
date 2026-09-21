@@ -383,6 +383,7 @@ private fun LibraryFilterChip(label: String, selected: Boolean, click: () -> Uni
         onClick = click,
         shape = RoundedCornerShape(10.dp),
         color = if (selected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
+        contentColor = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) { Text(label, Modifier.padding(horizontal = 15.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge) }
 }

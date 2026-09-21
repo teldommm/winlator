@@ -28,6 +28,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.Gamepad
+import androidx.compose.material.icons.outlined.Monitor
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Terminal
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -55,6 +61,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -322,7 +329,15 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
     val scope = rememberCoroutineScope()
 
     var category by remember { mutableStateOf("General") }
-    val categories = listOf("General", "Video", "Compatibility", "Input", "Storage", "Environment", "Advanced")
+    val categories = listOf(
+        ContainerCategoryItemV2("General", Icons.Outlined.Settings),
+        ContainerCategoryItemV2("Video", Icons.Outlined.Monitor),
+        ContainerCategoryItemV2("Compatibility", Icons.Outlined.Tune),
+        ContainerCategoryItemV2("Input", Icons.Outlined.Gamepad),
+        ContainerCategoryItemV2("Storage", Icons.Outlined.Folder),
+        ContainerCategoryItemV2("Environment", Icons.Outlined.Terminal),
+        ContainerCategoryItemV2("Advanced", Icons.Outlined.Terminal)
+    )
     val landscape = LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
     var revision by remember { mutableIntStateOf(0) }
     var installing by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -603,7 +618,7 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
                                 modifier = Modifier.padding(8.dp)
                             )
                         }
-                        items(categories) { item -> ContainerNavItemV2(item, category == item) { category = item } }
+                        items(categories) { item -> ContainerNavItemV2(item.label, item.icon, category == item.label) { category = item.label } }
                     }
                 }
                 LazyColumn(
@@ -627,7 +642,7 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    items(categories) { item -> ContainerNavItemV2(item, category == item) { category = item } }
+                    items(categories) { item -> ContainerNavItemV2(item.label, item.icon, category == item.label) { category = item.label } }
                 }
                 LazyColumn(
                     Modifier.fillMaxSize().padding(horizontal = 14.dp),
@@ -647,19 +662,28 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
     }
 }
 
+private data class ContainerCategoryItemV2(val label: String, val icon: ImageVector)
+
 @Composable
-private fun ContainerNavItemV2(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun ContainerNavItemV2(label: String, icon: ImageVector, selected: Boolean, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(10.dp),
         color = if (selected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
+        contentColor = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
     ) {
-        Text(
-            label,
-            Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
-        )
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(icon, null, modifier = Modifier.size(16.dp))
+            Text(
+                label,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+            )
+        }
     }
 }
 

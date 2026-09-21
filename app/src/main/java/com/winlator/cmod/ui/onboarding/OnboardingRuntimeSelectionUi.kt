@@ -113,6 +113,7 @@ internal fun OnboardingRuntimeSelectionScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),
                     color = if (selected == id) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
+                    contentColor = if (selected == id) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                     border = BorderStroke(1.dp, if (selected == id) accent else MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {

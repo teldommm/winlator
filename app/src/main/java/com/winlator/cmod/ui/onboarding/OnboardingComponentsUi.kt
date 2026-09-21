@@ -377,6 +377,7 @@ private fun CategorySelector(selected: String, select: (String) -> Unit) {
                 onClick = { select(it) },
                 shape = RoundedCornerShape(10.dp),
                 color = if (selected == it) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
+                contentColor = if (selected == it) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 Text(it, Modifier.padding(horizontal = 13.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)

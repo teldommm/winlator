@@ -148,7 +148,7 @@ fun WinlatorThemePreferenceCard(modifier: Modifier = Modifier) {
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f), RoundedCornerShape(10.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Outlined.Palette, contentDescription = null, modifier = Modifier.size(22.dp))
+                Icon(Icons.Outlined.Palette, contentDescription = null, modifier = Modifier.size(22.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(Modifier.width(11.dp))
             Column(Modifier.weight(1f)) {
