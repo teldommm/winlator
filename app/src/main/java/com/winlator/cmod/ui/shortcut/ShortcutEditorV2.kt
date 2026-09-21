@@ -6,6 +6,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,7 +17,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -36,11 +36,8 @@ import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material.icons.outlined.Tune
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -121,7 +118,9 @@ import com.winlator.cmod.ui.settings.normalizeLocaleValue
 import com.winlator.cmod.ui.settings.normalizeResolution
 import com.winlator.cmod.ui.settings.readConfig
 import com.winlator.cmod.ui.settings.writeConfig
+import com.winlator.cmod.ui.ThemedAlertHost
 import com.winlator.cmod.ui.theme.controlAccentColor
+import com.winlator.cmod.ui.theme.findActivity
 import com.winlator.cmod.winhandler.WinHandler
 import kotlinx.coroutines.launch
 import org.json.JSONArray
@@ -1067,37 +1066,30 @@ private fun ShortcutVulkanExtensionsV2(context: Context, driver: String, blackli
     }
     val disabled = blacklisted.split(',').map(String::trim).filter(String::isNotBlank).toSet()
     val enabledCount = extensions.count { it !in disabled }
-    var open by remember { mutableStateOf(false) }
-    Surface(onClick = { open = true }, color = Color.Transparent, modifier = Modifier.fillMaxWidth()) {
+    val activity = context.findActivity() as? AppCompatActivity
+    Surface(
+        onClick = {
+            if (activity != null) {
+                ThemedAlertHost.multiChoice(
+                    activity,
+                    "Vulkan Extensions",
+                    extensions,
+                    "Done",
+                    { checkedIndices: List<Int> ->
+                        val checked = checkedIndices.map { extensions[it] }.toSet()
+                        onChanged(extensions.filterNot { it in checked }.joinToString(","))
+                    },
+                    extensions.map { it !in disabled }
+                )
+            }
+        },
+        color = Color.Transparent,
+        modifier = Modifier.fillMaxWidth()
+    ) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 11.dp)) {
             Text("Vulkan Extensions", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("$enabledCount of ${extensions.size} enabled", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
         }
-    }
-    if (open) {
-        val selected = remember(blacklisted, open, extensions) { mutableStateListOf<String>().apply { addAll(extensions.filter { it !in disabled }) } }
-        AlertDialog(
-            onDismissRequest = { open = false },
-            confirmButton = {
-                TextButton(onClick = { onChanged(extensions.filterNot { it in selected }.joinToString(",")); open = false }) { Text("Done") }
-            },
-            dismissButton = { TextButton(onClick = { open = false }) { Text("Cancel") } },
-            title = { Text("Vulkan Extensions") },
-            text = {
-                LazyColumn(Modifier.heightIn(max = 460.dp)) {
-                    items(extensions) { extension ->
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(
-                                checked = extension in selected,
-                                onCheckedChange = { checked -> if (checked) { if (extension !in selected) selected.add(extension) } else selected.remove(extension) },
-                                colors = CheckboxDefaults.colors(checkedColor = controlAccentColor())
-                            )
-                            Text(extension, modifier = Modifier.weight(1f).padding(vertical = 10.dp))
-                        }
-                    }
-                }
-            }
-        )
     }
 }
 
