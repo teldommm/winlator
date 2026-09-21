@@ -1,6 +1,9 @@
 name: Android CI Bionic
 
 on:
+  push:
+    branches:
+      - ludashi
   workflow_dispatch:
 
 permissions:
