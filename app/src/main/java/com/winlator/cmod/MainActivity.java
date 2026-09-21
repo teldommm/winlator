@@ -3,7 +3,6 @@ package com.winlator.cmod;
 import android.Manifest;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.pm.ActivityInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -43,6 +42,7 @@ import androidx.preference.PreferenceManager;
 import com.google.android.material.navigation.NavigationView;
 import com.winlator.cmod.FileManagerFragment;
 import com.winlator.cmod.R;
+import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.ImageUtils;
 import com.winlator.cmod.core.PreloaderDialog;
@@ -95,6 +95,8 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+        orientationMode = sharedPreferences.getString("orientation_mode", ORIENTATION_MODE_AUTO);
+        orientationLocked = sharedPreferences.getBoolean("orientation_locked", false);
 
         // Persist the default value on first run so all other components
         // (dialogs, fragments) read the correct value instead of their own default
@@ -113,6 +115,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         }
 
         super.onCreate(savedInstanceState);
+        applyOrientationMode();
         applyImmersiveMode();
 
         if (!sharedPreferences.getBoolean(OnboardingActivity.PREF_ONBOARDING_COMPLETE, false)) {
@@ -283,36 +286,31 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
     public boolean toggleOrientationLock() {
         orientationLocked = !orientationLocked;
+        sharedPreferences.edit().putBoolean("orientation_locked", orientationLocked).apply();
         applyOrientationMode();
         return orientationLocked;
     }
 
     public boolean toggleVerticalMode() {
         orientationMode = isVerticalModeEnabled() ? ORIENTATION_MODE_AUTO : ORIENTATION_MODE_VERTICAL;
+        sharedPreferences.edit().putString("orientation_mode", orientationMode).apply();
         applyOrientationMode();
         return isVerticalModeEnabled();
     }
 
     public boolean toggleHorizontalMode() {
         orientationMode = isHorizontalModeEnabled() ? ORIENTATION_MODE_AUTO : ORIENTATION_MODE_HORIZONTAL;
+        sharedPreferences.edit().putString("orientation_mode", orientationMode).apply();
         applyOrientationMode();
         return isHorizontalModeEnabled();
     }
 
+    // Delegates to AppUtils so every other activity reachable from here (Components,
+    // Containers, ...) can apply the same persisted preference via
+    // AppUtils.applyOrientationMode(activity) instead of just inheriting manifest
+    // screenOrientation="sensor" and potentially landing on a different orientation.
     private void applyOrientationMode() {
-        switch (orientationMode) {
-            case ORIENTATION_MODE_VERTICAL:
-                setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
-                break;
-            case ORIENTATION_MODE_HORIZONTAL:
-                setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
-                break;
-            default:
-                setRequestedOrientation(orientationLocked
-                        ? ActivityInfo.SCREEN_ORIENTATION_LOCKED
-                        : ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
-                break;
-        }
+        AppUtils.applyOrientationMode(this);
         invalidateOptionsMenu();
     }
 

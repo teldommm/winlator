@@ -3,6 +3,8 @@ package com.winlator.cmod.core;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
@@ -28,6 +30,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.preference.PreferenceManager;
 
 import com.google.android.material.tabs.TabLayout;
 import com.winlator.cmod.R;
@@ -42,6 +45,32 @@ public abstract class AppUtils {
 
     public static void keepScreenOn(Activity activity) {
         activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+    }
+
+    // Reads the same "orientation_mode"/"orientation_locked" prefs MainActivity's own
+    // vertical/horizontal toggle writes, and applies them the same way it does. MainActivity
+    // used to be the only place that ever called setRequestedOrientation for this — every
+    // other screen just fell back on its manifest screenOrientation="sensor" declaration,
+    // which (depending on the device's own rotation-lock setting) could mean an activity
+    // opened from a landscape-forced MainActivity would revert to portrait. Called from
+    // any activity that should honor the app's orientation preference, not just MainActivity.
+    public static void applyOrientationMode(Activity activity) {
+        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(activity);
+        String orientationMode = preferences.getString("orientation_mode", "auto");
+        boolean orientationLocked = preferences.getBoolean("orientation_locked", false);
+        switch (orientationMode) {
+            case "vertical":
+                activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+                break;
+            case "horizontal":
+                activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+                break;
+            default:
+                activity.setRequestedOrientation(orientationLocked
+                        ? ActivityInfo.SCREEN_ORIENTATION_LOCKED
+                        : ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
+                break;
+        }
     }
 
     public static String getArchName() {

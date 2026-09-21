@@ -72,6 +72,7 @@ import androidx.compose.ui.unit.dp
 import com.winlator.cmod.XServerDisplayActivity
 import com.winlator.cmod.container.Container
 import com.winlator.cmod.container.ContainerManager
+import com.winlator.cmod.core.AppUtils
 import com.winlator.cmod.core.FileUtils
 import com.winlator.cmod.core.StringUtils
 import com.winlator.cmod.ui.applyAppFullscreen
@@ -94,6 +95,7 @@ class ContainersSettingsActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AppUtils.applyOrientationMode(this)
         applyAppFullscreen(this)
         root = FrameLayout(this).apply { id = View.generateViewId() }
         setContentView(root)

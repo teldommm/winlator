@@ -27,6 +27,7 @@ import com.winlator.cmod.contents.AdrenotoolsManager;
 import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.contents.RemoteDriverCatalog;
+import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.OpenGLDriverDefaults;
 import com.winlator.cmod.core.ProtonPackageManager;
@@ -103,6 +104,7 @@ public class OnboardingActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        AppUtils.applyOrientationMode(this);
         preferences = PreferenceManager.getDefaultSharedPreferences(this);
         contentsManager = new ContentsManager(this);
         contentsManager.syncContents();
