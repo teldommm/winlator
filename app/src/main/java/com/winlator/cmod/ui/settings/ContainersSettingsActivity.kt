@@ -94,11 +94,8 @@ class ContainersSettingsActivity : AppCompatActivity() {
     private var showingEditor = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Before super.onCreate() so the first layout pass already uses the requested
-        // orientation instead of settling on manifest screenOrientation="sensor" first and
-        // visibly flipping a moment after this runs.
-        AppUtils.applyOrientationMode(this)
         super.onCreate(savedInstanceState)
+        AppUtils.applyOrientationMode(this)
         applyAppFullscreen(this)
         root = FrameLayout(this).apply { id = View.generateViewId() }
         setContentView(root)
