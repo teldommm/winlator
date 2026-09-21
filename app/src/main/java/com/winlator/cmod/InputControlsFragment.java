@@ -24,6 +24,7 @@ import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.ExternalController;
 import com.winlator.cmod.inputcontrols.InputControlsManager;
 import com.winlator.cmod.ui.ThemedAlertHost;
+import com.winlator.cmod.ui.ThemedLoadingOverlayHost;
 import com.winlator.cmod.ui.inputcontrols.InputControllerItem;
 import com.winlator.cmod.ui.inputcontrols.InputControlsCallbacks;
 import com.winlator.cmod.ui.inputcontrols.InputControlsComposeHost;
@@ -374,7 +375,7 @@ public class InputControlsFragment extends Fragment {
 
     private void downloadSelectedProfiles(String[] items, List<Integer> positions) {
         MainActivity activity = (MainActivity) requireActivity();
-        activity.preloaderDialog.show(R.string.downloading_file);
+        View downloadOverlay = ThemedLoadingOverlayHost.show(activity, activity.getString(R.string.downloading_file));
         currentProfile = null;
         AtomicInteger processedItemCount = new AtomicInteger();
 
@@ -387,7 +388,7 @@ public class InputControlsFragment extends Fragment {
                 }
                 if (processedItemCount.incrementAndGet() == positions.size()) {
                     activity.runOnUiThread(() -> {
-                        activity.preloaderDialog.close();
+                        ThemedLoadingOverlayHost.dismiss(downloadOverlay);
                         refreshCompose();
                     });
                 }
@@ -397,10 +398,10 @@ public class InputControlsFragment extends Fragment {
 
     private void downloadProfileList() {
         MainActivity activity = (MainActivity) requireActivity();
-        activity.preloaderDialog.show(R.string.loading);
+        View loadingOverlay = ThemedLoadingOverlayHost.show(activity, activity.getString(R.string.loading));
         HttpUtils.download(String.format(INPUT_CONTROLS_URL, "index.txt"), content ->
                 activity.runOnUiThread(() -> {
-                    activity.preloaderDialog.close();
+                    ThemedLoadingOverlayHost.dismiss(loadingOverlay);
                     if (content == null) {
                         Toast.makeText(activity, "Unable to load profile list", Toast.LENGTH_SHORT).show();
                         return;

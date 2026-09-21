@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -16,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -28,17 +28,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.Folder
-import androidx.compose.material.icons.outlined.Gamepad
-import androidx.compose.material.icons.outlined.Monitor
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.Terminal
-import androidx.compose.material.icons.outlined.Tune
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -51,7 +42,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -61,7 +51,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -84,6 +73,7 @@ import com.winlator.cmod.core.WineThemeManager
 import com.winlator.cmod.fexcore.FEXCorePreset
 import com.winlator.cmod.fexcore.FEXCorePresetManager
 import com.winlator.cmod.midi.MidiManager
+import com.winlator.cmod.ui.ThemedAlertHost
 import com.winlator.cmod.ui.settings.CpuSelectorRow
 import com.winlator.cmod.ui.shortcut.DriveLettersEditorV2
 import com.winlator.cmod.ui.settings.DDrawWrapperChoice
@@ -120,6 +110,7 @@ import com.winlator.cmod.ui.settings.normalizeResolution
 import com.winlator.cmod.ui.settings.readConfig
 import com.winlator.cmod.ui.settings.writeConfig
 import com.winlator.cmod.ui.theme.controlAccentColor
+import com.winlator.cmod.ui.theme.findActivity
 import com.winlator.cmod.winhandler.WinHandler
 import kotlinx.coroutines.launch
 import org.json.JSONArray
@@ -329,15 +320,7 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
     val scope = rememberCoroutineScope()
 
     var category by remember { mutableStateOf("General") }
-    val categories = listOf(
-        ContainerCategoryItemV2("General", Icons.Outlined.Settings),
-        ContainerCategoryItemV2("Video", Icons.Outlined.Monitor),
-        ContainerCategoryItemV2("Compatibility", Icons.Outlined.Tune),
-        ContainerCategoryItemV2("Input", Icons.Outlined.Gamepad),
-        ContainerCategoryItemV2("Storage", Icons.Outlined.Folder),
-        ContainerCategoryItemV2("Environment", Icons.Outlined.Terminal),
-        ContainerCategoryItemV2("Advanced", Icons.Outlined.Terminal)
-    )
+    val categories = listOf("General", "Video", "Compatibility", "Input", "Storage", "Environment", "Advanced")
     val landscape = LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
     var revision by remember { mutableIntStateOf(0) }
     var installing by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -618,7 +601,7 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
                                 modifier = Modifier.padding(8.dp)
                             )
                         }
-                        items(categories) { item -> ContainerNavItemV2(item.label, item.icon, category == item.label) { category = item.label } }
+                        items(categories) { item -> ContainerNavItemV2(item, category == item) { category = item } }
                     }
                 }
                 LazyColumn(
@@ -642,7 +625,7 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    items(categories) { item -> ContainerNavItemV2(item.label, item.icon, category == item.label) { category = item.label } }
+                    items(categories) { item -> ContainerNavItemV2(item, category == item) { category = item } }
                 }
                 LazyColumn(
                     Modifier.fillMaxSize().padding(horizontal = 14.dp),
@@ -662,28 +645,19 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
     }
 }
 
-private data class ContainerCategoryItemV2(val label: String, val icon: ImageVector)
-
 @Composable
-private fun ContainerNavItemV2(label: String, icon: ImageVector, selected: Boolean, onClick: () -> Unit) {
+private fun ContainerNavItemV2(label: String, selected: Boolean, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(10.dp),
         color = if (selected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
-        contentColor = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Icon(icon, null, modifier = Modifier.size(16.dp))
-            Text(
-                label,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
-            )
-        }
+        Text(
+            label,
+            Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+        )
     }
 }
 
@@ -1080,43 +1054,30 @@ private fun ContainerVulkanExtensionsV2(
     }
     val disabled = blacklisted.split(',').map(String::trim).filter(String::isNotBlank).toSet()
     val enabledCount = extensions.count { it !in disabled }
-    var open by remember { mutableStateOf(false) }
-    Surface(onClick = { open = true }, color = Color.Transparent, modifier = Modifier.fillMaxWidth()) {
+    val activity = context.findActivity() as? AppCompatActivity
+    Surface(
+        onClick = {
+            if (activity != null) {
+                ThemedAlertHost.multiChoice(
+                    activity,
+                    "Vulkan Extensions",
+                    extensions,
+                    "Done",
+                    { checkedIndices: List<Int> ->
+                        val checked = checkedIndices.map { extensions[it] }.toSet()
+                        onChanged(extensions.filterNot { it in checked }.joinToString(","))
+                    },
+                    extensions.map { it !in disabled }
+                )
+            }
+        },
+        color = Color.Transparent,
+        modifier = Modifier.fillMaxWidth()
+    ) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 11.dp)) {
             Text("Vulkan Extensions", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("$enabledCount of ${extensions.size} enabled", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
         }
-    }
-    if (open) {
-        val selected = remember(blacklisted, open, extensions) {
-            mutableStateListOf<String>().apply { addAll(extensions.filter { it !in disabled }) }
-        }
-        AlertDialog(
-            onDismissRequest = { open = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    onChanged(extensions.filterNot { it in selected }.joinToString(",")); open = false
-                }) { Text("Done") }
-            },
-            dismissButton = { TextButton(onClick = { open = false }) { Text("Cancel") } },
-            title = { Text("Vulkan Extensions") },
-            text = {
-                LazyColumn(Modifier.heightIn(max = 460.dp)) {
-                    items(extensions) { extension ->
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(
-                                checked = extension in selected,
-                                onCheckedChange = { checked ->
-                                    if (checked) { if (extension !in selected) selected.add(extension) } else selected.remove(extension)
-                                },
-                                colors = CheckboxDefaults.colors(checkedColor = controlAccentColor())
-                            )
-                            Text(extension, modifier = Modifier.weight(1f).padding(vertical = 10.dp))
-                        }
-                    }
-                }
-            }
-        )
     }
 }
 

@@ -73,7 +73,7 @@ class DebugLogState {
 // Themed replacement for the old ContentDialog-based debug panel (debug_dialog.xml +
 // debug_toolbar.xml) — a full-screen scrim + large card, added straight onto the activity's
 // content root like the app's other Themed*Host overlays (ThemedAlertHost, ThemedProgressHost,
-// ShutdownOverlayHost), rather than a native android.app.Dialog window.
+// ThemedLoadingOverlayHost), rather than a native android.app.Dialog window.
 object DebugLogDialogHost {
     @JvmStatic
     fun show(activity: Activity, state: DebugLogState, onDismissed: Runnable): View {

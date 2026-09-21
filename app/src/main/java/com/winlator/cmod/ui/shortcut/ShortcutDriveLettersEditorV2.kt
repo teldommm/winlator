@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
@@ -42,6 +43,7 @@ import com.winlator.cmod.container.Container
 import com.winlator.cmod.core.FileUtils
 import com.winlator.cmod.ui.settings.SettingsCard
 import com.winlator.cmod.ui.settings.SettingsDivider
+import com.winlator.cmod.ui.theme.controlAccentColor
 import kotlinx.coroutines.delay
 
 private data class ShortcutDriveEntryV2(
@@ -171,10 +173,24 @@ private fun ShortcutDriveLetterRowV2(
                     Icon(Icons.Outlined.KeyboardArrowDown, null)
                 }
             }
-            DropdownMenu(expanded = letterMenuOpen, onDismissRequest = { letterMenuOpen = false }) {
+            DropdownMenu(
+                expanded = letterMenuOpen,
+                onDismissRequest = { letterMenuOpen = false },
+                shape = RoundedCornerShape(14.dp),
+                containerColor = MaterialTheme.colorScheme.surface
+            ) {
+                val accent = controlAccentColor()
                 availableLetters.forEach { letter ->
+                    val isSelected = letter == entry.letter
                     DropdownMenuItem(
-                        text = { Text("$letter:") },
+                        text = {
+                            Text(
+                                "$letter:",
+                                color = if (isSelected) accent else MaterialTheme.colorScheme.onSurface,
+                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                            )
+                        },
+                        trailingIcon = { if (isSelected) Icon(Icons.Outlined.Check, null, tint = accent) },
                         onClick = {
                             onLetter(letter)
                             letterMenuOpen = false

@@ -99,7 +99,7 @@ import com.winlator.cmod.ui.InputSidebarPanelHost;
 import com.winlator.cmod.ui.RuntimeStatusState;
 import com.winlator.cmod.ui.ScreenPanelCallbacks;
 import com.winlator.cmod.ui.ScreenSidebarPanelHost;
-import com.winlator.cmod.ui.ShutdownOverlayHost;
+import com.winlator.cmod.ui.ThemedLoadingOverlayHost;
 import com.winlator.cmod.ui.SidebarRailCallbacks;
 import com.winlator.cmod.ui.SidebarRailHost;
 import com.winlator.cmod.ui.SidebarRailItemData;
@@ -900,7 +900,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         NotificationManagerCompat.from(this).cancel(NOTIFICATION_ID);
         boolean removeLoadingBar = PreferenceManager.getDefaultSharedPreferences(this)
                 .getBoolean("remove_loading_bar_when_booting_games", false);
-        View shutdownOverlay = removeLoadingBar ? null : ShutdownOverlayHost.show(this, getString(R.string.shutdown));
+        View shutdownOverlay = removeLoadingBar ? null : ThemedLoadingOverlayHost.show(this, getString(R.string.shutdown));
 
         if (xServerView != null) {
             xServerView.forceCleanup();
@@ -939,7 +939,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     break;
                 }
             }
-            runOnUiThread(() -> ShutdownOverlayHost.dismiss(shutdownOverlay));
+            runOnUiThread(() -> ThemedLoadingOverlayHost.dismiss(shutdownOverlay));
             runOnUiThread(() -> AppUtils.restartApplication(getApplicationContext()));
         });
     }

@@ -23,12 +23,17 @@ import com.winlator.cmod.ui.theme.ThemedDialogSurface
 import com.winlator.cmod.ui.theme.WinZOverlayTheme
 import com.winlator.cmod.ui.theme.controlAccentColor
 
-// Themed replacement for PreloaderDialog's "standard preloader" mode as used by
-// XServerDisplayActivity.exit() (R.string.shutdown) — matches ThemedDownloadProgressHost's
-// card (the reinstall-imagefs/download progress overlay) exactly: same 60dp circular
-// indicator size/stroke, same 0.5f scrim, same ThemedDialogSurface + Row layout. The only
-// difference is the indicator is indeterminate here (no percent to show for a shutdown).
-object ShutdownOverlayHost {
+// Themed replacement for PreloaderDialog's "standard preloader" mode — an indeterminate
+// spinner + message card, matching ThemedDownloadProgressHost's card (the reinstall-imagefs/
+// download progress overlay) exactly: same 60dp circular indicator size/stroke, same 0.5f
+// scrim, same ThemedDialogSurface + Row layout, just indeterminate since there's no percent
+// to show for these (a shutdown, or a "loading"/"downloading" wait with no progress feed).
+//
+// Shared by XServerDisplayActivity.exit() (R.string.shutdown) and InputControlsFragment's
+// profile-list download flow (R.string.loading while fetching index.txt, then
+// R.string.downloading_file while pulling the selected profiles) — same visual, so one host
+// rather than a near-duplicate object per caller.
+object ThemedLoadingOverlayHost {
     @JvmStatic
     fun show(activity: Activity, message: String): View {
         val root = activity.findViewById<ViewGroup>(android.R.id.content)
