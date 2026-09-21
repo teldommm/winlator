@@ -30,10 +30,10 @@ import androidx.documentfile.provider.DocumentFile;
 import androidx.fragment.app.Fragment;
 import androidx.preference.PreferenceManager;
 
-import com.winlator.cmod.bigpicture.steamgrid.SteamGridDBApi;
-import com.winlator.cmod.bigpicture.steamgrid.SteamGridGridsResponse;
-import com.winlator.cmod.bigpicture.steamgrid.SteamGridGridsResponseDeserializer;
-import com.winlator.cmod.bigpicture.steamgrid.SteamGridSearchResponse;
+import com.winlator.cmod.steamgrid.SteamGridDBApi;
+import com.winlator.cmod.steamgrid.SteamGridGridsResponse;
+import com.winlator.cmod.steamgrid.SteamGridGridsResponseDeserializer;
+import com.winlator.cmod.steamgrid.SteamGridSearchResponse;
 import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.container.Shortcut;

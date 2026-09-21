@@ -109,7 +109,6 @@ data class SettingsModel(
     val losslessDllAvailable: Boolean,
     val winlatorPath: String,
     val shortcutPath: String,
-    val bigPicture: Boolean,
     val cursorSpeedPercent: Int,
     val cursorLock: Boolean,
     val xInput: Boolean,
@@ -254,11 +253,9 @@ private fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) {
             item("winlator-path") { NavigationRow(Icons.Outlined.Storage, "Winlator Path", model.winlatorPath, callbacks::onChooseWinlatorPath) }
             item("shortcut-path") { NavigationRow(Icons.Outlined.FolderOpen, "Shortcut Export Path", model.shortcutPath, callbacks::onChooseShortcutPath) }
 
-            item("big-picture-title") { SectionTitle("BIG PICTURE MODE") }
-            item("big-picture") {
+            item("cover-art-title") { SectionTitle("COVER ART") }
+            item("cover-art") {
                 GroupCard {
-                    ToggleRow("Enable Big Picture Mode on App Launch", model.bigPicture) { callbacks.onBooleanChanged("enable_big_picture_mode", it) }
-                    GroupDivider()
                     ToggleRow("Set SteamGrid API Key? (Cover Art)", model.customApiKeyEnabled) { callbacks.onBooleanChanged("enable_custom_api_key", it) }
                 }
             }

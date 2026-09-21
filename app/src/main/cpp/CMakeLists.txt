@@ -4,7 +4,6 @@ project(Winlator)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -Wno-unused-function -Wimplicit-function-declaration")
 
-add_subdirectory(patchelf)
 add_subdirectory(adrenotools)
 add_subdirectory(thirdparty/dxbc)
 

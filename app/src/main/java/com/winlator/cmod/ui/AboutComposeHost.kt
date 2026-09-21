@@ -175,9 +175,6 @@ private fun AboutDialogContent(onDismiss: () -> Unit) {
                     ")"
                 )
             )
-            Text("Big Picture Mode Music by")
-            Text("Dale Melvin Blevens III (Fumer)")
-            Text("---")
             Text(linkText("Termux Package(", "github.com/termux/termux-package" to "https://github.com/termux/termux-packages", ")"))
             Text(linkText("Wine (", "winehq.org" to "https://www.winehq.org", ")"))
             Text(linkText("Box64 (", "github.com/ptitSeb/box64" to "https://github.com/ptitSeb/box64", ")"))

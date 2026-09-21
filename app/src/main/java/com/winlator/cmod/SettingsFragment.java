@@ -154,7 +154,6 @@ public class SettingsFragment extends Fragment {
                 LosslessDll.isGlobalDllAvailable(context),
                 winlatorPath,
                 shortcutPath,
-                preferences.getBoolean("enable_big_picture_mode", false),
                 Math.round(preferences.getFloat("cursor_speed", 1.0f) * 100.0f),
                 preferences.getBoolean("cursor_lock", true),
                 preferences.getBoolean("xinput_toggle", false),

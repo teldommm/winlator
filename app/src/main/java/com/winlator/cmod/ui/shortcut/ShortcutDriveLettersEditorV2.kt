@@ -52,19 +52,6 @@ private data class ShortcutDriveEntryV2(
 private val shortcutDriveLettersV2 = ('D'..'Z').map { it.toString() }
 
 @Composable
-internal fun ShortcutDriveLettersEditorV2(container: Container) {
-    DriveLettersEditorV2(
-        initialDrives = container.drives.orEmpty(),
-        subtitle = "Changes apply to this container"
-    ) { serialized ->
-        if (serialized != container.drives.orEmpty()) {
-            container.setDrives(serialized)
-            container.saveData()
-        }
-    }
-}
-
-@Composable
 internal fun DriveLettersEditorV2(
     initialDrives: String,
     subtitle: String = "Changes apply to this container",
