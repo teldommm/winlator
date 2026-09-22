@@ -66,7 +66,9 @@ internal fun LibraryRootWithoutEmptyDescription(
                 activity = activity,
                 grid = grid,
                 onArtwork = false,
-                onGridViewChanged = callbacks::onGridViewChanged
+                query = query,
+                onGridViewChanged = callbacks::onGridViewChanged,
+                onSearchQueryChanged = callbacks::onSearchQueryChanged
             )
         } else {
             LibraryPortraitHeader(

@@ -11,6 +11,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
@@ -284,6 +285,7 @@ fun WinlatorTheme(content: @Composable () -> Unit) {
 // IME without Compose ever being told to drop focus from the field that opened it — so the
 // field is left blinking with no keyboard on screen. Watching the IME's own visibility and
 // clearing focus the moment it goes away closes that gap everywhere at once.
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ClearFocusWhenKeyboardHides(focusManager: FocusManager) {
     val imeVisible = WindowInsets.isImeVisible
