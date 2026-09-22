@@ -7,16 +7,19 @@ import android.graphics.Bitmap
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -30,9 +33,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -74,7 +80,6 @@ import com.winlator.cmod.core.WineThemeManager
 import com.winlator.cmod.fexcore.FEXCorePreset
 import com.winlator.cmod.fexcore.FEXCorePresetManager
 import com.winlator.cmod.midi.MidiManager
-import com.winlator.cmod.ui.ThemedAlertHost
 import com.winlator.cmod.ui.settings.CpuSelectorRow
 import com.winlator.cmod.ui.shortcut.DriveLettersEditorV2
 import com.winlator.cmod.ui.settings.DDrawWrapperChoice
@@ -110,8 +115,8 @@ import com.winlator.cmod.ui.settings.normalizeLocaleValue
 import com.winlator.cmod.ui.settings.normalizeResolution
 import com.winlator.cmod.ui.settings.readConfig
 import com.winlator.cmod.ui.settings.writeConfig
+import com.winlator.cmod.ui.theme.ThemedDialog
 import com.winlator.cmod.ui.theme.controlAccentColor
-import com.winlator.cmod.ui.theme.findActivity
 import com.winlator.cmod.winhandler.WinHandler
 import kotlinx.coroutines.launch
 import org.json.JSONArray
@@ -1055,29 +1060,60 @@ private fun ContainerVulkanExtensionsV2(
     }
     val disabled = blacklisted.split(',').map(String::trim).filter(String::isNotBlank).toSet()
     val enabledCount = extensions.count { it !in disabled }
-    val activity = context.findActivity() as? AppCompatActivity
+    var showDialog by remember { mutableStateOf(false) }
     Surface(
-        onClick = {
-            if (activity != null) {
-                ThemedAlertHost.multiChoice(
-                    activity,
-                    "Vulkan Extensions",
-                    extensions,
-                    "Done",
-                    { checkedIndices: List<Int> ->
-                        val checked = checkedIndices.map { extensions[it] }.toSet()
-                        onChanged(extensions.filterNot { it in checked }.joinToString(","))
-                    },
-                    extensions.map { it !in disabled }
-                )
-            }
-        },
+        onClick = { showDialog = true },
         color = Color.Transparent,
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 11.dp)) {
             Text("Vulkan Extensions", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("$enabledCount of ${extensions.size} enabled", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+        }
+    }
+    if (showDialog) {
+        ThemedDialog(onDismissRequest = { showDialog = false }) {
+            Text("Vulkan Extensions", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(12.dp))
+            val checked = remember { mutableStateListOf(*Array(extensions.size) { i -> extensions[i] !in disabled }) }
+            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp)) {
+                items(extensions.size) { index ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(
+                                indication = null,
+                                interactionSource = remember { MutableInteractionSource() }
+                            ) { checked[index] = !checked[index] }
+                            .padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = checked[index],
+                            onCheckedChange = { checked[index] = it },
+                            colors = CheckboxDefaults.colors(checkedColor = controlAccentColor())
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(extensions[index], style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+            Row(Modifier.align(Alignment.End), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(
+                    onClick = { showDialog = false },
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) { Text("Cancel") }
+                Button(
+                    onClick = {
+                        showDialog = false
+                        val enabledNames = extensions.indices.filter { checked[it] }.map { extensions[it] }.toSet()
+                        onChanged(extensions.filterNot { it in enabledNames }.joinToString(","))
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
+                ) { Text("Done") }
+            }
         }
     }
 }
