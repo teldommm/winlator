@@ -25,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -130,8 +131,12 @@ private fun TaskManagerPanel(state: TaskManagerPanelState, callbacks: TaskManage
             }
         } else {
             state.processes.forEach { row ->
-                ProcessRow(row = row, callbacks = callbacks)
-                Spacer(Modifier.height(8.dp))
+                key(row.pid) {
+                    Column {
+                        ProcessRow(row = row, callbacks = callbacks)
+                        Spacer(Modifier.height(8.dp))
+                    }
+                }
             }
         }
 
