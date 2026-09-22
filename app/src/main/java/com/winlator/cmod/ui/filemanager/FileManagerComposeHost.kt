@@ -187,7 +187,8 @@ private fun FileManagerScreen(model: FileManagerModel, callbacks: FileManagerCal
                 onClick = { driveSheetOpen = true },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 Row(
                     modifier = Modifier
@@ -195,13 +196,14 @@ private fun FileManagerScreen(model: FileManagerModel, callbacks: FileManagerCal
                         .padding(horizontal = 14.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(painterResource(model.driveIconRes), null, modifier = Modifier.size(24.dp))
+                    Icon(painterResource(model.driveIconRes), null, modifier = Modifier.size(24.dp), tint = Color.White)
                     Spacer(Modifier.width(12.dp))
                     Text(
                         model.driveTitle,
                         modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
+                        color = Color.White,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -210,16 +212,25 @@ private fun FileManagerScreen(model: FileManagerModel, callbacks: FileManagerCal
             }
         }
 
-        Text(
-            model.currentPath,
+        Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.MiddleEllipsis
-        )
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Text(
+                model.currentPath,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 13.dp, vertical = 10.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.MiddleEllipsis
+            )
+        }
 
         StorageMeter(
             usedText = model.storageUsedText,
