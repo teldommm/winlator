@@ -86,18 +86,12 @@ public class ContainerOverviewFragment extends Fragment {
 
             @Override
             public void onManageComponents() {
-                Intent intent = new Intent(requireContext(), OnboardingActivity.class);
-                intent.putExtra(OnboardingActivity.EXTRA_COMPONENT_MANAGER, true);
-                startActivity(intent);
+                openComponentManager(ComponentManagerFragment.newInstance());
             }
 
             @Override
             public void onInstallComponent(@NonNull String type, @NonNull String version) {
-                Intent intent = new Intent(requireContext(), OnboardingActivity.class);
-                intent.putExtra(OnboardingActivity.EXTRA_COMPONENT_MANAGER, true);
-                intent.putExtra(OnboardingActivity.EXTRA_AUTO_INSTALL_TYPE, type);
-                intent.putExtra(OnboardingActivity.EXTRA_AUTO_INSTALL_VERSION, version);
-                startActivity(intent);
+                openComponentManager(ComponentManagerFragment.newInstance(type, version, Integer.MIN_VALUE));
             }
 
             @Override
@@ -163,5 +157,13 @@ public class ContainerOverviewFragment extends Fragment {
         if (((AppCompatActivity) requireActivity()).getSupportActionBar() != null) {
             ((AppCompatActivity) requireActivity()).getSupportActionBar().setTitle(R.string.configure_container);
         }
+    }
+
+    private void openComponentManager(ComponentManagerFragment fragment) {
+        getParentFragmentManager().beginTransaction()
+                .setCustomAnimations(R.anim.slide_in_up, R.anim.slide_out_down, R.anim.slide_in_down, R.anim.slide_out_up)
+                .addToBackStack(null)
+                .replace(R.id.FLFragmentContainer, fragment)
+                .commit();
     }
 }

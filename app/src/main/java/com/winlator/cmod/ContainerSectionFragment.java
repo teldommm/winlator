@@ -1,6 +1,5 @@
 package com.winlator.cmod;
 
-import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -243,18 +242,12 @@ public class ContainerSectionFragment extends Fragment {
                 new ContainerSectionCallbacks() {
                     @Override
                     public void onManageComponents() {
-                        Intent intent = new Intent(requireContext(), OnboardingActivity.class);
-                        intent.putExtra(OnboardingActivity.EXTRA_COMPONENT_MANAGER, true);
-                        startActivity(intent);
+                        openComponentManager(ComponentManagerFragment.newInstance());
                     }
 
                     @Override
                     public void onInstallComponent(@NonNull String type, @NonNull String version) {
-                        Intent intent = new Intent(requireContext(), OnboardingActivity.class);
-                        intent.putExtra(OnboardingActivity.EXTRA_COMPONENT_MANAGER, true);
-                        intent.putExtra(OnboardingActivity.EXTRA_AUTO_INSTALL_TYPE, type);
-                        intent.putExtra(OnboardingActivity.EXTRA_AUTO_INSTALL_VERSION, version);
-                        startActivity(intent);
+                        openComponentManager(ComponentManagerFragment.newInstance(type, version, Integer.MIN_VALUE));
                     }
 
                     @Override
@@ -435,5 +428,13 @@ public class ContainerSectionFragment extends Fragment {
         int title = section == VIDEO ? R.string.video
                 : section == AUDIO ? R.string.audio_driver : R.string.compatibility;
         ((AppCompatActivity) requireActivity()).getSupportActionBar().setTitle(title);
+    }
+
+    private void openComponentManager(ComponentManagerFragment fragment) {
+        getParentFragmentManager().beginTransaction()
+                .setCustomAnimations(R.anim.slide_in_up, R.anim.slide_out_down, R.anim.slide_in_down, R.anim.slide_out_up)
+                .addToBackStack(null)
+                .replace(R.id.FLFragmentContainer, fragment)
+                .commit();
     }
 }

@@ -86,7 +86,6 @@ import com.winlator.cmod.core.StringUtils
 import com.winlator.cmod.fexcore.FEXCorePresetManager
 import com.winlator.cmod.inputcontrols.InputControlsManager
 import com.winlator.cmod.midi.MidiManager
-import com.winlator.cmod.ui.settings.ContainersSettingsActivity
 import com.winlator.cmod.ui.settings.CpuSelectorRow
 import com.winlator.cmod.ui.settings.DriverOption
 import com.winlator.cmod.ui.settings.DxvkAsyncMode
@@ -478,7 +477,11 @@ internal fun ShortcutEditorV2(fragment: Fragment, shortcut: Shortcut, close: () 
     }
 
     fun createContainer() {
-        context.startActivity(Intent(context, ContainersSettingsActivity::class.java))
+        fragment.parentFragmentManager.beginTransaction()
+            .setCustomAnimations(R.anim.slide_in_up, R.anim.slide_out_down, R.anim.slide_in_down, R.anim.slide_out_up)
+            .addToBackStack(null)
+            .replace(R.id.FLFragmentContainer, com.winlator.cmod.ui.settings.ContainersSettingsFragment())
+            .commit()
     }
 
     fun changeContainer(targetId: Int) {

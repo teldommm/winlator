@@ -186,9 +186,20 @@ public class SettingsFragment extends Fragment {
         return new SettingsCallbacks() {
             @Override
             public void onOpenComponents() {
-                Intent intent = new Intent(requireContext(), OnboardingActivity.class);
-                intent.putExtra(OnboardingActivity.EXTRA_COMPONENT_MANAGER, true);
-                startActivity(intent);
+                getParentFragmentManager().beginTransaction()
+                        .setCustomAnimations(R.anim.slide_in_up, R.anim.slide_out_down, R.anim.slide_in_down, R.anim.slide_out_up)
+                        .addToBackStack(null)
+                        .replace(R.id.FLFragmentContainer, ComponentManagerFragment.newInstance())
+                        .commit();
+            }
+
+            @Override
+            public void onOpenContainers() {
+                getParentFragmentManager().beginTransaction()
+                        .setCustomAnimations(R.anim.slide_in_up, R.anim.slide_out_down, R.anim.slide_in_down, R.anim.slide_out_up)
+                        .addToBackStack(null)
+                        .replace(R.id.FLFragmentContainer, new com.winlator.cmod.ui.settings.ContainersSettingsFragment())
+                        .commit();
             }
 
             @Override

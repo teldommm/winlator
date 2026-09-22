@@ -1,11 +1,11 @@
 package com.winlator.cmod.ui.settings
 
-import android.content.Intent
 import android.os.Bundle
+import android.content.Intent
+import android.view.LayoutInflater
 import android.view.View
-import android.widget.FrameLayout
+import android.view.ViewGroup
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -69,13 +69,13 @@ import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.fragment.app.Fragment
+import com.winlator.cmod.R
 import com.winlator.cmod.XServerDisplayActivity
 import com.winlator.cmod.container.Container
 import com.winlator.cmod.container.ContainerManager
-import com.winlator.cmod.core.AppUtils
 import com.winlator.cmod.core.FileUtils
 import com.winlator.cmod.core.StringUtils
-import com.winlator.cmod.ui.applyAppFullscreen
 import com.winlator.cmod.ui.container.ContainerCreateComposeFragment
 import com.winlator.cmod.ui.ThemedAlertHost
 import com.winlator.cmod.ui.theme.WinZTheme
@@ -87,50 +87,29 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.ArrayDeque
 
-class ContainersSettingsActivity : AppCompatActivity() {
-    private lateinit var root: FrameLayout
+// Hosted as a Fragment inside MainActivity's own R.id.FLFragmentContainer (exactly like
+// ShortcutsFragment -> GameDetailFragment) instead of as a separate Activity. A separate
+// Activity here previously showed a brief portrait flash before settling into the app's
+// locked landscape mode, because a fresh Activity's window gets its initial orientation
+// resolved by the OS independently of MainActivity's already-correct orientation; as a
+// Fragment there is no new Window/ActivityRecord at all, so there is nothing to flash.
+class ContainersSettingsFragment : Fragment() {
     private val containersState = mutableStateOf<List<Container>>(emptyList())
     private val propertiesState = mutableStateOf<Container?>(null)
-    private var showingEditor = false
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        AppUtils.applyOrientationMode(this)
-        applyAppFullscreen(this)
-        root = FrameLayout(this).apply { id = View.generateViewId() }
-        setContentView(root)
-
-        supportFragmentManager.addOnBackStackChangedListener {
-            if (supportFragmentManager.backStackEntryCount == 0 && showingEditor) {
-                showingEditor = false
-                refresh()
-                showHome()
-            }
-        }
-
-        if (savedInstanceState == null) showHome()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        applyAppFullscreen(this)
-        refresh()
-    }
-
-    private fun showHome() {
-        root.removeAllViews()
-        root.addView(ComposeView(this).apply {
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+        return ComposeView(requireContext()).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
                 WinZTheme {
                     ContainersSettingsScreen(
                         containers = containersState.value,
                         propertiesContainer = propertiesState.value,
-                        onBack = { finish() },
+                        onBack = { parentFragmentManager.popBackStack() },
                         onAdd = { openFragment(ContainerCreateComposeFragment()) },
                         onEdit = { id -> openFragment(ContainerCreateComposeFragment.forEdit(id)) },
                         onProperties = { id ->
-                            propertiesState.value = ContainerManager(this@ContainersSettingsActivity).getContainerById(id)
+                            propertiesState.value = ContainerManager(requireContext()).getContainerById(id)
                         },
                         onDismissProperties = { propertiesState.value = null },
                         onRun = ::runContainer,
@@ -139,51 +118,77 @@ class ContainersSettingsActivity : AppCompatActivity() {
                     )
                 }
             }
-        }, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        refresh()
+        applyDetailChrome()
+    }
+
+    override fun onPause() {
+        if (!isLandscape() && activity is com.winlator.cmod.MainActivity) {
+            (activity as com.winlator.cmod.MainActivity).setDetailMode(false)
+        }
+        super.onPause()
+    }
+
+    private fun isLandscape(): Boolean {
+        return resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    }
+
+    private fun applyDetailChrome() {
+        val mainActivity = activity as? com.winlator.cmod.MainActivity ?: return
+        mainActivity.setDetailMode(true)
+        if (isLandscape()) {
+            mainActivity.setBottomNavigationVisible(false)
+            mainActivity.setMainToolbarVisible(false)
+        }
     }
 
     private fun openFragment(fragment: androidx.fragment.app.Fragment) {
         propertiesState.value = null
-        showingEditor = true
-        supportFragmentManager.beginTransaction()
-            .replace(root.id, fragment)
+        parentFragmentManager.beginTransaction()
+            .setCustomAnimations(R.anim.slide_in_up, R.anim.slide_out_down, R.anim.slide_in_down, R.anim.slide_out_up)
             .addToBackStack(null)
+            .replace(R.id.FLFragmentContainer, fragment)
             .commit()
     }
 
     private fun refresh() {
-        containersState.value = ContainerManager(this).containers.toList()
+        containersState.value = ContainerManager(requireContext()).containers.toList()
     }
 
     private fun duplicateContainer(id: Int) {
-        val manager = ContainerManager(this)
+        val manager = ContainerManager(requireContext())
         val container = manager.getContainerById(id) ?: return
         ThemedAlertHost.confirm(
-            this,
+            requireContext(),
             "Duplicate container?",
             "A copy of ${container.name} and its container files will be created.",
             "Duplicate",
             onConfirm = {
                 manager.duplicateContainerAsync(container) {
                     refresh()
-                    Toast.makeText(this, "Container duplicated", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), "Container duplicated", Toast.LENGTH_SHORT).show()
                 }
             }
         )
     }
 
     private fun removeContainer(id: Int) {
-        val manager = ContainerManager(this)
+        val manager = ContainerManager(requireContext())
         val container = manager.getContainerById(id) ?: return
         ThemedAlertHost.confirm(
-            this,
+            requireContext(),
             "Remove container?",
             "${container.name} and its container files will be deleted.",
             "Remove",
             onConfirm = {
                 manager.removeContainerAsync(container) {
                     refresh()
-                    Toast.makeText(this, "Container removed", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), "Container removed", Toast.LENGTH_SHORT).show()
                 }
             },
             destructive = true
@@ -191,15 +196,7 @@ class ContainersSettingsActivity : AppCompatActivity() {
     }
 
     private fun runContainer(id: Int) {
-        startActivity(Intent(this, XServerDisplayActivity::class.java).putExtra("container_id", id))
-    }
-
-    override fun onBackPressed() {
-        if (supportFragmentManager.backStackEntryCount > 0) {
-            supportFragmentManager.popBackStack()
-        } else {
-            super.onBackPressed()
-        }
+        startActivity(Intent(requireContext(), XServerDisplayActivity::class.java).putExtra("container_id", id))
     }
 }
 

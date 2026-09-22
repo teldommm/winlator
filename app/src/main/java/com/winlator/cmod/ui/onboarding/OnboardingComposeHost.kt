@@ -1,9 +1,11 @@
 package com.winlator.cmod.ui.onboarding
 
+import android.content.Context
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.ComposeView
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -155,12 +157,71 @@ object OnboardingComposeHost {
         }
         return controller
     }
+
+    // Fragment-hosted variant (e.g. ComponentManagerFragment) — sets content on a
+    // caller-provided ComposeView instead of activity.setContent, so no separate
+    // Activity/Window is ever created and there's no window-orientation resolution
+    // to race with the host Activity's own locked orientation. Always managerMode.
+    @JvmStatic
+    fun attachToView(
+        context: Context,
+        composeView: ComposeView,
+        initialCoreReady: Boolean,
+        initialCoreProgress: Int,
+        initialBundledWineInstalled: Boolean,
+        initialBundledWineInUse: Boolean,
+        callbacks: OnboardingCallbacks
+    ): OnboardingComposeController {
+        val ready = mutableStateOf(initialCoreReady)
+        val progress = mutableStateOf(initialCoreProgress)
+        val bundledInstalled = mutableStateOf(initialBundledWineInstalled)
+        val bundledInUse = mutableStateOf(initialBundledWineInUse)
+        val components = mutableStateOf<List<OnboardingComponent>>(emptyList())
+        val installing = mutableStateOf<String?>(null)
+        val installLabel = mutableStateOf<String?>(null)
+        val installProgress = mutableStateOf(-1)
+        val containerPreparing = mutableStateOf(false)
+        val containerReady = mutableStateOf(false)
+        val controller = OnboardingComposeController(
+            ready,
+            progress,
+            bundledInstalled,
+            bundledInUse,
+            components,
+            installing,
+            installLabel,
+            installProgress,
+            containerPreparing,
+            containerReady
+        )
+
+        composeView.setContent {
+            WinZTheme {
+                OnboardingFlow(
+                    context,
+                    ready,
+                    progress,
+                    bundledInstalled,
+                    bundledInUse,
+                    components,
+                    installing,
+                    installLabel,
+                    installProgress,
+                    containerPreparing,
+                    containerReady,
+                    true,
+                    callbacks
+                )
+            }
+        }
+        return controller
+    }
 }
 
 private enum class OnboardingPage { Welcome, Theme, Components, Runtime, Access }
 
 private fun prepareInitialContainer(
-    activity: ComponentActivity,
+    activity: Context,
     runtimeIdentifier: String,
     preparing: MutableState<Boolean>,
     ready: MutableState<Boolean>
@@ -230,7 +291,7 @@ private fun prepareInitialContainer(
 
 @Composable
 private fun OnboardingFlow(
-    activity: ComponentActivity,
+    activity: Context,
     ready: State<Boolean>,
     progress: State<Int>,
     bundledInstalled: State<Boolean>,
