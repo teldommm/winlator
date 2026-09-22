@@ -138,7 +138,7 @@ public class ComponentManagerFragment extends Fragment {
 
         FrameLayout root = new FrameLayout(requireContext());
         ComposeView composeView = new ComposeView(requireContext());
-        composeView.setViewCompositionStrategy(ViewCompositionStrategy.Companion.getDisposeOnViewTreeLifecycleDestroyed());
+        composeView.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed.INSTANCE);
         root.addView(composeView, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 
         composeController = OnboardingComposeHost.attachToView(
