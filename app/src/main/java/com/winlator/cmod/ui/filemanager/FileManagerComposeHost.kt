@@ -176,7 +176,7 @@ private fun FileManagerScreen(model: FileManagerModel, callbacks: FileManagerCal
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 6.dp, end = 16.dp, top = 8.dp, bottom = 4.dp),
+                .padding(start = 6.dp, end = 16.dp, top = 8.dp, bottom = 2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = callbacks::onUpDir) {
@@ -215,7 +215,7 @@ private fun FileManagerScreen(model: FileManagerModel, callbacks: FileManagerCal
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .padding(horizontal = 16.dp, vertical = 4.dp),
             shape = RoundedCornerShape(12.dp),
             color = MaterialTheme.colorScheme.surface,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
@@ -235,7 +235,7 @@ private fun FileManagerScreen(model: FileManagerModel, callbacks: FileManagerCal
         StorageMeter(
             usedText = model.storageUsedText,
             percent = model.storagePercent,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
         )
 
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)

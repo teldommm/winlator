@@ -51,7 +51,7 @@ enum class WinlatorThemeType(
     val description: String
 ) {
     WHITE("white", "White", "Bright surfaces with dark text"),
-    BLACK("black", "Black", "Balanced dark theme · Default"),
+    BLACK("black", "Dark", "Balanced dark theme · Default"),
     AMOLED("amoled", "AMOLED", "Pure black background for OLED displays");
 
     companion object {

@@ -199,17 +199,12 @@ internal data class ThemePreviewColors(
     val outline: Color
 )
 
-internal fun winlatorThemePreview(theme: WinlatorThemeType): ThemePreviewColors = when (theme) {
-    WinlatorThemeType.WHITE -> ThemePreviewColors(
-        background = Color(0xFFF5F6F8), surface = Color.White,
-        accent = Color(0xFF25272D), outline = Color(0xFFB9BBC2)
-    )
-    WinlatorThemeType.BLACK -> ThemePreviewColors(
-        background = Color(0xFF06070A), surface = Color(0xFF17181E),
-        accent = Color(0xFFF2F2F4), outline = Color(0xFF41434D)
-    )
-    WinlatorThemeType.AMOLED -> ThemePreviewColors(
-        background = Color.Black, surface = Color(0xFF080808),
-        accent = Color.White, outline = Color(0xFF2A2A2A)
+internal fun winlatorThemePreview(theme: WinlatorThemeType): ThemePreviewColors {
+    val scheme = winlatorColorScheme(theme)
+    return ThemePreviewColors(
+        background = scheme.background,
+        surface = scheme.surface,
+        accent = scheme.primary,
+        outline = scheme.outline
     )
 }

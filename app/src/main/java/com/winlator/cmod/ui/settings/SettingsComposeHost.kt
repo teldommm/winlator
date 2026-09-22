@@ -530,6 +530,8 @@ private fun PresetChoiceRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 8.dp).padding(bottom = 10.dp)
                 )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(Modifier.size(12.dp))
                 val accent = controlAccentColor()
                 LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
                     items(choices, key = { it.id }) { choice ->

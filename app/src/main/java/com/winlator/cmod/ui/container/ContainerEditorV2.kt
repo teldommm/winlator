@@ -45,6 +45,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -63,6 +64,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.winlator.cmod.MainActivity
 import com.winlator.cmod.R
 import com.winlator.cmod.box64.Box64Preset
 import com.winlator.cmod.box64.Box64PresetManager
@@ -328,6 +330,11 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
     var category by remember { mutableStateOf("General") }
     val categories = listOf("General", "Video", "Compatibility", "Input", "Storage", "Environment", "Advanced")
     val landscape = LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
+    val activity = context as? MainActivity
+    DisposableEffect(activity) {
+        activity?.setBottomNavigationVisible(false)
+        onDispose { }
+    }
     var revision by remember { mutableIntStateOf(0) }
     var installing by remember { mutableStateOf<Set<String>>(emptySet()) }
     var creating by remember { mutableStateOf(false) }
@@ -657,6 +664,7 @@ private fun ContainerNavItemV2(label: String, selected: Boolean, onClick: () -> 
         onClick = onClick,
         shape = RoundedCornerShape(10.dp),
         color = if (selected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
+        contentColor = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
     ) {
         Text(
