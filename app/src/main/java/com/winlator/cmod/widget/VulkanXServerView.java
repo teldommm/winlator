@@ -72,7 +72,6 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
     private File pendingLsfgDll;
     private float pendingFrameGenRefreshHz;
     private volatile String frameGenError = "";
-    private Runnable frameGenStatusListener;
 
     private WinlatorHUD hudRef = null;
     private FrameRating classicHudRef = null;
@@ -613,13 +612,6 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
         queueEvent(() -> { synchronized (lock) { if (nativeHandle != 0) applyFrameGenNative(); } });
     }
 
-    public String getFrameGenError() { return frameGenError; }
-
-    public void setFrameGenStatusListener(Runnable listener) {
-        frameGenStatusListener = listener;
-        if (listener != null) post(listener);
-    }
-
     // Runs on an existing worker, under lock; cache translation never blocks the UI.
     private void applyFrameGenNative() {
         int multiplier = pendingLsfgMultiplier;
@@ -647,13 +639,9 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
                             + "Set Renderer Driver to a Turnip driver, then relaunch the game."
                             : error + (error.endsWith(".") ? "" : "."));
             final String message = frameGenError;
-            post(() -> {
-                Toast.makeText(getContext(), message, Toast.LENGTH_LONG).show();
-                if (frameGenStatusListener != null) frameGenStatusListener.run();
-            });
+            post(() -> Toast.makeText(getContext(), message, Toast.LENGTH_LONG).show());
         } else {
             frameGenError = "";
-            post(() -> { if (frameGenStatusListener != null) frameGenStatusListener.run(); });
         }
     }
 

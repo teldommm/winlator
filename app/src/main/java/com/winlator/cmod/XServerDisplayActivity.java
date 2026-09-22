@@ -10,7 +10,6 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.PictureInPictureParams;
 import android.graphics.Rect;
-import android.graphics.Color;
 import android.util.Rational;
 import android.content.Context;
 import android.content.Intent;
@@ -58,7 +57,6 @@ import com.winlator.cmod.contentdialog.WineD3DConfig;
 import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.contents.AdrenotoolsManager;
-import com.winlator.cmod.contents.D7VKManager;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.DebugLogFile;
 import com.winlator.cmod.core.DefaultVersion;
@@ -70,7 +68,6 @@ import com.winlator.cmod.core.LosslessDll;
 import com.winlator.cmod.core.OnExtractFileListener;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.ProcessHelper;
-import com.winlator.cmod.core.RuntimeBackendProbe;
 import com.winlator.cmod.core.StringUtils;
 import com.winlator.cmod.core.TarCompressorUtils;
 import com.winlator.cmod.core.WineInfo;
@@ -96,7 +93,6 @@ import com.winlator.cmod.ui.InputPanelCallbacks;
 import com.winlator.cmod.ui.InputPanelState;
 import com.winlator.cmod.ui.InputProfileOption;
 import com.winlator.cmod.ui.InputSidebarPanelHost;
-import com.winlator.cmod.ui.RuntimeStatusState;
 import com.winlator.cmod.ui.ScreenPanelCallbacks;
 import com.winlator.cmod.ui.ScreenSidebarPanelHost;
 import com.winlator.cmod.ui.ThemedLoadingOverlayHost;
@@ -104,7 +100,6 @@ import com.winlator.cmod.ui.SidebarRailCallbacks;
 import com.winlator.cmod.ui.SidebarRailHost;
 import com.winlator.cmod.ui.SidebarRailItemData;
 import com.winlator.cmod.ui.SidebarRailState;
-import com.winlator.cmod.ui.StatusLine;
 import com.winlator.cmod.ui.TaskManagerCallbacks;
 import com.winlator.cmod.ui.TaskManagerPanelHost;
 import com.winlator.cmod.ui.TaskManagerPanelState;
@@ -186,7 +181,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private int activeLsfgMultiplier;
     private java.io.File activeLsfgDll;
     private float activeLsfgFlowScale = 0.80f;
-    private final RuntimeStatusState runtimeStatusState = new RuntimeStatusState();
     private boolean graphicsFsrEnabled;
     private int graphicsUpscalerModeIndex;
     private int graphicsPostFxModeIndex;
@@ -217,12 +211,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private short taskAffinityMaskWoW64 = 0;
     private String wineCpuTopologyValue = "";
     private int frameRatingWindowId = -1;
-    private volatile RuntimeBackendProbe.FexMode runtimeFexMode = RuntimeBackendProbe.FexMode.NA;
-    private volatile boolean runtimeStatusProbeRunning;
-    private volatile boolean runtimeStatusProbeStopped;
-    private String runtimeDxvkVersion = "";
-    private String runtimeVkd3dVersion = "";
-    private String runtimeDdrawWrapper = "";
 
     private int activeRendererWindowId = -1;
     private String lastRendererName = null;
@@ -946,7 +934,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
-        runtimeStatusProbeStopped = true;
         if (taskManagerSidebar != null) taskManagerSidebar.stop();
         super.onDestroy();
     }
@@ -1358,126 +1345,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         setupSidebarHudControls();
         setupSidebarGraphicsControls();
-        setupRuntimeStatusSection();
-    }
-
-    private void setupRuntimeStatusSection() {
-        runtimeStatusProbeStopped = false;
-        if (dxwrapperConfig != null) {
-            runtimeDxvkVersion = dxwrapperConfig.get("version");
-            runtimeVkd3dVersion = dxwrapperConfig.get("vkd3dVersion");
-            runtimeDdrawWrapper = dxwrapperConfig.get("ddrawrapper");
-        }
-        updateRuntimeStatusUi(runtimeFexMode);
-        requestRuntimeStatusProbe();
-    }
-
-    private void requestRuntimeStatusProbe() {
-        if (runtimeStatusProbeRunning || runtimeStatusProbeStopped || container == null) return;
-        runtimeStatusProbeRunning = true;
-        Thread probe = new Thread(() -> {
-            try {
-                for (int i = 0; i < 15 && !runtimeStatusProbeStopped; i++) {
-                    RuntimeBackendProbe.FexMode detected = RuntimeBackendProbe.detect(container.getRootDir());
-                    runtimeFexMode = detected;
-                    runOnUiThread(() -> {
-                        if (!isFinishing() && !isDestroyed()) updateRuntimeStatusUi(detected);
-                    });
-                    if (wineInfo == null || !wineInfo.isArm64EC()
-                            || !"fexcore".equalsIgnoreCase(emulator)
-                            || detected != RuntimeBackendProbe.FexMode.NA) break;
-                    Thread.sleep(1000L);
-                }
-            } catch (InterruptedException ignored) {
-                Thread.currentThread().interrupt();
-            } finally {
-                runtimeStatusProbeRunning = false;
-            }
-        }, "runtime-status-probe");
-        probe.setDaemon(true);
-        probe.start();
-    }
-
-    private void updateRuntimeStatusUi(RuntimeBackendProbe.FexMode fexMode) {
-        int normal = Color.rgb(184, 196, 206);
-        int active = Color.rgb(76, 175, 80);
-        int warning = Color.rgb(255, 152, 0);
-
-        List<StatusLine> lines = new ArrayList<>();
-        lines.add(new StatusLine("Renderer", "Vulkan active", active));
-
-        boolean dxvkActive = dxwrapper != null && dxwrapper.contains("dxvk");
-        boolean vkd3dActive = dxvkActive && dxwrapper.contains("vkd3d")
-                && !runtimeVkd3dVersion.isEmpty() && !"None".equalsIgnoreCase(runtimeVkd3dVersion);
-        boolean d7vkActive = D7VKManager.isD7VK(runtimeDdrawWrapper);
-        boolean dd7to9Active = !d7vkActive && "dd7to9".equalsIgnoreCase(runtimeDdrawWrapper);
-        boolean cncDdrawActive = !d7vkActive && !dd7to9Active && "cnc-ddraw".equalsIgnoreCase(runtimeDdrawWrapper);
-        String openglDriver = "freedreno".equals(getSelectedOpenGLDriver()) ? "Freedreno" : "Zink";
-
-        StringBuilder dxWrapperStatus = new StringBuilder();
-        if (dxvkActive) {
-            dxWrapperStatus.append("DXVK ").append(runtimeDxvkVersion.isEmpty() ? "?" : runtimeDxvkVersion);
-            if (vkd3dActive) dxWrapperStatus.append(" + VKD3D ").append(runtimeVkd3dVersion);
-        } else {
-            dxWrapperStatus.append("WineD3D (native)");
-        }
-        if (d7vkActive) dxWrapperStatus.append(" · ").append(D7VKManager.getWrapperLabel(runtimeDdrawWrapper));
-        else if (dd7to9Active) dxWrapperStatus.append(" · Dd7To9");
-        else if (cncDdrawActive) dxWrapperStatus.append(" · CnC-DDraw");
-        lines.add(new StatusLine("DX Wrapper", dxWrapperStatus.toString(), dxvkActive ? active : normal));
-
-        // GALLIUM_DRIVER/MESA_LOADER_DRIVER_OVERRIDE are set on the whole guest
-        // environment (applyOpenGLDriverEnvVars), not gated by dxwrapper - any
-        // OpenGL call anywhere in the container (GDI, video codecs, wine's own
-        // internals) goes through it regardless of which D3D wrapper the game
-        // itself uses, so it gets its own row rather than riding on DX Wrapper.
-        lines.add(new StatusLine("GL Driver", openglDriver, active));
-
-        // Vulkan is the only renderer now, so xServerView (when set) is always a
-        // VulkanXServerView; upscaling/framegen are simply unavailable before it's created.
-        VulkanXServerView vkStatusRenderer = xServerView != null ? (VulkanXServerView) xServerView : null;
-        boolean upscalerAvailable = vkStatusRenderer != null;
-        boolean upscalerActive = upscalerAvailable && graphicsFsrEnabled;
-        String[] upscalerLabels = {"SGSR", "FSR", "Lanczos 2", "Color Boost"};
-        String upscalerModeLabel = graphicsUpscalerModeIndex >= 0 && graphicsUpscalerModeIndex < upscalerLabels.length
-                ? upscalerLabels[graphicsUpscalerModeIndex] : "SGSR";
-        String upscalerStatus = !upscalerAvailable ? "Unavailable"
-                : upscalerActive ? upscalerModeLabel + " active"
-                : "Off";
-        lines.add(new StatusLine("Upscaler", upscalerStatus, upscalerActive ? active : normal));
-
-        VulkanXServerView framegenRenderer = vkStatusRenderer;
-        boolean framegenAvailable = framegenRenderer != null;
-        boolean framegenActive = framegenAvailable && activeLsfgMultiplier >= 2;
-        String framegenError = framegenAvailable ? framegenRenderer.getFrameGenError() : "";
-        String framegenStatus = !framegenAvailable ? "Unavailable"
-                : !framegenActive ? "Off"
-                : !framegenError.isEmpty() ? "Error"
-                : "LSFG " + activeLsfgMultiplier + "x active";
-        int framegenColor = framegenActive && framegenError.isEmpty() ? active
-                : framegenActive ? warning : normal;
-        lines.add(new StatusLine("Framegen", framegenStatus, framegenColor));
-
-        boolean arm64ec = wineInfo != null && wineInfo.isArm64EC();
-        boolean fexConfigured = arm64ec && "fexcore".equalsIgnoreCase(emulator);
-        String version = container == null ? "" : shortcut != null
-                ? shortcut.getExtra("fexcoreVersion", container.getFEXCoreVersion())
-                : container.getFEXCoreVersion();
-        String fexStatus = !arm64ec ? "Not applicable"
-                : !fexConfigured ? "Off · " + emulator
-                : (version == null || version.isEmpty() ? "" : version + " ")
-                        + (fexMode == RuntimeBackendProbe.FexMode.NA ? "not detected" : "active");
-        lines.add(new StatusLine("FEXCore", fexStatus,
-                fexConfigured ? (fexMode == RuntimeBackendProbe.FexMode.NA ? warning : active) : normal));
-
-        String unixLibsStatus = !fexConfigured ? "Not applicable"
-                : fexMode == RuntimeBackendProbe.FexMode.UNIXLIB ? "Active"
-                : fexMode == RuntimeBackendProbe.FexMode.DLL ? "Off · DLL mode" : "Not detected";
-        lines.add(new StatusLine("Unixlibs", unixLibsStatus,
-                fexMode == RuntimeBackendProbe.FexMode.UNIXLIB ? active
-                        : fexConfigured && fexMode == RuntimeBackendProbe.FexMode.NA ? warning : normal));
-
-        runtimeStatusState.setLines(lines);
     }
 
     private ActivityResultLauncher<Intent> controlsEditorActivityResultLauncher = registerForActivityResult(
@@ -1705,7 +1572,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
             sub.animate().alpha(1.0f).translationX(0.0f).setDuration(130).start();
         }
         if (sidebarRailState != null) sidebarRailState.setSelectedId(subId);
-        if (subId == R.id.LLSubGraphics) requestRuntimeStatusProbe();
         activeSidebarPanelId = subId;
     }
 
@@ -1858,7 +1724,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
             if (fsrOn) vkRenderer.setFilterMode(upscalerModeIndex + 2);
             vkRenderer.setSharpness(initSharp / 100f);
             if (initPFX > 0) vkRenderer.setPostFXMode(initPFX);
-            vkRenderer.setFrameGenStatusListener(() -> updateRuntimeStatusUi(runtimeFexMode));
         }
 
         GraphicsPanelState state = new GraphicsPanelState(
@@ -1890,7 +1755,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
                             : (container != null ? container.getRendererFilterMode() : 0));
                 }
                 autosaveGraphicsSettings();
-                updateRuntimeStatusUi(runtimeFexMode);
             }
 
             @Override
@@ -1898,7 +1762,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 graphicsUpscalerModeIndex = index;
                 if (vkRenderer != null && graphicsFsrEnabled) vkRenderer.setFilterMode(index + 2);
                 autosaveGraphicsSettings();
-                updateRuntimeStatusUi(runtimeFexMode);
             }
 
             @Override
@@ -1987,7 +1850,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
         };
 
-        GraphicsSidebarPanelHost.attach(graphicsPanel, state, runtimeStatusState, callbacks);
+        GraphicsSidebarPanelHost.attach(graphicsPanel, state, callbacks);
     }
 
     // Shortcut-preferred, Container-fallback read — same priority SidebarCleanupView's

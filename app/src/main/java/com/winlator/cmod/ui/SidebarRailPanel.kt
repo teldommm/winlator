@@ -78,7 +78,7 @@ private fun SidebarRail(
     Column(
         modifier = Modifier
             .fillMaxHeight()
-            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f))
             .padding(horizontal = 5.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {

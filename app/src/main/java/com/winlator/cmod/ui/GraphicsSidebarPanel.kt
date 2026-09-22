@@ -32,7 +32,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.text.font.FontWeight
@@ -41,16 +40,6 @@ import androidx.compose.ui.unit.dp
 import com.winlator.cmod.ui.theme.WinZOverlayTheme
 import com.winlator.cmod.ui.theme.accentSwitchColors
 import com.winlator.cmod.ui.theme.controlAccentColor
-
-// ---------- Runtime Status card ----------
-
-// colorArgb comes straight from Java's Color.rgb(...) ints (fixed status colors, not
-// theme-driven — the original never routed these through the ingameSidebar* attrs either).
-data class StatusLine(val label: String, val value: String, val colorArgb: Int)
-
-class RuntimeStatusState {
-    var lines: List<StatusLine> by mutableStateOf(emptyList())
-}
 
 // ---------- Graphics panel ----------
 
@@ -90,13 +79,12 @@ object GraphicsSidebarPanelHost {
     fun attach(
         composeView: ComposeView,
         state: GraphicsPanelState,
-        runtimeStatus: RuntimeStatusState,
         callbacks: GraphicsPanelCallbacks
     ) {
         composeView.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
         composeView.setContent {
             WinZOverlayTheme {
-                GraphicsSidebarPanel(state, runtimeStatus, callbacks)
+                GraphicsSidebarPanel(state, callbacks)
             }
         }
     }
@@ -113,7 +101,6 @@ private val RESHADE_EFFECTS = listOf(
 @Composable
 private fun GraphicsSidebarPanel(
     state: GraphicsPanelState,
-    runtimeStatus: RuntimeStatusState,
     callbacks: GraphicsPanelCallbacks
 ) {
     var fsrEnabled by remember { mutableStateOf(state.fsrEnabled) }
@@ -141,25 +128,6 @@ private fun GraphicsSidebarPanel(
         )
         Spacer(Modifier.height(12.dp))
 
-        PanelCard {
-            Text(
-                text = "Runtime Status",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(Modifier.height(8.dp))
-            runtimeStatus.lines.forEach { line ->
-                Text(
-                    text = "${line.label}: ${line.value}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color(line.colorArgb),
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-            }
-        }
-
-        Spacer(Modifier.height(18.dp))
         FpsLimiterCard(
             initialFps = state.fpsLimit,
             onFpsChanged = callbacks::onFpsLimitChanged
