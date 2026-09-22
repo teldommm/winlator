@@ -28,7 +28,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.ui.theme.WinZOverlayTheme
 import com.winlator.cmod.ui.theme.controlAccentColor
-import com.winlator.cmod.ui.theme.sidebarCardColor
 
 // Java-friendly callback surface (plain interface, not a Kotlin function type) so
 // XServerDisplayActivity.java can implement it with a normal anonymous class, the same
@@ -111,7 +110,7 @@ private fun ScreenPanelRow(
             .fillMaxWidth()
             .height(56.dp)
             .clip(shape)
-            .background(sidebarCardColor())
+            .background(MaterialTheme.colorScheme.surface)
             .let {
                 if (selected) it.border(BorderStroke(1.5.dp, accent), shape) else it
             }

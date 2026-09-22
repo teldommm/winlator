@@ -43,8 +43,6 @@ import com.winlator.cmod.R
 import com.winlator.cmod.ui.theme.WinZOverlayTheme
 import com.winlator.cmod.ui.theme.accentSwitchColors
 import com.winlator.cmod.ui.theme.controlAccentColor
-import com.winlator.cmod.ui.theme.sidebarBorderColor
-import com.winlator.cmod.ui.theme.sidebarCardColor
 
 // One entry in the controls-profile dropdown. Plain data holder so this file doesn't need
 // to depend on com.winlator.cmod.inputcontrols.ControlsProfile — Java builds this list from it.
@@ -315,8 +313,8 @@ private fun PanelActionRow(label: String, onClick: () -> Unit) {
             .fillMaxWidth()
             .height(56.dp)
             .clip(shape)
-            .background(sidebarCardColor())
-            .border(BorderStroke(1.dp, sidebarBorderColor()), shape)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -332,8 +330,8 @@ private fun PanelCard(content: @Composable ColumnScope.() -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(sidebarCardColor())
-            .border(BorderStroke(1.dp, sidebarBorderColor()), shape)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         content = content
     )
