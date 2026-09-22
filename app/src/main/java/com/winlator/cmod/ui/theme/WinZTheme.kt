@@ -130,13 +130,16 @@ fun destructiveColor(): Color = destructiveFor(WinlatorThemeManager.currentTheme
 
 // Sidebar's bordered cards/rows (FPS Limit, Enable HUD, ReShade, TaskManager rows, etc.
 // — anything using the PanelCard/PanelActionRow/MetricCard/ProcessRow/ScreenPanelRow
-// shape) and the rail's selected-item highlight now reuse the Black theme's own
-// surfaceVariant token (#313130) instead of colorScheme.surface/primaryContainer,
-// per request — no new color introduced. White/AMOLED keep colorScheme.surface as before.
+// shape) and the rail's selected-item highlight reuse the Black theme's own
+// surfaceVariant token (#313130) instead of colorScheme.surface/primaryContainer, per
+// request — no new color introduced. Alpha is knocked back to the same ~90% every other
+// translucent sidebar surface uses (colorScheme.surface itself), restoring the
+// translucency this had before it was briefly made fully opaque. White/AMOLED keep
+// colorScheme.surface as before (already translucent on its own).
 @Composable
 fun sidebarCardFillColor(): Color =
     if (WinlatorThemeManager.currentTheme() == WinlatorThemeType.BLACK) {
-        MaterialTheme.colorScheme.surfaceVariant
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
     } else {
         MaterialTheme.colorScheme.surface
     }
