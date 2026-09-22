@@ -45,6 +45,8 @@ import androidx.compose.ui.unit.dp
 import com.winlator.cmod.R
 import com.winlator.cmod.ui.theme.WinZOverlayTheme
 import com.winlator.cmod.ui.theme.controlAccentColor
+import com.winlator.cmod.ui.theme.sidebarBorderColor
+import com.winlator.cmod.ui.theme.sidebarCardColor
 
 // One process row. rawName is the exact name WinHandler/Windows reports (used for the
 // bring-to-front/kill/affinity calls); displayName additionally carries the " *32" suffix
@@ -152,8 +154,8 @@ private fun MetricCard(modifier: Modifier, title: String, value: String) {
         modifier = modifier
             .fillMaxHeight()
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surface)
-            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape)
+            .background(sidebarCardColor())
+            .border(BorderStroke(1.dp, sidebarBorderColor()), shape)
             .padding(9.dp)
     ) {
         Text(
@@ -184,8 +186,8 @@ private fun ProcessRow(row: ProcessRowData, callbacks: TaskManagerCallbacks) {
             .fillMaxWidth()
             .height(62.dp)
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surface)
-            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape)
+            .background(sidebarCardColor())
+            .border(BorderStroke(1.dp, sidebarBorderColor()), shape)
             .padding(start = 12.dp, end = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -283,8 +285,8 @@ private fun PanelActionRow(label: String, onClick: () -> Unit) {
             .fillMaxWidth()
             .height(48.dp)
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surface)
-            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape)
+            .background(sidebarCardColor())
+            .border(BorderStroke(1.dp, sidebarBorderColor()), shape)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically

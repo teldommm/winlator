@@ -27,6 +27,8 @@ import androidx.compose.ui.unit.dp
 import com.winlator.cmod.R
 import com.winlator.cmod.ui.theme.WinZOverlayTheme
 import com.winlator.cmod.ui.theme.destructiveColor
+import com.winlator.cmod.ui.theme.sidebarBorderColor
+import com.winlator.cmod.ui.theme.sidebarRailColor
 
 // One selectable rail entry (Graphics/Screen/Input/FPS/TaskManager). `id` reuses the
 // panel's own R.id.LLSubXxx ComposeView id as its identity, so there's no separate
@@ -78,7 +80,7 @@ private fun SidebarRail(
     Column(
         modifier = Modifier
             .fillMaxHeight()
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f))
+            .background(sidebarRailColor())
             .padding(horizontal = 5.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -101,7 +103,7 @@ private fun SidebarRail(
 @Composable
 private fun RailNavButton(iconRes: Int, contentDescription: String?, selected: Boolean, onClick: () -> Unit) {
     val background by animateColorAsState(
-        if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+        if (selected) sidebarBorderColor() else Color.Transparent,
         label = "railItemBackground"
     )
     val tint by animateColorAsState(

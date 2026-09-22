@@ -40,6 +40,8 @@ import androidx.compose.ui.unit.dp
 import com.winlator.cmod.ui.theme.WinZOverlayTheme
 import com.winlator.cmod.ui.theme.accentSwitchColors
 import com.winlator.cmod.ui.theme.controlAccentColor
+import com.winlator.cmod.ui.theme.sidebarBorderColor
+import com.winlator.cmod.ui.theme.sidebarCardColor
 
 // ---------- Graphics panel ----------
 
@@ -439,8 +441,8 @@ private fun PanelActionRow(label: String, onClick: () -> Unit) {
             .fillMaxWidth()
             .height(48.dp)
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surface)
-            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape)
+            .background(sidebarCardColor())
+            .border(BorderStroke(1.dp, sidebarBorderColor()), shape)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -461,8 +463,8 @@ private fun PanelCard(content: @Composable androidx.compose.foundation.layout.Co
         modifier = Modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surface)
-            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape)
+            .background(sidebarCardColor())
+            .border(BorderStroke(1.dp, sidebarBorderColor()), shape)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         content = content
     )

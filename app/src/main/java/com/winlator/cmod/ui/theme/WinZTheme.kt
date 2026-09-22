@@ -128,6 +128,32 @@ internal fun destructiveFor(theme: WinlatorThemeType): Color = DestructiveRed
 @Composable
 fun destructiveColor(): Color = destructiveFor(WinlatorThemeManager.currentTheme())
 
+// In-game sidebar (shturka) palette — a fixed set of colors that only applies to the
+// Black theme, diverging from the app-wide BlackColors above the same way the shturka's
+// outer card fill already diverges in ingame_sidebar_themes.xml. White/Amoled keep using
+// the shared MaterialTheme colors (surfaceVariant/surface/outlineVariant) as before.
+private val SidebarRailBlack = Color(0xFF1F1F1E)
+private val SidebarCardBlack = Color(0xFF151515)
+private val SidebarBorderBlack = Color(0xFF313130)
+
+@Composable
+fun sidebarRailColor(): Color =
+    if (WinlatorThemeManager.currentTheme() == WinlatorThemeType.BLACK) SidebarRailBlack
+    else MaterialTheme.colorScheme.surfaceVariant
+
+// Card fill for every bordered box inside the sidebar panels (FPS Limit, Rendering,
+// ReShade, Frame Generation, Task Manager rows, etc.) plus the Screen panel's toggle rows.
+@Composable
+fun sidebarCardColor(): Color =
+    if (WinlatorThemeManager.currentTheme() == WinlatorThemeType.BLACK) SidebarCardBlack
+    else MaterialTheme.colorScheme.surface
+
+// Doubles as the rail's selected-item highlight and every card's outline stroke.
+@Composable
+fun sidebarBorderColor(): Color =
+    if (WinlatorThemeManager.currentTheme() == WinlatorThemeType.BLACK) SidebarBorderBlack
+    else MaterialTheme.colorScheme.outlineVariant
+
 // Shared Switch styling for the whole app — matches claude.ai's own switch look:
 // no visible border/outline when off, thumb stays white in both states (never gray).
 @Composable
