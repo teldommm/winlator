@@ -17,6 +17,7 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.compose.ui.platform.ComposeView;
 import androidx.compose.ui.platform.ViewCompositionStrategy;
 import androidx.fragment.app.Fragment;
@@ -262,9 +263,13 @@ public class ComponentManagerFragment extends Fragment {
         if (activity != null) activity.runOnUiThread(action);
     }
 
+    private AppCompatActivity requireHostActivity() {
+        return (AppCompatActivity) requireActivity();
+    }
+
     private void startCoreInstallation() {
         if (installBusy) return;
-        ImageFsInstaller.installFromAssetsSilently(requireContext(), new ImageFsInstaller.InstallationProgressListener() {
+        ImageFsInstaller.installFromAssetsSilently(requireHostActivity(), new ImageFsInstaller.InstallationProgressListener() {
             @Override
             public void onProgress(int progress) {
                 coreProgress = Math.max(0, Math.min(100, progress));
@@ -306,7 +311,7 @@ public class ComponentManagerFragment extends Fragment {
         io.execute(() -> {
             boolean success;
             try {
-                ImageFsInstaller.installWineFromAssets(null, requireContext());
+                ImageFsInstaller.installWineFromAssets(null, requireHostActivity());
                 success = WineRuntimeGuard.isBundledMainInstalled(requireContext());
             } catch (Exception error) {
                 success = false;
@@ -329,14 +334,14 @@ public class ComponentManagerFragment extends Fragment {
                 : com.winlator.cmod.core.ProtonPackageManager.DEFAULT_IDENTIFIER;
         if (using != null) {
             com.winlator.cmod.ui.ThemedAlertHost.info(
-                    requireContext(),
+                    requireHostActivity(),
                     "Proton is in use",
                     bundledName + " cannot be deleted because it is used by " + using + "."
             );
             return;
         }
         com.winlator.cmod.ui.ThemedAlertHost.confirm(
-                requireContext(),
+                requireHostActivity(),
                 "Delete " + bundledName + "?",
                 "The bundled Proton files will be removed. You can install them again later.",
                 "Delete",
@@ -706,7 +711,7 @@ public class ComponentManagerFragment extends Fragment {
         if (componentId.startsWith("adrenotools:")) {
             String driverId = componentId.substring("adrenotools:".length());
             com.winlator.cmod.ui.ThemedAlertHost.confirm(
-                    requireContext(),
+                    requireHostActivity(),
                     "Delete driver?",
                     "The installed driver files will be removed.",
                     "Delete",
@@ -725,14 +730,14 @@ public class ComponentManagerFragment extends Fragment {
         if (!WineRuntimeGuard.canRemove(requireContext(), profile)) {
             String using = WineRuntimeGuard.getContainerUsing(requireContext(), ContentsManager.getEntryName(profile));
             com.winlator.cmod.ui.ThemedAlertHost.info(
-                    requireContext(),
+                    requireHostActivity(),
                     "Runtime is in use",
                     profile.verName + " cannot be deleted because it is used by " + using + "."
             );
             return;
         }
         com.winlator.cmod.ui.ThemedAlertHost.confirm(
-                requireContext(),
+                requireHostActivity(),
                 "Delete component?",
                 "The installed files will be removed from WinZ.",
                 "Delete",
@@ -746,14 +751,14 @@ public class ComponentManagerFragment extends Fragment {
         String using = WineRuntimeGuard.getContainerUsing(requireContext(), identifier);
         if (using != null) {
             com.winlator.cmod.ui.ThemedAlertHost.info(
-                    requireContext(),
+                    requireHostActivity(),
                     "Runtime is in use",
                     item.name + " cannot be deleted because it is used by " + using + "."
             );
             return;
         }
         com.winlator.cmod.ui.ThemedAlertHost.confirm(
-                requireContext(),
+                requireHostActivity(),
                 "Delete component?",
                 "The installed files will be removed from WinZ.",
                 "Delete",

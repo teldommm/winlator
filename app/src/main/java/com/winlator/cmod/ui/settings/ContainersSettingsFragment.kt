@@ -69,6 +69,7 @@ import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import com.winlator.cmod.R
 import com.winlator.cmod.XServerDisplayActivity
@@ -164,7 +165,7 @@ class ContainersSettingsFragment : Fragment() {
         val manager = ContainerManager(requireContext())
         val container = manager.getContainerById(id) ?: return
         ThemedAlertHost.confirm(
-            requireContext(),
+            requireActivity() as AppCompatActivity,
             "Duplicate container?",
             "A copy of ${container.name} and its container files will be created.",
             "Duplicate",
@@ -181,7 +182,7 @@ class ContainersSettingsFragment : Fragment() {
         val manager = ContainerManager(requireContext())
         val container = manager.getContainerById(id) ?: return
         ThemedAlertHost.confirm(
-            requireContext(),
+            requireActivity() as AppCompatActivity,
             "Remove container?",
             "${container.name} and its container files will be deleted.",
             "Remove",
