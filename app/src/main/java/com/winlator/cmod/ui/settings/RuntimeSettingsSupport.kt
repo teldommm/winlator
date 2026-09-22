@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
@@ -44,8 +46,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.preference.PreferenceManager
@@ -398,7 +402,13 @@ private fun settingFieldLabel(label: String): String = when (label) {
 private fun settingChoiceEntries(label: String, entries: List<String>): List<String> =
     if (label == "Graphics Driver") listOf("Zink", "Freedreno") else entries
 private fun settingChoiceSelected(label: String, selected: String): String =
-    if (label == "Graphics Driver" && selected.equals("wrapper", ignoreCase = true)) "Zink" else selected
+    if (label == "Graphics Driver") {
+        when {
+            selected.equals("wrapper", ignoreCase = true) -> "Zink"
+            selected.equals("freedreno", ignoreCase = true) -> "Freedreno"
+            else -> selected
+        }
+    } else selected
 
 @Composable
 internal fun SettingsCard(content: @Composable () -> Unit) {
@@ -773,6 +783,7 @@ internal fun SettingText(
     minLines: Int = 1,
     onChanged: (String) -> Unit
 ) {
+    val focusManager = LocalFocusManager.current
     OutlinedTextField(
         value = value,
         onValueChange = onChanged,
@@ -780,7 +791,9 @@ internal fun SettingText(
         modifier = Modifier.fillMaxWidth().padding(12.dp),
         minLines = minLines,
         maxLines = if (minLines > 1) 5 else 1,
-        shape = RoundedCornerShape(10.dp)
+        shape = RoundedCornerShape(10.dp),
+        keyboardOptions = KeyboardOptions(imeAction = if (minLines > 1) ImeAction.Default else ImeAction.Done),
+        keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
     )
 }
 

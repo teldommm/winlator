@@ -8,8 +8,11 @@ import android.content.res.ColorStateList
 import android.view.View
 import androidx.appcompat.widget.Toolbar
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,11 +27,19 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.AbstractComposeView
 import androidx.compose.ui.text.TextStyle
@@ -249,12 +260,37 @@ fun WinlatorTheme(content: @Composable () -> Unit) {
     HideSystemBars(theme)
     ApplyLegacyChrome(colors)
     MaterialTheme(colorScheme = colors, typography = WinlatorTypography, shapes = WinlatorShapes) {
+        val focusManager = LocalFocusManager.current
+        val keyboardController = LocalSoftwareKeyboardController.current
+        ClearFocusWhenKeyboardHides(focusManager)
         Surface(
+            modifier = Modifier.pointerInput(Unit) {
+                detectTapGestures(onTap = {
+                    focusManager.clearFocus()
+                    keyboardController?.hide()
+                })
+            },
             color = MaterialTheme.colorScheme.background,
             contentColor = MaterialTheme.colorScheme.onBackground
         ) {
             content()
         }
+    }
+}
+
+// A text field's cursor/label keep animating for as long as Compose thinks it's focused.
+// Tapping a Button/Surface elsewhere already clears focus via the pointerInput above, but
+// dismissing the keyboard some other way (system back button, swipe-down gesture) hides the
+// IME without Compose ever being told to drop focus from the field that opened it — so the
+// field is left blinking with no keyboard on screen. Watching the IME's own visibility and
+// clearing focus the moment it goes away closes that gap everywhere at once.
+@Composable
+private fun ClearFocusWhenKeyboardHides(focusManager: FocusManager) {
+    val imeVisible = WindowInsets.isImeVisible
+    var wasVisible by remember { mutableStateOf(imeVisible) }
+    LaunchedEffect(imeVisible) {
+        if (wasVisible && !imeVisible) focusManager.clearFocus()
+        wasVisible = imeVisible
     }
 }
 

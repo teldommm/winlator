@@ -139,7 +139,9 @@ internal fun LibraryRoot(
                     activity = activity,
                     grid = grid,
                     onArtwork = true,
-                    onGridViewChanged = cb::onGridViewChanged
+                    query = query,
+                    onGridViewChanged = cb::onGridViewChanged,
+                    onSearchQueryChanged = cb::onSearchQueryChanged
                 )
                 Spacer(Modifier.height(7.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -162,7 +164,9 @@ internal fun LibraryRoot(
                 activity = activity,
                 grid = grid,
                 onArtwork = false,
-                onGridViewChanged = cb::onGridViewChanged
+                query = query,
+                onGridViewChanged = cb::onGridViewChanged,
+                onSearchQueryChanged = cb::onSearchQueryChanged
             )
             Spacer(Modifier.height(7.dp))
         } else {
@@ -236,40 +240,9 @@ internal fun LibraryLandscapeHeader(
     activity: MainActivity?,
     grid: Boolean,
     onArtwork: Boolean,
-    onGridViewChanged: (Boolean) -> Unit
-) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            "Library",
-            color = if (onArtwork) Color.White else MaterialTheme.colorScheme.onBackground,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Medium
-        )
-        Spacer(Modifier.weight(1f))
-        LibraryTopIcon(if (grid) Icons.Outlined.ViewList else Icons.Outlined.GridView, false) {
-            onGridViewChanged(!grid)
-        }
-        LibraryTopIcon(Icons.Outlined.Add, false) { activity?.navigateToMainDestination(R.id.main_menu_file_manager) }
-        LibraryTopIcon(Icons.Outlined.Home, true) {}
-        LibraryTopIcon(Icons.Outlined.SportsEsports, false) { activity?.navigateToMainDestination(R.id.main_menu_input_controls) }
-        LibraryTopIcon(Icons.Outlined.Settings, false) { activity?.navigateToMainDestination(R.id.main_menu_settings) }
-        LibraryOrientationMenu(activity)
-    }
-}
-
-// Portrait counterpart to LibraryLandscapeHeader: replaces the old native Toolbar options-menu
-// (grid/list toggle, collapsible SearchView, "Open File Manager", and the orientation "More"
-// submenu) now that ShortcutsFragment no longer implements onCreateOptionsMenu. Home/Input
-// Controls/Settings icons aren't needed here (unlike the landscape header) because portrait
-// keeps the app's BottomNavigation visible for those destinations.
-@Composable
-internal fun LibraryPortraitHeader(
-    activity: MainActivity?,
-    grid: Boolean,
     query: String,
     onGridViewChanged: (Boolean) -> Unit,
-    onSearchQueryChanged: (String) -> Unit,
-    onOpenFileManager: () -> Unit
+    onSearchQueryChanged: (String) -> Unit
 ) {
     var searchActive by rememberSaveable { mutableStateOf(false) }
 
@@ -290,6 +263,65 @@ internal fun LibraryPortraitHeader(
         }
     } else {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "Library",
+                color = if (onArtwork) Color.White else MaterialTheme.colorScheme.onBackground,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Medium
+            )
+            Spacer(Modifier.weight(1f))
+            LibraryTopIcon(Icons.Outlined.Search, false) { searchActive = true }
+            LibraryTopIcon(if (grid) Icons.Outlined.ViewList else Icons.Outlined.GridView, false) {
+                onGridViewChanged(!grid)
+            }
+            LibraryTopIcon(Icons.Outlined.Add, false) { activity?.navigateToMainDestination(R.id.main_menu_file_manager) }
+            LibraryTopIcon(Icons.Outlined.Home, true) {}
+            LibraryTopIcon(Icons.Outlined.SportsEsports, false) { activity?.navigateToMainDestination(R.id.main_menu_input_controls) }
+            LibraryTopIcon(Icons.Outlined.Settings, false) { activity?.navigateToMainDestination(R.id.main_menu_settings) }
+            LibraryOrientationMenu(activity)
+        }
+    }
+}
+
+// Portrait counterpart to LibraryLandscapeHeader: replaces the old native Toolbar options-menu
+// (grid/list toggle, collapsible SearchView, "Open File Manager", and the orientation "More"
+// submenu) now that ShortcutsFragment no longer implements onCreateOptionsMenu. Home/Input
+// Controls/Settings icons aren't needed here (unlike the landscape header) because portrait
+// keeps the app's BottomNavigation visible for those destinations.
+@Composable
+internal fun LibraryPortraitHeader(
+    activity: MainActivity?,
+    grid: Boolean,
+    query: String,
+    onGridViewChanged: (Boolean) -> Unit,
+    onSearchQueryChanged: (String) -> Unit,
+    onOpenFileManager: () -> Unit
+) {
+    var searchActive by rememberSaveable { mutableStateOf(false) }
+
+    if (searchActive) {
+        Row(
+            Modifier.fillMaxWidth().padding(vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            LibraryTopIcon(Icons.Outlined.ArrowBack, false) {
+                searchActive = false
+                onSearchQueryChanged("")
+            }
+            OutlinedTextField(
+                value = query,
+                onValueChange = onSearchQueryChanged,
+                modifier = Modifier.weight(1f).padding(start = 4.dp),
+                placeholder = { Text("Search games") },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp)
+            )
+        }
+    } else {
+        Row(
+            Modifier.fillMaxWidth().padding(vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Text(
                 "Library",
                 color = MaterialTheme.colorScheme.onBackground,
