@@ -128,6 +128,19 @@ internal fun destructiveFor(theme: WinlatorThemeType): Color = DestructiveRed
 @Composable
 fun destructiveColor(): Color = destructiveFor(WinlatorThemeManager.currentTheme())
 
+// Sidebar's bordered cards/rows (FPS Limit, Enable HUD, ReShade, TaskManager rows, etc.
+// — anything using the PanelCard/PanelActionRow/MetricCard/ProcessRow/ScreenPanelRow
+// shape) and the rail's selected-item highlight now reuse the Black theme's own
+// surfaceVariant token (#313130) instead of colorScheme.surface/primaryContainer,
+// per request — no new color introduced. White/AMOLED keep colorScheme.surface as before.
+@Composable
+fun sidebarCardFillColor(): Color =
+    if (WinlatorThemeManager.currentTheme() == WinlatorThemeType.BLACK) {
+        MaterialTheme.colorScheme.surfaceVariant
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+
 // Shared Switch styling for the whole app — matches claude.ai's own switch look:
 // no visible border/outline when off, thumb stays white in both states (never gray).
 @Composable

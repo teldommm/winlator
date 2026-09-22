@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import com.winlator.cmod.ui.theme.WinZOverlayTheme
 import com.winlator.cmod.ui.theme.accentSwitchColors
 import com.winlator.cmod.ui.theme.controlAccentColor
+import com.winlator.cmod.ui.theme.sidebarCardFillColor
 import com.winlator.cmod.widget.WinlatorHUD
 
 // What the panel needs to render one frame. hudScalePercent/hudAlphaPercent are seeded at
@@ -304,7 +305,7 @@ private fun PanelActionRow(label: String, onClick: () -> Unit) {
             .fillMaxWidth()
             .height(56.dp)
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surface)
+            .background(sidebarCardFillColor())
             .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp),
@@ -321,7 +322,7 @@ private fun PanelCard(content: @Composable ColumnScope.() -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surface)
+            .background(sidebarCardFillColor())
             .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         content = content

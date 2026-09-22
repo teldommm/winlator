@@ -35,7 +35,9 @@
         <item name="ingameSidebarPrimary">#D9DDE3</item>
         <item name="ingameSidebarPrimaryContainer">#1A1B1F</item>
         <item name="ingameSidebarOutline">#242423</item>
-        <item name="ingameSidebarPanelTranslucent">#E626272F</item>
+        <!-- Flat (opaque) fill for the sidebar's outer merged card, per request — was
+             a 90%-alpha translucent #E626272F before. -->
+        <item name="ingameSidebarPanelTranslucent">#151515</item>
         <item name="android:textColorPrimary">#F2F2F4</item>
         <item name="android:textColorSecondary">#85878C</item>
         <item name="android:colorAccent">#D9DDE3</item>
