@@ -43,16 +43,18 @@ import com.winlator.cmod.ui.theme.sidebarCardFillColor
 import com.winlator.cmod.widget.WinlatorHUD
 import kotlin.math.roundToInt
 
-// What the panel needs to render one frame. hudScalePercent/hudAlphaPercent must be the
-// actually-persisted HUD scale/alpha (see WinlatorHUD.getSavedScalePercent/getSavedAlphaPercent)
-// — they used to be seeded at 0 regardless of the saved value (matching the original sidebar's
-// SBHudScale/SBHudAlpha, which never called setValue() either), causing the sliders to always
-// open at 0%. Fixed at the call site in XServerDisplayActivity.setupSidebarHudControls().
+// What the panel needs to render one frame. HUD Size/Opacity read their live values
+// directly from WinlatorHUD.getSavedScalePercent/getSavedAlphaPercent(context), keyed on
+// isModern, rather than through a field here — that card lives inside an `if (isModern)`
+// block, so Compose forgets its remembered slider position every time isModern goes
+// false and recreates it fresh when isModern goes true again; a value passed in once here
+// would only ever reflect whatever was persisted when this state was first built (back
+// when the sidebar was opened), not any change made mid-session, so re-showing the card
+// (e.g. Classic -> Modern -> Classic -> Modern) would silently snap the sliders back to
+// that stale snapshot instead of the HUD's real current scale/alpha.
 data class HudPanelState(
     val hudOn: Boolean,
     val isModernStyle: Boolean,
-    val hudScalePercent: Int,
-    val hudAlphaPercent: Int,
     val showLogsRow: Boolean
 )
 
@@ -79,6 +81,7 @@ object HudSidebarPanelHost {
 
 @Composable
 private fun HudSidebarPanel(state: HudPanelState, callbacks: HudPanelCallbacks) {
+    val context = LocalContext.current
     var hudOn by remember { mutableStateOf(state.hudOn) }
     var isModern by remember { mutableStateOf(state.isModernStyle) }
 
@@ -136,7 +139,7 @@ private fun HudSidebarPanel(state: HudPanelState, callbacks: HudPanelCallbacks) 
         if (isModern) {
             Spacer(Modifier.height(10.dp))
             PanelCard {
-                var scale by remember { mutableStateOf(state.hudScalePercent.toFloat()) }
+                var scale by remember(isModern) { mutableStateOf(WinlatorHUD.getSavedScalePercent(context).toFloat()) }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "HUD Size",
@@ -162,7 +165,7 @@ private fun HudSidebarPanel(state: HudPanelState, callbacks: HudPanelCallbacks) 
                     colors = SliderDefaults.colors(thumbColor = controlAccentColor(), activeTrackColor = controlAccentColor())
                 )
                 Spacer(Modifier.height(8.dp))
-                var alpha by remember { mutableStateOf(state.hudAlphaPercent.toFloat()) }
+                var alpha by remember(isModern) { mutableStateOf(WinlatorHUD.getSavedAlphaPercent(context).toFloat()) }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "HUD Opacity",

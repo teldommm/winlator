@@ -1639,9 +1639,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
         };
 
-        int savedHudScalePercent = WinlatorHUD.getSavedScalePercent(this);
-        int savedHudAlphaPercent = WinlatorHUD.getSavedAlphaPercent(this);
-        HudPanelState state = new HudPanelState(hudOn, isModern, savedHudScalePercent, savedHudAlphaPercent, enableLogs);
+        HudPanelState state = new HudPanelState(hudOn, isModern, enableLogs);
         HudSidebarPanelHost.attach(hudPanel, state, callbacks);
     }
 
