@@ -85,6 +85,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.MainActivity
 import com.winlator.cmod.R
+import com.winlator.cmod.ui.PortraitMainHeader
 import com.winlator.cmod.ui.theme.controlAccentColor
 import com.winlator.cmod.ui.theme.accentSwitchColors
 import kotlinx.coroutines.Dispatchers
@@ -318,23 +319,19 @@ internal fun LibraryPortraitHeader(
             )
         }
     } else {
-        Row(
-            Modifier.fillMaxWidth().padding(vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                "Library",
-                color = MaterialTheme.colorScheme.onBackground,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Medium
-            )
-            Spacer(Modifier.weight(1f))
-            LibraryTopIcon(Icons.Outlined.Search, false) { searchActive = true }
-            LibraryTopIcon(if (grid) Icons.Outlined.ViewList else Icons.Outlined.GridView, false) {
-                onGridViewChanged(!grid)
+        Box(Modifier.fillMaxWidth()) {
+            PortraitMainHeader("Library")
+            Row(
+                modifier = Modifier.align(Alignment.CenterEnd),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                LibraryTopIcon(Icons.Outlined.Search, false) { searchActive = true }
+                LibraryTopIcon(if (grid) Icons.Outlined.ViewList else Icons.Outlined.GridView, false) {
+                    onGridViewChanged(!grid)
+                }
+                LibraryTopIcon(Icons.Outlined.Add, false) { onOpenFileManager() }
+                LibraryOrientationMenu(activity)
             }
-            LibraryTopIcon(Icons.Outlined.Add, false) { onOpenFileManager() }
-            LibraryOrientationMenu(activity)
         }
     }
 }

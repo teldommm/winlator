@@ -405,6 +405,7 @@ private fun settingChoiceSelected(label: String, selected: String): String =
     if (label == "Graphics Driver") {
         when {
             selected.equals("wrapper", ignoreCase = true) -> "Zink"
+            selected.equals("zink", ignoreCase = true) -> "Zink"
             selected.equals("freedreno", ignoreCase = true) -> "Freedreno"
             else -> selected
         }
