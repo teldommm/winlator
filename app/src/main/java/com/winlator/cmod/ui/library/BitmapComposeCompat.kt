@@ -42,7 +42,6 @@ import androidx.compose.material.icons.outlined.Photo
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.SportsEsports
 import androidx.compose.material.icons.outlined.ViewList
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -78,7 +77,11 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
+import com.winlator.cmod.ui.LandscapeScreenHeader
+import com.winlator.cmod.ui.ShellChrome
 import com.winlator.cmod.MainActivity
 import com.winlator.cmod.R
 import com.winlator.cmod.ui.PortraitMainHeader
@@ -123,6 +126,7 @@ internal fun LibraryRoot(
                     activity = activity,
                     grid = grid,
                     onArtwork = true,
+                    containerEndPadding = 26.dp,
                     query = query,
                     onGridViewChanged = cb::onGridViewChanged,
                     onSearchQueryChanged = cb::onSearchQueryChanged
@@ -226,12 +230,21 @@ internal fun LibraryLandscapeHeader(
     onArtwork: Boolean,
     query: String,
     onGridViewChanged: (Boolean) -> Unit,
-    onSearchQueryChanged: (String) -> Unit
+    onSearchQueryChanged: (String) -> Unit,
+    // Horizontal padding of the container this header sits in (list/empty state: 14dp, pager:
+    // 26dp), so the space kept free for MainShell's nav group is measured from the screen edge.
+    containerEndPadding: Dp = 14.dp
 ) {
     var searchActive by rememberSaveable { mutableStateOf(false) }
 
     if (searchActive) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .height(ShellChrome.LandscapeHeaderHeight)
+                .padding(end = (ShellChrome.LandscapeNavReserve - containerEndPadding).coerceAtLeast(0.dp)),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             LibraryTopIcon(Icons.Outlined.ArrowBack, false) {
                 searchActive = false
                 onSearchQueryChanged("")
@@ -246,22 +259,18 @@ internal fun LibraryLandscapeHeader(
             )
         }
     } else {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "Library",
-                color = if (onArtwork) Color.White else MaterialTheme.colorScheme.onBackground,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Medium
-            )
-            Spacer(Modifier.weight(1f))
+        // Home / Input Controls / Settings are MainShell's floating nav group now.
+        LandscapeScreenHeader(
+            title = "Library",
+            onArtwork = onArtwork,
+            startPadding = 0.dp,
+            containerEndPadding = containerEndPadding
+        ) {
             LibraryTopIcon(Icons.Outlined.Search, false) { searchActive = true }
             LibraryTopIcon(if (grid) Icons.Outlined.ViewList else Icons.Outlined.GridView, false) {
                 onGridViewChanged(!grid)
             }
             LibraryTopIcon(Icons.Outlined.Add, false) { activity?.navigateToMainDestination(R.id.main_menu_file_manager) }
-            LibraryTopIcon(Icons.Outlined.Home, true) {}
-            LibraryTopIcon(Icons.Outlined.SportsEsports, false) { activity?.navigateToMainDestination(R.id.main_menu_input_controls) }
-            LibraryTopIcon(Icons.Outlined.Settings, false) { activity?.navigateToMainDestination(R.id.main_menu_settings) }
             LibraryOrientationMenu(activity)
         }
     }

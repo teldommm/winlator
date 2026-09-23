@@ -61,7 +61,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.MainActivity
 import com.winlator.cmod.R
-import com.winlator.cmod.ui.LandscapeMainNavigation
+import com.winlator.cmod.ui.LandscapeScreenHeader
 import com.winlator.cmod.ui.PortraitMainHeader
 import com.winlator.cmod.ui.theme.controlAccentColor
 import kotlin.math.roundToInt
@@ -112,7 +112,7 @@ internal fun InputControlsScreen(model: InputControlsModel, callbacks: InputCont
 
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         if (landscape) {
-            LandscapeMainNavigation(activity, R.id.main_menu_input_controls, "Input Controls")
+            LandscapeScreenHeader("Input Controls")
         } else {
             PortraitMainHeader("Input Controls")
         }

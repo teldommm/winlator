@@ -9,8 +9,4 @@
         <attr name="textSize" format="dimension" />
     </declare-styleable>
 
-    <attr name="extraKeysButtonTextColor" format="reference" />
-    <attr name="extraKeysButtonActiveTextColor" format="reference" />
-    <attr name="extraKeysButtonBackgroundColor" format="reference" />
-    <attr name="extraKeysButtonActiveBackgroundColor" format="reference" />
 </resources>

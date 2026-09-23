@@ -4,6 +4,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
@@ -28,6 +29,10 @@ fun LibraryRoute(shownSerial: Int) {
         controller.onIconPicked(uri)
     }
     SideEffect { controller.setIconPickerLauncher { pickIcon.launch("image/*") } }
+
+    DisposableEffect(controller) {
+        onDispose { controller.dispose() }
+    }
 
     LifecycleResumeEffect(controller) {
         controller.loadShortcutsList()

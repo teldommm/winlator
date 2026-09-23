@@ -206,6 +206,25 @@ private fun MainShell(controller: MainShellController, listener: MainShellListen
             }
         }
 
+        // Landscape: the nav is one static group in the header band; screens reserve its space
+        // (ShellChrome) and draw only their title and actions.
+        AnimatedVisibility(
+            visible = landscape && !controller.detailActive,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .zIndex(2f)
+                .padding(top = 2.dp, end = 14.dp),
+            enter = fadeIn(tween(ENTER_MS)),
+            exit = fadeOut(tween(EXIT_MS))
+        ) {
+            WinZOverlayTheme {
+                LandscapeNavGroup(
+                    selected = controller.selectedTab,
+                    onNavigate = { listener.onNavigate(it) }
+                )
+            }
+        }
+
         Box(Modifier.fillMaxSize().zIndex(3f)) {
             DetailLayer(controller)
         }

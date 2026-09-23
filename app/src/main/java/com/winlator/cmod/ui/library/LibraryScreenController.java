@@ -61,6 +61,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import com.winlator.cmod.core.AppDefaults;
 
@@ -86,6 +87,13 @@ public class LibraryScreenController {
     
     private boolean isGridView = false;
     private final ArrayList<Shortcut> allShortcuts = new ArrayList<>();
+
+    // All disk work for the list (reading every container's desktop dir, parsing .desktop files,
+    // decoding icons, probing cover/banner/icon files) runs here, one job at a time; results are
+    // applied on the main thread. loadGeneration drops results superseded by a newer load.
+    private final ExecutorService loader = Executors.newSingleThreadExecutor();
+    private int loadGeneration;
+    private volatile Bitmap defaultIcon;
     private final Set<String> artworkRequests = Collections.synchronizedSet(new HashSet<>());
 
     private Shortcut shortcutForIconUpdate;
@@ -314,18 +322,54 @@ public class LibraryScreenController {
         return targetDir;
     }
 
+    // Reloads containers and shortcuts off the main thread. A fresh ContainerManager is built
+    // for every load: the Library tab now lives for the whole session, so reusing the one from
+    // construction would miss containers created or removed since (the old fragment got a new
+    // manager each time it was recreated).
     public void loadShortcutsList() {
-        ArrayList<Shortcut> shortcuts = manager.loadShortcuts();
-        allShortcuts.clear();
-        if (shortcuts != null) {
-            shortcuts.removeIf(shortcut -> shortcut == null || shortcut.file == null || shortcut.file.getName().isEmpty());
-            Bitmap defaultIcon = BitmapFactory.decodeResource(activity.getResources(), R.drawable.icon_wine);
-            for (Shortcut shortcut : shortcuts) {
-                if (shortcut.icon == null) shortcut.icon = defaultIcon;
+        if (loader.isShutdown()) return;
+        final int generation = ++loadGeneration;
+        loader.execute(() -> {
+            ContainerManager freshManager = new ContainerManager(activity);
+            ArrayList<Shortcut> shortcuts = freshManager.loadShortcuts();
+            ArrayList<Shortcut> loaded = new ArrayList<>();
+            if (shortcuts != null) {
+                shortcuts.removeIf(shortcut -> shortcut == null || shortcut.file == null || shortcut.file.getName().isEmpty());
+                Bitmap fallback = defaultIcon();
+                for (Shortcut shortcut : shortcuts) {
+                    if (shortcut.icon == null) shortcut.icon = fallback;
+                }
+                loaded.addAll(shortcuts);
             }
-            allShortcuts.addAll(shortcuts);
+            ArrayList<LibraryItem> items = buildLibraryItems(loaded);
+            postToUi(() -> {
+                if (generation != loadGeneration) return;
+                manager = freshManager;
+                allShortcuts.clear();
+                allShortcuts.addAll(loaded);
+                if (libraryController != null) libraryController.setItems(items);
+            });
+        });
+    }
+
+    // Stops background work; called when the Library route leaves composition.
+    public void dispose() {
+        loader.shutdownNow();
+    }
+
+    private Bitmap defaultIcon() {
+        Bitmap icon = defaultIcon;
+        if (icon == null) {
+            icon = BitmapFactory.decodeResource(activity.getResources(), R.drawable.icon_wine);
+            defaultIcon = icon;
         }
-        publishLibraryItems();
+        return icon;
+    }
+
+    private void postToUi(Runnable action) {
+        activity.runOnUiThread(() -> {
+            if (!activity.isDestroyed()) action.run();
+        });
     }
 
     private Shortcut findShortcut(String shortcutPath) {
@@ -335,10 +379,23 @@ public class LibraryScreenController {
         return null;
     }
 
+    // Re-publishes the current list (after artwork downloads, favorite/last-run changes). The
+    // file probing moves to the loader; a full reload started in the meantime wins.
     private void publishLibraryItems() {
-        if (libraryController == null) return;
+        if (libraryController == null || loader.isShutdown()) return;
+        final ArrayList<Shortcut> snapshot = new ArrayList<>(allShortcuts);
+        final int generation = loadGeneration;
+        loader.execute(() -> {
+            ArrayList<LibraryItem> items = buildLibraryItems(snapshot);
+            postToUi(() -> {
+                if (generation == loadGeneration && libraryController != null) libraryController.setItems(items);
+            });
+        });
+    }
+
+    private ArrayList<LibraryItem> buildLibraryItems(ArrayList<Shortcut> shortcuts) {
         ArrayList<LibraryItem> items = new ArrayList<>();
-        for (Shortcut shortcut : allShortcuts) {
+        for (Shortcut shortcut : shortcuts) {
             String baseName = FileUtils.getBasename(shortcut.file.getPath());
             File userIcon = new File(getImagesDir(false), baseName + ".user.png");
             File autoIcon = new File(getImagesDir(false), baseName + ".png");
@@ -360,7 +417,7 @@ public class LibraryScreenController {
                     parseLastRunAt(shortcut)
             ));
         }
-        libraryController.setItems(items);
+        return items;
     }
 
     private long parseLastRunAt(Shortcut shortcut) {

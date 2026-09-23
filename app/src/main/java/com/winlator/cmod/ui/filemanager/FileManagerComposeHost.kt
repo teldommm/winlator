@@ -61,7 +61,7 @@ import androidx.compose.ui.unit.dp
 import com.winlator.cmod.MainActivity
 import com.winlator.cmod.R
 import com.winlator.cmod.core.ExeIconExtractor
-import com.winlator.cmod.ui.LandscapeMainNavigation
+import com.winlator.cmod.ui.LandscapeScreenHeader
 import com.winlator.cmod.ui.PortraitMainHeader
 import com.winlator.cmod.ui.theme.controlAccentColor
 import kotlinx.coroutines.Dispatchers
@@ -135,7 +135,7 @@ internal fun FileManagerScreen(model: FileManagerModel, callbacks: FileManagerCa
 
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         if (landscape) {
-            LandscapeMainNavigation(activity = activity, selected = 0, title = "File Manager")
+            LandscapeScreenHeader("File Manager")
         } else {
             PortraitMainHeader("File Manager")
         }

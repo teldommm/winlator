@@ -8,7 +8,12 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import com.winlator.cmod.MainActivity
 import com.winlator.cmod.ui.applyAppFullscreen
 import java.util.concurrent.atomic.AtomicInteger
@@ -45,6 +50,10 @@ class LibraryComposeController internal constructor(
     internal val query: MutableState<String>,
     internal val selectedShortcutPath: MutableState<String?>
 ) {
+    // False until the first item list arrives. Items are loaded off the main thread now, so
+    // without this the "empty library" state would flash for a frame on every cold start.
+    internal val loaded = mutableStateOf(false)
+
     private val statePreferences = context.getSharedPreferences("library_compose_state", Context.MODE_PRIVATE)
     private val metadataGeneration = AtomicInteger(0)
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -52,6 +61,7 @@ class LibraryComposeController internal constructor(
     fun setItems(value: List<LibraryItem>) {
         val snapshot = value.toList()
         items.value = snapshot
+        loaded.value = true
         val generation = metadataGeneration.incrementAndGet()
         Thread {
             val resolved = resolveLibraryEnvironmentLabels(context, snapshot)
@@ -102,6 +112,10 @@ object LibraryComposeHost {
 
 @Composable
 internal fun LibraryContent(controller: LibraryComposeController, callbacks: LibraryCallbacks) {
+    if (!controller.loaded.value) {
+        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
+        return
+    }
     LibraryRootWithoutEmptyDescription(
         controller.items.value,
         controller.grid.value,

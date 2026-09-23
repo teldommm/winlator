@@ -4,21 +4,13 @@ import android.app.Activity
 import android.os.Build
 import android.view.View
 import android.view.WindowManager
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.SportsEsports
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -26,15 +18,16 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.winlator.cmod.MainActivity
 import com.winlator.cmod.R
-import com.winlator.cmod.ui.theme.controlAccentColor
 
 fun applyAppFullscreen(activity: Activity?) {
     if (activity == null) return
@@ -73,52 +66,55 @@ fun KeepLandscapeChromeHidden(activity: MainActivity?) {
     }
 }
 
+// Shared geometry between MainShell's floating landscape navigation and the screens' own
+// landscape headers. The shell draws the destinations (Library / Input Controls / Settings) as
+// one static group pinned top-end, centred in the header band; each screen draws only its title
+// and its own actions, and keeps LandscapeNavReserve free at the end so they never sit under it.
+object ShellChrome {
+    val LandscapeHeaderHeight = 54.dp
+
+    // Nav group width (3 × 44dp cells + spacing + padding = 142dp) + its 14dp end margin + 8dp gap.
+    val LandscapeNavReserve = 164.dp
+}
+
+// Landscape header for a main tab: title + screen actions. Navigation is not part of it anymore —
+// MainShell draws it once, so it no longer fades out and back in with every tab switch.
+//  startPadding / containerEndPadding: for callers that already sit inside horizontally padded
+//  containers (Library's list and pager), so the reserve is measured from the screen edge.
 @Composable
-fun LandscapeMainNavigation(
-    activity: MainActivity?,
-    selected: Int,
+fun LandscapeScreenHeader(
     title: String,
     modifier: Modifier = Modifier,
-    actionIcon: ImageVector? = null,
-    actionDescription: String = "Action",
-    actionAccent: Boolean = false,
-    onAction: (() -> Unit)? = null
+    onArtwork: Boolean = false,
+    startPadding: Dp = 20.dp,
+    containerEndPadding: Dp = 0.dp,
+    actions: @Composable RowScope.() -> Unit = {}
 ) {
-    KeepLandscapeChromeHidden(activity)
+    KeepLandscapeChromeHidden(LocalContext.current as? MainActivity)
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(54.dp)
-            .padding(start = 20.dp, end = 14.dp),
+            .height(ShellChrome.LandscapeHeaderHeight)
+            .padding(
+                start = startPadding,
+                end = (ShellChrome.LandscapeNavReserve - containerEndPadding).coerceAtLeast(0.dp)
+            ),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             title,
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onBackground
+            color = if (onArtwork) Color.White else MaterialTheme.colorScheme.onBackground,
+            maxLines = 1
         )
         Spacer(Modifier.weight(1f))
-        if (actionIcon != null && onAction != null) {
-            Destination(actionIcon, actionDescription, false, accent = actionAccent, onClick = onAction)
-        }
-        Destination(Icons.Outlined.Home, "Library", selected == R.id.main_menu_shortcuts) {
-            activity?.navigateToMainDestination(R.id.main_menu_shortcuts)
-        }
-        Destination(Icons.Outlined.SportsEsports, "Input Controls", selected == R.id.main_menu_input_controls) {
-            activity?.navigateToMainDestination(R.id.main_menu_input_controls)
-        }
-        Destination(Icons.Outlined.Settings, "Settings", selected == R.id.main_menu_settings) {
-            activity?.navigateToMainDestination(R.id.main_menu_settings)
-        }
+        actions()
     }
 }
 
-// Portrait counterpart to LandscapeMainNavigation: in portrait the bottom navigation is drawn
-// by MainShell, so the screen only needs its title. Screens that fully own their background (Library, and now Settings/Input
-// Controls) hide the native Toolbar unconditionally and need a plain in-Compose title instead —
-// otherwise the area behind the old Toolbar shows its @drawable/ui_glass_background gradient
-// instead of the flat MaterialTheme.colorScheme.background every other screen sits on.
+// Portrait counterpart to LandscapeScreenHeader: in portrait the bottom navigation is drawn
+// by MainShell, so the screen only needs its title.
 @Composable
 fun PortraitMainHeader(title: String, modifier: Modifier = Modifier) {
     Row(
@@ -133,33 +129,5 @@ fun PortraitMainHeader(title: String, modifier: Modifier = Modifier) {
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onBackground
         )
-    }
-}
-
-@Composable
-private fun Destination(
-    icon: ImageVector,
-    description: String,
-    selected: Boolean,
-    accent: Boolean = false,
-    onClick: () -> Unit
-) {
-    val normalIcon = if (selected) MaterialTheme.colorScheme.primary
-        else MaterialTheme.colorScheme.onBackground.copy(alpha = .68f)
-    val iconColor = if (accent) Color.White else normalIcon
-    val selectedBackground = MaterialTheme.colorScheme.primary.copy(alpha = .12f)
-    val background = if (accent) controlAccentColor()
-        else if (selected) selectedBackground else Color.Transparent
-
-    Surface(
-        onClick = onClick,
-        modifier = Modifier.padding(horizontal = 3.dp),
-        shape = RoundedCornerShape(12.dp),
-        color = background,
-        contentColor = iconColor
-    ) {
-        Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
-            Icon(icon, description, modifier = Modifier.size(23.dp))
-        }
     }
 }

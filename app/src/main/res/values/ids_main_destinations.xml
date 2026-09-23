@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Main destinations (MainShell tabs + About). These ids used to be declared by
+      res/menu/main_menu.xml, a leftover of the removed NavigationView drawer; nothing inflates
+      that menu anymore, so the ids live here on their own.
+    -->
+    <item name="main_menu_shortcuts" type="id" />
+    <item name="main_menu_input_controls" type="id" />
+    <item name="main_menu_settings" type="id" />
+    <item name="main_menu_file_manager" type="id" />
+    <item name="main_menu_about" type="id" />
+</resources>
