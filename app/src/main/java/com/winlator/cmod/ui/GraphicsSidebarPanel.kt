@@ -139,6 +139,10 @@ private fun GraphicsSidebarPanel(
                 checked = fsrEnabled,
                 onCheckedChange = {
                     fsrEnabled = it
+                    if (it && reshadeIndex > 0) {
+                        reshadeIndex = 0
+                        callbacks.onReshadeEffectChanged(0)
+                    }
                     callbacks.onFsrToggled(it)
                 }
             )
@@ -190,6 +194,10 @@ private fun GraphicsSidebarPanel(
                 selectedIndex = postFxIndex,
                 onSelect = {
                     postFxIndex = it
+                    if (reshadeIndex > 0) {
+                        reshadeIndex = 0
+                        callbacks.onReshadeEffectChanged(0)
+                    }
                     callbacks.onPostFxModeChanged(it)
                 }
             )
@@ -217,12 +225,18 @@ private fun GraphicsSidebarPanel(
                 onSelect = { index ->
                     reshadeIndex = index
                     // Mirrors ReshadeSidebarPanelView.applyEffect(): picking a real effect
-                    // (index > 0) force-disables Super Resolution, since both ultimately
-                    // drive the same renderer filter/post-fx state and the original never
-                    // let them run together from this side.
-                    if (index > 0 && fsrEnabled) {
-                        fsrEnabled = false
-                        callbacks.onFsrToggled(false)
+                    // (index > 0) force-disables Super Resolution and resets Post Effect to
+                    // None, since all three ultimately drive the same renderer filter/post-fx
+                    // state and only one can actually be active at the renderer at a time.
+                    if (index > 0) {
+                        if (fsrEnabled) {
+                            fsrEnabled = false
+                            callbacks.onFsrToggled(false)
+                        }
+                        if (postFxIndex != 0) {
+                            postFxIndex = 0
+                            callbacks.onPostFxModeChanged(0)
+                        }
                     }
                     callbacks.onReshadeEffectChanged(index)
                 }
