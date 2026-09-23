@@ -1283,6 +1283,20 @@ public class WinlatorHUD extends View {
         return (prefs.getInt(KEY_SHOW, SHOW_DEFAULT) & bit) != 0;
     }
 
+    // percent = scale * 50, the inverse of onHudScale()'s "1f + (percent - 50f) / 50f" — so a
+    // freshly-opened HUD Size slider reflects the actually-persisted scale (50% = 1.0x) instead
+    // of always showing 0 regardless of the saved value.
+    public static int getSavedScalePercent(Context context) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        float scale = prefs.getFloat(KEY_SCALE, 1f);
+        return Math.round(scale * 50f);
+    }
+
+    public static int getSavedAlphaPercent(Context context) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        return prefs.getInt(KEY_ALPHA, 100);
+    }
+
     public static void setOptionPreference(Context context, int bit, boolean enabled) {
         SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         int mask = prefs.getInt(KEY_SHOW, SHOW_DEFAULT);

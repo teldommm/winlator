@@ -351,17 +351,16 @@ private fun RoundAction(icon: androidx.compose.ui.graphics.vector.ImageVector, d
 private fun OpacityCard(initialPercent: Int, onOpacityChanged: (Int) -> Unit) {
     var opacity by remember(initialPercent) { mutableFloatStateOf(initialPercent.toFloat()) }
     SettingsCard(title = "Overlay Opacity") {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Slider(
-                value = opacity,
-                onValueChange = { opacity = (it / 5f).roundToInt() * 5f },
-                onValueChangeFinished = { onOpacityChanged(opacity.roundToInt()) },
-                modifier = Modifier.weight(1f), valueRange = 0f..100f, steps = 19,
-                colors = SliderDefaults.colors(thumbColor = controlAccentColor(), activeTrackColor = controlAccentColor())
-            )
-            Spacer(Modifier.width(14.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             Text("${opacity.roundToInt()}%", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+        Slider(
+            value = opacity,
+            onValueChange = { opacity = it },
+            onValueChangeFinished = { onOpacityChanged(opacity.roundToInt()) },
+            modifier = Modifier.fillMaxWidth(), valueRange = 0f..100f,
+            colors = SliderDefaults.colors(thumbColor = controlAccentColor(), activeTrackColor = controlAccentColor())
+        )
     }
 }
 

@@ -12,14 +12,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
@@ -35,12 +33,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.ui.theme.WinZOverlayTheme
 import com.winlator.cmod.ui.theme.accentSwitchColors
 import com.winlator.cmod.ui.theme.controlAccentColor
 import com.winlator.cmod.ui.theme.sidebarCardFillColor
+import kotlin.math.roundToInt
 
 // ---------- Graphics panel ----------
 
@@ -158,11 +156,20 @@ private fun GraphicsSidebarPanel(
             }
             if (sharpnessVisible) {
                 Spacer(Modifier.height(10.dp))
-                Text(
-                    text = "Sharpness",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = controlAccentColor()
-                )
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Sharpness",
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = controlAccentColor()
+                    )
+                    Text(
+                        text = "$sharpness%",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = controlAccentColor()
+                    )
+                }
                 var sharpnessDraft by remember(sharpnessVisible) { mutableStateOf(sharpness.toFloat()) }
                 Slider(
                     value = sharpnessDraft,
@@ -220,30 +227,32 @@ private fun GraphicsSidebarPanel(
                     callbacks.onReshadeEffectChanged(index)
                 }
             )
-            Spacer(Modifier.height(10.dp))
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "Strength",
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = "$reshadeStrength%",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = controlAccentColor()
+            if (reshadeIndex > 0) {
+                Spacer(Modifier.height(10.dp))
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Strength",
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = controlAccentColor()
+                    )
+                    Text(
+                        text = "$reshadeStrength%",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = controlAccentColor()
+                    )
+                }
+                Slider(
+                    value = reshadeStrength.toFloat(),
+                    onValueChange = {
+                        reshadeStrength = it.toInt()
+                        callbacks.onReshadeStrengthChanged(it.toInt())
+                    },
+                    valueRange = 0f..100f,
+                    colors = SliderDefaults.colors(thumbColor = controlAccentColor(), activeTrackColor = controlAccentColor())
                 )
             }
-            Slider(
-                value = reshadeStrength.toFloat(),
-                onValueChange = {
-                    reshadeStrength = it.toInt()
-                    callbacks.onReshadeStrengthChanged(it.toInt())
-                },
-                valueRange = 0f..100f,
-                colors = SliderDefaults.colors(thumbColor = controlAccentColor(), activeTrackColor = controlAccentColor())
-            )
         }
 
         if (state.frameGenAvailable) {
@@ -267,12 +276,21 @@ private fun GraphicsSidebarPanel(
                 )
                 if (frameGenIndex > 0) {
                     Spacer(Modifier.height(10.dp))
-                    Text(
-                        text = "Flow Scale",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                     var flowScale by remember { mutableStateOf(state.frameGenFlowScale) }
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "Flow Scale",
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = controlAccentColor()
+                        )
+                        Text(
+                            text = "${(flowScale * 100).roundToInt()}%",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = controlAccentColor()
+                        )
+                    }
                     Slider(
                         value = flowScale,
                         onValueChange = {
@@ -291,29 +309,12 @@ private fun GraphicsSidebarPanel(
     }
 }
 
-// FPS Limit slider: positions 0..23 map to 0/5/10.../115 FPS, position 24 ("Custom") shows
-// a numeric field — same layout as the old FpsLimiterControl widget it replaces.
-private const val FPS_STEP = 5
-private const val FPS_SLIDER_MAX_FPS = 120
-private const val FPS_CUSTOM_POSITION = FPS_SLIDER_MAX_FPS / FPS_STEP
+private const val FPS_LIMIT_MIN = 30
+private const val FPS_LIMIT_MAX = 120
 
 @Composable
 private fun FpsLimiterCard(initialFps: Int, onFpsChanged: (Int) -> Unit) {
-    val initialPosition = when {
-        initialFps <= 0 -> 0
-        initialFps >= FPS_SLIDER_MAX_FPS || initialFps % FPS_STEP != 0 -> FPS_CUSTOM_POSITION
-        else -> initialFps / FPS_STEP
-    }
-    var position by remember { mutableStateOf(initialPosition) }
-    var customText by remember {
-        mutableStateOf(if (initialPosition == FPS_CUSTOM_POSITION && initialFps > 0) initialFps.toString() else "")
-    }
-
-    fun chosenLimit(): Int = when {
-        position <= 0 -> 0
-        position < FPS_CUSTOM_POSITION -> position * FPS_STEP
-        else -> customText.toIntOrNull()?.takeIf { it > 0 } ?: FPS_SLIDER_MAX_FPS
-    }
+    var fps by remember { mutableStateOf(initialFps.coerceIn(FPS_LIMIT_MIN, FPS_LIMIT_MAX)) }
 
     PanelCard {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -325,11 +326,7 @@ private fun FpsLimiterCard(initialFps: Int, onFpsChanged: (Int) -> Unit) {
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = when {
-                    position <= 0 -> "Off"
-                    position >= FPS_CUSTOM_POSITION -> "Custom"
-                    else -> "${position * FPS_STEP} FPS"
-                },
+                text = "$fps FPS",
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
                 color = controlAccentColor()
@@ -337,27 +334,12 @@ private fun FpsLimiterCard(initialFps: Int, onFpsChanged: (Int) -> Unit) {
         }
         Spacer(Modifier.height(6.dp))
         Slider(
-            value = position.toFloat(),
-            onValueChange = { position = it.toInt() },
-            onValueChangeFinished = { onFpsChanged(chosenLimit()) },
-            valueRange = 0f..FPS_CUSTOM_POSITION.toFloat(),
-            steps = FPS_CUSTOM_POSITION - 1,
+            value = fps.toFloat(),
+            onValueChange = { fps = it.roundToInt() },
+            onValueChangeFinished = { onFpsChanged(fps) },
+            valueRange = FPS_LIMIT_MIN.toFloat()..FPS_LIMIT_MAX.toFloat(),
             colors = SliderDefaults.colors(thumbColor = controlAccentColor(), activeTrackColor = controlAccentColor())
         )
-        if (position >= FPS_CUSTOM_POSITION) {
-            Spacer(Modifier.height(6.dp))
-            OutlinedTextField(
-                value = customText,
-                onValueChange = {
-                    customText = it.filter(Char::isDigit)
-                    onFpsChanged(chosenLimit())
-                },
-                singleLine = true,
-                placeholder = { Text("Enter custom FPS") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
     }
 }
 

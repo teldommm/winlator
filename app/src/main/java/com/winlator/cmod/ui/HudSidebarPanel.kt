@@ -41,11 +41,13 @@ import com.winlator.cmod.ui.theme.accentSwitchColors
 import com.winlator.cmod.ui.theme.controlAccentColor
 import com.winlator.cmod.ui.theme.sidebarCardFillColor
 import com.winlator.cmod.widget.WinlatorHUD
+import kotlin.math.roundToInt
 
-// What the panel needs to render one frame. hudScalePercent/hudAlphaPercent are seeded at
-// 0 on purpose — the original sidebar's SBHudScale/SBHudAlpha never called setValue() either,
-// so they always opened at 0 regardless of the HUD's actual persisted scale/alpha. Replicated
-// as-is rather than "fixed", since that's a separate, pre-existing rough edge.
+// What the panel needs to render one frame. hudScalePercent/hudAlphaPercent must be the
+// actually-persisted HUD scale/alpha (see WinlatorHUD.getSavedScalePercent/getSavedAlphaPercent)
+// — they used to be seeded at 0 regardless of the saved value (matching the original sidebar's
+// SBHudScale/SBHudAlpha, which never called setValue() either), causing the sliders to always
+// open at 0%. Fixed at the call site in XServerDisplayActivity.setupSidebarHudControls().
 data class HudPanelState(
     val hudOn: Boolean,
     val isModernStyle: Boolean,
@@ -131,41 +133,61 @@ private fun HudSidebarPanel(state: HudPanelState, callbacks: HudPanelCallbacks) 
             }
         }
 
-        Spacer(Modifier.height(10.dp))
-        PanelCard {
-            Text(
-                text = "HUD Size",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                color = controlAccentColor()
-            )
-            var scale by remember { mutableStateOf(state.hudScalePercent.toFloat()) }
-            Slider(
-                value = scale,
-                onValueChange = {
-                    scale = it
-                    callbacks.onHudScale(it.toInt())
-                },
-                valueRange = 0f..100f,
-                colors = SliderDefaults.colors(thumbColor = controlAccentColor(), activeTrackColor = controlAccentColor())
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = "HUD Opacity",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                color = controlAccentColor()
-            )
-            var alpha by remember { mutableStateOf(state.hudAlphaPercent.toFloat()) }
-            Slider(
-                value = alpha,
-                onValueChange = {
-                    alpha = it
-                    callbacks.onHudAlpha(it.toInt())
-                },
-                valueRange = 0f..100f,
-                colors = SliderDefaults.colors(thumbColor = controlAccentColor(), activeTrackColor = controlAccentColor())
-            )
+        if (isModern) {
+            Spacer(Modifier.height(10.dp))
+            PanelCard {
+                var scale by remember { mutableStateOf(state.hudScalePercent.toFloat()) }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "HUD Size",
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = controlAccentColor()
+                    )
+                    Text(
+                        text = "${scale.roundToInt()}%",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = controlAccentColor()
+                    )
+                }
+                Slider(
+                    value = scale,
+                    onValueChange = {
+                        scale = it
+                        callbacks.onHudScale(it.toInt())
+                    },
+                    valueRange = 0f..100f,
+                    colors = SliderDefaults.colors(thumbColor = controlAccentColor(), activeTrackColor = controlAccentColor())
+                )
+                Spacer(Modifier.height(8.dp))
+                var alpha by remember { mutableStateOf(state.hudAlphaPercent.toFloat()) }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "HUD Opacity",
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = controlAccentColor()
+                    )
+                    Text(
+                        text = "${alpha.roundToInt()}%",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = controlAccentColor()
+                    )
+                }
+                Slider(
+                    value = alpha,
+                    onValueChange = {
+                        alpha = it
+                        callbacks.onHudAlpha(it.toInt())
+                    },
+                    valueRange = 0f..100f,
+                    colors = SliderDefaults.colors(thumbColor = controlAccentColor(), activeTrackColor = controlAccentColor())
+                )
+            }
         }
 
         Spacer(Modifier.height(12.dp))

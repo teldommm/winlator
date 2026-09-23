@@ -44,6 +44,7 @@ import com.winlator.cmod.ui.theme.WinZOverlayTheme
 import com.winlator.cmod.ui.theme.accentSwitchColors
 import com.winlator.cmod.ui.theme.controlAccentColor
 import com.winlator.cmod.ui.theme.sidebarCardFillColor
+import kotlin.math.roundToInt
 
 // One entry in the controls-profile dropdown. Plain data holder so this file doesn't need
 // to depend on com.winlator.cmod.inputcontrols.ControlsProfile — Java builds this list from it.
@@ -161,14 +162,23 @@ private fun InputSidebarPanel(state: InputPanelState, callbacks: InputPanelCallb
         Spacer(Modifier.height(10.dp))
 
         PanelCard {
-            Text(
-                text = "Touch Controls Opacity",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                color = controlAccentColor()
-            )
             var opacityDraft by remember {
                 mutableStateOf(state.controlsOpacityPercent.coerceIn(10, 100).toFloat())
+            }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Controls Opacity",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = controlAccentColor()
+                )
+                Text(
+                    text = "${opacityDraft.roundToInt()}%",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = controlAccentColor()
+                )
             }
             Slider(
                 value = opacityDraft,
