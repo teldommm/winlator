@@ -155,6 +155,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import cn.sherlock.com.sun.media.sound.SF2Soundbank;
+import com.winlator.cmod.core.AppDefaults;
 
 public class XServerDisplayActivity extends AppCompatActivity {
 
@@ -1076,7 +1077,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         boolean enableWineDebug = preferences.getBoolean("enable_wine_debug", false);
         String wineDebugChannels = preferences.getString("wine_debug_channels",
-                SettingsFragment.DEFAULT_WINE_DEBUG_CHANNELS);
+                AppDefaults.DEFAULT_WINE_DEBUG_CHANNELS);
         envVars.put("WINEDEBUG", enableWineDebug && !wineDebugChannels.isEmpty()
                 ? "+" + wineDebugChannels.replace(",", ",+")
                 : "-all");

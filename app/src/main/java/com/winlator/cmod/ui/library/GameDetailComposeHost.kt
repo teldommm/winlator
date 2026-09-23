@@ -1,6 +1,5 @@
 package com.winlator.cmod.ui.library
 
-import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.BorderStroke
@@ -38,7 +37,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -51,23 +49,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.MainActivity
 import com.winlator.cmod.ui.KeepLandscapeChromeHidden
-import com.winlator.cmod.ui.applyAppFullscreen
-import com.winlator.cmod.ui.theme.WinZTheme
 import com.winlator.cmod.ui.theme.controlAccentColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 
 interface GameDetailCallbacks {
+    fun onBack()
     fun onPlay()
     fun onConfigure()
     fun onArguments()
@@ -76,33 +71,16 @@ interface GameDetailCallbacks {
     fun onRemove()
 }
 
-object GameDetailComposeHost {
-    @JvmStatic
-    fun create(context: Context, title: String, subtitle: String, artworkPath: String?, fallback: Bitmap?, favorite: Boolean, callbacks: GameDetailCallbacks): ComposeView {
-        applyAppFullscreen(context as? MainActivity)
-        return ComposeView(context).apply {
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-            setContent { WinZTheme { GameDetailScreen(title, subtitle, artworkPath, fallback, favorite, callbacks) } }
-        }
-    }
-}
-
+// The game detail screen. Opened by MainShell as a detail entry through GameDetailRoute
+// (GameDetailRoute.kt); onBack pops it.
 @Composable
-private fun GameDetailScreen(title: String, subtitle: String, artworkPath: String?, fallback: Bitmap?, initialFavorite: Boolean, callbacks: GameDetailCallbacks) {
+internal fun GameDetailScreen(title: String, subtitle: String, artworkPath: String?, fallback: Bitmap?, initialFavorite: Boolean, callbacks: GameDetailCallbacks) {
     val landscape = LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
     val activity = LocalContext.current as? MainActivity
 
-    if (landscape) {
-        KeepLandscapeChromeHidden(activity, restoreChromeOnPortrait = false)
-    }
-
-    DisposableEffect(activity, landscape) {
-        if (!landscape) {
-            activity?.setBottomNavigationVisible(false)
-            activity?.setMainToolbarVisible(true)
-        }
-        onDispose { }
-    }
+    // Fullscreen is kept by the shell's tabs; the native Toolbar this screen used in portrait
+    // (title + up arrow) is gone — portrait now has the same on-artwork back button as landscape.
+    if (landscape) KeepLandscapeChromeHidden(activity)
 
     val artwork by produceState<Bitmap?>(fallback, artworkPath, fallback) {
         value = withContext(Dispatchers.IO) { artworkPath?.takeIf { File(it).isFile }?.let(BitmapFactory::decodeFile) ?: fallback }
@@ -118,14 +96,13 @@ private fun GameDetailScreen(title: String, subtitle: String, artworkPath: Strin
 
 @Composable
 private fun LandscapeDetail(title: String, subtitle: String, artwork: Bitmap?, favorite: Boolean, callbacks: GameDetailCallbacks, toggleFavorite: () -> Unit) {
-    val activity = LocalContext.current as? MainActivity
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         if (artwork != null) Image(artwork.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Color.Black.copy(.93f), Color.Black.copy(.70f), Color.Black.copy(.28f)))))
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(.18f), Color.Transparent, Color.Black.copy(.55f)))))
 
         Surface(
-            onClick = { activity?.onBackPressedDispatcher?.onBackPressed() },
+            onClick = callbacks::onBack,
             modifier = Modifier.align(Alignment.TopStart).padding(start = 18.dp, top = 16.dp).size(44.dp),
             shape = RoundedCornerShape(12.dp),
             color = Color.Black.copy(.62f),
@@ -197,6 +174,18 @@ private fun PortraitDetail(title: String, subtitle: String, artwork: Bitmap?, fa
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(.18f), Color.Transparent, Color.Black.copy(.88f)))))
             IconButton(onClick = toggleFavorite, modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).size(48.dp)) {
                 Icon(if (favorite) Icons.Outlined.Star else Icons.Outlined.StarBorder, "Favorite", tint = Color.White)
+            }
+            Surface(
+                onClick = callbacks::onBack,
+                modifier = Modifier.align(Alignment.TopStart).padding(start = 14.dp, top = 14.dp).size(44.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = Color.Black.copy(.62f),
+                contentColor = Color.White,
+                border = BorderStroke(1.dp, Color.White.copy(.16f))
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.Outlined.ArrowBack, "Back", modifier = Modifier.size(24.dp))
+                }
             }
             Column(Modifier.align(Alignment.BottomStart).padding(22.dp)) {
                 Text(title, color = Color.White, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)

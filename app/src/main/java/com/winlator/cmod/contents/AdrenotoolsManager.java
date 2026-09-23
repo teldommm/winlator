@@ -6,7 +6,7 @@ import android.net.Uri;
 import android.content.Context;
 import android.util.Log;
 
-import com.winlator.cmod.SettingsFragment;
+import com.winlator.cmod.core.AppDefaults;
 import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.Shortcut;
 import com.winlator.cmod.container.ContainerManager;
@@ -252,7 +252,7 @@ public class AdrenotoolsManager {
                 envVars.put("ADRENOTOOLS_HOOKS_PATH", imagefs.getLibDir());
                 envVars.put("ADRENOTOOLS_DRIVER_NAME", getLibraryName(adrenotoolsDriverId));
 
-                File winlatorDir = new File(SettingsFragment.DEFAULT_WINLATOR_PATH);
+                File winlatorDir = new File(AppDefaults.DEFAULT_WINLATOR_PATH);
                 File qglConfig = new File(winlatorDir, "qgl_config.txt");
                 if (qglConfig.exists())
                     envVars.put("ADRENOTOOLS_REDIRECT_DIR", winlatorDir.getAbsolutePath() + "/");

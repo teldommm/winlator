@@ -21,7 +21,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,12 +48,6 @@ internal fun LibraryRootWithoutEmptyDescription(
     val activity = LocalContext.current as? MainActivity
     val configuration = LocalConfiguration.current
     val landscape = configuration.screenWidthDp > configuration.screenHeightDp
-    // See BitmapComposeCompat.LibraryRoot for why onDispose doesn't restore visibility.
-    DisposableEffect(activity, landscape) {
-        activity?.setBottomNavigationVisible(!landscape)
-        activity?.setMainToolbarVisible(false)
-        onDispose { }
-    }
     Column(
         Modifier
             .fillMaxSize()

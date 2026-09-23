@@ -1,10 +1,8 @@
 package com.winlator.cmod.ui
 
 import android.app.Activity
-import android.content.res.Configuration
 import android.os.Build
 import android.view.View
-import android.view.ViewTreeObserver
 import android.view.WindowManager
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -23,7 +21,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -63,50 +60,16 @@ fun applyAppFullscreen(activity: Activity?) {
     }
 }
 
+// Re-applies the app's fullscreen/immersive window setup while a landscape screen is shown
+// (the system can bring the bars back, e.g. after a dialog). This used to also force the native
+// Toolbar and bottom nav hidden on every frame; neither exists as a View anymore — MainShell
+// owns all chrome — so only the fullscreen part remains.
 @Composable
-fun KeepLandscapeChromeHidden(activity: MainActivity?, restoreChromeOnPortrait: Boolean = true) {
-    DisposableEffect(activity, restoreChromeOnPortrait) {
-        val toolbar = activity?.findViewById<View>(R.id.Toolbar)
-        val bottomNavigation = activity?.findViewById<View>(R.id.BottomNavigation)
-        val decor = activity?.window?.decorView
-
-        fun forceLandscapeChrome() {
-            if (activity?.resources?.configuration?.orientation == Configuration.ORIENTATION_LANDSCAPE) {
-                toolbar?.visibility = View.GONE
-                bottomNavigation?.visibility = View.GONE
-            }
-        }
-
-        val preDrawListener = ViewTreeObserver.OnPreDrawListener {
-            forceLandscapeChrome()
-            true
-        }
-
-        applyAppFullscreen(activity)
-        forceLandscapeChrome()
-        decor?.viewTreeObserver?.addOnPreDrawListener(preDrawListener)
-
-        onDispose {
-            if (decor?.viewTreeObserver?.isAlive == true) {
-                decor.viewTreeObserver.removeOnPreDrawListener(preDrawListener)
-            }
-            if (restoreChromeOnPortrait &&
-                activity?.resources?.configuration?.orientation != Configuration.ORIENTATION_LANDSCAPE
-            ) {
-                toolbar?.visibility = View.VISIBLE
-                bottomNavigation?.visibility = View.VISIBLE
-            }
-        }
-    }
-
+fun KeepLandscapeChromeHidden(activity: MainActivity?) {
     LaunchedEffect(activity) {
         applyAppFullscreen(activity)
-        activity?.setBottomNavigationVisible(false)
-        activity?.setMainToolbarVisible(false)
         withFrameNanos { }
         applyAppFullscreen(activity)
-        activity?.setBottomNavigationVisible(false)
-        activity?.setMainToolbarVisible(false)
     }
 }
 
@@ -151,9 +114,8 @@ fun LandscapeMainNavigation(
     }
 }
 
-// Portrait counterpart to LandscapeMainNavigation: in portrait the app's native Toolbar and
-// BottomNavigation are still used for chrome, but ONLY when the fragment itself keeps the
-// Toolbar visible. Screens that fully own their background (Library, and now Settings/Input
+// Portrait counterpart to LandscapeMainNavigation: in portrait the bottom navigation is drawn
+// by MainShell, so the screen only needs its title. Screens that fully own their background (Library, and now Settings/Input
 // Controls) hide the native Toolbar unconditionally and need a plain in-Compose title instead —
 // otherwise the area behind the old Toolbar shows its @drawable/ui_glass_background gradient
 // instead of the flat MaterialTheme.colorScheme.background every other screen sits on.

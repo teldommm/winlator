@@ -49,16 +49,13 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
@@ -74,7 +71,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap as composeAsImageBitmap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -87,10 +83,10 @@ import com.winlator.cmod.MainActivity
 import com.winlator.cmod.R
 import com.winlator.cmod.ui.PortraitMainHeader
 import com.winlator.cmod.ui.theme.controlAccentColor
-import com.winlator.cmod.ui.theme.accentSwitchColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import androidx.compose.ui.graphics.asImageBitmap as composeAsImageBitmap
 
 internal fun Bitmap.asImageBitmap(): ImageBitmap = this.composeAsImageBitmap()
 
@@ -115,19 +111,6 @@ internal fun LibraryRoot(
     val configuration = LocalConfiguration.current
     val landscape = configuration.screenWidthDp > configuration.screenHeightDp
     val activity = LocalContext.current as? MainActivity
-    // No restore-to-visible in onDispose: with animated fragment transitions
-    // (setCustomAnimations in MainActivity.show()), the outgoing fragment's ComposeView
-    // isn't detached — and this dispose doesn't fire — until the exit animation finishes,
-    // by which point the incoming screen has already hidden the Toolbar itself. A restore
-    // here would fire late and re-show it on top of whichever screen is now active
-    // (this was the cause of the duplicated "Library"/"Settings"/etc. header bug). Every
-    // screen that reaches this composable sets its own Toolbar/BottomNavigation state fresh
-    // on entry, so nothing needs to hand it back on the way out.
-    DisposableEffect(activity, landscape) {
-        activity?.setBottomNavigationVisible(!landscape)
-        activity?.setMainToolbarVisible(false)
-        onDispose { }
-    }
 
     if (landscape && visible.isNotEmpty() && !grid) {
         var menu by remember { mutableStateOf<LibraryItem?>(null) }

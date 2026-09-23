@@ -7,7 +7,6 @@ import android.text.format.DateFormat;
 
 import androidx.preference.PreferenceManager;
 
-import com.winlator.cmod.SettingsFragment;
 
 import java.io.File;
 import java.util.Date;
@@ -32,7 +31,7 @@ public class DebugLogFile {
             Uri winlatorUri = Uri.parse(winlatorPath);
             logsDir = new File(FileUtils.getFilePathFromUri(context, winlatorUri), "logs");
         } else {
-            logsDir = new File(SettingsFragment.DEFAULT_WINLATOR_PATH, "logs");
+            logsDir = new File(AppDefaults.DEFAULT_WINLATOR_PATH, "logs");
         }
 
         if (!logsDir.exists()) logsDir.mkdirs();

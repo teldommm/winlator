@@ -11,36 +11,21 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
-import android.os.StatFs;
 import android.provider.Settings;
-import android.text.Html;
-import android.text.format.Formatter;
-import android.text.SpannableString;
-import android.text.method.LinkMovementMethod;
-import android.text.style.ForegroundColorSpan;
 import android.util.Log;
-import android.view.MenuItem;
 import android.view.View;
-import android.widget.FrameLayout;
-import android.widget.TextView;
-import android.widget.ProgressBar;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 
 import androidx.annotation.IntRange;
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentManager;
+import androidx.compose.ui.platform.ComposeView;
 import androidx.preference.PreferenceManager;
 
-import com.google.android.material.navigation.NavigationView;
-import com.winlator.cmod.FileManagerFragment;
 import com.winlator.cmod.R;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.Callback;
@@ -48,14 +33,17 @@ import com.winlator.cmod.core.ImageUtils;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.core.WineThemeManager;
-import com.winlator.cmod.ui.PortraitBottomNavigationHost;
+import com.winlator.cmod.ui.shell.MainShellController;
+import com.winlator.cmod.ui.shell.MainShellHost;
+import com.winlator.cmod.ui.shell.ShellDetail;
 import com.winlator.cmod.ui.ThemedAlertHost;
 import com.winlator.cmod.xenvironment.ImageFsInstaller;
 import com.winlator.cmod.services.NotificationService;
 
 import java.io.File;
+import com.winlator.cmod.core.AppDefaults;
 
-public class MainActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
+public class MainActivity extends AppCompatActivity {
     public static final @IntRange(from = 1, to = 19) byte CONTAINER_PATTERN_COMPRESSION_LEVEL = 9;
     public static final int PERMISSION_WRITE_EXTERNAL_STORAGE_REQUEST_CODE = 500;
     public static final int PERMISSION_POST_NOTIFICATIONS_REQUEST_CODE = 501;
@@ -68,10 +56,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private static final String ORIENTATION_MODE_AUTO = "auto";
     private static final String ORIENTATION_MODE_VERTICAL = "vertical";
     private static final String ORIENTATION_MODE_HORIZONTAL = "horizontal";
-    private NavigationView navigationView;
-    private FrameLayout bottomNavigation;
-    private View bottomNavigationComposeView;
-    private View mainToolbar;
+    private MainShellController mainShell;
     public final PreloaderDialog preloaderDialog = new PreloaderDialog(this);
     private boolean editInputControls = false;
     private int selectedProfileId;
@@ -130,29 +115,12 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
         setContentView(R.layout.main_activity);
 
-        navigationView = findViewById(R.id.NavigationView);
-        navigationView.setNavigationItemSelectedListener(this);
-        navigationView.setBackgroundColor(Color.parseColor("#0B0D12"));
-
-        bottomNavigation = findViewById(R.id.BottomNavigation);
-        bottomNavigationComposeView = PortraitBottomNavigationHost.create(this, this::navigateToMainDestination);
-        bottomNavigation.addView(bottomNavigationComposeView);
-        updateStorageFooter();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             getWindow().setStatusBarColor(Color.BLACK);
             getWindow().setNavigationBarColor(Color.BLACK);
         }
 
-        mainToolbar = findViewById(R.id.Toolbar);
-        setSupportActionBar((androidx.appcompat.widget.Toolbar) mainToolbar);
-        ActionBar actionBar = getSupportActionBar();
-        if (actionBar != null) {
-            actionBar.setDisplayHomeAsUpEnabled(false);
-        }
-
-        setNavigationViewItemTextColor(navigationView, Color.WHITE);
-
-        File winlatorDir = new File(SettingsFragment.DEFAULT_WINLATOR_PATH);
+        File winlatorDir = new File(AppDefaults.DEFAULT_WINLATOR_PATH);
         if (!winlatorDir.exists())
             winlatorDir.mkdirs();
 
@@ -160,50 +128,35 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
         Intent intent = getIntent();
         editInputControls = intent.getBooleanExtra("edit_input_controls", false);
+        int initialTab;
         if (editInputControls) {
             selectedProfileId = intent.getIntExtra("selected_profile_id", 0);
-            if (actionBar != null) {
-                actionBar.setDisplayHomeAsUpEnabled(true);
-                actionBar.setHomeAsUpIndicator(R.drawable.ui_ic_back);
-            }
-            onNavigationItemSelected(navigationView.getMenu().findItem(R.id.main_menu_input_controls));
-            navigationView.setCheckedItem(R.id.main_menu_input_controls);
+            initialTab = R.id.main_menu_input_controls;
         } else {
             int selectedMenuItemId = intent.getIntExtra("selected_menu_item_id", 0);
-            int menuItemId;
-            if (selectedMenuItemId > 0) {
-                menuItemId = selectedMenuItemId;
+            if (MainShellController.isTab(selectedMenuItemId)) {
+                initialTab = selectedMenuItemId;
             } else {
                 containerManager.loadShortcuts();
-                menuItemId = R.id.main_menu_shortcuts;
+                initialTab = R.id.main_menu_shortcuts;
             }
+        }
 
-            if (actionBar != null) actionBar.setDisplayHomeAsUpEnabled(false);
-            onNavigationItemSelected(navigationView.getMenu().findItem(menuItemId));
-            navigationView.setCheckedItem(menuItemId);
-            selectBottomDestination(menuItemId);
+        ComposeView shellView = findViewById(R.id.MainShellCompose);
+        mainShell = MainShellHost.attach(
+                shellView,
+                initialTab,
+                selectedProfileId,
+                editInputControls,
+                this::navigateToMainDestination
+        );
 
+        if (!editInputControls) {
             if (!ImageFsInstaller.installIfNeeded(this, () -> requestAppPermissions())) {
                 if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED)
                     startForegroundService(notificationService);
             }
         }
-    }
-
-    private void updateStorageFooter() {
-        TextView storageView = findViewById(R.id.TVStorageUsage);
-        ProgressBar storageProgress = findViewById(R.id.PBStorageUsage);
-        if (storageView == null || storageProgress == null) return;
-
-        File storageRoot = Environment.getExternalStorageDirectory();
-        StatFs statFs = new StatFs(storageRoot.getPath());
-        long totalBytes = statFs.getTotalBytes();
-        long freeBytes = statFs.getAvailableBytes();
-        long usedBytes = Math.max(0, totalBytes - freeBytes);
-        int usedPercent = totalBytes > 0 ? Math.min(100, Math.round((usedBytes * 100f) / totalBytes)) : 0;
-
-        storageView.setText(Formatter.formatShortFileSize(this, usedBytes) + " / " + Formatter.formatShortFileSize(this, totalBytes));
-        storageProgress.setProgress(usedPercent);
     }
 
     private void showAllFilesAccessDialog() {
@@ -233,20 +186,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             else
                 finish();
         }
-    }
-
-    @Override
-    public void onBackPressed() {
-        FragmentManager fragmentManager = getSupportFragmentManager();
-        if (fragmentManager.getBackStackEntryCount() > 0) {
-            fragmentManager.popBackStack();
-            return;
-        }
-        if (editInputControls) {
-            super.onBackPressed();
-            return;
-        }
-        finish();
     }
 
     private void requestAppPermissions() {
@@ -314,75 +253,35 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         invalidateOptionsMenu();
     }
 
-    @Override
-    public boolean onOptionsItemSelected(MenuItem menuItem) {
-        if (menuItem.getItemId() == android.R.id.home) {
-            Fragment current = getSupportFragmentManager().findFragmentById(R.id.FLFragmentContainer);
-            if (current instanceof GameDetailFragment
-                    || current instanceof ContainerOverviewFragment
-                    || current instanceof ContainerSectionFragment) {
-                onBackPressed();
-                return true;
-            }
-            if (editInputControls) {
-                onBackPressed();
-                return true;
-            }
-
-            return true;
-        } else {
-            return super.onOptionsItemSelected(menuItem);
-        }
-    }
-
-    @Override
-    public boolean onNavigationItemSelected(@NonNull MenuItem item) {
-        setDetailMode(false);
-        selectBottomDestination(item.getItemId());
-        FragmentManager fragmentManager = getSupportFragmentManager();
-        if (fragmentManager.getBackStackEntryCount() > 0) {
-            fragmentManager.popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
-        }
-
-        switch (item.getItemId()) {
-            case R.id.main_menu_shortcuts:
-                show(new ShortcutsFragment(), false);
-                break;
-            case R.id.main_menu_input_controls:
-                show(InputControlsFragment.newInstance(selectedProfileId), false);
-                break;
-            case R.id.main_menu_file_manager:
-                show(new FileManagerFragment(), false);
-                break;
-            case R.id.main_menu_settings:
-                show(new SettingsFragment(), false);
-                break;
-            case R.id.main_menu_about:
-                showAboutDialog();
-                break;
-        }
-        return true;
-    }
-
-
-    private void selectBottomDestination(int menuItemId) {
-        PortraitBottomNavigationHost.updateSelected(bottomNavigationComposeView, menuItemId);
-    }
-
-    public void setBottomNavigationVisible(boolean visible) {
-        if (bottomNavigation != null) bottomNavigation.setVisibility(visible ? View.VISIBLE : View.GONE);
-    }
-
-    public void setMainToolbarVisible(boolean visible) {
-        if (mainToolbar != null) mainToolbar.setVisibility(visible ? View.VISIBLE : View.GONE);
-    }
-
+    // Single entry point for main destinations: bottom nav, landscape headers, Library's "Add"
+    // (File Manager), and the About entry. Closes any open detail screen, then lets the shell
+    // switch tabs (no-op if the tab is already selected — tabs persist, nothing to reload).
     public void navigateToMainDestination(int menuItemId) {
-        if (navigationView == null) return;
-        MenuItem destination = navigationView.getMenu().findItem(menuItemId);
-        if (destination == null) return;
-        navigationView.setCheckedItem(menuItemId);
-        onNavigationItemSelected(destination);
+        if (menuItemId == R.id.main_menu_about) {
+            showAboutDialog();
+            return;
+        }
+        if (!MainShellController.isTab(menuItemId) || mainShell == null) return;
+        mainShell.closeAllDetails();
+        mainShell.select(menuItemId);
+    }
+
+    // Detail screens (drawn by MainShell above the tabs; system back pops them).
+    public void openGameDetail(String shortcutPath) {
+        if (mainShell != null) mainShell.pushDetail(new ShellDetail.GameDetail(shortcutPath));
+    }
+
+    public void openContainersSettings() {
+        if (mainShell != null) mainShell.pushDetail(ShellDetail.Containers.INSTANCE);
+    }
+
+    public void openComponentManager() {
+        if (mainShell != null) mainShell.pushDetail(ShellDetail.ComponentManager.INSTANCE);
+    }
+
+    // Asks the Library tab to reload (e.g. after a detail screen changed a shortcut).
+    public void refreshLibrary() {
+        if (mainShell != null) mainShell.requestRefresh(R.id.main_menu_shortcuts);
     }
 
     private void applyImmersiveMode() {
@@ -401,52 +300,8 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         if (hasFocus) applyImmersiveMode();
     }
 
-    public void setDetailMode(boolean detail) {
-        setBottomNavigationVisible(!detail);
-        ActionBar actionBar = getSupportActionBar();
-        if (actionBar != null) {
-            actionBar.setDisplayHomeAsUpEnabled(detail);
-            if (detail) actionBar.setHomeAsUpIndicator(R.drawable.ui_ic_back);
-        }
-    }
-
-    private void show(Fragment fragment, boolean reverse) {
-        FragmentManager fragmentManager = getSupportFragmentManager();
-        if (reverse) {
-            fragmentManager.beginTransaction()
-                    .setCustomAnimations(R.anim.slide_in_down, R.anim.slide_out_up)
-                    .replace(R.id.FLFragmentContainer, fragment)
-                    .commit();
-        } else {
-            fragmentManager.beginTransaction()
-                    .setCustomAnimations(R.anim.slide_in_up, R.anim.slide_out_down)
-                    .replace(R.id.FLFragmentContainer, fragment)
-                    .commit();
-        }
-    }
-
     public void showAboutDialog() {
         com.winlator.cmod.ui.AboutDialogHost.show(this);
-    }
-
-    private void setNavigationViewItemTextColor(NavigationView navigationView, int color) {
-        for (int i = 0; i < navigationView.getMenu().size(); i++) {
-            MenuItem menuItem = navigationView.getMenu().getItem(i);
-            setMenuItemTextColor(menuItem, color);
-
-            if (menuItem.hasSubMenu()) {
-                for (int j = 0; j < menuItem.getSubMenu().size(); j++) {
-                    MenuItem subMenuItem = menuItem.getSubMenu().getItem(j);
-                    setMenuItemTextColor(subMenuItem, color);
-                }
-            }
-        }
-    }
-
-    private void setMenuItemTextColor(MenuItem menuItem, int color) {
-        SpannableString spanString = new SpannableString(menuItem.getTitle());
-        spanString.setSpan(new ForegroundColorSpan(color), 0, spanString.length(), 0);
-        menuItem.setTitle(spanString);
     }
 
     @Override

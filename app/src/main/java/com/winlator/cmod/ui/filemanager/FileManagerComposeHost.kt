@@ -1,9 +1,7 @@
 package com.winlator.cmod.ui.filemanager
 
-import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.view.View
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -45,8 +43,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -56,10 +52,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -69,7 +63,6 @@ import com.winlator.cmod.R
 import com.winlator.cmod.core.ExeIconExtractor
 import com.winlator.cmod.ui.LandscapeMainNavigation
 import com.winlator.cmod.ui.PortraitMainHeader
-import com.winlator.cmod.ui.theme.WinZTheme
 import com.winlator.cmod.ui.theme.controlAccentColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -131,40 +124,14 @@ interface FileManagerCallbacks {
 // rescan rather than navigating anywhere, so the sheet is kept open after it's tapped.
 const val DRIVE_OPTION_SCAN_ID = "scan"
 
-object FileManagerComposeHost {
-    @JvmStatic
-    fun create(context: Context, model: FileManagerModel, callbacks: FileManagerCallbacks): ComposeView {
-        val modelState = mutableStateOf(model)
-        return ComposeView(context).apply {
-            tag = modelState
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-            setContent { WinZTheme { FileManagerScreen(modelState.value, callbacks) } }
-        }
-    }
-
-    // Pushes a freshly-built model into an already-created view (see FileManagerFragment's
-    // pushState()). Every state-changing action in the Fragment rebuilds the whole model and
-    // calls this rather than mutating individual pieces of UI.
-    @JvmStatic
-    @Suppress("UNCHECKED_CAST")
-    fun update(view: View?, model: FileManagerModel) {
-        (view?.tag as? MutableState<FileManagerModel>)?.value = model
-    }
-}
-
+// The File Manager screen. Hosted by MainShell through FileManagerRoute (FileManagerRoute.kt);
+// the logic lives in FileManagerController.
 @Composable
-private fun FileManagerScreen(model: FileManagerModel, callbacks: FileManagerCallbacks) {
+internal fun FileManagerScreen(model: FileManagerModel, callbacks: FileManagerCallbacks) {
     val configuration = LocalConfiguration.current
     val landscape = configuration.screenWidthDp > configuration.screenHeightDp
     val activity = LocalContext.current as? MainActivity
     var driveSheetOpen by remember { mutableStateOf(false) }
-
-    // See BitmapComposeCompat.LibraryRoot for why onDispose doesn't restore visibility.
-    DisposableEffect(activity, landscape) {
-        activity?.setBottomNavigationVisible(!landscape)
-        activity?.setMainToolbarVisible(false)
-        onDispose { }
-    }
 
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         if (landscape) {
@@ -402,7 +369,7 @@ private fun FileRow(entry: FileEntryUiModel, callbacks: FileManagerCallbacks) {
     }
 }
 
-// Mirrors the old FileManagerFragment's folderDetails()/fileDetails()/modifiedLabel() text
+// Mirrors FileManagerController's (formerly FileManagerFragment's) folderDetails()/fileDetails()/modifiedLabel() text
 // formatting. Kept here rather than pushed from Java so it stays lazy: a folder's child count
 // (File.list()) is only read for rows Compose actually composes, matching the RecyclerView's
 // original per-visible-item binding cost instead of paying it for the whole directory upfront.

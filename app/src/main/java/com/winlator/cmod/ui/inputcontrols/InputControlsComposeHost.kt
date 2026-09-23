@@ -1,7 +1,5 @@
 package com.winlator.cmod.ui.inputcontrols
 
-import android.content.Context
-import android.view.View
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -46,9 +44,7 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -58,10 +54,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -69,7 +63,6 @@ import com.winlator.cmod.MainActivity
 import com.winlator.cmod.R
 import com.winlator.cmod.ui.LandscapeMainNavigation
 import com.winlator.cmod.ui.PortraitMainHeader
-import com.winlator.cmod.ui.theme.WinZTheme
 import com.winlator.cmod.ui.theme.controlAccentColor
 import kotlin.math.roundToInt
 
@@ -107,37 +100,15 @@ interface InputControlsCallbacks {
     fun onRemoveController(index: Int)
 }
 
-object InputControlsComposeHost {
-    @JvmStatic
-    fun create(context: Context, model: InputControlsModel, callbacks: InputControlsCallbacks): ComposeView {
-        val modelState = mutableStateOf(model)
-        return ComposeView(context).apply {
-            tag = modelState
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-            setContent { WinZTheme { InputControlsScreen(modelState.value, callbacks) } }
-        }
-    }
-
-    @JvmStatic
-    @Suppress("UNCHECKED_CAST")
-    fun update(view: View?, model: InputControlsModel) {
-        (view?.tag as? MutableState<InputControlsModel>)?.value = model
-    }
-}
-
+// The screen itself. Hosted directly by MainShell through InputControlsRoute
+// (InputControlsRoute.kt), which owns the state and actions that InputControlsFragment used to.
+// There is no view/fragment bridge for this screen anymore.
 @Composable
-private fun InputControlsScreen(model: InputControlsModel, callbacks: InputControlsCallbacks) {
+internal fun InputControlsScreen(model: InputControlsModel, callbacks: InputControlsCallbacks) {
     val selectedName = model.profiles.firstOrNull { it.id == model.selectedProfileId }?.name ?: "-- Select Profile --"
     val configuration = LocalConfiguration.current
     val landscape = configuration.screenWidthDp > configuration.screenHeightDp
     val activity = LocalContext.current as? MainActivity
-
-    // See BitmapComposeCompat.LibraryRoot for why onDispose doesn't restore visibility.
-    DisposableEffect(activity, landscape) {
-        activity?.setBottomNavigationVisible(!landscape)
-        activity?.setMainToolbarVisible(false)
-        onDispose { }
-    }
 
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         if (landscape) {

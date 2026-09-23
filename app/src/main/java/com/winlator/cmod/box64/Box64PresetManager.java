@@ -12,7 +12,7 @@ import android.widget.Toast;
 import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.R;
-import com.winlator.cmod.SettingsFragment;
+import com.winlator.cmod.core.AppDefaults;
 import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
 
@@ -233,7 +233,7 @@ public abstract class Box64PresetManager {
                     presetFile = new File(path, "Presets/" + prefix + "_" + preset[1] + ".wbp");
                 }
                 else {
-                    presetFile = new File(SettingsFragment.DEFAULT_WINLATOR_PATH, "Presets/" + prefix + "_" + preset[1] + ".wbp");
+                    presetFile = new File(AppDefaults.DEFAULT_WINLATOR_PATH, "Presets/" + prefix + "_" + preset[1] + ".wbp");
                 }
                 if (!presetFile.getParentFile().exists())
                     presetFile.getParentFile().mkdirs();

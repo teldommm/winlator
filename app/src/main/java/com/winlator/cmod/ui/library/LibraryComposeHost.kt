@@ -8,11 +8,9 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.runtime.Composable
 import com.winlator.cmod.MainActivity
 import com.winlator.cmod.ui.applyAppFullscreen
-import com.winlator.cmod.ui.theme.WinZTheme
 import java.util.concurrent.atomic.AtomicInteger
 
 @Immutable
@@ -42,10 +40,10 @@ interface LibraryCallbacks {
 
 class LibraryComposeController internal constructor(
     private val context: Context,
-    private val items: MutableState<List<LibraryItem>>,
-    private val grid: MutableState<Boolean>,
-    private val query: MutableState<String>,
-    private val selectedShortcutPath: MutableState<String?>
+    internal val items: MutableState<List<LibraryItem>>,
+    internal val grid: MutableState<Boolean>,
+    internal val query: MutableState<String>,
+    internal val selectedShortcutPath: MutableState<String?>
 ) {
     private val statePreferences = context.getSharedPreferences("library_compose_state", Context.MODE_PRIVATE)
     private val metadataGeneration = AtomicInteger(0)
@@ -75,11 +73,6 @@ class LibraryComposeController internal constructor(
     }
 }
 
-class LibraryComposeBinding internal constructor(
-    val view: ComposeView,
-    val controller: LibraryComposeController
-)
-
 object LibraryComposeHost {
     const val ACTION_SETTINGS = "settings"
     const val ACTION_ICON = "icon"
@@ -89,45 +82,33 @@ object LibraryComposeHost {
     const val ACTION_REMOVE = "remove"
     const val ACTION_FAVORITE = "favorite"
 
+    // Library UI state. The screen itself is LibraryContent(), called from LibraryRoute inside
+    // MainShell — there is no ComposeView for the Library anymore.
     @JvmStatic
-    fun create(
-        context: Context,
-        initialGridView: Boolean,
-        callbacks: LibraryCallbacks
-    ): LibraryComposeBinding {
-        val activity = context as? MainActivity
-        applyAppFullscreen(activity)
-
-        val items = mutableStateOf<List<LibraryItem>>(emptyList())
-        val grid = mutableStateOf(initialGridView)
-        val query = mutableStateOf("")
-        val selectedShortcutPath = mutableStateOf(
-            context.getSharedPreferences("library_compose_state", Context.MODE_PRIVATE)
-                .getString("selected_shortcut_path", null)
-        )
-        val controller = LibraryComposeController(
+    fun createController(context: Context, initialGridView: Boolean): LibraryComposeController {
+        applyAppFullscreen(context as? MainActivity)
+        return LibraryComposeController(
             context.applicationContext,
-            items,
-            grid,
-            query,
-            selectedShortcutPath
+            mutableStateOf(emptyList()),
+            mutableStateOf(initialGridView),
+            mutableStateOf(""),
+            mutableStateOf(
+                context.getSharedPreferences("library_compose_state", Context.MODE_PRIVATE)
+                    .getString("selected_shortcut_path", null)
+            )
         )
-        val view = ComposeView(context).apply {
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-            setContent {
-                WinZTheme {
-                    LibraryRootWithoutEmptyDescription(
-                        items.value,
-                        grid.value,
-                        query.value,
-                        selectedShortcutPath,
-                        callbacks
-                    )
-                }
-            }
-        }
-        return LibraryComposeBinding(view, controller)
     }
+}
+
+@Composable
+internal fun LibraryContent(controller: LibraryComposeController, callbacks: LibraryCallbacks) {
+    LibraryRootWithoutEmptyDescription(
+        controller.items.value,
+        controller.grid.value,
+        controller.query.value,
+        controller.selectedShortcutPath,
+        callbacks
+    )
 }
 
 internal enum class LibraryFilter { All, Favorites, Recent }

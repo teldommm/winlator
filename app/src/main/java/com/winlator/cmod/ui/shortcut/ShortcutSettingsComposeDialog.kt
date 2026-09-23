@@ -8,14 +8,16 @@ import android.view.WindowManager
 import androidx.activity.ComponentDialog
 import androidx.compose.ui.platform.ComposeView
 import androidx.core.view.WindowCompat
-import androidx.fragment.app.Fragment
+import androidx.appcompat.app.AppCompatActivity
 import com.winlator.cmod.container.Shortcut
 import com.winlator.cmod.ui.theme.WinZTheme
 
 object ShortcutSettingsComposeDialog {
+    // onShortcutsChanged: called after an edit that changes what the Library shows (rename,
+    // copy to another container) — the Library reloads, GameDetail asks MainActivity to.
     @JvmStatic
-    fun show(fragment: Fragment, shortcut: Shortcut) {
-        val dialog = ComponentDialog(fragment.requireContext())
+    fun show(activity: AppCompatActivity, shortcut: Shortcut, onShortcutsChanged: Runnable) {
+        val dialog = ComponentDialog(activity)
         dialog.show()
         dialog.window?.apply {
             setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
@@ -32,8 +34,8 @@ object ShortcutSettingsComposeDialog {
             }
             decorView.systemUiVisibility = immersiveUiFlagsV2()
         }
-        dialog.setContentView(ComposeView(fragment.requireContext()).apply {
-            setContent { WinZTheme { ShortcutEditorV2(fragment, shortcut, dialog::dismiss) } }
+        dialog.setContentView(ComposeView(activity).apply {
+            setContent { WinZTheme { ShortcutEditorV2(activity, shortcut, { onShortcutsChanged.run() }, dialog::dismiss) } }
         })
         dialog.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
     }

@@ -1,8 +1,5 @@
 package com.winlator.cmod.ui.settings
 
-import android.content.Context
-import android.graphics.Color
-import android.view.View
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -42,7 +39,6 @@ import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DropdownMenu
@@ -59,14 +55,10 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -76,10 +68,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -88,7 +78,6 @@ import com.winlator.cmod.MainActivity
 import com.winlator.cmod.R
 import com.winlator.cmod.ui.LandscapeMainNavigation
 import com.winlator.cmod.ui.PortraitMainHeader
-import com.winlator.cmod.ui.theme.WinZTheme
 import com.winlator.cmod.ui.theme.controlAccentColor
 import com.winlator.cmod.ui.theme.ThemedDialog
 import com.winlator.cmod.ui.theme.accentSwitchColors
@@ -147,39 +136,15 @@ interface SettingsCallbacks {
     fun onPresetAction(kind: String, id: String, action: String)
 }
 
-object SettingsComposeHost {
-    @JvmStatic
-    fun create(context: Context, model: SettingsModel, callbacks: SettingsCallbacks): ComposeView {
-        val modelState = mutableStateOf(model)
-        return ComposeView(context).apply {
-            tag = modelState
-            setBackgroundColor(Color.TRANSPARENT)
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-            setContent { WinZTheme { SettingsScreen(modelState.value, callbacks) } }
-        }
-    }
-
-    @JvmStatic
-    @Suppress("UNCHECKED_CAST")
-    fun update(view: View?, model: SettingsModel) {
-        (view?.tag as? MutableState<SettingsModel>)?.value = model
-    }
-}
-
+// The Settings screen. Hosted directly by MainShell through SettingsRoute (SettingsRoute.kt),
+// which owns the state and actions SettingsFragment used to.
 @Composable
-private fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) {
+internal fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val landscape = configuration.screenWidthDp > configuration.screenHeightDp
     val activity = context as? MainActivity
     var confirmReinstallImageFs by remember { mutableStateOf(false) }
-
-    // See BitmapComposeCompat.LibraryRoot for why onDispose doesn't restore visibility.
-    DisposableEffect(activity, landscape) {
-        activity?.setBottomNavigationVisible(!landscape)
-        activity?.setMainToolbarVisible(false)
-        onDispose { }
-    }
 
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         if (landscape) {

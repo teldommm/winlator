@@ -1,12 +1,9 @@
 package com.winlator.cmod.ui.theme
 
-import android.R as AndroidR
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
-import android.content.res.ColorStateList
 import android.view.View
-import androidx.appcompat.widget.Toolbar
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Column
@@ -49,12 +46,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.preference.PreferenceManager
-import com.google.android.material.navigation.NavigationView
 import com.winlator.cmod.R
 
 enum class WinlatorThemeType(
@@ -259,7 +254,7 @@ fun WinlatorTheme(content: @Composable () -> Unit) {
     val colors = winlatorColorScheme(theme)
     ConfigureComposeHostFocus()
     HideSystemBars(theme)
-    ApplyLegacyChrome(colors)
+    ApplyWindowBackground(colors)
     MaterialTheme(colorScheme = colors, typography = WinlatorTypography, shapes = WinlatorShapes) {
         val focusManager = LocalFocusManager.current
         val keyboardController = LocalSoftwareKeyboardController.current
@@ -366,45 +361,18 @@ private fun HideSystemBars(theme: WinlatorThemeType) {
     }
 }
 
+// Paints the window and MainActivity's root with the theme background, so nothing but the
+// theme color can show before/around Compose content (e.g. during a theme switch). The native
+// Toolbar/FLFragmentContainer/NavigationView tinting that used to live here is gone with those
+// views.
 @Composable
-private fun ApplyLegacyChrome(colors: ColorScheme) {
+private fun ApplyWindowBackground(colors: ColorScheme) {
     val activity = LocalContext.current.findActivity()
     DisposableEffect(activity, colors) {
         activity?.let { host ->
             val background = colors.background.toArgb()
-            val surface = colors.surface.toArgb()
-            val onSurface = colors.onSurface.toArgb()
-
             host.window.decorView.setBackgroundColor(background)
-            host.findViewById<View>(R.id.DrawerLayout)?.let { rootLayout ->
-                rootLayout.setBackgroundColor(background)
-                if (rootLayout is android.view.ViewGroup && rootLayout.childCount > 0) {
-                    rootLayout.getChildAt(0)?.setBackgroundColor(background)
-                }
-            }
-            host.findViewById<View>(R.id.FLFragmentContainer)?.setBackgroundColor(background)
-
-            val toolbar = host.findViewById<Toolbar>(R.id.Toolbar)
-            toolbar?.setBackgroundColor(surface)
-            toolbar?.setTitleTextColor(onSurface)
-            toolbar?.navigationIcon = toolbar?.navigationIcon?.mutate()?.apply { setTint(onSurface) }
-            toolbar?.menu?.let { menu ->
-                for (i in 0 until menu.size()) {
-                    menu.getItem(i).icon?.mutate()?.setTint(onSurface)
-                }
-            }
-
-            host.findViewById<NavigationView>(R.id.NavigationView)?.let { drawer ->
-                val selectedStates = arrayOf(
-                    intArrayOf(AndroidR.attr.state_checked),
-                    intArrayOf()
-                )
-                val navColors = intArrayOf(colors.primary.toArgb(), colors.onSurfaceVariant.toArgb())
-                val tint = ColorStateList(selectedStates, navColors)
-                drawer.setBackgroundColor(surface)
-                drawer.itemIconTintList = tint
-                drawer.itemTextColor = ColorStateList.valueOf(onSurface)
-            }
+            host.findViewById<View>(R.id.DrawerLayout)?.setBackgroundColor(background)
         }
         onDispose { }
     }

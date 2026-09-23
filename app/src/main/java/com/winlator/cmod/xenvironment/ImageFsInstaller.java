@@ -8,7 +8,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.winlator.cmod.MainActivity;
 import com.winlator.cmod.R;
-import com.winlator.cmod.SettingsFragment;
+import com.winlator.cmod.core.AppDefaults;
 import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.contents.AdrenotoolsManager;
@@ -112,7 +112,7 @@ public abstract class ImageFsInstaller {
         ImageFs imageFs = ImageFs.find(activity);
         File rootDir = imageFs.getRootDir();
 
-        SettingsFragment.resetEmulatorsVersion(activity);
+        AppDefaults.resetEmulatorsVersion(activity);
 
         final DownloadProgressDialog dialog = new DownloadProgressDialog(activity);
         dialog.show(R.string.installing_system_files);
@@ -151,7 +151,7 @@ public abstract class ImageFsInstaller {
         AppUtils.keepScreenOn(activity);
         ImageFs imageFs = ImageFs.find(activity);
         File rootDir = imageFs.getRootDir();
-        SettingsFragment.resetEmulatorsVersion(activity);
+        AppDefaults.resetEmulatorsVersion(activity);
 
         Executors.newSingleThreadExecutor().execute(() -> {
             android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND);

@@ -76,9 +76,8 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.fragment.app.Fragment
+import androidx.appcompat.app.AppCompatActivity
 import com.winlator.cmod.R
-import com.winlator.cmod.ShortcutsFragment
 import com.winlator.cmod.XServerDisplayActivity
 import com.winlator.cmod.box64.Box64PresetManager
 import com.winlator.cmod.container.Container
@@ -396,8 +395,13 @@ private class ShortcutEditorStateV2(val shortcut: Shortcut) {
 }
 
 @Composable
-internal fun ShortcutEditorV2(fragment: Fragment, shortcut: Shortcut, close: () -> Unit) {
-    val context = fragment.requireContext()
+internal fun ShortcutEditorV2(
+    activity: AppCompatActivity,
+    shortcut: Shortcut,
+    onShortcutsChanged: () -> Unit,
+    close: () -> Unit
+) {
+    val context: android.content.Context = activity
     val state = remember(shortcut.file.path) {
         OpenGLDriverDefaults.initialize(context, shortcut.container)
         ShortcutEditorStateV2(shortcut)
@@ -472,21 +476,16 @@ internal fun ShortcutEditorV2(fragment: Fragment, shortcut: Shortcut, close: () 
 
     fun closeEditor() {
         renameShortcutV2(shortcut, state.name)
-        if (fragment is ShortcutsFragment) fragment.loadShortcutsList()
+        onShortcutsChanged()
         close()
     }
 
     fun enterContainer() {
-        val activity = fragment.requireActivity()
         activity.startActivity(Intent(activity, XServerDisplayActivity::class.java).putExtra("container_id", state.container.id))
     }
 
     fun createContainer() {
-        fragment.parentFragmentManager.beginTransaction()
-            .setCustomAnimations(R.anim.slide_in_up, R.anim.slide_out_down, R.anim.slide_in_down, R.anim.slide_out_up)
-            .addToBackStack(null)
-            .replace(R.id.FLFragmentContainer, com.winlator.cmod.ui.settings.ContainersSettingsFragment())
-            .commit()
+        (activity as? com.winlator.cmod.MainActivity)?.openContainersSettings()
     }
 
     fun changeContainer(targetId: Int) {
@@ -494,7 +493,7 @@ internal fun ShortcutEditorV2(fragment: Fragment, shortcut: Shortcut, close: () 
         if (target.id == state.container.id) return
         if (shortcut.cloneToContainer(target)) {
             Toast.makeText(context, "Shortcut copied to ${target.name}", Toast.LENGTH_SHORT).show()
-            if (fragment is ShortcutsFragment) fragment.loadShortcutsList()
+            onShortcutsChanged()
             close()
         }
     }
