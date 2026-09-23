@@ -1,30 +1,14 @@
 package com.winlator.cmod.ui
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.KeyboardArrowDown
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,18 +16,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.R
-import com.winlator.cmod.ui.theme.WinZOverlayTheme
-import com.winlator.cmod.ui.theme.accentSwitchColors
 import com.winlator.cmod.ui.theme.controlAccentColor
-import com.winlator.cmod.ui.theme.sidebarCardFillColor
 import kotlin.math.roundToInt
 
 // One entry in the controls-profile dropdown. Plain data holder so this file doesn't need
@@ -86,13 +63,11 @@ interface InputPanelCallbacks {
 
 object InputSidebarPanelHost {
     @JvmStatic
-    fun attach(composeView: ComposeView, state: InputPanelState, callbacks: InputPanelCallbacks) {
-        composeView.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-        composeView.setContent {
-            WinZOverlayTheme {
-                InputSidebarPanel(state, callbacks)
-            }
-        }
+    // Called again whenever the underlying state changes outside the panel; each call
+    // re-registers with a new generation, so the panel recomposes from scratch with the
+    // new snapshot (same effect the old repeated setContent() had).
+    fun attach(sidebar: IngameSidebarController, panelId: Int, state: InputPanelState, callbacks: InputPanelCallbacks) {
+        sidebar.setPanel(panelId) { InputSidebarPanel(state, callbacks) }
     }
 }
 
@@ -114,15 +89,9 @@ private fun InputSidebarPanel(state: InputPanelState, callbacks: InputPanelCallb
             .fillMaxWidth()
             .padding(vertical = 4.dp)
     ) {
-        Text(
-            text = "Controls",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Spacer(Modifier.height(18.dp))
+        SidebarPanelTitle("Controls")
 
-        PanelCard {
+        SidebarCard {
             ProfileRow(
                 profiles = state.profiles,
                 selectedProfileId = profileId,
@@ -132,8 +101,8 @@ private fun InputSidebarPanel(state: InputPanelState, callbacks: InputPanelCallb
                 },
                 onEditClick = { callbacks.onEditProfiles(profileId) }
             )
-            Spacer(Modifier.height(8.dp))
-            InlineToggleRow(
+            Spacer(Modifier.height(6.dp))
+            SidebarInlineToggle(
                 label = stringResource(R.string.show_touchscreen_controls),
                 checked = showControls,
                 onCheckedChange = {
@@ -141,7 +110,7 @@ private fun InputSidebarPanel(state: InputPanelState, callbacks: InputPanelCallb
                     pushControlsSettings()
                 }
             )
-            InlineToggleRow(
+            SidebarInlineToggle(
                 label = stringResource(R.string.enable_touchscreen_timeout),
                 checked = timeout,
                 onCheckedChange = {
@@ -149,7 +118,7 @@ private fun InputSidebarPanel(state: InputPanelState, callbacks: InputPanelCallb
                     pushControlsSettings()
                 }
             )
-            InlineToggleRow(
+            SidebarInlineToggle(
                 label = stringResource(R.string.enable_touchscreen_haptics),
                 checked = haptics,
                 onCheckedChange = {
@@ -159,65 +128,45 @@ private fun InputSidebarPanel(state: InputPanelState, callbacks: InputPanelCallb
             )
         }
 
-        Spacer(Modifier.height(10.dp))
-
-        PanelCard {
+        SidebarGap()
+        SidebarCard {
             var opacityDraft by remember {
                 mutableStateOf(state.controlsOpacityPercent.coerceIn(10, 100).toFloat())
             }
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "Controls Opacity",
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = controlAccentColor()
-                )
-                Text(
-                    text = "${opacityDraft.roundToInt()}%",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = controlAccentColor()
-                )
-            }
-            Slider(
+            SidebarSlider(
+                label = "Controls Opacity",
+                valueText = "${opacityDraft.roundToInt()}%",
                 value = opacityDraft,
                 onValueChange = {
                     opacityDraft = it
                     callbacks.onControlsOpacity(it.toInt())
                 },
-                valueRange = 10f..100f,
-                colors = SliderDefaults.colors(thumbColor = controlAccentColor(), activeTrackColor = controlAccentColor())
+                valueRange = 10f..100f
             )
         }
 
-        Spacer(Modifier.height(10.dp))
-        PanelActionRow(label = "Show Keyboard", onClick = callbacks::onShowKeyboard)
-        Spacer(Modifier.height(10.dp))
-        PanelActionRow(label = "Vibration", onClick = callbacks::onVibration)
-        Spacer(Modifier.height(18.dp))
-
-        PanelCard {
-            InlineToggleRow(
-                label = "Relative Mouse",
-                checked = relativeMouse,
-                onCheckedChange = {
-                    relativeMouse = it
-                    callbacks.onRelativeMouse(it)
-                }
-            )
-        }
-        Spacer(Modifier.height(10.dp))
-        PanelCard {
-            InlineToggleRow(
-                label = "Disable Mouse",
-                checked = disableMouse,
-                onCheckedChange = {
-                    disableMouse = it
-                    callbacks.onDisableMouse(it)
-                }
-            )
-        }
+        SidebarGap()
+        SidebarActionRow(label = "Show Keyboard", onClick = callbacks::onShowKeyboard)
+        SidebarGap()
+        SidebarActionRow(label = "Vibration", onClick = callbacks::onVibration)
+        SidebarGap()
+        SidebarToggleRow(
+            label = "Relative Mouse",
+            checked = relativeMouse,
+            onCheckedChange = {
+                relativeMouse = it
+                callbacks.onRelativeMouse(it)
+            }
+        )
+        SidebarGap()
+        SidebarToggleRow(
+            label = "Disable Mouse",
+            checked = disableMouse,
+            onCheckedChange = {
+                disableMouse = it
+                callbacks.onDisableMouse(it)
+            }
+        )
     }
 }
 
@@ -228,122 +177,33 @@ private fun ProfileRow(
     onSelect: (Int) -> Unit,
     onEditClick: () -> Unit
 ) {
-    var expanded by remember { mutableStateOf(false) }
     val disabledLabel = "-- ${stringResource(R.string.disabled)} --"
-    val selectedName = if (selectedProfileId < 0) {
-        disabledLabel
-    } else {
-        profiles.firstOrNull { it.id == selectedProfileId }?.name ?: disabledLabel
-    }
+    // Index 0 is always "Disabled" (id -1); profiles follow in order. An id that no longer
+    // exists (profile deleted in the editor) falls back to Disabled, as before.
+    val options = listOf(disabledLabel) + profiles.map { it.name }
+    val selectedIndex = if (selectedProfileId < 0) 0
+        else profiles.indexOfFirst { it.id == selectedProfileId }.let { if (it < 0) 0 else it + 1 }
 
+    SidebarCaption("Controls Profile")
+    Spacer(Modifier.height(6.dp))
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(48.dp),
+        modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(modifier = Modifier.weight(1f)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .clickable { expanded = true }
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = selectedName,
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Icon(
-                    imageVector = Icons.Outlined.KeyboardArrowDown,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-                shape = RoundedCornerShape(14.dp),
-                containerColor = MaterialTheme.colorScheme.surface
-            ) {
-                DropdownMenuItem(
-                    text = { Text(disabledLabel) },
-                    onClick = {
-                        expanded = false
-                        onSelect(-1)
-                    }
-                )
-                profiles.forEach { profile ->
-                    DropdownMenuItem(
-                        text = { Text(profile.name) },
-                        onClick = {
-                            expanded = false
-                            onSelect(profile.id)
-                        }
-                    )
-                }
-            }
-        }
-        Spacer(Modifier.width(10.dp))
+        SidebarDropdownField(
+            caption = null,
+            options = options,
+            selectedIndex = selectedIndex,
+            onSelect = { index -> onSelect(if (index == 0) -1 else profiles[index - 1].id) },
+            modifier = Modifier.weight(1f)
+        )
+        Spacer(Modifier.width(4.dp))
         IconButton(onClick = onEditClick) {
             Icon(
                 painter = painterResource(id = R.drawable.icon_settings),
-                contentDescription = null,
+                contentDescription = "Edit profiles",
                 tint = controlAccentColor()
             )
         }
     }
-}
-
-@Composable
-private fun InlineToggleRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(48.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = label,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Switch(checked = checked, onCheckedChange = onCheckedChange, colors = accentSwitchColors())
-    }
-}
-
-@Composable
-private fun PanelActionRow(label: String, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(18.dp)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .clip(shape)
-            .background(sidebarCardFillColor())
-            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(text = label, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-    }
-}
-
-@Composable
-private fun PanelCard(content: @Composable ColumnScope.() -> Unit) {
-    val shape = RoundedCornerShape(18.dp)
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(sidebarCardFillColor())
-            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        content = content
-    )
 }

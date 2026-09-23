@@ -5,7 +5,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,9 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -34,8 +30,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -43,8 +37,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.R
-import com.winlator.cmod.ui.theme.WinZOverlayTheme
 import com.winlator.cmod.ui.theme.controlAccentColor
+import com.winlator.cmod.ui.theme.destructiveColor
 import com.winlator.cmod.ui.theme.sidebarCardFillColor
 
 // One process row. rawName is the exact name WinHandler/Windows reports (used for the
@@ -78,14 +72,9 @@ class TaskManagerPanelState {
 
 object TaskManagerPanelHost {
     @JvmStatic
-    fun attach(composeView: ComposeView, callbacks: TaskManagerCallbacks): TaskManagerPanelState {
+    fun attach(sidebar: IngameSidebarController, panelId: Int, callbacks: TaskManagerCallbacks): TaskManagerPanelState {
         val state = TaskManagerPanelState()
-        composeView.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-        composeView.setContent {
-            WinZOverlayTheme {
-                TaskManagerPanel(state, callbacks)
-            }
-        }
+        sidebar.setPanel(panelId) { TaskManagerPanel(state, callbacks) }
         return state
     }
 }
@@ -97,13 +86,7 @@ private fun TaskManagerPanel(state: TaskManagerPanelState, callbacks: TaskManage
             .fillMaxWidth()
             .padding(vertical = 4.dp)
     ) {
-        Text(
-            text = "Task Manager",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Spacer(Modifier.height(18.dp))
+        SidebarPanelTitle("Task Manager")
 
         Row(Modifier.fillMaxWidth().height(66.dp)) {
             MetricCard(modifier = Modifier.weight(0.82f), title = "CPU", value = state.cpuLabel)
@@ -111,14 +94,9 @@ private fun TaskManagerPanel(state: TaskManagerPanelState, callbacks: TaskManage
             MetricCard(modifier = Modifier.weight(1.18f), title = "Memory", value = state.memoryLabel)
         }
 
-        Spacer(Modifier.height(12.dp))
-        Text(
-            text = "Processes: ${state.processes.size}",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(14.dp))
+        SidebarSectionTitle("Processes: ${state.processes.size}")
+        Spacer(Modifier.height(8.dp))
 
         if (state.processes.isEmpty()) {
             Box(
@@ -127,7 +105,8 @@ private fun TaskManagerPanel(state: TaskManagerPanelState, callbacks: TaskManage
             ) {
                 Text(
                     text = stringResource(R.string.no_items_to_display),
-                    color = controlAccentColor()
+                    style = SidebarText.caption(),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         } else {
@@ -135,41 +114,38 @@ private fun TaskManagerPanel(state: TaskManagerPanelState, callbacks: TaskManage
                 key(row.pid) {
                     Column {
                         ProcessRow(row = row, callbacks = callbacks)
-                        Spacer(Modifier.height(8.dp))
+                        SidebarGap()
                     }
                 }
             }
         }
 
-        Spacer(Modifier.height(4.dp))
-        PanelActionRow(label = "+ New Task", onClick = callbacks::onNewTask)
+        SidebarActionRow(label = "+ New Task", accent = true, onClick = callbacks::onNewTask)
     }
 }
 
 @Composable
 private fun MetricCard(modifier: Modifier, title: String, value: String) {
-    val shape = RoundedCornerShape(18.dp)
+    val shape = sidebarCardShape()
     Column(
         modifier = modifier
             .fillMaxHeight()
             .clip(shape)
             .background(sidebarCardFillColor())
             .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape)
-            .padding(9.dp)
+            .padding(horizontal = 12.dp, vertical = 9.dp)
     ) {
         Text(
             text = title,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-            color = controlAccentColor()
+            style = SidebarText.small().copy(fontWeight = FontWeight.SemiBold),
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(4.dp))
         Text(
             text = value,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleMedium,
             color = controlAccentColor()
         )
     }
@@ -178,7 +154,7 @@ private fun MetricCard(modifier: Modifier, title: String, value: String) {
 @Composable
 private fun ProcessRow(row: ProcessRowData, callbacks: TaskManagerCallbacks) {
     var menuExpanded by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(18.dp)
+    val shape = sidebarCardShape()
 
     Row(
         modifier = Modifier
@@ -219,7 +195,7 @@ private fun ProcessRow(row: ProcessRowData, callbacks: TaskManagerCallbacks) {
             Spacer(Modifier.height(2.dp))
             Text(
                 text = row.pidLabel,
-                style = MaterialTheme.typography.bodySmall,
+                style = SidebarText.small(),
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -229,7 +205,7 @@ private fun ProcessRow(row: ProcessRowData, callbacks: TaskManagerCallbacks) {
             modifier = Modifier.width(72.dp),
             maxLines = 1,
             textAlign = TextAlign.End,
-            style = MaterialTheme.typography.bodySmall,
+            style = SidebarText.small(),
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
@@ -241,31 +217,33 @@ private fun ProcessRow(row: ProcessRowData, callbacks: TaskManagerCallbacks) {
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            DropdownMenu(
-                expanded = menuExpanded,
-                onDismissRequest = { menuExpanded = false },
-                shape = RoundedCornerShape(14.dp),
-                containerColor = MaterialTheme.colorScheme.surface
-            ) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.processor_affinity)) },
+            SidebarMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                SidebarActionItem(
+                    label = stringResource(R.string.processor_affinity),
                     leadingIcon = { Icon(painterResource(id = R.drawable.icon_popup_menu_cpu), null) },
                     onClick = {
                         menuExpanded = false
                         callbacks.onProcessorAffinity(row.pid, row.rawName, row.affinityMask)
                     }
                 )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.bring_to_front)) },
+                SidebarActionItem(
+                    label = stringResource(R.string.bring_to_front),
                     leadingIcon = { Icon(painterResource(id = R.drawable.icon_popup_menu_bring_to_front), null) },
                     onClick = {
                         menuExpanded = false
                         callbacks.onBringToFront(row.pid, row.rawName)
                     }
                 )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.end_process)) },
-                    leadingIcon = { Icon(painterResource(id = R.drawable.icon_popup_menu_remove), null) },
+                SidebarActionItem(
+                    label = stringResource(R.string.end_process),
+                    leadingIcon = {
+                        Icon(
+                            painterResource(id = R.drawable.icon_popup_menu_remove),
+                            null,
+                            tint = destructiveColor()
+                        )
+                    },
+                    destructive = true,
                     onClick = {
                         menuExpanded = false
                         callbacks.onEndProcess(row.pid, row.rawName)
@@ -273,28 +251,5 @@ private fun ProcessRow(row: ProcessRowData, callbacks: TaskManagerCallbacks) {
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun PanelActionRow(label: String, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(18.dp)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(48.dp)
-            .clip(shape)
-            .background(sidebarCardFillColor())
-            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Bold,
-            color = controlAccentColor()
-        )
     }
 }

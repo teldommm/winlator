@@ -10,12 +10,11 @@ import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.R;
 
-// Applies the ingameSidebar* theme-overlay attrs (see ingame_sidebar_themes.xml) so
-// sidebar_panel_bg (the outer floating-card background/outline) resolves per the user's
-// chosen Winlator theme. Used to also retint an entire legacy native sidebar tree
-// (normalizeLegacyTree/wrapLegacySpinnerAdapters/isLegacyBlue) — removed once that tree
-// was replaced by the Compose sidebar rail + panels (see SidebarRailPanel.kt and the
-// sidebar Compose port), since nothing native remains under this root to retint.
+// Root of left_sidebar.xml. The sidebar itself is a single Compose composition
+// (IngameSidebar.kt) that takes all of its colors from WinZTheme, so nothing under this
+// root reads the overlay anymore. The overlay is still applied because it sets
+// android:textColor*/colorAccent/colorControl* on XServerDisplayActivity's theme, which
+// native widgets elsewhere in the activity inherit — dropping it is a separate decision.
 public class IngameSidebarThemeLayout extends FrameLayout {
 
     public IngameSidebarThemeLayout(Context context) {

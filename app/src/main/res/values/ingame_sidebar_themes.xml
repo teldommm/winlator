@@ -1,23 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!--
-      Values below are kept in lockstep with WinZTheme.kt's WhiteColors/BlackColors/AmoledColors
-      (background, surface, outlineVariant) rather than being their own separate palette. The
-      The floating content panel's shared background (sidebar_panel_bg, now also the outer
-      IngameSidebarCard's background) is the only still-live consumer of ingameSidebarSurface/
-      ingameSidebarOutline — the rail paints ingameSidebarSurfaceVariant as a plain fill now
-      (see left_sidebar.xml), no longer its own rounded sidebar_rail_bg shape.
+      Applied to XServerDisplayActivity's theme by IngameSidebarThemeLayout. The sidebar
+      itself no longer reads anything from here — it is fully Compose and takes every color
+      from WinZTheme. What's left are only the platform attrs that native widgets in the
+      activity inherit. The former ingameSidebar* custom attrs were removed together with
+      their last consumers (sidebar_panel_bg.xml and the unused widget/SeekBar.java).
     -->
     <style name="IngameSidebarTheme_White">
-        <item name="ingameSidebarBackground">#F5F6F8</item>
-        <item name="ingameSidebarSurface">#E6FFFFFF</item>
-        <item name="ingameSidebarSurfaceVariant">#E8E9ED</item>
-        <item name="ingameSidebarOnSurface">#18191D</item>
-        <item name="ingameSidebarOnSurfaceVariant">#60636B</item>
-        <item name="ingameSidebarPrimary">#23252B</item>
-        <item name="ingameSidebarPrimaryContainer">#E1E3E8</item>
-        <item name="ingameSidebarOutline">#D1D3D8</item>
-        <item name="ingameSidebarPanelTranslucent">#E6FFFFFF</item>
         <item name="android:textColorPrimary">#18191D</item>
         <item name="android:textColorSecondary">#60636B</item>
         <item name="android:colorAccent">#23252B</item>
@@ -27,17 +17,6 @@
     </style>
 
     <style name="IngameSidebarTheme_Black">
-        <item name="ingameSidebarBackground">#1C1D23</item>
-        <item name="ingameSidebarSurface">#E626272F</item>
-        <item name="ingameSidebarSurfaceVariant">#1A1A20</item>
-        <item name="ingameSidebarOnSurface">#F2F2F4</item>
-        <item name="ingameSidebarOnSurfaceVariant">#85878C</item>
-        <item name="ingameSidebarPrimary">#D9DDE3</item>
-        <item name="ingameSidebarPrimaryContainer">#1A1B1F</item>
-        <item name="ingameSidebarOutline">#242423</item>
-        <!-- Sidebar's outer merged-card fill: the #151515 hue from the last request,
-             with the ~90% alpha the panel had before it was made flat/opaque. -->
-        <item name="ingameSidebarPanelTranslucent">#E6151515</item>
         <item name="android:textColorPrimary">#F2F2F4</item>
         <item name="android:textColorSecondary">#85878C</item>
         <item name="android:colorAccent">#D9DDE3</item>
@@ -47,15 +26,6 @@
     </style>
 
     <style name="IngameSidebarTheme_Amoled">
-        <item name="ingameSidebarBackground">#000000</item>
-        <item name="ingameSidebarSurface">#E6050505</item>
-        <item name="ingameSidebarSurfaceVariant">#0D0D0D</item>
-        <item name="ingameSidebarOnSurface">#F7F7F7</item>
-        <item name="ingameSidebarOnSurfaceVariant">#858585</item>
-        <item name="ingameSidebarPrimary">#EDEDED</item>
-        <item name="ingameSidebarPrimaryContainer">#101010</item>
-        <item name="ingameSidebarOutline">#202020</item>
-        <item name="ingameSidebarPanelTranslucent">#E6050505</item>
         <item name="android:textColorPrimary">#F7F7F7</item>
         <item name="android:textColorSecondary">#858585</item>
         <item name="android:colorAccent">#EDEDED</item>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      In-game sidebar panel identities. These used to be the ids of five ComposeViews in
+      left_sidebar.xml; the panels now live inside one composition (IngameSidebar.kt), but
+      XServerDisplayActivity (openSidebarPanel, activeSidebarPanelId, rail items) and the
+      panel hosts still address them by these ints.
+    -->
+    <item name="LLSubGraphics" type="id" />
+    <item name="LLSubScreen" type="id" />
+    <item name="LLSubInput" type="id" />
+    <item name="LLSubFPS" type="id" />
+    <item name="LLSubTaskManager" type="id" />
+</resources>

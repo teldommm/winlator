@@ -1,100 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  The entire in-game sidebar is a single Compose composition (IngameSidebar.kt):
+  card background/outline/elevation, rail, and all five panels. Panel identity is still
+  R.id.LLSubXxx, declared as plain ids in values/ids_sidebar.xml.
+
+  IngameSidebarThemeLayout is kept only as the root wrapper because it applies the
+  IngameSidebarTheme_* overlay (android:textColor*/colorAccent/colorControl*) to the
+  activity theme, which any remaining native widget in XServerDisplayActivity inherits.
+-->
 <com.winlator.cmod.ui.theme.IngameSidebarThemeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/IngameSidebarRoot"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:clipChildren="false"
-    android:clipToPadding="false">
+    android:layout_height="match_parent">
 
-    <!--
-      Rail and content used to be two separate floating shapes (their own rounded
-      background, border and elevation each) with a visible gap of game view between
-      them. They're now one physical card: this LinearLayout owns the single rounded
-      background/border/elevation for both, and clipToOutline crops each child's plain
-      rectangular fill to that shared rounded silhouette — the rail's own background is
-      just a flat color, it never draws its own corners.
-    -->
-    <LinearLayout
-        android:id="@+id/IngameSidebarCard"
+    <androidx.compose.ui.platform.ComposeView
+        android:id="@+id/IngameSidebarCompose"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_marginStart="6dp"
-        android:layout_marginTop="10dp"
-        android:layout_marginEnd="10dp"
-        android:layout_marginBottom="10dp"
-        android:orientation="horizontal"
-        android:background="@drawable/sidebar_panel_bg"
-        android:elevation="8dp"
-        android:clipToOutline="true">
-
-        <!--
-          Rail is a Compose port of the old SidebarNavItemView column (see
-          SidebarRailPanel.kt / SidebarRailHost) — attached from
-          XServerDisplayActivity.wireSidebarListeners() same way the panel
-          ComposeViews below are.
-        -->
-        <androidx.compose.ui.platform.ComposeView
-            android:id="@+id/IngameSidebarRail"
-            android:layout_width="58dp"
-            android:layout_height="match_parent" />
-
-        <ScrollView
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:scrollbars="none"
-            android:fillViewport="true">
-
-            <FrameLayout
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:paddingStart="18dp"
-                android:paddingEnd="20dp"
-                android:paddingTop="18dp"
-                android:paddingBottom="18dp">
-
-                <androidx.compose.ui.platform.ComposeView
-                    android:id="@+id/LLSubGraphics"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:visibility="visible" />
-
-                <androidx.compose.ui.platform.ComposeView
-                    android:id="@+id/LLSubScreen"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:visibility="gone" />
-
-                <androidx.compose.ui.platform.ComposeView
-                    android:id="@+id/LLSubInput"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:visibility="gone" />
-
-                <androidx.compose.ui.platform.ComposeView
-                    android:id="@+id/LLSubFPS"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:visibility="gone" />
-
-                <androidx.compose.ui.platform.ComposeView
-                    android:id="@+id/LLSubTaskManager"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:visibility="gone" />
-            </FrameLayout>
-        </ScrollView>
-    </LinearLayout>
-
-    <com.winlator.cmod.ui.RenderingSidebarPolisherView
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:visibility="invisible" />
-
-    <com.winlator.cmod.ui.SidebarCleanupView
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:visibility="invisible" />
+        android:layout_height="match_parent" />
 
 </com.winlator.cmod.ui.theme.IngameSidebarThemeLayout>

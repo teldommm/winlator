@@ -97,7 +97,8 @@ import com.winlator.cmod.ui.ScreenPanelCallbacks;
 import com.winlator.cmod.ui.ScreenSidebarPanelHost;
 import com.winlator.cmod.ui.ThemedLoadingOverlayHost;
 import com.winlator.cmod.ui.SidebarRailCallbacks;
-import com.winlator.cmod.ui.SidebarRailHost;
+import com.winlator.cmod.ui.IngameSidebarController;
+import com.winlator.cmod.ui.IngameSidebarHost;
 import com.winlator.cmod.ui.SidebarRailItemData;
 import com.winlator.cmod.ui.SidebarRailState;
 import com.winlator.cmod.ui.TaskManagerCallbacks;
@@ -201,6 +202,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private WinHandler winHandler;
     private TaskManagerSidebar taskManagerSidebar;
     private SidebarRailState sidebarRailState;
+    private IngameSidebarController ingameSidebar;
     private WineRequestHandler wineRequestHandler;
     private float globalCursorSpeed = 1.0f;
     private float refreshRate = 60.0f;
@@ -379,7 +381,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
             @Override
             public void onDrawerClosed(View drawerView) {
-                hideAllSidebarPanels();
+                onSidebarClosed();
             }
         });
 
@@ -1389,8 +1391,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     private void wireSidebarListeners(boolean enableLogs) {
 
-        ComposeView railView = findViewById(R.id.IngameSidebarRail);
-        if (railView != null) {
+        // The whole sidebar (card, rail and all five panels) is one Compose composition —
+        // see IngameSidebar.kt. Panels register into it via their XxxPanelHost.attach(
+        // ingameSidebar, R.id.LLSubXxx, ...) calls below and in setupSidebar*Controls().
+        ComposeView sidebarView = findViewById(R.id.IngameSidebarCompose);
+        if (sidebarView != null) {
             List<SidebarRailItemData> railItems = Arrays.asList(
                     new SidebarRailItemData(R.id.LLSubGraphics, R.drawable.ic_sidebar_gpu, "Graphics"),
                     new SidebarRailItemData(R.id.LLSubScreen, R.drawable.ic_sidebar_effects, "Screen"),
@@ -1398,11 +1403,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     new SidebarRailItemData(R.id.LLSubFPS, R.drawable.ic_sidebar_performance, "HUD"),
                     new SidebarRailItemData(R.id.LLSubTaskManager, R.drawable.ic_sidebar_task_manager, "Task Manager")
             );
-            sidebarRailState = SidebarRailHost.attach(railView, railItems, R.id.LLSubFPS, new SidebarRailCallbacks() {
+            ingameSidebar = IngameSidebarHost.attach(sidebarView, railItems, R.id.LLSubFPS, new SidebarRailCallbacks() {
                 @Override
                 public void onSelect(int subId) {
                     openSidebarPanel(subId);
-                    if (subId == R.id.LLSubTaskManager && taskManagerSidebar != null) taskManagerSidebar.start();
                 }
 
                 @Override
@@ -1423,15 +1427,15 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     exit();
                 }
             });
+            sidebarRailState = ingameSidebar.getRailState();
         }
         openSidebarPanel(R.id.LLSubFPS);
 
         setupSidebarInputControls();
 
 
-        ComposeView screenPanel = findViewById(R.id.LLSubScreen);
-        if (screenPanel != null) {
-            ScreenSidebarPanelHost.attach(screenPanel, new ScreenPanelCallbacks() {
+        if (ingameSidebar != null) {
+            ScreenSidebarPanelHost.attach(ingameSidebar, R.id.LLSubScreen, new ScreenPanelCallbacks() {
                 @Override
                 public void onPipMode() {
                     enterPipMode();
@@ -1486,9 +1490,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
             });
         }
 
-        ComposeView taskManagerPanel = findViewById(R.id.LLSubTaskManager);
-        if (taskManagerPanel != null) {
-            TaskManagerPanelState taskManagerState = TaskManagerPanelHost.attach(taskManagerPanel, new TaskManagerCallbacks() {
+        if (ingameSidebar != null) {
+            TaskManagerPanelState taskManagerState = TaskManagerPanelHost.attach(ingameSidebar, R.id.LLSubTaskManager, new TaskManagerCallbacks() {
                 @Override
                 public void onNewTask() {
                     ThemedAlertHost.prompt(XServerDisplayActivity.this, getString(R.string.new_task), "taskmgr.exe",
@@ -1542,42 +1545,28 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     private int activeSidebarPanelId = R.id.LLSubFPS;
 
-    private final int[] sidebarPanelIds = {
-        R.id.LLSubInput,
-        R.id.LLSubFPS,
-        R.id.LLSubGraphics,
-        R.id.LLSubScreen,
-        R.id.LLSubTaskManager
-    };
-
-    private void hideAllSidebarPanels() {
+    // Drawer closed: nothing to hide anymore (the single sidebar composition just stays
+    // composed off-screen) — only the Task Manager's 1s process poll needs to stop.
+    private void onSidebarClosed() {
         if (taskManagerSidebar != null) taskManagerSidebar.stop();
-        for (int panelId : sidebarPanelIds) {
-            View panel = findViewById(panelId);
-            if (panel != null) panel.setVisibility(View.GONE);
-        }
     }
 
-    // Selection highlight is now drawn by the Compose rail itself (see
-    // SidebarRailPanel.kt) off sidebarRailState.selectedId — no native View lookup
-    // or hand-rolled GradientDrawable/scale-animation needed here anymore.
+    // Selection + the panel switch animation are both driven by sidebarRailState.selectedId
+    // inside IngameSidebar.kt (AnimatedContent). The Task Manager poll is started/stopped
+    // here for every path that shows a panel — rail tap AND drawer re-open. Previously
+    // only the rail tap started it, so re-opening the drawer on Task Manager showed a
+    // frozen list (onDrawerClosed had stopped the poll and nothing restarted it).
     private void openSidebarPanel(int subId) {
-        hideAllSidebarPanels();
-        View sub = findViewById(subId);
-        if (sub != null) {
-            float density = getResources().getDisplayMetrics().density;
-            sub.setVisibility(View.VISIBLE);
-            sub.setAlpha(0.0f);
-            sub.setTranslationX(-8.0f * density);
-            sub.animate().alpha(1.0f).translationX(0.0f).setDuration(130).start();
+        if (taskManagerSidebar != null) {
+            if (subId == R.id.LLSubTaskManager) taskManagerSidebar.start();
+            else taskManagerSidebar.stop();
         }
         if (sidebarRailState != null) sidebarRailState.setSelectedId(subId);
         activeSidebarPanelId = subId;
     }
 
     private void setupSidebarHudControls() {
-        ComposeView hudPanel = findViewById(R.id.LLSubFPS);
-        if (hudPanel == null) return;
+        if (ingameSidebar == null) return;
 
         boolean enableLogs = preferences.getBoolean("enable_wine_debug", false)
                 || preferences.getBoolean("enable_box64_logs", false);
@@ -1639,8 +1628,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
         };
 
-        HudPanelState state = new HudPanelState(hudOn, isModern, enableLogs);
-        HudSidebarPanelHost.attach(hudPanel, state, callbacks);
+        int savedHudScalePercent = WinlatorHUD.getSavedScalePercent(this);
+        int savedHudAlphaPercent = WinlatorHUD.getSavedAlphaPercent(this);
+        HudPanelState state = new HudPanelState(hudOn, isModern, savedHudScalePercent, savedHudAlphaPercent, enableLogs);
+        HudSidebarPanelHost.attach(ingameSidebar, R.id.LLSubFPS, state, callbacks);
     }
 
     private void enableHudLazily(int style) {
@@ -1690,8 +1681,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     private void setupSidebarGraphicsControls() {
-        ComposeView graphicsPanel = findViewById(R.id.LLSubGraphics);
-        if (graphicsPanel == null) return;
+        if (ingameSidebar == null) return;
 
         // Vulkan is the only renderer now, so renderer (when set) is always a VulkanXServerView.
         final XServerRendererView renderer = xServerView;
@@ -1850,7 +1840,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
         };
 
-        GraphicsSidebarPanelHost.attach(graphicsPanel, state, callbacks);
+        GraphicsSidebarPanelHost.attach(ingameSidebar, R.id.LLSubGraphics, state, callbacks);
     }
 
     // Shortcut-preferred, Container-fallback read — same priority SidebarCleanupView's
@@ -1939,8 +1929,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         private void setupSidebarInputControls() {
         if (inputControlsView == null || inputControlsManager == null) return;
 
-        ComposeView inputPanel = findViewById(R.id.LLSubInput);
-        if (inputPanel == null) return;
+        if (ingameSidebar == null) return;
 
         InputPanelCallbacks callbacks = new InputPanelCallbacks() {
             // Mirrors the old applySidebarInputControls(): always re-reads/re-persists the
@@ -2056,7 +2045,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     isRelativeMouseMovement,
                     isMouseDisabled
             );
-            InputSidebarPanelHost.attach(inputPanel, state, callbacks);
+            InputSidebarPanelHost.attach(ingameSidebar, R.id.LLSubInput, state, callbacks);
         };
         refreshInputPanel.run();
     }

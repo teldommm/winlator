@@ -1,27 +1,15 @@
 package com.winlator.cmod.ui
 
 import android.content.Context
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,31 +18,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.ViewCompositionStrategy
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.winlator.cmod.ui.theme.WinZOverlayTheme
-import com.winlator.cmod.ui.theme.accentSwitchColors
 import com.winlator.cmod.ui.theme.controlAccentColor
-import com.winlator.cmod.ui.theme.sidebarCardFillColor
 import com.winlator.cmod.widget.WinlatorHUD
 import kotlin.math.roundToInt
 
-// What the panel needs to render one frame. HUD Size/Opacity read their live values
-// directly from WinlatorHUD.getSavedScalePercent/getSavedAlphaPercent(context), keyed on
-// isModern, rather than through a field here — that card lives inside an `if (isModern)`
-// block, so Compose forgets its remembered slider position every time isModern goes
-// false and recreates it fresh when isModern goes true again; a value passed in once here
-// would only ever reflect whatever was persisted when this state was first built (back
-// when the sidebar was opened), not any change made mid-session, so re-showing the card
-// (e.g. Classic -> Modern -> Classic -> Modern) would silently snap the sliders back to
-// that stale snapshot instead of the HUD's real current scale/alpha.
+// What the panel needs to render one frame. hudScalePercent/hudAlphaPercent must be the
+// actually-persisted HUD scale/alpha (see WinlatorHUD.getSavedScalePercent/getSavedAlphaPercent)
+// — they used to be seeded at 0 regardless of the saved value, causing the sliders to always
+// open at 0%. Fixed at the call site in XServerDisplayActivity.setupSidebarHudControls().
 data class HudPanelState(
     val hudOn: Boolean,
     val isModernStyle: Boolean,
+    val hudScalePercent: Int,
+    val hudAlphaPercent: Int,
     val showLogsRow: Boolean
 )
 
@@ -69,19 +48,15 @@ interface HudPanelCallbacks {
 
 object HudSidebarPanelHost {
     @JvmStatic
-    fun attach(composeView: ComposeView, state: HudPanelState, callbacks: HudPanelCallbacks) {
-        composeView.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-        composeView.setContent {
-            WinZOverlayTheme {
-                HudSidebarPanel(state, callbacks)
-            }
-        }
+    fun attach(sidebar: IngameSidebarController, panelId: Int, state: HudPanelState, callbacks: HudPanelCallbacks) {
+        sidebar.setPanel(panelId) { HudSidebarPanel(state, callbacks) }
     }
 }
 
+private val HUD_STYLE_LABELS = listOf("Classic", "Modern")
+
 @Composable
 private fun HudSidebarPanel(state: HudPanelState, callbacks: HudPanelCallbacks) {
-    val context = LocalContext.current
     var hudOn by remember { mutableStateOf(state.hudOn) }
     var isModern by remember { mutableStateOf(state.isModernStyle) }
 
@@ -90,31 +65,26 @@ private fun HudSidebarPanel(state: HudPanelState, callbacks: HudPanelCallbacks) 
             .fillMaxWidth()
             .padding(vertical = 4.dp)
     ) {
-        Text(
-            text = "HUD",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Spacer(Modifier.height(18.dp))
+        SidebarPanelTitle("HUD")
 
-        PanelCard {
-            InlineToggleRow(
-                label = "Enable HUD",
-                checked = hudOn,
-                onCheckedChange = {
-                    hudOn = it
-                    callbacks.onHudMasterToggled(it, isModern)
-                }
-            )
-        }
+        SidebarToggleRow(
+            label = "Enable HUD",
+            checked = hudOn,
+            onCheckedChange = {
+                hudOn = it
+                callbacks.onHudMasterToggled(it, isModern)
+            }
+        )
 
         if (hudOn) {
-            Spacer(Modifier.height(10.dp))
-            PanelCard {
-                StyleRow(
-                    isModern = isModern,
-                    onSelect = { modern ->
+            SidebarGap()
+            SidebarCard {
+                SidebarDropdownField(
+                    caption = "Style",
+                    options = HUD_STYLE_LABELS,
+                    selectedIndex = if (isModern) 1 else 0,
+                    onSelect = { index ->
+                        val modern = index == 1
                         isModern = modern
                         callbacks.onStyleChanged(modern)
                     }
@@ -122,131 +92,56 @@ private fun HudSidebarPanel(state: HudPanelState, callbacks: HudPanelCallbacks) 
             }
         }
 
-        if (isModern) {
-            Spacer(Modifier.height(10.dp))
-            PanelCard {
-                Text(
-                    text = "HUD Metrics",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = controlAccentColor()
-                )
+        // Metrics and size/opacity only apply to the Modern HUD, and only while the HUD is
+        // on. Previously gated on isModern alone, so they stayed visible under a disabled
+        // HUD while the Style picker right above them was already hidden.
+        if (hudOn && isModern) {
+            SidebarGap()
+            SidebarCard {
+                SidebarSectionTitle("HUD Metrics")
                 Spacer(Modifier.height(4.dp))
                 HudMetricsGrid()
             }
-        }
 
-        if (isModern) {
-            Spacer(Modifier.height(10.dp))
-            PanelCard {
-                var scale by remember(isModern) { mutableStateOf(WinlatorHUD.getSavedScalePercent(context).toFloat()) }
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "HUD Size",
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = controlAccentColor()
-                    )
-                    Text(
-                        text = "${scale.roundToInt()}%",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = controlAccentColor()
-                    )
-                }
-                Slider(
+            SidebarGap()
+            SidebarCard {
+                var scale by remember { mutableStateOf(state.hudScalePercent.toFloat()) }
+                SidebarSlider(
+                    label = "HUD Size",
+                    valueText = "${scale.roundToInt()}%",
                     value = scale,
                     onValueChange = {
                         scale = it
                         callbacks.onHudScale(it.toInt())
                     },
-                    valueRange = 0f..100f,
-                    colors = SliderDefaults.colors(thumbColor = controlAccentColor(), activeTrackColor = controlAccentColor())
+                    valueRange = 0f..100f
                 )
-                Spacer(Modifier.height(8.dp))
-                var alpha by remember(isModern) { mutableStateOf(WinlatorHUD.getSavedAlphaPercent(context).toFloat()) }
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "HUD Opacity",
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = controlAccentColor()
-                    )
-                    Text(
-                        text = "${alpha.roundToInt()}%",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = controlAccentColor()
-                    )
-                }
-                Slider(
+                Spacer(Modifier.height(6.dp))
+                var alpha by remember { mutableStateOf(state.hudAlphaPercent.toFloat()) }
+                SidebarSlider(
+                    label = "HUD Opacity",
+                    valueText = "${alpha.roundToInt()}%",
                     value = alpha,
                     onValueChange = {
                         alpha = it
                         callbacks.onHudAlpha(it.toInt())
                     },
-                    valueRange = 0f..100f,
-                    colors = SliderDefaults.colors(thumbColor = controlAccentColor(), activeTrackColor = controlAccentColor())
+                    valueRange = 0f..100f
                 )
             }
         }
 
-        Spacer(Modifier.height(12.dp))
-        PanelActionRow(label = "Reset HUD", onClick = callbacks::onResetHud)
+        SidebarGap()
+        SidebarActionRow(label = "Reset HUD", onClick = callbacks::onResetHud)
 
         if (state.showLogsRow) {
-            Spacer(Modifier.height(12.dp))
-            PanelActionRow(label = "Show Logs", onClick = callbacks::onShowLogs)
+            SidebarGap()
+            SidebarActionRow(label = "Show Logs", onClick = callbacks::onShowLogs)
         }
     }
 }
 
-@Composable
-private fun StyleRow(isModern: Boolean, onSelect: (Boolean) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(48.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = "Style",
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Box {
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
-                    .clickable { expanded = true }
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = if (isModern) "Modern" else "Classic",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-                shape = RoundedCornerShape(14.dp),
-                containerColor = MaterialTheme.colorScheme.surface
-            ) {
-                DropdownMenuItem(text = { Text("Classic") }, onClick = { expanded = false; onSelect(false) })
-                DropdownMenuItem(text = { Text("Modern") }, onClick = { expanded = false; onSelect(true) })
-            }
-        }
-    }
-}
-
-// Fully self-contained: reads/writes WinlatorHUD's own static prefs directly, exactly like
-// the dynamically-added checkboxes SidebarCleanupView used to inject here — no Java
+// Fully self-contained: reads/writes WinlatorHUD's own static prefs directly — no Java
 // round-trip needed since WinlatorHUD's rendering already reacts to the same prefs key
 // through its own SharedPreferences.OnSharedPreferenceChangeListener.
 @Composable
@@ -286,7 +181,13 @@ private fun MetricCheckbox(context: Context, label: String, bit: Int, modifier: 
             },
             colors = CheckboxDefaults.colors(checkedColor = controlAccentColor())
         )
-        Text(text = label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+        Text(
+            text = label,
+            style = SidebarText.small(),
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -294,62 +195,12 @@ private fun MetricCheckbox(context: Context, label: String, bit: Int, modifier: 
 private fun DualCellRow(context: Context) {
     val prefs = remember { context.getSharedPreferences(WinlatorHUD.PREFS, Context.MODE_PRIVATE) }
     var checked by remember { mutableStateOf(prefs.getBoolean(WinlatorHUD.KEY_DUAL_CELL, false)) }
-    InlineToggleRow(
+    SidebarInlineToggle(
         label = "Dual-cell correction",
         checked = checked,
         onCheckedChange = {
             checked = it
             prefs.edit().putBoolean(WinlatorHUD.KEY_DUAL_CELL, it).apply()
         }
-    )
-}
-
-@Composable
-private fun InlineToggleRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(48.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = label,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Switch(checked = checked, onCheckedChange = onCheckedChange, colors = accentSwitchColors())
-    }
-}
-
-@Composable
-private fun PanelActionRow(label: String, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(18.dp)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .clip(shape)
-            .background(sidebarCardFillColor())
-            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(text = label, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-    }
-}
-
-@Composable
-private fun PanelCard(content: @Composable ColumnScope.() -> Unit) {
-    val shape = RoundedCornerShape(18.dp)
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(sidebarCardFillColor())
-            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        content = content
     )
 }

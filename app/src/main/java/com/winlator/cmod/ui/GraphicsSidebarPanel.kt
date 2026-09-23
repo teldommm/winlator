@@ -1,43 +1,17 @@
 package com.winlator.cmod.ui
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.KeyboardArrowDown
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.ViewCompositionStrategy
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.winlator.cmod.ui.theme.WinZOverlayTheme
-import com.winlator.cmod.ui.theme.accentSwitchColors
-import com.winlator.cmod.ui.theme.controlAccentColor
-import com.winlator.cmod.ui.theme.sidebarCardFillColor
 import kotlin.math.roundToInt
 
 // ---------- Graphics panel ----------
@@ -76,16 +50,12 @@ interface GraphicsPanelCallbacks {
 object GraphicsSidebarPanelHost {
     @JvmStatic
     fun attach(
-        composeView: ComposeView,
+        sidebar: IngameSidebarController,
+        panelId: Int,
         state: GraphicsPanelState,
         callbacks: GraphicsPanelCallbacks
     ) {
-        composeView.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-        composeView.setContent {
-            WinZOverlayTheme {
-                GraphicsSidebarPanel(state, callbacks)
-            }
-        }
+        sidebar.setPanel(panelId) { GraphicsSidebarPanel(state, callbacks) }
     }
 }
 
@@ -96,6 +66,9 @@ private val RESHADE_EFFECTS = listOf(
     "Off", "Game Clarity", "Cinematic", "Vivid", "Competitive", "Adaptive Sharpen",
     "Filmic", "Arcade", "Retro CRT", "Upscale Sharp", "Pixel Clean", "Anime Edge"
 )
+
+private const val FPS_LIMIT_MIN = 30
+private const val FPS_LIMIT_MAX = 120
 
 @Composable
 private fun GraphicsSidebarPanel(
@@ -119,22 +92,16 @@ private fun GraphicsSidebarPanel(
             .fillMaxWidth()
             .padding(vertical = 4.dp)
     ) {
-        Text(
-            text = "Rendering",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Spacer(Modifier.height(12.dp))
+        SidebarPanelTitle("Rendering")
 
         FpsLimiterCard(
             initialFps = state.fpsLimit,
             onFpsChanged = callbacks::onFpsLimitChanged
         )
 
-        Spacer(Modifier.height(14.dp))
-        PanelCard {
-            InlineToggleRow(
+        SidebarGap()
+        SidebarCard {
+            SidebarInlineToggle(
                 label = "Super Resolution",
                 checked = fsrEnabled,
                 onCheckedChange = {
@@ -147,9 +114,9 @@ private fun GraphicsSidebarPanel(
                 }
             )
             if (fsrEnabled) {
-                Spacer(Modifier.height(10.dp))
-                DropdownRow(
-                    label = "Upscaler Mode",
+                Spacer(Modifier.height(8.dp))
+                SidebarDropdownField(
+                    caption = "Upscaler Mode",
                     options = UPSCALER_LABELS,
                     selectedIndex = upscalerIndex,
                     onSelect = {
@@ -159,23 +126,11 @@ private fun GraphicsSidebarPanel(
                 )
             }
             if (sharpnessVisible) {
-                Spacer(Modifier.height(10.dp))
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "Sharpness",
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = controlAccentColor()
-                    )
-                    Text(
-                        text = "$sharpness%",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = controlAccentColor()
-                    )
-                }
+                Spacer(Modifier.height(12.dp))
                 var sharpnessDraft by remember(sharpnessVisible) { mutableStateOf(sharpness.toFloat()) }
-                Slider(
+                SidebarSlider(
+                    label = "Sharpness",
+                    valueText = "$sharpness%",
                     value = sharpnessDraft,
                     onValueChange = {
                         sharpnessDraft = it
@@ -183,13 +138,12 @@ private fun GraphicsSidebarPanel(
                         callbacks.onSharpnessChanged(it.toInt())
                     },
                     onValueChangeFinished = { callbacks.onSharpnessCommitted(sharpnessDraft.toInt()) },
-                    valueRange = 0f..100f,
-                    colors = SliderDefaults.colors(thumbColor = controlAccentColor(), activeTrackColor = controlAccentColor())
+                    valueRange = 0f..100f
                 )
             }
-            Spacer(Modifier.height(10.dp))
-            DropdownRow(
-                label = "Post Effect",
+            Spacer(Modifier.height(if (sharpnessVisible) 4.dp else 12.dp))
+            SidebarDropdownField(
+                caption = "Post Effect",
                 options = POSTFX_LABELS,
                 selectedIndex = postFxIndex,
                 onSelect = {
@@ -203,31 +157,19 @@ private fun GraphicsSidebarPanel(
             )
         }
 
-        Spacer(Modifier.height(14.dp))
-        PanelCard {
-            Text(
-                text = "ReShade",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+        SidebarGap()
+        SidebarCard {
+            SidebarSectionTitle("ReShade")
             Spacer(Modifier.height(10.dp))
-            Text(
-                text = "Effect",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(2.dp))
-            DropdownRow(
-                label = null,
+            SidebarDropdownField(
+                caption = "Effect",
                 options = RESHADE_EFFECTS,
                 selectedIndex = reshadeIndex,
                 onSelect = { index ->
                     reshadeIndex = index
-                    // Mirrors ReshadeSidebarPanelView.applyEffect(): picking a real effect
-                    // (index > 0) force-disables Super Resolution and resets Post Effect to
-                    // None, since all three ultimately drive the same renderer filter/post-fx
-                    // state and only one can actually be active at the renderer at a time.
+                    // Picking a real effect (index > 0) force-disables Super Resolution and
+                    // resets Post Effect to None, since all three drive the same renderer
+                    // filter/post-fx state and only one can be active at a time.
                     if (index > 0) {
                         if (fsrEnabled) {
                             fsrEnabled = false
@@ -242,45 +184,27 @@ private fun GraphicsSidebarPanel(
                 }
             )
             if (reshadeIndex > 0) {
-                Spacer(Modifier.height(10.dp))
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "Strength",
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = controlAccentColor()
-                    )
-                    Text(
-                        text = "$reshadeStrength%",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = controlAccentColor()
-                    )
-                }
-                Slider(
+                Spacer(Modifier.height(12.dp))
+                SidebarSlider(
+                    label = "Strength",
+                    valueText = "$reshadeStrength%",
                     value = reshadeStrength.toFloat(),
                     onValueChange = {
                         reshadeStrength = it.toInt()
                         callbacks.onReshadeStrengthChanged(it.toInt())
                     },
-                    valueRange = 0f..100f,
-                    colors = SliderDefaults.colors(thumbColor = controlAccentColor(), activeTrackColor = controlAccentColor())
+                    valueRange = 0f..100f
                 )
             }
         }
 
         if (state.frameGenAvailable) {
-            Spacer(Modifier.height(14.dp))
-            PanelCard {
-                Text(
-                    text = "Frame Generation",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+            SidebarGap()
+            SidebarCard {
+                SidebarSectionTitle("Frame Generation")
                 Spacer(Modifier.height(10.dp))
-                DropdownRow(
-                    label = null,
+                SidebarDropdownField(
+                    caption = null,
                     options = FRAMEGEN_LABELS,
                     selectedIndex = frameGenIndex,
                     onSelect = {
@@ -289,178 +213,39 @@ private fun GraphicsSidebarPanel(
                     }
                 )
                 if (frameGenIndex > 0) {
-                    Spacer(Modifier.height(10.dp))
+                    Spacer(Modifier.height(12.dp))
                     var flowScale by remember { mutableStateOf(state.frameGenFlowScale) }
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "Flow Scale",
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = controlAccentColor()
-                        )
-                        Text(
-                            text = "${(flowScale * 100).roundToInt()}%",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = controlAccentColor()
-                        )
-                    }
-                    Slider(
+                    SidebarSlider(
+                        label = "Flow Scale",
+                        valueText = "${(flowScale * 100).roundToInt()}%",
                         value = flowScale,
                         onValueChange = {
                             flowScale = it
                             callbacks.onFrameGenFlowScaleChanged(it)
                         },
-                        valueRange = 0.25f..1.0f,
-                        colors = SliderDefaults.colors(thumbColor = controlAccentColor(), activeTrackColor = controlAccentColor())
+                        valueRange = 0.25f..1.0f
                     )
                 }
             }
         }
 
-        Spacer(Modifier.height(14.dp))
-        PanelActionRow(label = "Save Preset", onClick = callbacks::onSavePreset)
+        SidebarGap()
+        SidebarActionRow(label = "Save Preset", accent = true, onClick = callbacks::onSavePreset)
     }
 }
-
-private const val FPS_LIMIT_MIN = 30
-private const val FPS_LIMIT_MAX = 120
 
 @Composable
 private fun FpsLimiterCard(initialFps: Int, onFpsChanged: (Int) -> Unit) {
     var fps by remember { mutableStateOf(initialFps.coerceIn(FPS_LIMIT_MIN, FPS_LIMIT_MAX)) }
 
-    PanelCard {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = "FPS Limit",
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = "$fps FPS",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = controlAccentColor()
-            )
-        }
-        Spacer(Modifier.height(6.dp))
-        Slider(
+    SidebarCard {
+        SidebarSlider(
+            label = "FPS Limit",
+            valueText = "$fps FPS",
             value = fps.toFloat(),
             onValueChange = { fps = it.roundToInt() },
             onValueChangeFinished = { onFpsChanged(fps) },
-            valueRange = FPS_LIMIT_MIN.toFloat()..FPS_LIMIT_MAX.toFloat(),
-            colors = SliderDefaults.colors(thumbColor = controlAccentColor(), activeTrackColor = controlAccentColor())
+            valueRange = FPS_LIMIT_MIN.toFloat()..FPS_LIMIT_MAX.toFloat()
         )
     }
-}
-
-@Composable
-private fun DropdownRow(label: String?, options: List<String>, selectedIndex: Int, onSelect: (Int) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    Row(
-        modifier = Modifier.fillMaxWidth().height(42.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        if (label != null) {
-            Text(
-                text = label,
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Box(modifier = if (label == null) Modifier.fillMaxWidth() else Modifier) {
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
-                    .clickable { expanded = true }
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = options.getOrElse(selectedIndex) { options.first() },
-                    modifier = if (label == null) Modifier.weight(1f) else Modifier,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Icon(
-                    imageVector = Icons.Outlined.KeyboardArrowDown,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-                shape = RoundedCornerShape(14.dp),
-                containerColor = MaterialTheme.colorScheme.surface
-            ) {
-                options.forEachIndexed { index, optionLabel ->
-                    DropdownMenuItem(
-                        text = { Text(optionLabel) },
-                        onClick = {
-                            expanded = false
-                            onSelect(index)
-                        }
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun InlineToggleRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().height(48.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = label,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Switch(checked = checked, onCheckedChange = onCheckedChange, colors = accentSwitchColors())
-    }
-}
-
-@Composable
-private fun PanelActionRow(label: String, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(18.dp)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(48.dp)
-            .clip(shape)
-            .background(sidebarCardFillColor())
-            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Bold,
-            color = controlAccentColor()
-        )
-    }
-}
-
-@Composable
-private fun PanelCard(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
-    val shape = RoundedCornerShape(18.dp)
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(sidebarCardFillColor())
-            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        content = content
-    )
 }

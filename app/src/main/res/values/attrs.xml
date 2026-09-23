@@ -8,28 +8,9 @@
         <attr name="step" format="integer|float" />
         <attr name="textSize" format="dimension" />
     </declare-styleable>
-    <declare-styleable name="SeekBar">
-        <attr name="sbMinValue" format="float" />
-        <attr name="sbMaxValue" format="float" />
-        <attr name="sbStep" format="float" />
-        <attr name="sbValue" format="float" />
-        <attr name="suffix" format="string" />
-        <attr name="sbTextSize" format="dimension" />
-        <attr name="colorSecondary" format="color" />
-    </declare-styleable>
 
     <attr name="extraKeysButtonTextColor" format="reference" />
     <attr name="extraKeysButtonActiveTextColor" format="reference" />
     <attr name="extraKeysButtonBackgroundColor" format="reference" />
     <attr name="extraKeysButtonActiveBackgroundColor" format="reference" />
-
-    <attr name="ingameSidebarBackground" format="color" />
-    <attr name="ingameSidebarSurface" format="color" />
-    <attr name="ingameSidebarSurfaceVariant" format="color" />
-    <attr name="ingameSidebarOnSurface" format="color" />
-    <attr name="ingameSidebarOnSurfaceVariant" format="color" />
-    <attr name="ingameSidebarPrimary" format="color" />
-    <attr name="ingameSidebarPrimaryContainer" format="color" />
-    <attr name="ingameSidebarOutline" format="color" />
-    <attr name="ingameSidebarPanelTranslucent" format="color" />
 </resources>
