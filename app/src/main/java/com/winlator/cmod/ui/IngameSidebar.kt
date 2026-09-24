@@ -1,10 +1,5 @@
 package com.winlator.cmod.ui
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ScrollState
@@ -35,6 +30,14 @@ import androidx.compose.ui.unit.dp
 import com.winlator.cmod.ui.theme.WinZOverlayTheme
 import com.winlator.cmod.ui.theme.WinlatorThemeManager
 import com.winlator.cmod.ui.theme.WinlatorThemeType
+import androidx.compose.foundation.focusGroup
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.getValue
+import androidx.compose.animation.core.animateFloatAsState
 
 // The whole in-game sidebar (шторка) as ONE composition.
 //
@@ -132,33 +135,61 @@ private fun IngameSidebar(
                 modifier = Modifier.width(58.dp).fillMaxHeight()
             )
 
-            // Same motion the native openSidebarPanel() did (alpha 0→1 plus an 8dp slide
-            // from the left over 130ms), now owned by Compose.
-            AnimatedContent(
-                targetState = controller.railState.selectedId,
-                modifier = Modifier.weight(1f).fillMaxHeight(),
-                transitionSpec = {
-                    (fadeIn(tween(130)) + slideInHorizontally(tween(130)) { -slideOffsetPx }) togetherWith
-                        fadeOut(tween(90))
-                },
-                label = "sidebarPanel"
-            ) { panelId ->
-                val scroll = scrollStates.getOrPut(panelId) { ScrollState(0) }
-                val entry = controller.panels[panelId]
-                // Paddings match the old ScrollView's inner FrameLayout (18 / 20 / 18 / 18).
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(scroll)
-                        .padding(start = 18.dp, end = 20.dp, top = 18.dp, bottom = 18.dp)
-                ) {
-                    if (entry != null) {
-                        Box(Modifier.fillMaxWidth()) {
-                            key(entry.generation) { entry.content() }
-                        }
+            // Every registered panel stays composed; only the selected one is visible. This used
+            // to be an AnimatedContent, which disposed a panel when you switched away — and since
+            // panels seed their UI from the snapshot taken when they were attached (Graphics,
+            // HUD, Screen), coming back showed stale values: e.g. Super Resolution "off" while it
+            // was on, so picking a ReShade effect skipped turning FSR off and both ran at once.
+            // The old per-panel ComposeViews were only hidden, never disposed; this restores that.
+            Box(Modifier.weight(1f).fillMaxHeight()) {
+                controller.panels.forEach { (panelId, entry) ->
+                    key(panelId) {
+                        SidebarPanelLayer(
+                            selected = controller.railState.selectedId == panelId,
+                            scroll = scrollStates.getOrPut(panelId) { ScrollState(0) },
+                            slideOffsetPx = slideOffsetPx,
+                            entry = entry
+                        )
                     }
                 }
             }
+        }
+    }
+}
+
+// One panel of the sidebar. Same motion the native openSidebarPanel() did — fade in plus an 8dp
+// slide from the left over 130ms — while the outgoing panel fades out; hidden panels keep their
+// composition (and scroll position) but take no input, focus or accessibility.
+@Composable
+private fun SidebarPanelLayer(selected: Boolean, scroll: ScrollState, slideOffsetPx: Int, entry: SidebarPanelEntry) {
+    val progress by animateFloatAsState(
+        targetValue = if (selected) 1f else 0f,
+        animationSpec = tween(if (selected) 130 else 90),
+        label = "sidebarPanel"
+    )
+    val hidden = !selected && progress == 0f
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(if (selected) 1f else 0f)
+            .graphicsLayer {
+                alpha = progress
+                translationX = if (selected) -slideOffsetPx * (1f - progress) else 0f
+            }
+            .then(
+                if (selected) Modifier
+                else Modifier
+                    .pointerInput(Unit) { }
+                    .clearAndSetSemantics { }
+                    .focusProperties { onEnter = { cancelFocusChange() } }
+                    .focusGroup()
+            )
+            .then(if (hidden) Modifier else Modifier.verticalScroll(scroll))
+            // Paddings match the old ScrollView's inner FrameLayout (18 / 20 / 18 / 18).
+            .padding(start = 18.dp, end = 20.dp, top = 18.dp, bottom = 18.dp)
+    ) {
+        Box(Modifier.fillMaxWidth()) {
+            key(entry.generation) { entry.content() }
         }
     }
 }
