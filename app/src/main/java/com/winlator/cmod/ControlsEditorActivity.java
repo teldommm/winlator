@@ -307,6 +307,9 @@ public class ControlsEditorActivity extends AppCompatActivity {
         boolean showRange = type == ControlElement.Type.RANGE_BUTTON;
         boolean showToggleSwitch = type == ControlElement.Type.BUTTON;
         boolean showTextAndIcon = type == ControlElement.Type.BUTTON;
+        boolean showMouseMoveMode = type == ControlElement.Type.BUTTON;
+        boolean showOrientation = type == ControlElement.Type.RANGE_BUTTON;
+        boolean showColumns = type == ControlElement.Type.RANGE_BUTTON;
 
         ArrayList<Integer> colorList = new ArrayList<>();
         for (int color : PALETTE_COLORS) colorList.add(color);
@@ -322,7 +325,9 @@ public class ControlsEditorActivity extends AppCompatActivity {
                 showRange,
                 element.getRange().ordinal(),
                 Arrays.asList(ControlElement.Range.names()),
+                showOrientation,
                 element.getOrientation() == 1,
+                showColumns,
                 element.getBindingCount(),
                 3,
                 8,
@@ -332,6 +337,7 @@ public class ControlsEditorActivity extends AppCompatActivity {
                 element.getCustomColor(),
                 showToggleSwitch,
                 element.isToggleSwitch(),
+                showMouseMoveMode,
                 element.isMouseMoveMode(),
                 showTextAndIcon,
                 text != null ? text : "",

@@ -111,7 +111,12 @@ data class ControlElementSettingsModel(
     val showRange: Boolean,
     val rangeIndex: Int,
     val rangeOptions: List<String>,
+    // Orientation and Columns only mean anything for RANGE_BUTTON (bounding box / drawing /
+    // JSON all check the type); Columns calls setBindingCount(), which wipes every binding, so
+    // showing it for a Button/D-Pad/Stick/Trackpad silently destroyed their bindings.
+    val showOrientation: Boolean,
     val verticalOrientation: Boolean,
+    val showColumns: Boolean,
     val columns: Int,
     val columnsMin: Int,
     val columnsMax: Int,
@@ -121,6 +126,8 @@ data class ControlElementSettingsModel(
     val selectedColor: Int,
     val showToggleSwitch: Boolean,
     val toggleSwitch: Boolean,
+    // mouseMoveMode is only read in the BUTTON touch paths.
+    val showMouseMoveMode: Boolean,
     val mouseMoveMode: Boolean,
     val showTextAndIcon: Boolean,
     val text: String,
@@ -234,24 +241,28 @@ private fun ColumnScope.ControlElementSettingsScreen(
             EnumSelector("Range", model.rangeOptions, model.rangeIndex, cb::onRangeChanged)
         }
 
-        Spacer(Modifier.height(14.dp))
-        Text("Orientation", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(6.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SegmentButton("Horizontal", !model.verticalOrientation, Modifier.weight(1f)) { cb.onOrientationChanged(false) }
-            SegmentButton("Vertical", model.verticalOrientation, Modifier.weight(1f)) { cb.onOrientationChanged(true) }
+        if (model.showOrientation) {
+            Spacer(Modifier.height(14.dp))
+            Text("Orientation", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SegmentButton("Horizontal", !model.verticalOrientation, Modifier.weight(1f)) { cb.onOrientationChanged(false) }
+                SegmentButton("Vertical", model.verticalOrientation, Modifier.weight(1f)) { cb.onOrientationChanged(true) }
+            }
+        }
+
+        if (model.showColumns) {
+            Spacer(Modifier.height(14.dp))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("Columns", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                Stepper(model.columns, model.columnsMin, model.columnsMax, cb::onColumnsChanged)
+            }
         }
 
         Spacer(Modifier.height(14.dp))
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("Columns", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-            Stepper(model.columns, model.columnsMin, model.columnsMax, cb::onColumnsChanged)
-        }
-
-        Spacer(Modifier.height(14.dp))
-        LabeledPercentSlider("Scale", model.scalePercent, step = 5, onChange = cb::onScaleChanged)
+        PercentSliderCard("Scale", model.scalePercent, SCALE_RANGE, cb::onScaleChanged)
         Spacer(Modifier.height(10.dp))
-        LabeledPercentSlider("Opacity", model.opacityPercent, step = 1, onChange = cb::onOpacityChanged)
+        PercentSliderCard("Opacity", model.opacityPercent, 0f..100f, cb::onOpacityChanged)
 
         Spacer(Modifier.height(14.dp))
         Text("Scheme Color", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -262,8 +273,10 @@ private fun ColumnScope.ControlElementSettingsScreen(
             Spacer(Modifier.height(14.dp))
             SettingSwitchRow("Toggle Switch", model.toggleSwitch, cb::onToggleSwitchChanged)
         }
-        Spacer(Modifier.height(10.dp))
-        SettingSwitchRow("Relative Mouse Move", model.mouseMoveMode, cb::onMouseMoveModeChanged)
+        if (model.showMouseMoveMode) {
+            Spacer(Modifier.height(10.dp))
+            SettingSwitchRow("Relative Mouse Move", model.mouseMoveMode, cb::onMouseMoveModeChanged)
+        }
 
         if (model.showTextAndIcon) {
             Spacer(Modifier.height(14.dp))
@@ -386,25 +399,38 @@ private fun Stepper(value: Int, min: Int, max: Int, onChange: (Int) -> Unit) {
     }
 }
 
+// Scale was 0..100%: it couldn't enlarge anything, 0% collapsed the element, and just
+// touching it clamped bundled profiles' 1.2 / 1.25 scales down to 1.0.
+private val SCALE_RANGE = 50f..200f
+
+// Same look and behaviour as Overlay Opacity on the Input screen (InputControlsComposeHost's
+// OpacityCard) minus the card frame: title, value above the track on the right, continuous slider, and the
+// value is applied once on release instead of on every tick.
 @Composable
-private fun LabeledPercentSlider(label: String, percent: Int, step: Int, onChange: (Int) -> Unit) {
-    var live by remember(percent) { mutableStateOf(percent.toFloat()) }
-    val steps = (100 / step) - 1
+private fun PercentSliderCard(
+    title: String,
+    percent: Int,
+    range: ClosedFloatingPointRange<Float>,
+    onChange: (Int) -> Unit
+) {
+    var live by remember(percent) { mutableStateOf(percent.toFloat().coerceIn(range)) }
     Column(Modifier.fillMaxWidth()) {
-        Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Slider(
-                value = live,
-                onValueChange = { live = (it / step).roundToInt() * step.toFloat() },
-                onValueChangeFinished = { onChange(live.roundToInt()) },
-                modifier = Modifier.weight(1f),
-                valueRange = 0f..100f,
-                steps = steps,
-                colors = SliderDefaults.colors(thumbColor = controlAccentColor(), activeTrackColor = controlAccentColor())
-            )
-            Spacer(Modifier.width(10.dp))
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(12.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             Text("${live.roundToInt()}%", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+        Slider(
+            value = live,
+            onValueChange = { live = it },
+            onValueChangeFinished = {
+                val value = live.roundToInt()
+                if (value != percent) onChange(value)
+            },
+            modifier = Modifier.fillMaxWidth(),
+            valueRange = range,
+            colors = SliderDefaults.colors(thumbColor = controlAccentColor(), activeTrackColor = controlAccentColor())
+        )
     }
 }
 
