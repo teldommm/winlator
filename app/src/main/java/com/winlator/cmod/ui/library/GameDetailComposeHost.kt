@@ -22,7 +22,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.PlayArrow
@@ -60,6 +59,7 @@ import com.winlator.cmod.ui.theme.controlAccentColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 
 interface GameDetailCallbacks {
     fun onBack()
@@ -110,7 +110,7 @@ private fun LandscapeDetail(title: String, subtitle: String, artwork: Bitmap?, f
             border = BorderStroke(1.dp, Color.White.copy(.16f))
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(Icons.Outlined.ArrowBack, "Back", modifier = Modifier.size(24.dp))
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back", modifier = Modifier.size(24.dp))
             }
         }
 
@@ -184,7 +184,7 @@ private fun PortraitDetail(title: String, subtitle: String, artwork: Bitmap?, fa
                 border = BorderStroke(1.dp, Color.White.copy(.16f))
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Outlined.ArrowBack, "Back", modifier = Modifier.size(24.dp))
+                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back", modifier = Modifier.size(24.dp))
                 }
             }
             Column(Modifier.align(Alignment.BottomStart).padding(22.dp)) {

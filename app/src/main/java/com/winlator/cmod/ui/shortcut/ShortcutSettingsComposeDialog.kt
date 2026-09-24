@@ -2,7 +2,6 @@ package com.winlator.cmod.ui.shortcut
 
 import android.graphics.drawable.ColorDrawable
 import android.os.Build
-import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import androidx.activity.ComponentDialog
@@ -11,6 +10,8 @@ import androidx.core.view.WindowCompat
 import androidx.appcompat.app.AppCompatActivity
 import com.winlator.cmod.container.Shortcut
 import com.winlator.cmod.ui.theme.WinZTheme
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 
 object ShortcutSettingsComposeDialog {
     // onShortcutsChanged: called after an edit that changes what the Library shows (rename,
@@ -32,7 +33,10 @@ object ShortcutSettingsComposeDialog {
                     else WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
                 }
             }
-            decorView.systemUiVisibility = immersiveUiFlagsV2()
+            WindowInsetsControllerCompat(this, decorView).apply {
+                hide(WindowInsetsCompat.Type.systemBars())
+                systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
         }
         dialog.setContentView(ComposeView(activity).apply {
             setContent { WinZTheme { ShortcutEditorV2(activity, shortcut, { onShortcutsChanged.run() }, dialog::dismiss) } }
@@ -40,8 +44,3 @@ object ShortcutSettingsComposeDialog {
         dialog.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
     }
 }
-
-private fun immersiveUiFlagsV2() = View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
-        View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
-        View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
-        View.SYSTEM_UI_FLAG_LAYOUT_STABLE

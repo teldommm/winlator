@@ -23,7 +23,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ContentCut
 import androidx.compose.material.icons.outlined.ContentPaste
@@ -71,6 +70,8 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import com.winlator.cmod.ui.ShellChrome
 
 // One row in the file listing — a file or a folder in the current directory.
 data class FileEntryUiModel(
@@ -147,7 +148,7 @@ internal fun FileManagerScreen(model: FileManagerModel, callbacks: FileManagerCa
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = callbacks::onUpDir) {
-                Icon(Icons.Outlined.ArrowBack, "Up directory")
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Up directory")
             }
             Spacer(Modifier.width(4.dp))
             Surface(
@@ -207,6 +208,9 @@ internal fun FileManagerScreen(model: FileManagerModel, callbacks: FileManagerCa
 
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
+        // In portrait MainShell's bottom nav floats over this tab; keep the paste button and the
+        // last rows above it (File Manager used to be a detail screen in portrait, without the nav).
+        val navClearance = if (landscape) 0.dp else ShellChrome.PortraitNavClearance
         Box(Modifier.weight(1f)) {
             if (model.entries.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -215,7 +219,7 @@ internal fun FileManagerScreen(model: FileManagerModel, callbacks: FileManagerCa
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 92.dp)
+                    contentPadding = PaddingValues(bottom = 92.dp + navClearance)
                 ) {
                     items(model.entries, key = { it.path }) { entry ->
                         FileRow(entry = entry, callbacks = callbacks)
@@ -232,7 +236,7 @@ internal fun FileManagerScreen(model: FileManagerModel, callbacks: FileManagerCa
                     onClick = callbacks::onPasteClick,
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(18.dp),
+                        .padding(start = 18.dp, top = 18.dp, end = 18.dp, bottom = 18.dp + navClearance),
                     containerColor = controlAccentColor(),
                     contentColor = Color.White
                 ) {

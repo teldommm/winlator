@@ -21,7 +21,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Dns
@@ -78,6 +77,7 @@ import java.util.ArrayDeque
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.winlator.cmod.ui.theme.findActivity
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 
 // Containers list as a MainShell detail entry (replaces ContainersSettingsFragment). The
 // container editor opens as another detail entry on top (onOpenEditor); when it closes and this
@@ -170,7 +170,7 @@ private fun ContainersSettingsScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Containers") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, null) } },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, null) } },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         },

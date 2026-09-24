@@ -28,14 +28,14 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.winlator.cmod.MainActivity
 import com.winlator.cmod.R
+import com.winlator.cmod.ui.theme.setLegacySystemBarColors
 
 fun applyAppFullscreen(activity: Activity?) {
     if (activity == null) return
 
     val window = activity.window
     WindowCompat.setDecorFitsSystemWindows(window, false)
-    window.statusBarColor = android.graphics.Color.TRANSPARENT
-    window.navigationBarColor = android.graphics.Color.TRANSPARENT
+    window.setLegacySystemBarColors(android.graphics.Color.TRANSPARENT)
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
         window.attributes = window.attributes.apply {
@@ -75,6 +75,14 @@ object ShellChrome {
 
     // Nav group width (3 × 44dp cells + spacing + padding = 142dp) + its 14dp end margin + 8dp gap.
     val LandscapeNavReserve = 164.dp
+
+    // Portrait: the bottom nav floats over tab content (64dp bar + 12dp bottom margin); anything
+    // anchored to the bottom of a tab (FABs, last list rows) must clear it, plus a 12dp gap.
+    val PortraitNavClearance = 88.dp
+
+    // Portrait main header band (title row / search row share it, so opening search doesn't
+    // push the content below).
+    val PortraitHeaderHeight = 60.dp
 }
 
 // Landscape header for a main tab: title + screen actions. Navigation is not part of it anymore —

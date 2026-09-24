@@ -37,7 +37,7 @@ internal fun ClassicCoreStatusCard(readyState: State<Boolean>, progressState: St
                 Icon(Icons.Outlined.Check, null, Modifier.size(32.dp))
             } else {
                 CircularProgressIndicator(
-                    progress = progress / 100f,
+                    progress = { progress / 100f },
                     modifier = Modifier.size(24.dp),
                     color = MaterialTheme.colorScheme.primary,
                     trackColor = MaterialTheme.colorScheme.surfaceVariant,

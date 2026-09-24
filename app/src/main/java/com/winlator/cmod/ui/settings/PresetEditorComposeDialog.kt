@@ -35,7 +35,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -70,6 +69,7 @@ import com.winlator.cmod.ui.theme.ThemedDialogSurface
 import com.winlator.cmod.ui.theme.WinZOverlayTheme
 import com.winlator.cmod.ui.theme.accentSwitchColors
 import com.winlator.cmod.ui.theme.controlAccentColor
+import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 
 data class PresetEditorVariable(
     val name: String,
@@ -285,7 +285,7 @@ private fun PresetVariableRow(
             if (!variable.help.isNullOrBlank()) {
                 IconButton(onClick = onHelp, modifier = Modifier.size(36.dp)) {
                     Icon(
-                        Icons.Outlined.HelpOutline,
+                        Icons.AutoMirrored.Outlined.HelpOutline,
                         contentDescription = "Help",
                         modifier = Modifier.size(20.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant

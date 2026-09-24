@@ -45,6 +45,8 @@ import com.winlator.cmod.ui.settings.SettingsRoute
 import com.winlator.cmod.ui.theme.WinZTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.winlator.cmod.ui.settings.loadWineRuntimeOptions
+import androidx.compose.ui.platform.LocalContext
 
 // MainShell — the single Compose root of MainActivity's main screens.
 //
@@ -181,6 +183,13 @@ private fun MainShell(controller: MainShellController, listener: MainShellListen
 
     BackHandler(enabled = controller.backEnabled) { controller.onBack() }
 
+    // Warm the Wine/Proton runtime list in the background so container/shortcut settings open
+    // with their runtime labels already resolved (see cachedWineRuntimeOptions).
+    val appContext = LocalContext.current.applicationContext
+    LaunchedEffect(Unit) {
+        runCatching { loadWineRuntimeOptions(appContext) }
+    }
+
     LaunchedEffect(controller.selectedTab) {
         val tab = controller.selectedTab
         if (controller.shownOnce.add(tab)) return@LaunchedEffect
@@ -290,7 +299,10 @@ private fun ShellTab(controller: MainShellController, tab: Int) {
 private fun TabContent(controller: MainShellController, tab: Int) {
     val serial = controller.shownSerial[tab] ?: 0
     when (tab) {
-        R.id.main_menu_shortcuts -> LibraryRoute(shownSerial = serial)
+        R.id.main_menu_shortcuts -> LibraryRoute(
+            shownSerial = serial,
+            active = controller.selectedTab == tab
+        )
         R.id.main_menu_input_controls -> InputControlsRoute(
             initialProfileId = controller.inputControlsProfileId,
             shownSerial = serial

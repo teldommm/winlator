@@ -114,7 +114,19 @@ private suspend fun syncRemoteContents(context: Context, manager: ContentsManage
     }
 }
 
-internal suspend fun loadWineRuntimeOptions(context: Context): List<WineRuntimeOption> = withContext(Dispatchers.IO) {
+// Last loaded runtime list, process-wide. Screens start from it (produceState initial value) so a
+// runtime label is right on the first frame instead of flashing the raw id
+// ("proton-9.0-arm64ec-1") or nothing until the load — which includes a network fetch of the
+// remote profiles — finishes. MainShell warms it once at startup.
+@Volatile
+private var cachedRuntimeOptions: List<WineRuntimeOption> = emptyList()
+
+internal fun cachedWineRuntimeOptions(): List<WineRuntimeOption> = cachedRuntimeOptions
+
+internal suspend fun loadWineRuntimeOptions(context: Context): List<WineRuntimeOption> =
+    loadWineRuntimeOptionsUncached(context).also { cachedRuntimeOptions = it }
+
+private suspend fun loadWineRuntimeOptionsUncached(context: Context): List<WineRuntimeOption> = withContext(Dispatchers.IO) {
     val manager = ContentsManager(context)
     syncRemoteContents(context, manager)
     val out = LinkedHashMap<String, WineRuntimeOption>()

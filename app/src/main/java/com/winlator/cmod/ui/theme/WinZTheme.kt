@@ -348,8 +348,7 @@ private fun HideSystemBars(theme: WinlatorThemeType) {
         val window = activity?.window
         if (window != null) {
             WindowCompat.setDecorFitsSystemWindows(window, false)
-            window.statusBarColor = colors.background.toArgb()
-            window.navigationBarColor = colors.background.toArgb()
+            window.setLegacySystemBarColors(colors.background.toArgb())
             val controller = WindowInsetsControllerCompat(window, window.decorView)
             controller.hide(WindowInsetsCompat.Type.systemBars())
             controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
@@ -382,4 +381,13 @@ internal tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null
+}
+
+// Bar colours only matter below API 35 (and only while the hidden bars are swiped in
+// transiently); on 35+ edge-to-edge is enforced and these setters are no-ops, hence deprecated.
+// Kept for older devices; the deprecation is acknowledged here, in one place.
+@Suppress("DEPRECATION")
+internal fun android.view.Window.setLegacySystemBarColors(color: Int) {
+    statusBarColor = color
+    navigationBarColor = color
 }

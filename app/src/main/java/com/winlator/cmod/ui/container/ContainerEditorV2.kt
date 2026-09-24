@@ -30,7 +30,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
@@ -109,6 +108,7 @@ import com.winlator.cmod.ui.settings.isDxvkCompatibleWithVkd3d
 import com.winlator.cmod.ui.settings.isTurnipDriver
 import com.winlator.cmod.ui.settings.isVkd3dEnabled
 import com.winlator.cmod.ui.settings.loadSettingsCatalog
+import com.winlator.cmod.ui.settings.cachedWineRuntimeOptions
 import com.winlator.cmod.ui.settings.loadWineRuntimeOptions
 import com.winlator.cmod.ui.settings.localeDisplayValue
 import com.winlator.cmod.ui.settings.normalizeLocaleValue
@@ -123,6 +123,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.util.Locale
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 
 private val containerComponentRowsV2 = listOf(
     "direct3d" to "Direct3D",
@@ -332,7 +333,7 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
     var installing by remember { mutableStateOf<Set<String>>(emptySet()) }
     var creating by remember { mutableStateOf(false) }
 
-    val runtimeOptions by produceState<List<WineRuntimeOption>>(emptyList(), revision) {
+    val runtimeOptions by produceState(cachedWineRuntimeOptions(), revision) {
         value = loadWineRuntimeOptions(context)
     }
     LaunchedEffect(runtimeOptions, editing?.id) {
@@ -561,7 +562,7 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
         topBar = {
             TopAppBar(
                 title = { Text(if (editing == null) "New container" else state.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, null) } }
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, null) } }
             )
         },
         bottomBar = {

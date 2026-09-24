@@ -1,7 +1,6 @@
 package com.winlator.cmod.ui.library
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -28,7 +27,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.DeleteOutline
@@ -42,7 +40,6 @@ import androidx.compose.material.icons.outlined.Photo
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.ViewList
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -50,7 +47,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -90,6 +86,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import androidx.compose.ui.graphics.asImageBitmap as composeAsImageBitmap
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ViewList
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 
 internal fun Bitmap.asImageBitmap(): ImageBitmap = this.composeAsImageBitmap()
 
@@ -235,7 +242,7 @@ internal fun LibraryLandscapeHeader(
     // 26dp), so the space kept free for MainShell's nav group is measured from the screen edge.
     containerEndPadding: Dp = 14.dp
 ) {
-    var searchActive by rememberSaveable { mutableStateOf(false) }
+    var searchActive by LocalLibrarySearchActive.current
 
     if (searchActive) {
         Row(
@@ -245,18 +252,11 @@ internal fun LibraryLandscapeHeader(
                 .padding(end = (ShellChrome.LandscapeNavReserve - containerEndPadding).coerceAtLeast(0.dp)),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            LibraryTopIcon(Icons.Outlined.ArrowBack, false) {
+            LibraryTopIcon(Icons.AutoMirrored.Outlined.ArrowBack, false) {
                 searchActive = false
                 onSearchQueryChanged("")
             }
-            OutlinedTextField(
-                value = query,
-                onValueChange = onSearchQueryChanged,
-                modifier = Modifier.weight(1f).padding(start = 4.dp),
-                placeholder = { Text("Search games") },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp)
-            )
+            LibrarySearchField(query, onSearchQueryChanged, Modifier.weight(1f).padding(start = 4.dp))
         }
     } else {
         // Home / Input Controls / Settings are MainShell's floating nav group now.
@@ -267,7 +267,7 @@ internal fun LibraryLandscapeHeader(
             containerEndPadding = containerEndPadding
         ) {
             LibraryTopIcon(Icons.Outlined.Search, false) { searchActive = true }
-            LibraryTopIcon(if (grid) Icons.Outlined.ViewList else Icons.Outlined.GridView, false) {
+            LibraryTopIcon(if (grid) Icons.AutoMirrored.Outlined.ViewList else Icons.Outlined.GridView, false) {
                 onGridViewChanged(!grid)
             }
             LibraryTopIcon(Icons.Outlined.Add, false) { activity?.navigateToMainDestination(R.id.main_menu_file_manager) }
@@ -290,35 +290,31 @@ internal fun LibraryPortraitHeader(
     onSearchQueryChanged: (String) -> Unit,
     onOpenFileManager: () -> Unit
 ) {
-    var searchActive by rememberSaveable { mutableStateOf(false) }
+    var searchActive by LocalLibrarySearchActive.current
 
+    // Both states share one fixed-height band. The search row used to be a 56dp OutlinedTextField
+    // plus 14dp vertical padding — taller than the title row — so opening search pushed the
+    // filter chips and the games below it down.
     if (searchActive) {
         Row(
-            Modifier.fillMaxWidth().padding(vertical = 14.dp),
+            Modifier.fillMaxWidth().height(ShellChrome.PortraitHeaderHeight),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            LibraryTopIcon(Icons.Outlined.ArrowBack, false) {
+            LibraryTopIcon(Icons.AutoMirrored.Outlined.ArrowBack, false) {
                 searchActive = false
                 onSearchQueryChanged("")
             }
-            OutlinedTextField(
-                value = query,
-                onValueChange = onSearchQueryChanged,
-                modifier = Modifier.weight(1f).padding(start = 4.dp),
-                placeholder = { Text("Search games") },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp)
-            )
+            LibrarySearchField(query, onSearchQueryChanged, Modifier.weight(1f).padding(start = 4.dp))
         }
     } else {
-        Box(Modifier.fillMaxWidth()) {
+        Box(Modifier.fillMaxWidth().height(ShellChrome.PortraitHeaderHeight), contentAlignment = Alignment.CenterStart) {
             PortraitMainHeader("Library")
             Row(
                 modifier = Modifier.align(Alignment.CenterEnd),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 LibraryTopIcon(Icons.Outlined.Search, false) { searchActive = true }
-                LibraryTopIcon(if (grid) Icons.Outlined.ViewList else Icons.Outlined.GridView, false) {
+                LibraryTopIcon(if (grid) Icons.AutoMirrored.Outlined.ViewList else Icons.Outlined.GridView, false) {
                     onGridViewChanged(!grid)
                 }
                 LibraryTopIcon(Icons.Outlined.Add, false) { onOpenFileManager() }
@@ -493,10 +489,11 @@ private fun RequestArtworkCompat(item: LibraryItem, cb: LibraryCallbacks) {
 
 @Composable
 private fun ArtworkCompat(path: String?, fallback: Bitmap?, modifier: Modifier) {
-    val bitmap by produceState<Bitmap?>(fallback, path) {
-        value = withContext(Dispatchers.IO) {
-            path?.takeIf { File(it).isFile }?.let(BitmapFactory::decodeFile) ?: fallback
-        }
+    // Start from the cached decode when there is one (see LibraryImageCache), so a tile that
+    // comes back into view doesn't flash the fallback icon first.
+    val key = remember(path) { LibraryImageCache.keyFor(path) }
+    val bitmap by produceState(LibraryImageCache.peek(key) ?: fallback, key) {
+        value = withContext(Dispatchers.IO) { LibraryImageCache.load(path) } ?: fallback
     }
     if (bitmap != null) Image(bitmap!!.asImageBitmap(), null, modifier, contentScale = ContentScale.Crop)
     else Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant))
@@ -662,4 +659,64 @@ private fun LibraryActionTileCompat(
             )
         }
     }
+}
+
+// Compact search field shared by both Library headers: 44dp tall so it fits the header band
+// (a Material OutlinedTextField is at least 56dp). Focuses itself when shown, so the keyboard
+// comes up right away.
+@Composable
+private fun LibrarySearchField(query: String, onQueryChange: (String) -> Unit, modifier: Modifier = Modifier) {
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    val shape = RoundedCornerShape(12.dp)
+    BasicTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        singleLine = true,
+        textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+        cursorBrush = SolidColor(controlAccentColor()),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        modifier = modifier.focusRequester(focusRequester),
+        decorationBox = { innerTextField ->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(44.dp)
+                    .clip(shape)
+                    .background(MaterialTheme.colorScheme.surface)
+                    .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape)
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Outlined.Search,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
+                Box(Modifier.weight(1f).padding(horizontal = 10.dp)) {
+                    if (query.isEmpty()) {
+                        Text(
+                            "Search games",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
+                    }
+                    innerTextField()
+                }
+                if (query.isNotEmpty()) {
+                    Icon(
+                        Icons.Outlined.Close,
+                        contentDescription = "Clear",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { onQueryChange("") }
+                    )
+                }
+            }
+        }
+    )
 }

@@ -20,7 +20,7 @@ import com.winlator.cmod.ui.theme.findActivity
 //  - reload when MainShell re-shows the tab or asks for a refresh (shownSerial), e.g. after
 //    File Manager added a game or GameDetail edited a shortcut.
 @Composable
-fun LibraryRoute(shownSerial: Int) {
+fun LibraryRoute(shownSerial: Int, active: Boolean) {
     val activity = LocalContext.current.findActivity() as AppCompatActivity
     val controller = remember { LibraryScreenController(activity) }
 
@@ -37,6 +37,11 @@ fun LibraryRoute(shownSerial: Int) {
         controller.loadShortcutsList()
         onPauseOrDispose { }
     }
+    // Leaving the tab closes an open search and clears its filter (the tab itself persists).
+    LaunchedEffect(active) {
+        if (!active) controller.libraryController.closeSearch()
+    }
+
     LaunchedEffect(shownSerial) {
         if (shownSerial > 0) controller.loadShortcutsList()
     }

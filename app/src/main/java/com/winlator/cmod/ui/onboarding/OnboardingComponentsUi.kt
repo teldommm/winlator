@@ -25,7 +25,6 @@ import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Dns
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Folder
-import androidx.compose.material.icons.outlined.InsertDriveFile
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -51,6 +50,9 @@ import androidx.compose.ui.unit.dp
 import com.winlator.cmod.core.ProtonPackageManager
 import com.winlator.cmod.ui.theme.controlAccentColor
 import com.winlator.cmod.ui.theme.destructiveColor
+import androidx.compose.material.icons.automirrored.outlined.InsertDriveFile
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 
 private val bundledRuntimeId = "bundled:${ProtonPackageManager.DEFAULT_IDENTIFIER}"
 private val bundledRuntimeName = ProtonPackageManager.getPackage(ProtonPackageManager.DEFAULT_IDENTIFIER)?.title
@@ -169,13 +171,18 @@ internal fun OnboardingComponentsScreen(
     val showLocalInstallProgress = installing == "local" || installing == "driver-local"
 
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        // Opened from Settings (manager mode): a top bar with a back arrow, like Containers,
+        // instead of the first-run wizard's Back/Done footer.
+        if (managerMode) ManagerTopBar(onBack)
         if (landscape) {
             Row(
                 Modifier.weight(1f).fillMaxWidth().padding(horizontal = 22.dp, vertical = 14.dp),
                 horizontalArrangement = Arrangement.spacedBy(18.dp)
             ) {
                 Column(Modifier.weight(.9f).fillMaxHeight()) {
-                    Text("Choose components", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                    if (!managerMode) {
+                        Text("Choose components", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                    }
                     Text(
                         if (managerMode) "Install and manage runtime versions."
                         else "Install a Wine or Proton layer before continuing.",
@@ -235,7 +242,9 @@ internal fun OnboardingComponentsScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 item {
-                    Text("Choose components", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+                    if (!managerMode) {
+                        Text("Choose components", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+                    }
                     Text(
                         if (managerMode) "Install and manage runtime versions."
                         else "Install as many versions as you want. At least one Wine or Proton is required.",
@@ -290,13 +299,16 @@ internal fun OnboardingComponentsScreen(
                 }
             }
         }
-        ComponentsFooter(
-            back = onBack,
-            next = onContinue,
-            landscape = landscape,
-            nextEnabled = managerMode || hasInstalledRuntime,
-            nextLabel = if (managerMode) "Done" else "Continue"
-        )
+        // The Back/Continue footer only belongs to the first-run flow.
+        if (!managerMode) {
+            ComponentsFooter(
+                back = onBack,
+                next = onContinue,
+                landscape = landscape,
+                nextEnabled = hasInstalledRuntime,
+                nextLabel = "Continue"
+            )
+        }
     }
 }
 
@@ -404,7 +416,7 @@ private fun CoreComponentCard(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Row(Modifier.padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Outlined.InsertDriveFile, null, modifier = Modifier.size(28.dp))
+            Icon(Icons.AutoMirrored.Outlined.InsertDriveFile, null, modifier = Modifier.size(28.dp))
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(bundledRuntimeName, fontWeight = FontWeight.SemiBold)
@@ -457,7 +469,7 @@ private fun ComponentCard(
     ) {
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.InsertDriveFile, null, modifier = Modifier.size(28.dp))
+                Icon(Icons.AutoMirrored.Outlined.InsertDriveFile, null, modifier = Modifier.size(28.dp))
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(item.name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -516,7 +528,7 @@ private fun InstallProgressCard(label: String?, progress: Int) {
     ) {
         Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.InsertDriveFile, null, modifier = Modifier.size(28.dp))
+                Icon(Icons.AutoMirrored.Outlined.InsertDriveFile, null, modifier = Modifier.size(28.dp))
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text("Component installation", fontWeight = FontWeight.SemiBold)
@@ -552,6 +564,28 @@ private fun LoadingCard() {
             Spacer(Modifier.width(12.dp))
             Text("Loading component catalog…")
         }
+    }
+}
+
+// Same shape as the Containers screen's top app bar: 64dp, back arrow, title.
+@Composable
+private fun ManagerTopBar(onBack: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .padding(start = 4.dp, end = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onBack) {
+            Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+        }
+        Spacer(Modifier.width(4.dp))
+        Text(
+            "Components",
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onBackground
+        )
     }
 }
 

@@ -58,6 +58,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -94,6 +95,10 @@ public class LibraryScreenController {
     private final ExecutorService loader = Executors.newSingleThreadExecutor();
     private int loadGeneration;
     private volatile Bitmap defaultIcon;
+    // Runtime label per shortcut path, resolved on the loader with every full load; reused by the
+    // lighter re-publishes (artwork downloaded, favorite toggled) so they don't redo the sync.
+    // Loader-thread only.
+    private final HashMap<String, String> environmentLabels = new HashMap<>();
     private final Set<String> artworkRequests = Collections.synchronizedSet(new HashSet<>());
 
     private Shortcut shortcutForIconUpdate;
@@ -341,6 +346,8 @@ public class LibraryScreenController {
                 }
                 loaded.addAll(shortcuts);
             }
+            environmentLabels.clear();
+            environmentLabels.putAll(LibraryEnvironmentLabels.resolve(activity, loaded));
             ArrayList<LibraryItem> items = buildLibraryItems(loaded);
             postToUi(() -> {
                 if (generation != loadGeneration) return;
@@ -403,16 +410,21 @@ public class LibraryScreenController {
             File banner = new File(getBannerDir(), baseName + ".png");
             String iconPath = userIcon.exists() ? userIcon.getPath() :
                     (autoIcon.exists() ? autoIcon.getPath() : null);
+            // Decode the (small) game icon here, off the main thread, so the tile's first frame
+            // already shows it instead of the exe icon (see LibraryImageCache).
+            Bitmap icon = LibraryImageCache.load(iconPath);
+            String containerLabel = environmentLabels.get(shortcut.file.getPath());
+            if (containerLabel == null) containerLabel = shortcut.container != null ? shortcut.container.getName() : "";
 
             items.add(new LibraryItem(
                     shortcut.file.getPath(),
                     shortcut.file.getPath(),
                     shortcut.name,
-                    shortcut.container != null ? shortcut.container.getName() : "",
+                    containerLabel,
                     cover.exists() ? cover.getPath() : null,
                     banner.exists() ? banner.getPath() : null,
                     iconPath,
-                    shortcut.icon,
+                    icon != null ? icon : shortcut.icon,
                     "1".equals(shortcut.getExtra("favorite", "0")),
                     parseLastRunAt(shortcut)
             ));

@@ -30,7 +30,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.Gamepad
@@ -116,6 +115,7 @@ import com.winlator.cmod.ui.settings.isDxvkCompatibleWithVkd3d
 import com.winlator.cmod.ui.settings.isTurnipDriver
 import com.winlator.cmod.ui.settings.isVkd3dEnabled
 import com.winlator.cmod.ui.settings.loadSettingsCatalog
+import com.winlator.cmod.ui.settings.cachedWineRuntimeOptions
 import com.winlator.cmod.ui.settings.loadWineRuntimeOptions
 import com.winlator.cmod.ui.settings.localeDisplayValue
 import com.winlator.cmod.ui.settings.normalizeLocaleValue
@@ -129,6 +129,7 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import java.io.File
 import kotlin.math.roundToInt
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 
 private val shortcutComponentRowsV2 = listOf(
     "direct3d" to "Direct3D",
@@ -413,7 +414,7 @@ internal fun ShortcutEditorV2(
     val manager = remember { ContainerManager(context) }
     val containers = remember { manager.containers.toList() }
 
-    val runtimeOptions by produceState<List<WineRuntimeOption>>(emptyList()) {
+    val runtimeOptions by produceState(cachedWineRuntimeOptions()) {
         value = loadWineRuntimeOptions(context)
     }
     fun environmentLabel(container: Container): String {
@@ -515,7 +516,7 @@ internal fun ShortcutEditorV2(
         topBar = {
             TopAppBar(
                 title = { Text(state.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                navigationIcon = { IconButton(onClick = ::closeEditor) { Icon(Icons.Outlined.ArrowBack, null) } }
+                navigationIcon = { IconButton(onClick = ::closeEditor) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, null) } }
             )
         }
     ) { padding ->

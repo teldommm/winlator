@@ -2,8 +2,6 @@ package com.winlator.cmod.ui.library
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.os.Handler
-import android.os.Looper
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
@@ -16,7 +14,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.winlator.cmod.MainActivity
 import com.winlator.cmod.ui.applyAppFullscreen
-import java.util.concurrent.atomic.AtomicInteger
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 
 @Immutable
 data class LibraryItem(
@@ -54,21 +53,25 @@ class LibraryComposeController internal constructor(
     // without this the "empty library" state would flash for a frame on every cold start.
     internal val loaded = mutableStateOf(false)
 
-    private val statePreferences = context.getSharedPreferences("library_compose_state", Context.MODE_PRIVATE)
-    private val metadataGeneration = AtomicInteger(0)
-    private val mainHandler = Handler(Looper.getMainLooper())
+    // Search bar open/closed. Lives here (not in the header's rememberSaveable) so the shell can
+    // close it when the user leaves the Library tab — tabs persist now, so a local flag would
+    // stay open (with the list still filtered) until the user came back and closed it by hand.
+    internal val searchActive = mutableStateOf(false)
 
+    fun closeSearch() {
+        searchActive.value = false
+        query.value = ""
+    }
+
+    private val statePreferences = context.getSharedPreferences("library_compose_state", Context.MODE_PRIVATE)
+
+    // Items arrive fully resolved (runtime label, pre-decoded icon) from LibraryScreenController's
+    // loader thread. There used to be a second pass here that published the raw container name
+    // first and swapped in the "Proton … · Vulkan" label a moment later — the text jump on tiles
+    // every time the Library reloaded (e.g. switching back from Input Controls).
     fun setItems(value: List<LibraryItem>) {
-        val snapshot = value.toList()
-        items.value = snapshot
+        items.value = value.toList()
         loaded.value = true
-        val generation = metadataGeneration.incrementAndGet()
-        Thread {
-            val resolved = resolveLibraryEnvironmentLabels(context, snapshot)
-            mainHandler.post {
-                if (metadataGeneration.get() == generation) items.value = resolved
-            }
-        }.start()
     }
 
     fun setGridView(value: Boolean) { grid.value = value }
@@ -110,19 +113,26 @@ object LibraryComposeHost {
     }
 }
 
+// Search open/closed state for the Library headers (portrait and landscape).
+internal val LocalLibrarySearchActive = staticCompositionLocalOf<MutableState<Boolean>> {
+    mutableStateOf(false)
+}
+
 @Composable
 internal fun LibraryContent(controller: LibraryComposeController, callbacks: LibraryCallbacks) {
     if (!controller.loaded.value) {
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
         return
     }
-    LibraryRootWithoutEmptyDescription(
-        controller.items.value,
-        controller.grid.value,
-        controller.query.value,
-        controller.selectedShortcutPath,
-        callbacks
-    )
+    CompositionLocalProvider(LocalLibrarySearchActive provides controller.searchActive) {
+        LibraryRootWithoutEmptyDescription(
+            controller.items.value,
+            controller.grid.value,
+            controller.query.value,
+            controller.selectedShortcutPath,
+            callbacks
+        )
+    }
 }
 
 internal enum class LibraryFilter { All, Favorites, Recent }

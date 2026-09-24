@@ -1,7 +1,6 @@
 package com.winlator.cmod.ui.library
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -55,7 +54,6 @@ import com.winlator.cmod.ui.theme.controlAccentColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.withContext
-import java.io.File
 import kotlin.math.absoluteValue
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -73,7 +71,8 @@ internal fun LandscapePagerCore(
     }
     val pager = rememberPagerState(initialPage = initialPage, pageCount = { items.size })
     val item = items[pager.currentPage.coerceIn(items.indices)]
-    val environmentLabel = libraryEnvironmentLabel(item)
+    // Resolved on the Library loader thread (LibraryScreenController) — no second async pass here.
+    val environmentLabel = item.containerName
     val activity = LocalContext.current as? MainActivity
 
     KeepLandscapeChromeHidden(activity)
@@ -182,10 +181,9 @@ internal fun LandscapePagerCore(
 
 @Composable
 private fun PagerImage(path: String?, fallback: Bitmap?, modifier: Modifier) {
-    val image by produceState<Bitmap?>(fallback, path) {
-        value = withContext(Dispatchers.IO) {
-            path?.takeIf { File(it).isFile }?.let { BitmapFactory.decodeFile(it) } ?: fallback
-        }
+    val key = remember(path) { LibraryImageCache.keyFor(path) }
+    val image by produceState(LibraryImageCache.peek(key) ?: fallback, key) {
+        value = withContext(Dispatchers.IO) { LibraryImageCache.load(path) } ?: fallback
     }
     if (image != null) Image(image!!.asImageBitmap(), null, modifier, contentScale = ContentScale.Crop)
     else Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant))
