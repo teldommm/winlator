@@ -37,7 +37,6 @@ import com.winlator.cmod.fexcore.FEXCorePreset
 import com.winlator.cmod.fexcore.FEXCorePresetManager
 import com.winlator.cmod.midi.MidiManager
 import com.winlator.cmod.ui.ThemedAlertHost
-import com.winlator.cmod.ui.theme.WinZTheme
 import com.winlator.cmod.ui.theme.findActivity
 import com.winlator.cmod.xenvironment.ImageFsInstaller
 import kotlinx.coroutines.CoroutineScope
@@ -86,13 +85,11 @@ fun SettingsRoute(shownSerial: Int) {
         if (shownSerial > 0) state.reload()
     }
 
-    WinZTheme {
-        val model = state.model
-        if (model != null) {
-            SettingsScreen(model, state)
-        } else {
-            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
-        }
+    val model = state.model
+    if (model != null) {
+        SettingsScreen(model, state)
+    } else {
+        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
     }
 }
 

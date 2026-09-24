@@ -203,4 +203,11 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
                 keyCode == KeyEvent.KEYCODE_DPAD_CENTER;
     }
 
+    // Return motion matching the shared-axis enter used to open this screen (see
+    // InputControlsRoute.onOpenController).
+    @Override
+    public void finish() {
+        super.finish();
+        overridePendingTransition(R.anim.shared_axis_pop_enter, R.anim.shared_axis_pop_exit);
+    }
 }

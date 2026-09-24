@@ -14,7 +14,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import com.winlator.cmod.ui.theme.WinZTheme
 import com.winlator.cmod.ui.theme.findActivity
 
 // File Manager as a plain composable tab of MainShell (replaces FileManagerFragment). It is now
@@ -36,12 +35,10 @@ fun FileManagerRoute(shownSerial: Int) {
         if (shownSerial > 0) controller.refresh()
     }
 
-    WinZTheme {
-        val current = model
-        if (current != null) {
-            FileManagerScreen(current, callbacks)
-        } else {
-            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
-        }
+    val current = model
+    if (current != null) {
+        FileManagerScreen(current, callbacks)
+    } else {
+        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
     }
 }

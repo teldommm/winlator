@@ -590,9 +590,11 @@ public class ControlsEditorActivity extends AppCompatActivity {
         }
     }
 
+    // Every way out (system back, the editor's own close/save) ends in finish(), so the return
+    // motion is applied here: the reverse of the shared-axis enter used to open this screen.
     @Override
-    public void onBackPressed() {
-        super.onBackPressed();
-        overridePendingTransition(R.anim.slide_in_down, R.anim.slide_out_up);
+    public void finish() {
+        super.finish();
+        overridePendingTransition(R.anim.shared_axis_pop_enter, R.anim.shared_axis_pop_exit);
     }
 }

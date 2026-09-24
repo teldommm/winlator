@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Closing a deeper screen: slides back out by 1/10 of the width while fading out. 160ms. -->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:interpolator="@android:interpolator/fast_out_linear_in"
+    android:shareInterpolator="true">
+    <translate
+        android:duration="160"
+        android:fromXDelta="0"
+        android:toXDelta="10%p" />
+    <alpha
+        android:duration="160"
+        android:fromAlpha="1.0"
+        android:toAlpha="0.0" />
+</set>

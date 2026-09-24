@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Coming back: the screen underneath drifts back into place. -->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:interpolator="@android:interpolator/fast_out_slow_in">
+    <translate
+        android:duration="160"
+        android:fromXDelta="-5%p"
+        android:toXDelta="0" />
+</set>

@@ -5,7 +5,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -54,16 +54,16 @@ interface OnboardingCallbacks {
 }
 
 class OnboardingComposeController internal constructor(
-    private val coreReady: MutableState<Boolean>,
-    private val coreProgress: MutableState<Int>,
-    private val bundledWineInstalled: MutableState<Boolean>,
-    private val bundledWineInUse: MutableState<Boolean>,
-    private val components: MutableState<List<OnboardingComponent>>,
-    private val installingId: MutableState<String?>,
-    private val installingLabel: MutableState<String?>,
-    private val installingProgress: MutableState<Int>,
-    private val initialContainerPreparing: MutableState<Boolean>,
-    private val initialContainerReady: MutableState<Boolean>
+    internal val coreReady: MutableState<Boolean>,
+    internal val coreProgress: MutableState<Int>,
+    internal val bundledWineInstalled: MutableState<Boolean>,
+    internal val bundledWineInUse: MutableState<Boolean>,
+    internal val components: MutableState<List<OnboardingComponent>>,
+    internal val installingId: MutableState<String?>,
+    internal val installingLabel: MutableState<String?>,
+    internal val installingProgress: MutableState<Int>,
+    internal val initialContainerPreparing: MutableState<Boolean>,
+    internal val initialContainerReady: MutableState<Boolean>
 ) {
     fun updateCore(ready: Boolean, progress: Int) {
         coreReady.value = ready
@@ -102,6 +102,27 @@ class OnboardingComposeController internal constructor(
 }
 
 object OnboardingComposeHost {
+    // UI state for the onboarding/components flow; ComponentCatalogController drives it.
+    @JvmStatic
+    fun createController(
+        initialCoreReady: Boolean,
+        initialCoreProgress: Int,
+        initialBundledWineInstalled: Boolean,
+        initialBundledWineInUse: Boolean
+    ): OnboardingComposeController = OnboardingComposeController(
+        mutableStateOf(initialCoreReady),
+        mutableStateOf(initialCoreProgress),
+        mutableStateOf(initialBundledWineInstalled),
+        mutableStateOf(initialBundledWineInUse),
+        mutableStateOf<List<OnboardingComponent>>(emptyList()),
+        mutableStateOf<String?>(null),
+        mutableStateOf<String?>(null),
+        mutableStateOf(-1),
+        mutableStateOf(false),
+        mutableStateOf(false)
+    )
+
+    // First-run flow: OnboardingActivity's whole window.
     @JvmStatic
     fun attach(
         activity: ComponentActivity,
@@ -112,110 +133,28 @@ object OnboardingComposeHost {
         componentManagerMode: Boolean,
         callbacks: OnboardingCallbacks
     ): OnboardingComposeController {
-        val ready = mutableStateOf(initialCoreReady)
-        val progress = mutableStateOf(initialCoreProgress)
-        val bundledInstalled = mutableStateOf(initialBundledWineInstalled)
-        val bundledInUse = mutableStateOf(initialBundledWineInUse)
-        val components = mutableStateOf<List<OnboardingComponent>>(emptyList())
-        val installing = mutableStateOf<String?>(null)
-        val installLabel = mutableStateOf<String?>(null)
-        val installProgress = mutableStateOf(-1)
-        val containerPreparing = mutableStateOf(false)
-        val containerReady = mutableStateOf(false)
-        val controller = OnboardingComposeController(
-            ready,
-            progress,
-            bundledInstalled,
-            bundledInUse,
-            components,
-            installing,
-            installLabel,
-            installProgress,
-            containerPreparing,
-            containerReady
+        val controller = createController(
+            initialCoreReady,
+            initialCoreProgress,
+            initialBundledWineInstalled,
+            initialBundledWineInUse
         )
-
         applyAppFullscreen(activity)
         activity.setContent {
             WinZTheme {
-                OnboardingFlow(
-                    activity,
-                    ready,
-                    progress,
-                    bundledInstalled,
-                    bundledInUse,
-                    components,
-                    installing,
-                    installLabel,
-                    installProgress,
-                    containerPreparing,
-                    containerReady,
-                    componentManagerMode,
-                    callbacks
-                )
+                OnboardingFlow(activity, controller, componentManagerMode, callbacks)
             }
         }
         return controller
     }
+}
 
-    // Fragment-hosted variant (e.g. ComponentManagerFragment) — sets content on a
-    // caller-provided ComposeView instead of activity.setContent, so no separate
-    // Activity/Window is ever created and there's no window-orientation resolution
-    // to race with the host Activity's own locked orientation. Always managerMode.
-    @JvmStatic
-    fun attachToView(
-        context: Context,
-        composeView: ComposeView,
-        initialCoreReady: Boolean,
-        initialCoreProgress: Int,
-        initialBundledWineInstalled: Boolean,
-        initialBundledWineInUse: Boolean,
-        callbacks: OnboardingCallbacks
-    ): OnboardingComposeController {
-        val ready = mutableStateOf(initialCoreReady)
-        val progress = mutableStateOf(initialCoreProgress)
-        val bundledInstalled = mutableStateOf(initialBundledWineInstalled)
-        val bundledInUse = mutableStateOf(initialBundledWineInUse)
-        val components = mutableStateOf<List<OnboardingComponent>>(emptyList())
-        val installing = mutableStateOf<String?>(null)
-        val installLabel = mutableStateOf<String?>(null)
-        val installProgress = mutableStateOf(-1)
-        val containerPreparing = mutableStateOf(false)
-        val containerReady = mutableStateOf(false)
-        val controller = OnboardingComposeController(
-            ready,
-            progress,
-            bundledInstalled,
-            bundledInUse,
-            components,
-            installing,
-            installLabel,
-            installProgress,
-            containerPreparing,
-            containerReady
-        )
-
-        composeView.setContent {
-            WinZTheme {
-                OnboardingFlow(
-                    context,
-                    ready,
-                    progress,
-                    bundledInstalled,
-                    bundledInUse,
-                    components,
-                    installing,
-                    installLabel,
-                    installProgress,
-                    containerPreparing,
-                    containerReady,
-                    true,
-                    callbacks
-                )
-            }
-        }
-        return controller
-    }
+// Components screen (catalog / install / remove) as a plain composable — the flow in manager
+// mode. MainShell shows it as a detail entry through ComponentManagerRoute; it used to need a
+// ComposeView of its own (attachToView) embedded via AndroidView.
+@Composable
+fun ComponentManagerContent(controller: OnboardingComposeController, callbacks: OnboardingCallbacks) {
+    OnboardingFlow(LocalContext.current, controller, managerMode = true, cb = callbacks)
 }
 
 private enum class OnboardingPage { Welcome, Theme, Components, Runtime, Access }
@@ -292,19 +231,21 @@ private fun prepareInitialContainer(
 @Composable
 private fun OnboardingFlow(
     activity: Context,
-    ready: State<Boolean>,
-    progress: State<Int>,
-    bundledInstalled: State<Boolean>,
-    bundledInUse: State<Boolean>,
-    components: State<List<OnboardingComponent>>,
-    installing: State<String?>,
-    installingLabel: State<String?>,
-    installingProgress: State<Int>,
-    containerPreparing: MutableState<Boolean>,
-    containerReady: MutableState<Boolean>,
+    state: OnboardingComposeController,
     managerMode: Boolean,
     cb: OnboardingCallbacks
 ) {
+    val ready: State<Boolean> = state.coreReady
+    val progress: State<Int> = state.coreProgress
+    val bundledInstalled: State<Boolean> = state.bundledWineInstalled
+    val bundledInUse: State<Boolean> = state.bundledWineInUse
+    val components: State<List<OnboardingComponent>> = state.components
+    val installing: State<String?> = state.installingId
+    val installingLabel: State<String?> = state.installingLabel
+    val installingProgress: State<Int> = state.installingProgress
+    val containerPreparing: MutableState<Boolean> = state.initialContainerPreparing
+    val containerReady: MutableState<Boolean> = state.initialContainerReady
+
     var page by rememberSaveable(managerMode) {
         mutableStateOf(if (managerMode) OnboardingPage.Components else OnboardingPage.Theme)
     }

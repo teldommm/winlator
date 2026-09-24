@@ -6,36 +6,30 @@ import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.viewinterop.AndroidView
 import com.winlator.cmod.ComponentCatalogController
 import com.winlator.cmod.core.WineInfo
 import com.winlator.cmod.core.WineRuntimeGuard
+import com.winlator.cmod.ui.onboarding.ComponentManagerContent
 import com.winlator.cmod.ui.onboarding.OnboardingComposeHost
 import com.winlator.cmod.ui.theme.findActivity
 
-// Components (catalog/install/remove) as a MainShell detail entry (replaces
-// ComponentManagerFragment). The logic is ComponentCatalogController, shared with
-// OnboardingActivity's first-run flow; this route is its Host.
-//
-// The UI is OnboardingComposeHost's flow, which is built around attaching to a ComposeView, so
-// it's embedded through AndroidView rather than duplicated. The local-file pickers moved from
-// Fragment.registerForActivityResult to rememberLauncherForActivityResult.
+// Components (catalog/install/remove) as a MainShell detail entry. The logic is
+// ComponentCatalogController, shared with OnboardingActivity's first-run flow; this route is its
+// Host. The UI is ComponentManagerContent — rendered directly in the shell's composition (it
+// used to be a separate ComposeView embedded through AndroidView, with its own theme root).
 @Composable
 fun ComponentManagerRoute(onClose: () -> Unit) {
     val activity = LocalContext.current.findActivity() as AppCompatActivity
     val currentOnClose by rememberUpdatedState(onClose)
     val alive = remember { booleanArrayOf(true) }
 
-    val controller = remember {
+    val catalog = remember {
         ComponentCatalogController(object : ComponentCatalogController.Host {
             override fun context(): Context = activity
             override fun hostActivity(): AppCompatActivity = activity
@@ -47,43 +41,40 @@ fun ComponentManagerRoute(onClose: () -> Unit) {
 
     val pickComponent = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val uri = result.data?.data
-        if (result.resultCode == Activity.RESULT_OK && uri != null) controller.handleLocalComponentPicked(uri)
+        if (result.resultCode == Activity.RESULT_OK && uri != null) catalog.handleLocalComponentPicked(uri)
     }
     val pickDriver = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val uri = result.data?.data
-        if (result.resultCode == Activity.RESULT_OK && uri != null) controller.handleLocalDriverPicked(uri)
+        if (result.resultCode == Activity.RESULT_OK && uri != null) catalog.handleLocalDriverPicked(uri)
     }
 
-    DisposableEffect(controller) {
+    // Same order the fragment used: initialize → UI state → callbacks → attach; start() once
+    // the screen is composed (DisposableEffect below).
+    val ui = remember {
+        catalog.initialize(null, null, Int.MIN_VALUE)
+        OnboardingComposeHost.createController(
+            catalog.isCoreReady,
+            catalog.coreProgress,
+            WineRuntimeGuard.isBundledMainInstalled(activity),
+            WineRuntimeGuard.isInUse(activity, WineInfo.MAIN_WINE_VERSION.identifier())
+        ).also { catalog.attachComposeController(it) }
+    }
+    val callbacks = remember {
+        catalog.createCallbacks(object : ComponentCatalogController.ExtraCallbacks {
+            override fun onBrowseLocal() = pickComponent.launch(openDocumentIntent())
+            override fun onBrowseDriver() = pickDriver.launch(openDocumentIntent())
+        })
+    }
+
+    DisposableEffect(catalog) {
+        catalog.start()
         onDispose {
             alive[0] = false
-            controller.shutdown()
+            catalog.shutdown()
         }
     }
 
-    AndroidView(
-        modifier = Modifier.fillMaxSize(),
-        factory = { context ->
-            ComposeView(context).also { view ->
-                controller.initialize(null, null, Int.MIN_VALUE)
-                controller.attachComposeController(
-                    OnboardingComposeHost.attachToView(
-                        context,
-                        view,
-                        controller.isCoreReady,
-                        controller.coreProgress,
-                        WineRuntimeGuard.isBundledMainInstalled(context),
-                        WineRuntimeGuard.isInUse(context, WineInfo.MAIN_WINE_VERSION.identifier()),
-                        controller.createCallbacks(object : ComponentCatalogController.ExtraCallbacks {
-                            override fun onBrowseLocal() = pickComponent.launch(openDocumentIntent())
-                            override fun onBrowseDriver() = pickDriver.launch(openDocumentIntent())
-                        })
-                    )
-                )
-                controller.start()
-            }
-        }
-    )
+    ComponentManagerContent(ui, callbacks)
 }
 
 private fun openDocumentIntent(): Intent =

@@ -42,7 +42,7 @@ import com.winlator.cmod.ui.filemanager.FileManagerRoute
 import com.winlator.cmod.ui.inputcontrols.InputControlsRoute
 import com.winlator.cmod.ui.library.LibraryRoute
 import com.winlator.cmod.ui.settings.SettingsRoute
-import com.winlator.cmod.ui.theme.WinZOverlayTheme
+import com.winlator.cmod.ui.theme.WinZTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -159,7 +159,11 @@ object MainShellHost {
             editControlsMode
         )
         composeView.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-        composeView.setContent { MainShell(controller, listener) }
+        // The one theme root for everything MainActivity shows. WinZTheme also sets up the window
+        // (system bars, background, focus handling of this host view, tap-to-dismiss-keyboard);
+        // it used to be applied again by every tab route and every detail entry — five or six
+        // times over the same host view — so it lives here once instead.
+        composeView.setContent { WinZTheme { MainShell(controller, listener) } }
         return controller
     }
 }
@@ -198,12 +202,10 @@ private fun MainShell(controller: MainShellController, listener: MainShellListen
             enter = fadeIn(tween(ENTER_MS)) + slideInVertically(tween(ENTER_MS)) { it / 2 },
             exit = fadeOut(tween(EXIT_MS)) + slideOutVertically(tween(EXIT_MS)) { it / 2 }
         ) {
-            WinZOverlayTheme {
-                PortraitBottomNavigation(
-                    selected = controller.selectedTab,
-                    onNavigate = { listener.onNavigate(it) }
-                )
-            }
+            PortraitBottomNavigation(
+                selected = controller.selectedTab,
+                onNavigate = { listener.onNavigate(it) }
+            )
         }
 
         // Landscape: the nav is one static group in the header band; screens reserve its space
@@ -217,12 +219,10 @@ private fun MainShell(controller: MainShellController, listener: MainShellListen
             enter = fadeIn(tween(ENTER_MS)),
             exit = fadeOut(tween(EXIT_MS))
         ) {
-            WinZOverlayTheme {
-                LandscapeNavGroup(
-                    selected = controller.selectedTab,
-                    onNavigate = { listener.onNavigate(it) }
-                )
-            }
+            LandscapeNavGroup(
+                selected = controller.selectedTab,
+                onNavigate = { listener.onNavigate(it) }
+            )
         }
 
         Box(Modifier.fillMaxSize().zIndex(3f)) {

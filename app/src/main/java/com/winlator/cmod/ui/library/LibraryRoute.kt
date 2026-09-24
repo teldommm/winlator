@@ -10,7 +10,6 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LifecycleResumeEffect
-import com.winlator.cmod.ui.theme.WinZTheme
 import com.winlator.cmod.ui.theme.findActivity
 
 // Library as a plain composable tab of MainShell (replaces ShortcutsFragment). The logic is in
@@ -42,7 +41,5 @@ fun LibraryRoute(shownSerial: Int) {
         if (shownSerial > 0) controller.loadShortcutsList()
     }
 
-    WinZTheme {
-        LibraryContent(controller.libraryController, controller.callbacks)
-    }
+    LibraryContent(controller.libraryController, controller.callbacks)
 }

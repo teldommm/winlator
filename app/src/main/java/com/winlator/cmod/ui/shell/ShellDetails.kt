@@ -25,7 +25,6 @@ import com.winlator.cmod.ui.container.ContainerEditorV2
 import com.winlator.cmod.ui.library.GameDetailRoute
 import com.winlator.cmod.ui.settings.ComponentManagerRoute
 import com.winlator.cmod.ui.settings.ContainersSettingsRoute
-import com.winlator.cmod.ui.theme.WinZTheme
 
 // Detail screens — everything that used to be pushed as a Fragment onto FLFragmentContainer's
 // back stack. They now live in MainShell's own stack, drawn above the tabs:
@@ -66,24 +65,23 @@ internal fun DetailLayer(controller: MainShellController) {
                 exit = fadeOut(tween(DETAIL_EXIT_MS, easing = FastOutLinearInEasing)) +
                     slideOutHorizontally(tween(DETAIL_EXIT_MS, easing = FastOutLinearInEasing)) { it / 10 }
             ) {
-                WinZTheme {
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.background)
-                            // Being a pointer-input node makes this the hit target, so touches
-                            // never fall through to the tab (or lower detail) underneath.
-                            .pointerInput(Unit) { }
-                            .then(
-                                if (isTop) Modifier
-                                else Modifier
-                                    .clearAndSetSemantics { }
-                                    .focusProperties { onEnter = { cancelFocusChange() } }
-                                    .focusGroup()
-                            )
-                    ) {
-                        DetailContent(controller, entry.detail, isTop)
-                    }
+                // Theme comes from MainShell's single WinZTheme root.
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background)
+                        // Being a pointer-input node makes this the hit target, so touches
+                        // never fall through to the tab (or lower detail) underneath.
+                        .pointerInput(Unit) { }
+                        .then(
+                            if (isTop) Modifier
+                            else Modifier
+                                .clearAndSetSemantics { }
+                                .focusProperties { onEnter = { cancelFocusChange() } }
+                                .focusGroup()
+                        )
+                ) {
+                    DetailContent(controller, entry.detail, isTop)
                 }
             }
 

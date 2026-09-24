@@ -32,7 +32,6 @@ import com.winlator.cmod.inputcontrols.ExternalController
 import com.winlator.cmod.inputcontrols.InputControlsManager
 import com.winlator.cmod.ui.ThemedAlertHost
 import com.winlator.cmod.ui.ThemedLoadingOverlayHost
-import com.winlator.cmod.ui.theme.WinZTheme
 import com.winlator.cmod.ui.theme.findActivity
 import com.winlator.cmod.widget.InputControlsView
 import kotlinx.coroutines.CoroutineScope
@@ -80,14 +79,12 @@ fun InputControlsRoute(initialProfileId: Int, shownSerial: Int) {
         if (shownSerial > 0) state.reload()
     }
 
-    WinZTheme {
-        val model = state.model
-        if (model != null) {
-            InputControlsScreen(model, state)
-        } else {
-            // First load is in flight (a few ms of disk IO off the main thread).
-            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
-        }
+    val model = state.model
+    if (model != null) {
+        InputControlsScreen(model, state)
+    } else {
+        // First load is in flight (a few ms of disk IO off the main thread).
+        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
     }
 }
 
@@ -253,7 +250,7 @@ internal class InputControlsScreenState(
         intent.putExtra("profile_id", profile.id)
         activity.startActivity(intent)
         @Suppress("DEPRECATION")
-        activity.overridePendingTransition(R.anim.slide_in_up, R.anim.slide_out_down)
+        activity.overridePendingTransition(R.anim.shared_axis_enter, R.anim.shared_axis_exit)
     }
 
     override fun onOpenController(index: Int) {
@@ -264,7 +261,7 @@ internal class InputControlsScreenState(
         intent.putExtra("controller_id", controller.id)
         activity.startActivity(intent)
         @Suppress("DEPRECATION")
-        activity.overridePendingTransition(R.anim.slide_in_up, R.anim.slide_out_down)
+        activity.overridePendingTransition(R.anim.shared_axis_enter, R.anim.shared_axis_exit)
     }
 
     override fun onRemoveController(index: Int) {
