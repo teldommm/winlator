@@ -5,12 +5,19 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
@@ -66,8 +73,14 @@ private val RESHADE_EFFECTS = listOf(
     "Filmic", "Arcade", "Retro CRT", "Upscale Sharp", "Pixel Clean", "Anime Edge"
 )
 
-private const val FPS_LIMIT_MIN = 30
-private const val FPS_LIMIT_MAX = 120
+// FPS Limit slider: position 0 = Off, positions 1..23 = 5..115 FPS in 5 FPS steps, position 24
+// ("Custom") shows a numeric field for any other value (e.g. 40, 72, 144). 0 is what
+// VulkanXServerView / PresentExtension treat as "no limit".
+private const val FPS_STEP = 5
+private const val FPS_SLIDER_MAX_FPS = 120
+private const val FPS_CUSTOM_POSITION = FPS_SLIDER_MAX_FPS / FPS_STEP
+// Same ceiling VulkanXServerView.setFpsLimit() clamps to.
+private const val FPS_CUSTOM_MAX = 1000
 
 @Composable
 private fun GraphicsSidebarPanel(
@@ -235,16 +248,78 @@ private fun GraphicsSidebarPanel(
 
 @Composable
 private fun FpsLimiterCard(initialFps: Int, onFpsChanged: (Int) -> Unit) {
-    var fps by remember { mutableStateOf(initialFps.coerceIn(FPS_LIMIT_MIN, FPS_LIMIT_MAX)) }
+    val initialPosition = when {
+        initialFps <= 0 -> 0
+        initialFps >= FPS_SLIDER_MAX_FPS || initialFps % FPS_STEP != 0 -> FPS_CUSTOM_POSITION
+        else -> initialFps / FPS_STEP
+    }
+    var position by remember { mutableStateOf(initialPosition) }
+    var customText by remember {
+        mutableStateOf(if (initialPosition == FPS_CUSTOM_POSITION && initialFps > 0) initialFps.toString() else "")
+    }
+    // Last value handed to onFpsChanged, so the same limit isn't re-saved (shortcut.saveData()
+    // writes to disk) on every slider release or keystroke that doesn't change it.
+    var applied by remember { mutableStateOf(initialFps.coerceAtLeast(0)) }
+    val focusManager = LocalFocusManager.current
+
+    fun customValue(): Int? = customText.toIntOrNull()?.takeIf { it > 0 }?.coerceAtMost(FPS_CUSTOM_MAX)
+
+    // null = nothing valid to apply yet (Custom selected with an empty field): keep the
+    // current limit instead of silently jumping to some default.
+    fun chosenLimit(): Int? = when {
+        position <= 0 -> 0
+        position < FPS_CUSTOM_POSITION -> position * FPS_STEP
+        else -> customValue()
+    }
+
+    fun apply() {
+        val limit = chosenLimit() ?: return
+        if (limit != applied) {
+            applied = limit
+            onFpsChanged(limit)
+        }
+    }
 
     SidebarCard {
         SidebarSlider(
             label = "FPS Limit",
-            valueText = "$fps FPS",
-            value = fps.toFloat(),
-            onValueChange = { fps = it.roundToInt() },
-            onValueChangeFinished = { onFpsChanged(fps) },
-            valueRange = FPS_LIMIT_MIN.toFloat()..FPS_LIMIT_MAX.toFloat()
+            valueText = when {
+                position <= 0 -> "Off"
+                position >= FPS_CUSTOM_POSITION -> customValue()?.let { "Custom · $it FPS" } ?: "Custom"
+                else -> "${position * FPS_STEP} FPS"
+            },
+            value = position.toFloat(),
+            onValueChange = {
+                position = it.roundToInt().coerceIn(0, FPS_CUSTOM_POSITION)
+                // Pre-fill Custom with the limit that was active, so dragging into it doesn't
+                // leave an empty field.
+                if (position >= FPS_CUSTOM_POSITION && customText.isEmpty() && applied > 0) {
+                    customText = applied.toString()
+                }
+            },
+            onValueChangeFinished = { apply() },
+            valueRange = 0f..FPS_CUSTOM_POSITION.toFloat()
         )
+        if (position >= FPS_CUSTOM_POSITION) {
+            Spacer(Modifier.height(10.dp))
+            OutlinedTextField(
+                value = customText,
+                onValueChange = { text ->
+                    customText = text.filter(Char::isDigit).take(4)
+                    apply()
+                },
+                singleLine = true,
+                placeholder = { Text("Enter custom FPS") },
+                suffix = { Text("FPS") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = {
+                    // Normalize what's shown to what was applied (e.g. 5000 -> 1000).
+                    customValue()?.let { customText = it.toString() }
+                    apply()
+                    focusManager.clearFocus()
+                }),
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 }
