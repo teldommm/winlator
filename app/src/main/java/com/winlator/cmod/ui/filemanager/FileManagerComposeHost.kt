@@ -1,7 +1,5 @@
 package com.winlator.cmod.ui.filemanager
 
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -72,6 +70,7 @@ import java.util.Date
 import java.util.Locale
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import com.winlator.cmod.ui.ShellChrome
+import com.winlator.cmod.ui.library.LibraryImageCache
 
 // One row in the file listing — a file or a folder in the current directory.
 data class FileEntryUiModel(
@@ -402,7 +401,10 @@ private fun formatSize(size: Long): String {
 private fun FileIcon(entry: FileEntryUiModel, modifier: Modifier = Modifier) {
     val cachePath = entry.iconCachePath
     if (entry.isExecutable && cachePath != null) {
-        val bitmap by produceState<Bitmap?>(initialValue = null, entry.path, cachePath) {
+        // Start from an already decoded icon (same cache as the Library) so rows that scroll back
+        // into view, or a folder you return to, don't flash the generic file icon first.
+        val iconKey = remember(cachePath) { LibraryImageCache.keyFor(cachePath) }
+        val bitmap by produceState(LibraryImageCache.peek(iconKey), entry.path, cachePath) {
             value = withContext(Dispatchers.IO) {
                 val cacheFile = File(cachePath)
                 if (!cacheFile.exists()) {
@@ -415,7 +417,7 @@ private fun FileIcon(entry: FileEntryUiModel, modifier: Modifier = Modifier) {
                         }
                     }
                 }
-                if (cacheFile.exists()) BitmapFactory.decodeFile(cacheFile.absolutePath) else null
+                LibraryImageCache.load(cacheFile.absolutePath)
             }
         }
         val loaded = bitmap

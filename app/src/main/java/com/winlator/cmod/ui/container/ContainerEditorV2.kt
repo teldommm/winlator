@@ -109,6 +109,7 @@ import com.winlator.cmod.ui.settings.isTurnipDriver
 import com.winlator.cmod.ui.settings.isVkd3dEnabled
 import com.winlator.cmod.ui.settings.loadSettingsCatalog
 import com.winlator.cmod.ui.settings.cachedWineRuntimeOptions
+import com.winlator.cmod.ui.settings.initialSettingsCatalog
 import com.winlator.cmod.ui.settings.loadWineRuntimeOptions
 import com.winlator.cmod.ui.settings.localeDisplayValue
 import com.winlator.cmod.ui.settings.normalizeLocaleValue
@@ -373,7 +374,15 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
     val fexPresets = remember { FEXCorePresetManager.getPresets(context).associate { it.id to it.name } }
     val boxPresets = remember { Box64PresetManager.getPresets("box64", context).associate { it.id to it.name } }
 
-    val catalog by produceState<SettingsCatalog?>(null, arm64, revision, state.dxvkVersion, state.vkd3dVersion, state.driverVersion) {
+    // Never null: starts from the cached/local catalog so the Compatibility and Video rows are
+    // there from the first frame (see initialSettingsCatalog); the full load then refines it.
+    val initialCatalog = remember(arm64) {
+        initialSettingsCatalog(
+            context, arm64, state.dxvkVersion, state.vkd3dVersion,
+            state.fexVersion, state.boxVersion, state.driverVersion
+        )
+    }
+    val catalog by produceState<SettingsCatalog?>(initialCatalog, arm64, revision, state.dxvkVersion, state.vkd3dVersion, state.driverVersion) {
         value = loadSettingsCatalog(
             context, arm64, state.dxvkVersion, state.vkd3dVersion,
             state.fexVersion, state.boxVersion, state.driverVersion

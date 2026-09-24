@@ -1,7 +1,6 @@
 package com.winlator.cmod.ui.library
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -58,7 +57,6 @@ import com.winlator.cmod.ui.KeepLandscapeChromeHidden
 import com.winlator.cmod.ui.theme.controlAccentColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 
 interface GameDetailCallbacks {
@@ -82,8 +80,11 @@ internal fun GameDetailScreen(title: String, subtitle: String, artworkPath: Stri
     // (title + up arrow) is gone — portrait now has the same on-artwork back button as landscape.
     if (landscape) KeepLandscapeChromeHidden(activity)
 
-    val artwork by produceState<Bitmap?>(fallback, artworkPath, fallback) {
-        value = withContext(Dispatchers.IO) { artworkPath?.takeIf { File(it).isFile }?.let(BitmapFactory::decodeFile) ?: fallback }
+    // The Library pager/tiles have usually decoded this banner/cover already (LibraryImageCache),
+    // so start from it instead of flashing the exe icon first.
+    val artworkKey = remember(artworkPath) { LibraryImageCache.keyFor(artworkPath) }
+    val artwork by produceState(LibraryImageCache.peek(artworkKey) ?: fallback, artworkKey) {
+        value = withContext(Dispatchers.IO) { LibraryImageCache.load(artworkPath) } ?: fallback
     }
     var favorite by remember(initialFavorite) { mutableStateOf(initialFavorite) }
     val toggle = {

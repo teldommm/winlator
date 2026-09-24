@@ -40,9 +40,8 @@
 // One query at a time: the Vulkan loader/driver state is process-wide.
 static pthread_mutex_t gpu_query_lock = PTHREAD_MUTEX_INITIALIZER;
 
-// Strings handed to adrenotools_open_libvulkan(). Kept in static storage (not freed after the
-// call) because adrenotools' hook setup may keep pointers to them; reused by the next query,
-// which only happens after the previous driver handle has been closed (under the lock).
+// Scratch buffers for building the paths handed to adrenotools_open_libvulkan(). The values
+// actually passed are fresh heap copies (see open_vulkan) — never these buffers.
 static char s_driver_path[PATH_MAX];
 static char s_library_name[PATH_MAX];
 static char s_native_lib_dir[PATH_MAX];
@@ -181,9 +180,27 @@ static void *open_vulkan(JNIEnv *env, jobject context, const char *driver_name) 
     if (n <= 0 || (size_t)n >= sizeof(s_tmp_dir)) return NULL;
     mkdir(s_tmp_dir, S_IRWXU | S_IRWXG);
 
+    // adrenotools keeps pointers to these strings in its process-wide hook state, which the
+    // in-game Vulkan renderer (renderer/vulkan) shares. They must stay valid AND unchanged for the
+    // life of the process: an earlier version passed reused static buffers, so the next GPU
+    // query (e.g. the settings screen listing another driver's extensions) rewrote the paths
+    // under the renderer's feet — the game then ran against a different driver (different
+    // extension set, rendering artifacts). Fresh copies, intentionally never freed, like the
+    // original implementation. A few hundred bytes per custom-driver query.
+    char *tmp_dir = strdup(s_tmp_dir);
+    char *native_lib_dir = strdup(s_native_lib_dir);
+    char *driver_path = strdup(s_driver_path);
+    char *library_name = strdup(s_library_name);
+    if (!tmp_dir || !native_lib_dir || !driver_path || !library_name) {
+        free(tmp_dir);
+        free(native_lib_dir);
+        free(driver_path);
+        free(library_name);
+        return NULL;
+    }
     void *handle = adrenotools_open_libvulkan(RTLD_LOCAL | RTLD_NOW, ADRENOTOOLS_DRIVER_CUSTOM,
-                                              s_tmp_dir, s_native_lib_dir, s_driver_path,
-                                              s_library_name, NULL, NULL);
+                                              tmp_dir, native_lib_dir, driver_path,
+                                              library_name, NULL, NULL);
     if (!handle) LOGE("adrenotools_open_libvulkan failed for '%s'", driver_name);
     return handle;
 }
@@ -199,9 +216,23 @@ static void query_end(GpuQuery *q) {
 static int query_begin(GpuQuery *q, JNIEnv *env, jstring jdriverName, jobject context) {
     memset(q, 0, sizeof(*q));
 
+    // Same selection rule as the original implementation: only a Java null means "system
+    // driver"; any other name — including "" — is treated as a custom driver id (and fails
+    // cleanly if it isn't installed). Treating "" as System made settings screens list the
+    // system driver's extensions for configs whose driver is unset/empty.
     char driver_name[PATH_MAX];
-    int has_driver = copy_jstring(env, jdriverName, driver_name, sizeof(driver_name));
-    q->handle = open_vulkan(env, context, has_driver ? driver_name : NULL);
+    const char *requested = NULL;
+    if (jdriverName) {
+        const char *utf = (*env)->GetStringUTFChars(env, jdriverName, NULL);
+        if (!utf) {
+            clear_exception(env);
+            return 0;
+        }
+        snprintf(driver_name, sizeof(driver_name), "%s", utf);
+        (*env)->ReleaseStringUTFChars(env, jdriverName, utf);
+        requested = driver_name;
+    }
+    q->handle = open_vulkan(env, context, requested);
     if (!q->handle) return 0;
 
     PFN_vkGetInstanceProcAddr gip = (PFN_vkGetInstanceProcAddr)dlsym(q->handle, "vkGetInstanceProcAddr");

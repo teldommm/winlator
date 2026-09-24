@@ -208,6 +208,77 @@ internal suspend fun installWineRuntimeComponent(context: Context, option: WineR
         ?.let { ContentsManager.getEntryName(it) }
 }
 
+// Last full catalog per architecture (arm64 / x86_64 containers), process-wide.
+private val cachedCatalogs = java.util.concurrent.ConcurrentHashMap<Boolean, SettingsCatalog>()
+
+// What a settings screen shows before loadSettingsCatalog() returns. That load syncs remote
+// profiles over the network and probes every graphics driver through Vulkan, so it takes a
+// while; screens used to show nothing (catalog == null) meanwhile, then the DXVK/VKD3D/FEXCore/
+// Box64 rows and driver labels popped in and the Compatibility / Video tabs jumped.
+// Returns the last full catalog for this architecture, or a local stand-in with the same rows:
+// bundled versions, the container's current selections (as installed — they are in use), and
+// locally installed Adreno drivers. No network, no GPU probing.
+internal fun initialSettingsCatalog(
+    context: Context,
+    arm64: Boolean,
+    selectedDxvk: String = "",
+    selectedVkd3d: String = "",
+    selectedFex: String = "",
+    selectedBox: String = "",
+    selectedDriver: String = ""
+): SettingsCatalog {
+    cachedCatalogs[arm64]?.let { cached ->
+        // The cache may come from another container; make sure this one's selections are listed.
+        fun VersionCatalog.with(selected: String): VersionCatalog =
+            if (selected.isBlank() || selected in all) this
+            else VersionCatalog(all + selected, installed + selected)
+        return cached.copy(
+            dxvk = cached.dxvk.with(selectedDxvk),
+            vkd3d = cached.vkd3d.with(selectedVkd3d),
+            fex = cached.fex.with(selectedFex),
+            box = cached.box.with(selectedBox),
+            wow = cached.wow.with(selectedBox)
+        )
+    }
+
+    fun versions(bundled: Iterable<String>, selected: String, filterArm: Boolean = true): VersionCatalog {
+        val allowed: (String) -> Boolean = { value ->
+            !filterArm || arm64 || !value.contains("arm64ec", ignoreCase = true)
+        }
+        val installed = linkedSetOf<String>()
+        bundled.filter { it.isNotBlank() && allowed(it) }.forEach(installed::add)
+        if (selected.isNotBlank()) installed.add(selected)
+        return VersionCatalog(installed.toList(), installed)
+    }
+
+    val rendererDrivers = linkedMapOf("system" to "System")
+    val drivers = linkedMapOf("system" to DriverOption("System", "System", true))
+    runCatching {
+        val adreno = AdrenotoolsManager(context)
+        adreno.enumerateRendererDrivers().forEach { id ->
+            val label = listOf(adreno.getDriverName(id), adreno.getDriverVersion(id))
+                .filter { it.isNotBlank() }
+                .joinToString(" ")
+                .ifBlank { id }
+            rendererDrivers[id] = label
+            drivers[id.lowercase()] = DriverOption(id, label, true)
+        }
+    }
+    if (selectedDriver.isNotBlank() && drivers.values.none { it.id.equals(selectedDriver, ignoreCase = true) }) {
+        drivers["selected:${selectedDriver.lowercase()}"] = DriverOption(selectedDriver, selectedDriver, true)
+    }
+
+    return SettingsCatalog(
+        dxvk = versions(context.resources.getStringArray(R.array.dxvk_version_entries).toList(), selectedDxvk),
+        vkd3d = versions(context.resources.getStringArray(R.array.vkd3d_version_entries).toList(), selectedVkd3d),
+        fex = versions(emptyList(), selectedFex, false),
+        box = versions(emptyList(), selectedBox, false),
+        wow = versions(emptyList(), selectedBox, false),
+        drivers = drivers.values.toList(),
+        rendererDrivers = rendererDrivers
+    )
+}
+
 internal suspend fun loadSettingsCatalog(
     context: Context,
     arm64: Boolean,
@@ -216,6 +287,18 @@ internal suspend fun loadSettingsCatalog(
     selectedFex: String = "",
     selectedBox: String = "",
     selectedDriver: String = ""
+): SettingsCatalog = loadSettingsCatalogUncached(
+    context, arm64, selectedDxvk, selectedVkd3d, selectedFex, selectedBox, selectedDriver
+).also { cachedCatalogs[arm64] = it }
+
+private suspend fun loadSettingsCatalogUncached(
+    context: Context,
+    arm64: Boolean,
+    selectedDxvk: String,
+    selectedVkd3d: String,
+    selectedFex: String,
+    selectedBox: String,
+    selectedDriver: String
 ): SettingsCatalog = withContext(Dispatchers.IO) {
     val manager = ContentsManager(context)
     syncRemoteContents(context, manager)

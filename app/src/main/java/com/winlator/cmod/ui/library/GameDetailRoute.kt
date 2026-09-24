@@ -15,7 +15,6 @@ import com.winlator.cmod.container.ContainerManager
 import com.winlator.cmod.container.Shortcut
 import com.winlator.cmod.contents.ContentsManager
 import com.winlator.cmod.core.FileUtils
-import com.winlator.cmod.core.WineInfo
 import com.winlator.cmod.ui.ThemedAlertHost
 import com.winlator.cmod.ui.shortcut.ShortcutSettingsComposeDialog
 import com.winlator.cmod.ui.theme.findActivity
@@ -48,8 +47,14 @@ fun GameDetailRoute(shortcutPath: String, onClose: () -> Unit, onLibraryChanged:
             else -> null
         }
     }
-    val subtitle by produceState(shortcut.container.wineVersion + "  •  Vulkan", shortcut) {
-        value = withContext(Dispatchers.IO) { environmentSubtitle(activity, shortcut) }
+    // Same label as the Library tile ("Proton 9.0 arm64ec · Vulkan"), which the Library has
+    // normally already resolved — so the subtitle is final from the first frame. Refreshed in the
+    // background in case the container's runtime changed since.
+    val subtitle by produceState(
+        LibraryEnvironmentLabels.cached(shortcut.file.path) ?: shortcut.container.name,
+        shortcut
+    ) {
+        value = withContext(Dispatchers.IO) { LibraryEnvironmentLabels.resolveOne(activity, shortcut) }
     }
 
     val callbacks = remember(shortcut) {
@@ -112,18 +117,4 @@ fun GameDetailRoute(shortcutPath: String, onClose: () -> Unit, onLibraryChanged:
         "1" == shortcut.getExtra("favorite", "0"),
         callbacks
     )
-}
-
-private fun environmentSubtitle(activity: AppCompatActivity, shortcut: Shortcut): String {
-    var runtime = shortcut.container.wineVersion
-    try {
-        val contents = ContentsManager(activity)
-        contents.syncContents()
-        val info = WineInfo.fromIdentifier(activity, contents, runtime)
-        var version = info.fullVersion()
-        if (version.endsWith(".0")) version = version.substring(0, version.length - 2)
-        runtime = (if ("proton".equals(info.type, ignoreCase = true)) "Proton " else "Wine ") + version + " " + info.arch
-    } catch (ignored: Exception) {
-    }
-    return "$runtime  •  Vulkan"
 }

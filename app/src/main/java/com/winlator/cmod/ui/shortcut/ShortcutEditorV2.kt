@@ -116,6 +116,7 @@ import com.winlator.cmod.ui.settings.isTurnipDriver
 import com.winlator.cmod.ui.settings.isVkd3dEnabled
 import com.winlator.cmod.ui.settings.loadSettingsCatalog
 import com.winlator.cmod.ui.settings.cachedWineRuntimeOptions
+import com.winlator.cmod.ui.settings.initialSettingsCatalog
 import com.winlator.cmod.ui.settings.loadWineRuntimeOptions
 import com.winlator.cmod.ui.settings.localeDisplayValue
 import com.winlator.cmod.ui.settings.normalizeLocaleValue
@@ -437,7 +438,14 @@ internal fun ShortcutEditorV2(
             InputControlsManager(context).getProfiles(true).forEach { put(it.id.toString(), it.name) }
         }
     }
-    val catalog by produceState<SettingsCatalog?>(null, state.arm64, state.revision, state.dxvkVersion, state.vkd3dVersion, state.driverVersion) {
+    // Starts from the cached/local catalog so rows don't pop in (see initialSettingsCatalog).
+    val initialCatalog = remember(state.arm64) {
+        initialSettingsCatalog(
+            context, state.arm64, state.dxvkVersion, state.vkd3dVersion,
+            state.fexVersion, state.boxVersion, state.driverVersion
+        )
+    }
+    val catalog by produceState<SettingsCatalog?>(initialCatalog, state.arm64, state.revision, state.dxvkVersion, state.vkd3dVersion, state.driverVersion) {
         value = loadSettingsCatalog(
             context, state.arm64, state.dxvkVersion, state.vkd3dVersion,
             state.fexVersion, state.boxVersion, state.driverVersion
