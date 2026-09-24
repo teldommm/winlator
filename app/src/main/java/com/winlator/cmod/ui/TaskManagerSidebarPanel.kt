@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -89,9 +90,9 @@ private fun TaskManagerPanel(state: TaskManagerPanelState, callbacks: TaskManage
         SidebarPanelTitle("Task Manager")
 
         Row(Modifier.fillMaxWidth().height(66.dp)) {
-            MetricCard(modifier = Modifier.weight(0.82f), title = "CPU", value = state.cpuLabel)
+            MetricCard(modifier = Modifier.weight(0.7f), title = "CPU", value = state.cpuLabel)
             Spacer(Modifier.width(10.dp))
-            MetricCard(modifier = Modifier.weight(1.18f), title = "Memory", value = state.memoryLabel)
+            MetricCard(modifier = Modifier.weight(1.3f), title = "Memory", value = state.memoryLabel)
         }
 
         Spacer(Modifier.height(14.dp))
@@ -159,7 +160,7 @@ private fun ProcessRow(row: ProcessRowData, callbacks: TaskManagerCallbacks) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(62.dp)
+            .heightIn(min = 62.dp)
             .clip(shape)
             .background(sidebarCardFillColor())
             .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape)
@@ -184,30 +185,25 @@ private fun ProcessRow(row: ProcessRowData, callbacks: TaskManagerCallbacks) {
 
         Spacer(Modifier.width(10.dp))
 
-        Column(modifier = Modifier.weight(1f)) {
+        // Memory moved from its own 72dp column onto the PID line, so the name gets the full
+        // width; long names wrap to a second line instead of ending in "…".
+        Column(modifier = Modifier.weight(1f).padding(vertical = 8.dp)) {
             Text(
                 text = row.displayName,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(Modifier.height(2.dp))
             Text(
-                text = row.pidLabel,
+                text = if (row.memoryLabel.isNotEmpty()) "${row.pidLabel} · ${row.memoryLabel}" else row.pidLabel,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 style = SidebarText.small(),
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-
-        Text(
-            text = row.memoryLabel,
-            modifier = Modifier.width(72.dp),
-            maxLines = 1,
-            textAlign = TextAlign.End,
-            style = SidebarText.small(),
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
 
         Box {
             IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(32.dp)) {
@@ -236,14 +232,7 @@ private fun ProcessRow(row: ProcessRowData, callbacks: TaskManagerCallbacks) {
                 )
                 SidebarActionItem(
                     label = stringResource(R.string.end_process),
-                    leadingIcon = {
-                        Icon(
-                            painterResource(id = R.drawable.icon_popup_menu_remove),
-                            null,
-                            tint = destructiveColor()
-                        )
-                    },
-                    destructive = true,
+                    leadingIcon = { Icon(painterResource(id = R.drawable.icon_popup_menu_remove), null) },
                     onClick = {
                         menuExpanded = false
                         callbacks.onEndProcess(row.pid, row.rawName)

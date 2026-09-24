@@ -1550,6 +1550,23 @@ public class XServerDisplayActivity extends AppCompatActivity {
     // composed off-screen) — only the Task Manager's 1s process poll needs to stop.
     private void onSidebarClosed() {
         if (taskManagerSidebar != null) taskManagerSidebar.stop();
+        // Drop focus from a sidebar text field so it applies its value, the IME goes away and
+        // key events return to the X server.
+        if (com.winlator.cmod.ui.SidebarTextInputFocus.active) {
+            View focus = getCurrentFocus();
+            if (focus != null) {
+                android.view.inputmethod.InputMethodManager imm =
+                        (android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+                if (imm != null) imm.hideSoftInputFromWindow(focus.getWindowToken(), 0);
+                focus.clearFocus();
+            }
+            com.winlator.cmod.ui.SidebarTextInputFocus.active = false;
+        }
+    }
+
+    private boolean isSidebarTextInputActive() {
+        return com.winlator.cmod.ui.SidebarTextInputFocus.active
+                && drawerLayout != null && drawerLayout.isDrawerOpen(GravityCompat.START);
     }
 
     // Selection + the panel switch animation are both driven by sidebarRailState.selectedId
@@ -1608,13 +1625,13 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
 
             @Override
-            public void onHudScale(int percent) {
-                if (modernHud != null) modernHud.setHudScale(1f + (percent - 50f) / 50f);
+            public void onHudScale(int percent, boolean commit) {
+                if (modernHud != null) modernHud.setHudScale(1f + (percent - 50f) / 50f, commit);
             }
 
             @Override
-            public void onHudAlpha(int percent) {
-                if (modernHud != null) modernHud.setHudAlpha(percent / 100f);
+            public void onHudAlpha(int percent, boolean commit) {
+                if (modernHud != null) modernHud.setHudAlpha(percent / 100f, commit);
             }
 
             @Override
@@ -1814,6 +1831,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
             @Override
             public void onFrameGenFlowScaleChanged(float scale) {
+                if (Math.abs(scale - activeLsfgFlowScale) < 0.001f) return;
                 activeLsfgFlowScale = scale;
                 if (shortcut != null) {
                     shortcut.setLsfgFlowScale(activeLsfgFlowScale);
@@ -1979,9 +1997,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
 
             @Override
-            public void onControlsOpacity(int percent) {
+            public void onControlsOpacity(int percent, boolean commit) {
                 float opacity = percent / 100f;
-                preferences.edit().putFloat("overlay_opacity", opacity).apply();
+                if (commit) preferences.edit().putFloat("overlay_opacity", opacity).apply();
                 inputControlsView.setOverlayOpacity(opacity);
                 inputControlsView.invalidate();
             }
@@ -2388,6 +2406,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
+        // A text field in the sidebar (Custom FPS) is being edited: numeric IMEs deliver digits and
+        // backspace as KeyEvents, which the X server keyboard would otherwise swallow below.
+        if (isSidebarTextInputActive()) return super.dispatchKeyEvent(event);
+
 
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
             if (event.getKeyCode() == KeyEvent.KEYCODE_BUTTON_MODE || event.getKeyCode() == KeyEvent.KEYCODE_HOME

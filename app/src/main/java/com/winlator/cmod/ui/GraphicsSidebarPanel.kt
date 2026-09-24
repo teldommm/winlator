@@ -10,11 +10,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -73,12 +75,12 @@ private val RESHADE_EFFECTS = listOf(
     "Filmic", "Arcade", "Retro CRT", "Upscale Sharp", "Pixel Clean", "Anime Edge"
 )
 
-// FPS Limit slider: position 0 = Off, positions 1..23 = 5..115 FPS in 5 FPS steps, position 24
+// FPS Limit slider: position 0 = Off, positions 1..24 = 5..120 FPS in 5 FPS steps, position 25
 // ("Custom") shows a numeric field for any other value (e.g. 40, 72, 144). 0 is what
 // VulkanXServerView / PresentExtension treat as "no limit".
 private const val FPS_STEP = 5
 private const val FPS_SLIDER_MAX_FPS = 120
-private const val FPS_CUSTOM_POSITION = FPS_SLIDER_MAX_FPS / FPS_STEP
+private const val FPS_CUSTOM_POSITION = FPS_SLIDER_MAX_FPS / FPS_STEP + 1
 // Same ceiling VulkanXServerView.setFpsLimit() clamps to.
 private const val FPS_CUSTOM_MAX = 1000
 
@@ -226,14 +228,20 @@ private fun GraphicsSidebarPanel(
                 )
                 if (frameGenIndex > 0) {
                     Spacer(Modifier.height(12.dp))
+                    // Dragging only updates the label; the (expensive) frame-gen pipeline rebuild and
+                    // the shortcut/container save happen once, when the finger is lifted.
                     var flowScale by remember { mutableStateOf(state.frameGenFlowScale) }
+                    var appliedFlowScale by remember { mutableStateOf(state.frameGenFlowScale) }
                     SidebarSlider(
                         label = "Flow Scale",
                         valueText = "${(flowScale * 100).roundToInt()}%",
                         value = flowScale,
-                        onValueChange = {
-                            flowScale = it
-                            callbacks.onFrameGenFlowScaleChanged(it)
+                        onValueChange = { flowScale = (it * 20f).roundToInt() / 20f },
+                        onValueChangeFinished = {
+                            if (flowScale != appliedFlowScale) {
+                                appliedFlowScale = flowScale
+                                callbacks.onFrameGenFlowScaleChanged(flowScale)
+                            }
                         },
                         valueRange = 0.25f..1.0f
                     )
@@ -250,7 +258,7 @@ private fun GraphicsSidebarPanel(
 private fun FpsLimiterCard(initialFps: Int, onFpsChanged: (Int) -> Unit) {
     val initialPosition = when {
         initialFps <= 0 -> 0
-        initialFps >= FPS_SLIDER_MAX_FPS || initialFps % FPS_STEP != 0 -> FPS_CUSTOM_POSITION
+        initialFps > FPS_SLIDER_MAX_FPS || initialFps % FPS_STEP != 0 -> FPS_CUSTOM_POSITION
         else -> initialFps / FPS_STEP
     }
     var position by remember { mutableStateOf(initialPosition) }
@@ -280,6 +288,12 @@ private fun FpsLimiterCard(initialFps: Int, onFpsChanged: (Int) -> Unit) {
         }
     }
 
+    // While the field has focus the Activity must hand key events to the IME/text field instead
+    // of the X server keyboard; reset on dispose so a torn-down panel can't leave it stuck.
+    DisposableEffect(Unit) {
+        onDispose { SidebarTextInputFocus.active = false }
+    }
+
     SidebarCard {
         SidebarSlider(
             label = "FPS Limit",
@@ -304,22 +318,38 @@ private fun FpsLimiterCard(initialFps: Int, onFpsChanged: (Int) -> Unit) {
             Spacer(Modifier.height(10.dp))
             OutlinedTextField(
                 value = customText,
-                onValueChange = { text ->
-                    customText = text.filter(Char::isDigit).take(4)
-                    apply()
-                },
+                // Only edit the text here. Applying per keystroke would briefly cap the game at
+                // 1 FPS, then 14, ... while typing "144", and save to disk each time.
+                onValueChange = { text -> customText = text.filter(Char::isDigit).take(4) },
                 singleLine = true,
                 placeholder = { Text("Enter custom FPS") },
                 suffix = { Text("FPS") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = {
-                    // Normalize what's shown to what was applied (e.g. 5000 -> 1000).
-                    customValue()?.let { customText = it.toString() }
-                    apply()
-                    focusManager.clearFocus()
-                }),
-                modifier = Modifier.fillMaxWidth()
+                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { focus ->
+                        val wasActive = SidebarTextInputFocus.active
+                        SidebarTextInputFocus.active = focus.isFocused
+                        if (wasActive && !focus.isFocused) {
+                            // Done, tap elsewhere, or drawer closed: normalize (e.g. 5000 -> 1000)
+                            // and apply once.
+                            customValue()?.let { customText = it.toString() }
+                            apply()
+                        }
+                    }
             )
         }
     }
+}
+
+/**
+ * True while a text field inside the in-game sidebar has focus. XServerDisplayActivity checks it
+ * in dispatchKeyEvent: otherwise digit/backspace key events from the numeric IME are consumed by
+ * the X server keyboard and never reach the field.
+ */
+object SidebarTextInputFocus {
+    @JvmField
+    @Volatile
+    var active: Boolean = false
 }

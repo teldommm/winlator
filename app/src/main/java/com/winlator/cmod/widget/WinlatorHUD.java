@@ -1471,14 +1471,24 @@ public class WinlatorHUD extends View {
     public void setDataSource(Object dataSource) {}
 
     public void setHudScale(float scale) {
+        setHudScale(scale, true);
+    }
+
+    // persist = false for live slider drags: only the view changes, SharedPreferences are
+    // written once when the slider is released instead of on every drag tick.
+    public void setHudScale(float scale, boolean persist) {
         setScaleX(scale);
         setScaleY(scale);
-        prefs.edit().putFloat(KEY_SCALE, scale).apply();
+        if (persist) prefs.edit().putFloat(KEY_SCALE, scale).apply();
     }
 
     public void setHudAlpha(float alpha) {
+        setHudAlpha(alpha, true);
+    }
+
+    public void setHudAlpha(float alpha, boolean persist) {
         hudAlpha = Math.max(0f, Math.min(1f, alpha));
-        prefs.edit().putInt(KEY_ALPHA, (int) (hudAlpha * 100)).apply();
+        if (persist) prefs.edit().putInt(KEY_ALPHA, (int) (hudAlpha * 100)).apply();
         invalidate();
     }
 

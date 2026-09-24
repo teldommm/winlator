@@ -2,6 +2,10 @@ package com.winlator.cmod.ui
 
 import android.content.Context
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -40,8 +44,9 @@ data class HudPanelState(
 interface HudPanelCallbacks {
     fun onHudMasterToggled(enabled: Boolean, styleIsModern: Boolean)
     fun onStyleChanged(isModern: Boolean)
-    fun onHudScale(percent: Int)
-    fun onHudAlpha(percent: Int)
+    /** commit = false while dragging (live preview only), true once on release (persist). */
+    fun onHudScale(percent: Int, commit: Boolean)
+    fun onHudAlpha(percent: Int, commit: Boolean)
     fun onResetHudLayout()
     fun onShowLogs()
 }
@@ -120,8 +125,9 @@ private fun HudSidebarPanel(state: HudPanelState, callbacks: HudPanelCallbacks) 
                     value = scale,
                     onValueChange = {
                         scale = it
-                        callbacks.onHudScale(it.toInt())
+                        callbacks.onHudScale(it.toInt(), false)
                     },
+                    onValueChangeFinished = { callbacks.onHudScale(scale.toInt(), true) },
                     valueRange = 0f..100f
                 )
                 Spacer(Modifier.height(6.dp))
@@ -131,8 +137,9 @@ private fun HudSidebarPanel(state: HudPanelState, callbacks: HudPanelCallbacks) 
                     value = alpha,
                     onValueChange = {
                         alpha = it
-                        callbacks.onHudAlpha(it.toInt())
+                        callbacks.onHudAlpha(it.toInt(), false)
                     },
+                    onValueChangeFinished = { callbacks.onHudAlpha(alpha.toInt(), true) },
                     valueRange = 0f..100f
                 )
             }
@@ -175,7 +182,7 @@ private fun MetricCheckboxRow(context: Context, leftLabel: String, leftBit: Int,
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(40.dp),
+            .heightIn(min = 40.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         MetricCheckbox(context, leftLabel, leftBit, Modifier.weight(1f))
@@ -186,21 +193,31 @@ private fun MetricCheckboxRow(context: Context, leftLabel: String, leftBit: Int,
 @Composable
 private fun MetricCheckbox(context: Context, label: String, bit: Int, modifier: Modifier) {
     var checked by remember { mutableStateOf(WinlatorHUD.isOptionEnabled(context, bit)) }
-    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        Checkbox(
-            checked = checked,
-            onCheckedChange = {
+    // The whole cell is the touch target, so the Checkbox itself takes no click handler: that
+    // drops Material's forced 48dp touch box around it (it drew only ~20dp but reserved 48),
+    // which is what squeezed "Battery Temp" / "CPU Usage" into "…" in half the sidebar width.
+    Row(
+        modifier = modifier
+            .heightIn(min = 40.dp)
+            .toggleable(value = checked, role = Role.Checkbox) {
                 checked = it
                 WinlatorHUD.setOptionPreference(context, bit, it)
-            },
+            }
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(
+            checked = checked,
+            onCheckedChange = null,
             colors = CheckboxDefaults.colors(checkedColor = controlAccentColor())
         )
+        Spacer(Modifier.width(8.dp))
         Text(
             text = label,
+            modifier = Modifier.padding(end = 4.dp),
             style = SidebarText.small(),
             color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            maxLines = 2
         )
     }
 }

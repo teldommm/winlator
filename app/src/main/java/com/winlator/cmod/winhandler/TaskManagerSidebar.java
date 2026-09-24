@@ -123,7 +123,7 @@ public class TaskManagerSidebar implements OnGetProcessInfoListener {
     private String formatMemoryPair(long usedBytes, long totalBytes) {
         final double gib = 1024.0 * 1024.0 * 1024.0;
         if (totalBytes >= gib) {
-            return String.format(Locale.US, "%.2f / %.2f GB", usedBytes / gib, totalBytes / gib);
+            return String.format(Locale.US, "%.1f / %.1f GB", usedBytes / gib, totalBytes / gib);
         }
 
         final double mib = 1024.0 * 1024.0;

@@ -54,7 +54,8 @@ interface InputPanelCallbacks {
     )
 
     fun onEditProfiles(selectedProfileId: Int)
-    fun onControlsOpacity(percent: Int)
+    /** commit = false while dragging (live preview only), true once on release (persist). */
+    fun onControlsOpacity(percent: Int, commit: Boolean)
     fun onShowKeyboard()
     fun onVibration()
     fun onRelativeMouse(enabled: Boolean)
@@ -139,8 +140,9 @@ private fun InputSidebarPanel(state: InputPanelState, callbacks: InputPanelCallb
                 value = opacityDraft,
                 onValueChange = {
                     opacityDraft = it
-                    callbacks.onControlsOpacity(it.toInt())
+                    callbacks.onControlsOpacity(it.toInt(), false)
                 },
+                onValueChangeFinished = { callbacks.onControlsOpacity(opacityDraft.toInt(), true) },
                 valueRange = 10f..100f
             )
         }
