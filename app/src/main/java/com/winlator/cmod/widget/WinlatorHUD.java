@@ -1272,8 +1272,8 @@ public class WinlatorHUD extends View {
         float scale = prefs.getFloat(KEY_SCALE, 1f);
         setScaleX(scale);
         setScaleY(scale);
-        setX(prefs.getFloat(KEY_X, 16f));
-        setY(prefs.getFloat(KEY_Y, 16f));
+        setX(prefs.getFloat(KEY_X, DEFAULT_POS));
+        setY(prefs.getFloat(KEY_Y, DEFAULT_POS));
         userEnabled = false;
         setVisibility(GONE);
     }
@@ -1490,23 +1490,32 @@ public class WinlatorHUD extends View {
         refreshBackendRenderer(true);
     }
 
-    public void forceReset() {
+    // Default layout: top-left corner (16, 16), 1.0x size, full opacity, horizontal. Used by
+    // "Reset HUD Layout" in the in-game sidebar. Visibility and the chosen metrics stay as they are.
+    private static final float DEFAULT_POS = 16f;
+
+    public void resetLayout() {
         uiHandler.post(() -> {
-            uiHandler.removeCallbacks(redrawRunnable);
-            redrawScheduled = false;
-            frameAccum.set(0);
-            snapFps = 0;
-            lastFpsNs = 0;
-            dragging = false;
-            touchDownMs = 0;
-            rendererActive = true;
-            userEnabled = true;
-            prefs.edit().putBoolean(KEY_VIS, true).apply();
-            if (!mesaRendererActive) refreshBackendRenderer(true);
-            startStatsThread();
-            setVisibility(VISIBLE);
-            scheduleRedraw();
+            resetSavedLayout(getContext());
+            setX(DEFAULT_POS);
+            setY(DEFAULT_POS);
+            setScaleX(1f);
+            setScaleY(1f);
+            hudAlpha = 1f;
+            vertical = false;
+            requestRelayout();
         });
+    }
+
+    // Prefs-only variant for when the HUD view doesn't exist yet; it reads these on creation.
+    public static void resetSavedLayout(Context context) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .remove(KEY_X)
+                .remove(KEY_Y)
+                .remove(KEY_SCALE)
+                .remove(KEY_ALPHA)
+                .remove(KEY_VERT)
+                .apply();
     }
 
     private void requestRelayout() {

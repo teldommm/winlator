@@ -42,7 +42,7 @@ interface HudPanelCallbacks {
     fun onStyleChanged(isModern: Boolean)
     fun onHudScale(percent: Int)
     fun onHudAlpha(percent: Int)
-    fun onResetHud()
+    fun onResetHudLayout()
     fun onShowLogs()
 }
 
@@ -55,10 +55,19 @@ object HudSidebarPanelHost {
 
 private val HUD_STYLE_LABELS = listOf("Classic", "Modern")
 
+// Slider positions for the default HUD layout (see WinlatorHUD.resetLayout): size 50% = 1.0x,
+// opacity 100%.
+private const val HUD_DEFAULT_SCALE_PERCENT = 50f
+private const val HUD_DEFAULT_ALPHA_PERCENT = 100f
+
 @Composable
 private fun HudSidebarPanel(state: HudPanelState, callbacks: HudPanelCallbacks) {
     var hudOn by remember { mutableStateOf(state.hudOn) }
     var isModern by remember { mutableStateOf(state.isModernStyle) }
+    // Hoisted (not inside the Modern-only card) so "Reset HUD Layout" can snap the sliders back
+    // and they keep their value while the HUD is toggled off and on.
+    var scale by remember { mutableStateOf(state.hudScalePercent.toFloat()) }
+    var alpha by remember { mutableStateOf(state.hudAlphaPercent.toFloat()) }
 
     Column(
         modifier = Modifier
@@ -105,7 +114,6 @@ private fun HudSidebarPanel(state: HudPanelState, callbacks: HudPanelCallbacks) 
 
             SidebarGap()
             SidebarCard {
-                var scale by remember { mutableStateOf(state.hudScalePercent.toFloat()) }
                 SidebarSlider(
                     label = "HUD Size",
                     valueText = "${scale.roundToInt()}%",
@@ -117,7 +125,6 @@ private fun HudSidebarPanel(state: HudPanelState, callbacks: HudPanelCallbacks) 
                     valueRange = 0f..100f
                 )
                 Spacer(Modifier.height(6.dp))
-                var alpha by remember { mutableStateOf(state.hudAlphaPercent.toFloat()) }
                 SidebarSlider(
                     label = "HUD Opacity",
                     valueText = "${alpha.roundToInt()}%",
@@ -129,10 +136,17 @@ private fun HudSidebarPanel(state: HudPanelState, callbacks: HudPanelCallbacks) 
                     valueRange = 0f..100f
                 )
             }
-        }
 
-        SidebarGap()
-        SidebarActionRow(label = "Reset HUD", onClick = callbacks::onResetHud)
+            // Puts the Modern HUD back to its default layout: top-left corner, 1.0x size, full
+            // opacity, horizontal. Useful once it has been dragged off-screen or scaled oddly.
+            // Doesn't change whether the HUD is on or which metrics it shows.
+            SidebarGap()
+            SidebarActionRow(label = "Reset HUD Layout") {
+                scale = HUD_DEFAULT_SCALE_PERCENT
+                alpha = HUD_DEFAULT_ALPHA_PERCENT
+                callbacks.onResetHudLayout()
+            }
+        }
 
         if (state.showLogsRow) {
             SidebarGap()

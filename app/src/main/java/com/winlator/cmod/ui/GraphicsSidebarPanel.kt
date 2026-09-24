@@ -5,16 +5,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
@@ -48,7 +44,6 @@ interface GraphicsPanelCallbacks {
     fun onReshadeStrengthChanged(percent: Int)
     fun onFrameGenChanged(multiplierIndex: Int)
     fun onFrameGenFlowScaleChanged(scale: Float)
-    fun onSavePreset()
 }
 
 object GraphicsSidebarPanelHost {
@@ -71,59 +66,8 @@ private val RESHADE_EFFECTS = listOf(
     "Filmic", "Arcade", "Retro CRT", "Upscale Sharp", "Pixel Clean", "Anime Edge"
 )
 
-// FPS Limit slider: positions 0..23 map to 0/5/10.../115 FPS, position 24 ("Custom") shows
-// a numeric field.
-private const val FPS_STEP = 5
-private const val FPS_SLIDER_MAX_FPS = 120
-private const val FPS_CUSTOM_POSITION = FPS_SLIDER_MAX_FPS / FPS_STEP
-
-@Composable
-private fun FpsLimiterCard(initialFps: Int, onFpsChanged: (Int) -> Unit) {
-    val initialPosition = when {
-        initialFps <= 0 -> 0
-        initialFps >= FPS_SLIDER_MAX_FPS || initialFps % FPS_STEP != 0 -> FPS_CUSTOM_POSITION
-        else -> initialFps / FPS_STEP
-    }
-    var position by remember { mutableStateOf(initialPosition) }
-    var customText by remember {
-        mutableStateOf(if (initialPosition == FPS_CUSTOM_POSITION && initialFps > 0) initialFps.toString() else "")
-    }
-
-    fun chosenLimit(): Int = when {
-        position <= 0 -> 0
-        position < FPS_CUSTOM_POSITION -> position * FPS_STEP
-        else -> customText.toIntOrNull()?.takeIf { it > 0 } ?: FPS_SLIDER_MAX_FPS
-    }
-
-    SidebarCard {
-        SidebarSlider(
-            label = "FPS Limit",
-            valueText = when {
-                position <= 0 -> "Off"
-                position >= FPS_CUSTOM_POSITION -> "Custom"
-                else -> "${position * FPS_STEP} FPS"
-            },
-            value = position.toFloat(),
-            onValueChange = { position = it.roundToInt() },
-            onValueChangeFinished = { onFpsChanged(chosenLimit()) },
-            valueRange = 0f..FPS_CUSTOM_POSITION.toFloat()
-        )
-        if (position >= FPS_CUSTOM_POSITION) {
-            Spacer(Modifier.height(10.dp))
-            OutlinedTextField(
-                value = customText,
-                onValueChange = {
-                    customText = it.filter(Char::isDigit)
-                    onFpsChanged(chosenLimit())
-                },
-                singleLine = true,
-                placeholder = { Text("Enter custom FPS") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-    }
-}
+private const val FPS_LIMIT_MIN = 30
+private const val FPS_LIMIT_MAX = 120
 
 @Composable
 private fun GraphicsSidebarPanel(
@@ -284,7 +228,23 @@ private fun GraphicsSidebarPanel(
             }
         }
 
-        SidebarGap()
-        SidebarActionRow(label = "Save Preset", accent = true, onClick = callbacks::onSavePreset)
+        // Settings on this panel are saved as they change (per shortcut, or to the container when
+        // launched without one) — there's no separate "Save Preset" step.
+    }
+}
+
+@Composable
+private fun FpsLimiterCard(initialFps: Int, onFpsChanged: (Int) -> Unit) {
+    var fps by remember { mutableStateOf(initialFps.coerceIn(FPS_LIMIT_MIN, FPS_LIMIT_MAX)) }
+
+    SidebarCard {
+        SidebarSlider(
+            label = "FPS Limit",
+            valueText = "$fps FPS",
+            value = fps.toFloat(),
+            onValueChange = { fps = it.roundToInt() },
+            onValueChangeFinished = { onFpsChanged(fps) },
+            valueRange = FPS_LIMIT_MIN.toFloat()..FPS_LIMIT_MAX.toFloat()
+        )
     }
 }

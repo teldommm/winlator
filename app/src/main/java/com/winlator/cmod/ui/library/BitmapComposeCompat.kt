@@ -129,21 +129,15 @@ internal fun LibraryRoot(
             selectedShortcutPath = selectedShortcutPath,
             callbacks = cb,
             header = {
-                LibraryLandscapeHeader(
+                LibraryLandscapeTop(
                     activity = activity,
                     grid = grid,
                     onArtwork = true,
-                    containerEndPadding = 26.dp,
                     query = query,
-                    onGridViewChanged = cb::onGridViewChanged,
-                    onSearchQueryChanged = cb::onSearchQueryChanged
+                    filter = filter,
+                    onFilter = { filterName = it.name },
+                    cb = cb
                 )
-                Spacer(Modifier.height(7.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                    LibraryFilter.values().forEach { option ->
-                        LibraryFilterChip(option.name, option == filter) { filterName = option.name }
-                    }
-                }
             },
             footerActions = { item ->
                 IconButton(onClick = { menu = item }) { Icon(Icons.Outlined.MoreVert, "More options", tint = Color.White) }
@@ -155,15 +149,21 @@ internal fun LibraryRoot(
 
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(horizontal = 14.dp)) {
         if (landscape) {
-            LibraryLandscapeHeader(
-                activity = activity,
-                grid = grid,
-                onArtwork = false,
-                query = query,
-                onGridViewChanged = cb::onGridViewChanged,
-                onSearchQueryChanged = cb::onSearchQueryChanged
-            )
-            Spacer(Modifier.height(7.dp))
+            // Same top section, at the same screen position, as the artwork pager — the grid/list
+            // toggle switches between the two layouts, and the title and filter chips used to
+            // jump (different side padding, chips 12dp lower and differently spaced).
+            Box(Modifier.padding(horizontal = LANDSCAPE_TOP_EXTRA_PADDING)) {
+                LibraryLandscapeTop(
+                    activity = activity,
+                    grid = grid,
+                    onArtwork = false,
+                    query = query,
+                    filter = filter,
+                    onFilter = { filterName = it.name },
+                    cb = cb
+                )
+            }
+            Spacer(Modifier.height(12.dp))
         } else {
             LibraryPortraitHeader(
                 activity = activity,
@@ -173,10 +173,10 @@ internal fun LibraryRoot(
                 onSearchQueryChanged = cb::onSearchQueryChanged,
                 onOpenFileManager = cb::onOpenFileManager
             )
-        }
-        Row(Modifier.padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            LibraryFilter.values().forEach { option ->
-                LibraryFilterChip(option.name, option == filter) { filterName = option.name }
+            Row(Modifier.padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(LIBRARY_CHIP_SPACING)) {
+                LibraryFilter.values().forEach { option ->
+                    LibraryFilterChip(option.name, option == filter) { filterName = option.name }
+                }
             }
         }
         if (visible.isEmpty()) {
@@ -225,6 +225,43 @@ internal fun LibraryRoot(
                 items(visible, key = { it.id }) { item ->
                     if (grid) CoverArtworkCard(item, cb) else CompactArtworkCard(item, cb)
                 }
+            }
+        }
+    }
+}
+
+// Landscape top section shared by the artwork pager and the grid/list layout: header band +
+// filter chips, identical in both so switching layouts leaves them exactly where they were.
+// Both containers put it 26dp from the screen edges (pager: its own 26dp padding; grid: 14dp
+// column padding + LANDSCAPE_TOP_EXTRA_PADDING).
+private val LANDSCAPE_TOP_EXTRA_PADDING = 12.dp
+private val LANDSCAPE_TOP_EDGE = 26.dp
+private val LIBRARY_CHIP_SPACING = 8.dp
+
+@Composable
+private fun LibraryLandscapeTop(
+    activity: MainActivity?,
+    grid: Boolean,
+    onArtwork: Boolean,
+    query: String,
+    filter: LibraryFilter,
+    onFilter: (LibraryFilter) -> Unit,
+    cb: LibraryCallbacks
+) {
+    Column {
+        LibraryLandscapeHeader(
+            activity = activity,
+            grid = grid,
+            onArtwork = onArtwork,
+            containerEndPadding = LANDSCAPE_TOP_EDGE,
+            query = query,
+            onGridViewChanged = cb::onGridViewChanged,
+            onSearchQueryChanged = cb::onSearchQueryChanged
+        )
+        Spacer(Modifier.height(7.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(LIBRARY_CHIP_SPACING)) {
+            LibraryFilter.values().forEach { option ->
+                LibraryFilterChip(option.name, option == filter) { onFilter(option) }
             }
         }
     }

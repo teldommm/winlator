@@ -1618,8 +1618,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
 
             @Override
-            public void onResetHud() {
-                if (modernHud != null) modernHud.forceReset();
+            public void onResetHudLayout() {
+                if (modernHud != null) modernHud.resetLayout();
+                else WinlatorHUD.resetSavedLayout(XServerDisplayActivity.this);
             }
 
             @Override
@@ -1825,20 +1826,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     vkRenderer.setFrameGenNative(activeLsfgDll, activeLsfgMultiplier, activeLsfgFlowScale);
             }
 
-            @Override
-            public void onSavePreset() {
-                // Distinct from the per-shortcut autosave above: this always writes the
-                // container-wide default, matching the original Save Preset button, which
-                // only ever targeted Container regardless of whether a Shortcut existed.
-                if (container == null) return;
-                container.putExtra("graphicsFilterMode",
-                        String.valueOf(graphicsFsrEnabled ? graphicsUpscalerModeIndex + 2 : 0));
-                container.putExtra("graphicsSharpness", String.valueOf((float) graphicsSharpnessPercent));
-                container.putExtra("graphicsPostFXMode", String.valueOf(graphicsPostFxModeIndex));
-                container.putExtra("graphicsColorMode", "0");
-                container.saveData();
-                Toast.makeText(XServerDisplayActivity.this, "Preset saved", Toast.LENGTH_SHORT).show();
-            }
         };
 
         GraphicsSidebarPanelHost.attach(ingameSidebar, R.id.LLSubGraphics, state, callbacks);
