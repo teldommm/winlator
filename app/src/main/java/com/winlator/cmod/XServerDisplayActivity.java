@@ -205,7 +205,16 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private SidebarRailState sidebarRailState;
     private IngameSidebarController ingameSidebar;
     private WineRequestHandler wineRequestHandler;
+    // Touch Speed (pref "cursor_speed"): finger on the touch area, Trackpad elements and
+    // mouse-move buttons. Applied on its own — the active profile no longer multiplies it.
     private float globalCursorSpeed = 1.0f;
+    // Mouse Speed (pref "mouse_speed"): physical mouse while the pointer is captured.
+    private float mouseSpeed = 1.0f;
+    private final com.winlator.cmod.math.MotionAccumulator capturedMouseMotion = new com.winlator.cmod.math.MotionAccumulator();
+    // Touch surface mode (sidebar "Touch Mode"); starts from the shortcut's simTouchScreen
+    // setting. Sidebar changes last for this session only — the shortcut is never rewritten
+    // from in-game (its editor's Input tab stays the one place that sets the default).
+    private int touchMode = TouchpadView.MODE_TRACKPAD;
     private float refreshRate = 60.0f;
     private MagnifierView magnifierView;
     private DebugDialog debugDialog;
@@ -729,9 +738,13 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
             case MotionEvent.ACTION_MOVE:
             case MotionEvent.ACTION_HOVER_MOVE: {
+                // Captured pointer: getX()/getY() are the device's relative counts. Scale them by
+                // Mouse Speed and carry the fraction, so low speeds don't round fine motion away.
                 float[] p = XForm.transformPoint(xform, event.getX(), event.getY());
-                int dx = (int) p[0];
-                int dy = (int) p[1];
+                capturedMouseMotion.add(p[0] * mouseSpeed, p[1] * mouseSpeed);
+                int dx = capturedMouseMotion.x();
+                int dy = capturedMouseMotion.y();
+                if (dx == 0 && dy == 0) break;
                 if (xServer.isRelativeMouseMovement())
                     winHandler.mouseEvent(MouseEventFlags.MOVE, dx, dy, 0);
                 else
@@ -1230,9 +1243,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         rootView.addView(xServerView);
 
-        globalCursorSpeed = preferences.getFloat("cursor_speed", 1.0f);
+        globalCursorSpeed = clampSpeedPercent(Math.round(preferences.getFloat("cursor_speed", 1.0f) * 100f)) / 100f;
+        mouseSpeed = clampSpeedPercent(Math.round(preferences.getFloat("mouse_speed", 1.0f) * 100f)) / 100f;
         touchpadView = new TouchpadView(this, xServer, timeoutHandler, hideControlsRunnable);
         touchpadView.setSensitivity(globalCursorSpeed);
+        touchpadView.setTapToClickEnabled(preferences.getBoolean("touch_tap_to_click", true));
         touchpadView.setMouseEnabled(!isMouseDisabled);
         touchpadView.setFourFingersTapCallback(() -> {
             if (!drawerLayout.isDrawerOpen(GravityCompat.START))
@@ -1311,8 +1326,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     showInputControls(profile);
             }
 
+            // The shortcut's "simulate touchscreen" picks the starting Touch Mode; the sidebar
+            // can switch it for the session.
             String simTouchScreen = shortcut.getExtra("simTouchScreen");
-            touchpadView.setSimTouchScreen(simTouchScreen.equals("1"));
+            touchMode = simTouchScreen.equals("1") ? TouchpadView.MODE_TOUCHSCREEN : TouchpadView.MODE_TRACKPAD;
+            touchpadView.setTouchMode(touchMode);
             if (simulateTouchScreen) {
                 renderer.setCursorVisible(false);
             }
@@ -1906,17 +1924,20 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
     }
 
-        private void setupSidebarInputControls() {
+    private void setupSidebarInputControls() {
         if (inputControlsView == null || inputControlsManager == null) return;
 
         if (ingameSidebar == null) return;
 
         InputPanelCallbacks callbacks = new InputPanelCallbacks() {
             // Mirrors the old applySidebarInputControls(): always re-reads/re-persists the
-            // full snapshot of profile + all three switches, whichever one just changed.
+            // full snapshot of profile + switches, whichever one just changed. The touchscreen
+            // timeout switch is gone from the panel (auto-hide is compiled out, see
+            // DISABLE_TOUCHSCREEN_AUTO_HIDE), so its stored value is simply carried along.
             @Override
             public void onControlsSettingsChanged(int profileId, boolean showTouchscreenControls,
-                                                   boolean touchscreenTimeout, boolean touchscreenHaptics) {
+                                                   boolean touchscreenHaptics) {
+                boolean touchscreenTimeout = preferences.getBoolean("touchscreen_timeout_enabled", false);
                 inputControlsView.setShowTouchscreenControls(showTouchscreenControls);
 
                 ArrayList<ControlsProfile> profiles = inputControlsManager.getProfiles();
@@ -1930,7 +1951,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
                 SharedPreferences.Editor editor = preferences.edit();
                 editor.putBoolean("show_touchscreen_controls_enabled", showTouchscreenControls);
-                editor.putBoolean("touchscreen_timeout_enabled", touchscreenTimeout);
                 editor.putBoolean("touchscreen_haptics_enabled", touchscreenHaptics);
                 editor.putInt("selected_profile_index", position);
                 editor.apply();
@@ -1970,7 +1990,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     onControlsSettingsChanged(
                             -1,
                             inputControlsView.isShowTouchscreenControls(),
-                            preferences.getBoolean("touchscreen_timeout_enabled", false),
                             preferences.getBoolean("touchscreen_haptics_enabled", false)
                     );
                     refreshInputPanel.run();
@@ -1996,6 +2015,37 @@ public class XServerDisplayActivity extends AppCompatActivity {
             public void onVibration() {
                 showVibrationDialog();
                 drawerLayout.closeDrawers();
+            }
+
+            @Override
+            public void onTouchMode(int mode) {
+                touchMode = mode == TouchpadView.MODE_TOUCHSCREEN ? TouchpadView.MODE_TOUCHSCREEN : TouchpadView.MODE_TRACKPAD;
+                simulateTouchScreen = touchMode == TouchpadView.MODE_TOUCHSCREEN;
+                if (touchpadView != null) touchpadView.setTouchMode(touchMode);
+                // Touchscreen: the finger is the cursor, so hide the drawn one (as the shortcut
+                // option always did); Trackpad needs it back.
+                if (xServerView != null) xServerView.setCursorVisible(!simulateTouchScreen);
+            }
+
+            @Override
+            public void onTouchSpeed(int percent, boolean commit) {
+                globalCursorSpeed = clampSpeedPercent(percent) / 100f;
+                if (touchpadView != null) touchpadView.setSensitivity(globalCursorSpeed);
+                // Same global setting as Settings > Touch speed.
+                if (commit) preferences.edit().putFloat("cursor_speed", globalCursorSpeed).apply();
+            }
+
+            @Override
+            public void onMouseSpeed(int percent, boolean commit) {
+                mouseSpeed = clampSpeedPercent(percent) / 100f;
+                // Same global setting as Settings > Mouse speed.
+                if (commit) preferences.edit().putFloat("mouse_speed", mouseSpeed).apply();
+            }
+
+            @Override
+            public void onTapToClick(boolean enabled) {
+                if (touchpadView != null) touchpadView.setTapToClickEnabled(enabled);
+                preferences.edit().putBoolean("touch_tap_to_click", enabled).apply();
             }
 
             @Override
@@ -2027,15 +2077,23 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     profileOptions,
                     selectedProfileId,
                     inputControlsView.isShowTouchscreenControls(),
-                    preferences.getBoolean("touchscreen_timeout_enabled", false),
                     preferences.getBoolean("touchscreen_haptics_enabled", false),
                     Math.round(preferences.getFloat("overlay_opacity", InputControlsView.DEFAULT_OVERLAY_OPACITY) * 100f),
                     isRelativeMouseMovement,
-                    isMouseDisabled
+                    isMouseDisabled,
+                    touchMode,
+                    Math.round(globalCursorSpeed * 100f),
+                    Math.round(mouseSpeed * 100f),
+                    touchpadView == null || touchpadView.isTapToClickEnabled()
             );
             InputSidebarPanelHost.attach(ingameSidebar, R.id.LLSubInput, state, callbacks);
         };
         refreshInputPanel.run();
+    }
+
+    /** Touch Speed / Mouse Speed share the Settings range: 10..200 %. */
+    private static int clampSpeedPercent(int percent) {
+        return Math.max(10, Math.min(200, percent));
     }
 
     private void simulateConfirmInputControlsDialog() {
@@ -2131,7 +2189,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
         inputControlsView.setVisibility(View.VISIBLE);
         inputControlsView.requestFocus();
 
-        touchpadView.setSensitivity(profile.getCursorSpeed() * globalCursorSpeed);
+        // Touch Speed only: the profile's own speed now drives just its stick/button mouse moves.
+        touchpadView.setSensitivity(globalCursorSpeed);
         touchpadView.setPointerButtonRightEnabled(false);
 
         inputControlsView.invalidate();
@@ -2150,6 +2209,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
         touchpadView.setSensitivity(globalCursorSpeed);
         touchpadView.setPointerButtonLeftEnabled(true);
         touchpadView.setPointerButtonRightEnabled(true);
+        // No controls any more: no pointer may stay on the touchpad's ignore list.
+        touchpadView.setPointerIdsToIgnore(java.util.Collections.emptySet());
 
         inputControlsView.invalidate();
         winHandler.sendGamepadState();

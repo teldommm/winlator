@@ -148,6 +148,7 @@ internal class InputControlsScreenState(
             profileItems,
             currentProfile?.id ?: 0,
             opacity,
+            currentProfile?.let { (it.cursorSpeed * 100f).roundToInt() },
             controllerItems
         )
     }
@@ -171,6 +172,14 @@ internal class InputControlsScreenState(
     override fun onOpacityChanged(percent: Int) {
         val snapped = ((percent / 5.0f).roundToInt() * 5).coerceIn(0, 100)
         preferences.edit().putFloat("overlay_opacity", snapped / 100.0f).apply()
+        rebuild()
+    }
+
+    override fun onStickMouseSpeedChanged(percent: Int) {
+        val profile = currentProfile ?: return
+        // ControlsProfile sanitizes/clamps (0.1..2.0) and rounds to whole percent.
+        profile.cursorSpeed = percent / 100f
+        profile.save()
         rebuild()
     }
 

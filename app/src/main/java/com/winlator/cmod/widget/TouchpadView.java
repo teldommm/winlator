@@ -8,6 +8,7 @@ import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.StateListDrawable;
 import android.util.Log;
 import android.os.Handler;
+import android.os.Looper;
 import android.view.InputDevice;
 import android.view.MotionEvent;
 import android.view.PointerIcon;
@@ -17,9 +18,13 @@ import android.widget.FrameLayout;
 
 import androidx.preference.PreferenceManager;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import com.winlator.cmod.R;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.math.Mathf;
+import com.winlator.cmod.math.MotionAccumulator;
 import com.winlator.cmod.math.XForm;
 import com.winlator.cmod.renderer.ViewTransformation;
 import com.winlator.cmod.winhandler.MouseEventFlags;
@@ -55,6 +60,46 @@ public class TouchpadView extends View {
     private float resolutionScale;
     private static final int UPDATE_FORM_DELAYED_TIME = 50;
     private boolean mouseEnabled = true;
+
+    // ---------- Touch mode ----------
+    // TRACKPAD: relative cursor (tap = click, two-finger tap = right click, scroll, drag).
+    // TOUCHSCREEN: the cursor goes where the finger is (press = left button down), always with
+    // absolute X pointer events — Relative Mouse is not applied in this mode.
+    public static final int MODE_TRACKPAD = 0;
+    public static final int MODE_TOUCHSCREEN = 1;
+    private int touchMode = MODE_TRACKPAD;
+    // Mode captured on the first finger down and kept until every finger is up, so switching
+    // modes can never re-route a gesture halfway through.
+    private int gestureMode = -1;
+
+    // Tap/press-to-click for every touch gesture (tap, two-finger tap, long press, touchscreen
+    // press). Off = the touch surface only moves / scrolls; on-screen buttons still click.
+    private boolean tapToClickEnabled = true;
+
+    // Pointers currently held by on-screen controls (InputControlsView keeps this in sync):
+    // those fingers never count as trackpad / touchscreen fingers.
+    private final Set<Integer> pointerIdsToIgnore = new HashSet<>();
+
+    // Trackpad: hold one finger still ~1 s = right click.
+    private static final long LONG_PRESS_RIGHT_CLICK_MS = 1000;
+    private final Handler longPressHandler = new Handler(Looper.getMainLooper());
+    private boolean longPressActive = false;
+    private final Runnable longPressRunnable = this::onLongPress;
+
+    // Touchscreen: own pointer tracking (independent of the event's pointer order, so a finger
+    // on a stick can't become "the" touch).
+    private static final long TOUCHSCREEN_DOUBLE_TAP_MS = 500;
+    private static final float TOUCHSCREEN_DOUBLE_TAP_DISTANCE = 100f;
+    private static final float TOUCHSCREEN_SCROLL_STEP = 100f;
+    private int tsPrimaryId = -1;
+    private int tsSecondaryId = -1;
+    private boolean tsScrolled = false;
+    private long tsSecondaryDownTime;
+    private float tsScrollLastY;
+    private float tsScrollAccum;
+    private long lastTapDownTime;
+    private float lastTapRawX, lastTapRawY;
+    private int lastTapX, lastTapY;
 
     private Handler timeoutHandler; // Reference to the activity's timeout handler
     private Runnable hideControlsRunnable; // Runnable to hide the controls
@@ -123,10 +168,19 @@ public class TouchpadView extends View {
         private final int startY;
         private int lastX;
         private int lastY;
+        // Unrounded X-screen position: deltas are taken from these so sub-pixel finger motion
+        // isn't lost before the speed is applied (the int fields stay for absolute use).
+        private float fx;
+        private float fy;
+        private float lastFx;
+        private float lastFy;
+        private final MotionAccumulator motion = new MotionAccumulator();
         private final long touchTime;
 
         public Finger(float x, float y) {
             float[] transformedPoint = XForm.transformPoint(xform, x, y);
+            this.fx = this.lastFx = transformedPoint[0];
+            this.fy = this.lastFy = transformedPoint[1];
             this.x = this.startX = this.lastX = (int)transformedPoint[0];
             this.y = this.startY = this.lastY = (int)transformedPoint[1];
             touchTime = System.currentTimeMillis();
@@ -135,21 +189,18 @@ public class TouchpadView extends View {
         public void update(float x, float y) {
             lastX = this.x;
             lastY = this.y;
+            lastFx = fx;
+            lastFy = fy;
             float[] transformedPoint = XForm.transformPoint(xform, x, y);
-            this.x = (int)transformedPoint[0];
-            this.y = (int)transformedPoint[1];
+            fx = transformedPoint[0];
+            fy = transformedPoint[1];
+            this.x = (int)fx;
+            this.y = (int)fy;
         }
 
-        private int deltaX() {
-            float dx = (x - lastX) * sensitivity;
-            if (Math.abs(dx) > CURSOR_ACCELERATION_THRESHOLD) dx *= CURSOR_ACCELERATION;
-            return Mathf.roundPoint(dx);
-        }
-
-        private int deltaY() {
-            float dy = (y - lastY) * sensitivity;
-            if (Math.abs(dy) > CURSOR_ACCELERATION_THRESHOLD) dy *= CURSOR_ACCELERATION;
-            return Mathf.roundPoint(dy);
+        /** Scales the last move by the touch speed and returns it as whole pixels in {@link #motion}. */
+        private void accumulateDelta() {
+            motion.add(accelerate((fx - lastFx) * sensitivity), accelerate((fy - lastFy) * sensitivity));
         }
 
         private boolean isTap() {
@@ -169,22 +220,19 @@ public class TouchpadView extends View {
     public boolean onTouchEvent(MotionEvent event) {
         // If mouse is disabled, ignore all input
         if (!mouseEnabled) return true;
-        
-        boolean isTouchscreenMode = preferences.getBoolean("touchscreen_toggle", false);
 
         // Reset the timeout timer to keep controls visible
-        resetTouchscreenTimeout();  // <-- Ensure the controls stay visible
+        resetTouchscreenTimeout();
 
-        // Continue handling touch events as usual
-        int toolType = event.getToolType(0);
+        if (event.getToolType(0) == MotionEvent.TOOL_TYPE_STYLUS) return handleStylusEvent(event);
 
-        if (toolType == MotionEvent.TOOL_TYPE_STYLUS) {
-            return handleStylusEvent(event);
-        } else if (isTouchscreenMode) {
-            return handleTouchscreenEvent(event);
-        } else {
-            return handleTouchpadEvent(event);
-        }
+        int action = event.getActionMasked();
+        if (action == MotionEvent.ACTION_DOWN || gestureMode == -1) gestureMode = touchMode;
+
+        boolean result = gestureMode == MODE_TOUCHSCREEN ? handleTouchscreenEvent(event) : handleTouchpadEvent(event);
+
+        if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) gestureMode = -1;
+        return result;
     }
 
     private void resetTouchscreenTimeout() {
@@ -268,7 +316,8 @@ public class TouchpadView extends View {
         int actionIndex = event.getActionIndex();
         int pointerId = event.getPointerId(actionIndex);
         int actionMasked = event.getActionMasked();
-        if (pointerId >= MAX_FINGERS) return true;
+        if (actionMasked != MotionEvent.ACTION_MOVE && actionMasked != MotionEvent.ACTION_CANCEL
+                && (pointerId >= MAX_FINGERS || pointerIdsToIgnore.contains(pointerId))) return true;
 
         switch (actionMasked) {
             case MotionEvent.ACTION_DOWN:
@@ -278,6 +327,13 @@ public class TouchpadView extends View {
                 scrolling = false;
                 fingers[pointerId] = new Finger(event.getX(actionIndex), event.getY(actionIndex));
                 numFingers++;
+                if (numFingers == 1 && !simTouchScreen) {
+                    longPressActive = false;
+                    longPressHandler.removeCallbacks(longPressRunnable);
+                    longPressHandler.postDelayed(longPressRunnable, LONG_PRESS_RIGHT_CLICK_MS);
+                } else {
+                    longPressHandler.removeCallbacks(longPressRunnable);
+                }
                 if (simTouchScreen) {
                     final Runnable clickDelay = () -> {
                         if (continueClick) {
@@ -317,6 +373,14 @@ public class TouchpadView extends View {
                 } else {
                     for (byte i = 0; i < MAX_FINGERS; i++) {
                         if (fingers[i] != null) {
+                            if (pointerIdsToIgnore.contains((int) i)) {
+                                // Taken by an on-screen control after all: drop it quietly.
+                                releasePointerButtonLeft(fingers[i]);
+                                releasePointerButtonRight(fingers[i]);
+                                fingers[i] = null;
+                                numFingers--;
+                                continue;
+                            }
                             int pointerIndex = event.findPointerIndex(i);
                             if (pointerIndex >= 0) {
                                 fingers[i].update(event.getX(pointerIndex), event.getY(pointerIndex));
@@ -332,14 +396,24 @@ public class TouchpadView extends View {
                 break;
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_POINTER_UP:
+                longPressHandler.removeCallbacks(longPressRunnable);
                 if (fingers[pointerId] != null) {
                     fingers[pointerId].update(event.getX(actionIndex), event.getY(actionIndex));
-                    handleFingerUp(fingers[pointerId]);
+                    // After a long-press right click the lift must not also count as a tap.
+                    if (longPressActive) {
+                        releasePointerButtonLeft(fingers[pointerId]);
+                        releasePointerButtonRight(fingers[pointerId]);
+                    } else {
+                        handleFingerUp(fingers[pointerId]);
+                    }
                     fingers[pointerId] = null;
                     numFingers--;
                 }
+                if (numFingers <= 0) longPressActive = false;
                 break;
             case MotionEvent.ACTION_CANCEL:
+                longPressHandler.removeCallbacks(longPressRunnable);
+                longPressActive = false;
                 for (byte i = 0; i < MAX_FINGERS; i++) fingers[i] = null;
                 numFingers = 0;
                 break;
@@ -348,101 +422,144 @@ public class TouchpadView extends View {
         return true;
     }
 
+    // Touchscreen mode. Tracks its own primary/secondary pointer ids (fingers held by on-screen
+    // controls are skipped), uses absolute X pointer events only, and:
+    //  - one finger: cursor under the finger, left button held while touching (Tap to Click);
+    //    a second tap within 500 ms / 100 px lands on the first tap's point (clean double-click)
+    //  - two fingers: scroll by the fingers' vertical *movement*; a quick two-finger tap without
+    //    scrolling = right click.
+    // (The old version scrolled by the *distance* between the fingers — every move event while
+    // they were apart — and fed absolute coordinates to Relative Mouse as if they were deltas.)
     private boolean handleTouchscreenEvent(MotionEvent event) {
         int action = event.getActionMasked();
+        int actionIndex = event.getActionIndex();
+        int pointerId = event.getPointerId(actionIndex);
 
         switch (action) {
             case MotionEvent.ACTION_DOWN:
-            case MotionEvent.ACTION_POINTER_DOWN:
-                handleTouchDown(event);
-                break;
-            case MotionEvent.ACTION_MOVE:
-                if (event.getPointerCount() == 2) {
-                    handleTwoFingerScroll(event);
-                } else {
-                    handleTouchMove(event);
+            case MotionEvent.ACTION_POINTER_DOWN: {
+                if (event.isFromSource(InputDevice.SOURCE_MOUSE) || pointerIdsToIgnore.contains(pointerId)) break;
+                if (tsPrimaryId == -1) {
+                    tsPrimaryId = pointerId;
+                    tsSecondaryId = -1;
+                    touchscreenPrimaryDown(event.getX(actionIndex), event.getY(actionIndex));
+                } else if (tsSecondaryId == -1) {
+                    tsSecondaryId = pointerId;
+                    tsScrolled = false;
+                    tsScrollAccum = 0;
+                    tsSecondaryDownTime = System.currentTimeMillis();
+                    tsScrollLastY = touchscreenMidY(event);
                 }
                 break;
-            case MotionEvent.ACTION_UP:
+            }
+            case MotionEvent.ACTION_MOVE: {
+                if (tsPrimaryId == -1 || pointerIdsToIgnore.contains(tsPrimaryId)) break;
+                if (tsSecondaryId != -1) {
+                    float midY = touchscreenMidY(event);
+                    if (Float.isNaN(midY)) break;
+                    tsScrollAccum += midY - tsScrollLastY;
+                    tsScrollLastY = midY;
+                    if (Math.abs(tsScrollAccum) >= TOUCHSCREEN_SCROLL_STEP) {
+                        // Scrolling: never keep the left button held while doing it.
+                        if (xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT)) {
+                            xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_LEFT);
+                        }
+                        Pointer.Button button = tsScrollAccum > 0 ? Pointer.Button.BUTTON_SCROLL_UP : Pointer.Button.BUTTON_SCROLL_DOWN;
+                        xServer.injectPointerButtonPress(button);
+                        xServer.injectPointerButtonRelease(button);
+                        tsScrollAccum = 0;
+                        tsScrolled = true;
+                    }
+                } else {
+                    int index = event.findPointerIndex(tsPrimaryId);
+                    if (index < 0) break;
+                    float[] p = XForm.transformPoint(xform, event.getX(index), event.getY(index));
+                    xServer.injectPointerMove((int) p[0], (int) p[1]);
+                }
+                break;
+            }
             case MotionEvent.ACTION_POINTER_UP:
-                if (event.getPointerCount() == 2) {
-                    handleTwoFingerTap(event);
-                } else {
-                    handleTouchUp(event);
+            case MotionEvent.ACTION_UP: {
+                if (pointerId == tsSecondaryId) {
+                    boolean quick = System.currentTimeMillis() - tsSecondaryDownTime < 300;
+                    if (!tsScrolled && quick && tapToClickEnabled) {
+                        if (xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT)) {
+                            xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_LEFT);
+                        }
+                        xServer.injectPointerButtonPress(Pointer.Button.BUTTON_RIGHT);
+                        xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_RIGHT);
+                    }
+                    tsSecondaryId = -1;
+                } else if (pointerId == tsPrimaryId) {
+                    if (xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT)) {
+                        xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_LEFT);
+                    }
+                    // The gesture ends with its first finger; a remaining second finger is ignored.
+                    tsPrimaryId = -1;
+                    tsSecondaryId = -1;
+                }
+                if (action == MotionEvent.ACTION_UP) {
+                    tsPrimaryId = -1;
+                    tsSecondaryId = -1;
                 }
                 break;
+            }
             case MotionEvent.ACTION_CANCEL:
-                if (xServer.isRelativeMouseMovement()) {
-                    xServer.getWinHandler().mouseEvent(MouseEventFlags.LEFTUP, 0, 0, 0);
-                    xServer.getWinHandler().mouseEvent(MouseEventFlags.RIGHTUP, 0, 0, 0);
-                }
-                else {
-                    xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_LEFT);
-                    xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_RIGHT);
-                }
+                resetInputState();
                 break;
         }
         return true;
     }
 
-    private void handleTouchDown(MotionEvent event) {
-        float[] transformedPoint = XForm.transformPoint(xform, event.getX(), event.getY());
-        if (xServer.isRelativeMouseMovement())
-            xServer.getWinHandler().mouseEvent(MouseEventFlags.MOVE, (int)transformedPoint[0], (int)transformedPoint[1], 0);
-        else
-            xServer.injectPointerMove((int) transformedPoint[0], (int) transformedPoint[1]);
+    private void touchscreenPrimaryDown(float rawX, float rawY) {
+        float[] p = XForm.transformPoint(xform, rawX, rawY);
+        int x = (int) p[0];
+        int y = (int) p[1];
+        long now = System.currentTimeMillis();
+        boolean near = Math.hypot(rawX - lastTapRawX, rawY - lastTapRawY) < TOUCHSCREEN_DOUBLE_TAP_DISTANCE;
+        if (now - lastTapDownTime < TOUCHSCREEN_DOUBLE_TAP_MS && near) {
+            // Second tap of a double tap: hit exactly the same spot as the first.
+            x = lastTapX;
+            y = lastTapY;
+        }
+        lastTapDownTime = now;
+        lastTapRawX = rawX;
+        lastTapRawY = rawY;
+        lastTapX = x;
+        lastTapY = y;
 
-        // Handle long press for right click (or use a dedicated method to detect long press)
-        if (event.getPointerCount() == 1) {
-            if (xServer.isRelativeMouseMovement())
-                xServer.getWinHandler().mouseEvent(MouseEventFlags.LEFTDOWN, 0, 0, 0);
-            else
-                xServer.injectPointerButtonPress(Pointer.Button.BUTTON_LEFT);
+        xServer.injectPointerMove(x, y);
+        // Only Tap to Click gates this: the trackpad's pointerButtonLeft/RightEnabled (turned off
+        // while a controls profile maps mouse buttons) are about trackpad taps, not direct touch.
+        if (tapToClickEnabled && !xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT)) {
+            xServer.injectPointerButtonPress(Pointer.Button.BUTTON_LEFT);
         }
     }
 
-    private void handleTouchMove(MotionEvent event) {
-        float[] transformedPoint = XForm.transformPoint(xform, event.getX(), event.getY());
-        if (xServer.isRelativeMouseMovement())
-            xServer.getWinHandler().mouseEvent(MouseEventFlags.MOVE, (int)transformedPoint[0], (int)transformedPoint[1], 0);
-        else
-            xServer.injectPointerMove((int) transformedPoint[0], (int) transformedPoint[1]);
+    // Average transformed Y of the two touchscreen fingers, NaN if either is gone.
+    private float touchscreenMidY(MotionEvent event) {
+        int a = event.findPointerIndex(tsPrimaryId);
+        int b = event.findPointerIndex(tsSecondaryId);
+        if (a < 0 || b < 0) return Float.NaN;
+        float[] pa = XForm.transformPoint(xform, event.getX(a), event.getY(a));
+        float ya = pa[1];
+        float[] pb = XForm.transformPoint(xform, event.getX(b), event.getY(b));
+        return (ya + pb[1]) * 0.5f;
     }
 
-    private void handleTouchUp(MotionEvent event) {
-        if (xServer.isRelativeMouseMovement())
-            xServer.getWinHandler().mouseEvent(MouseEventFlags.LEFTUP, 0, 0, 0);
-        else
+    // Trackpad long press: one finger held still for LONG_PRESS_RIGHT_CLICK_MS = right click.
+    private void onLongPress() {
+        if (!tapToClickEnabled || !pointerButtonRightEnabled || numFingers != 1) return;
+        Finger finger = null;
+        for (byte i = 0; i < MAX_FINGERS; i++) if (fingers[i] != null) { finger = fingers[i]; break; }
+        if (finger == null || finger.travelDistance() >= MAX_TAP_TRAVEL_DISTANCE) return;
+        longPressActive = true;
+        if (xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT)) {
             xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_LEFT);
-    }
-
-    private void handleTwoFingerScroll(MotionEvent event) {
-        float scrollDistance = event.getY(0) - event.getY(1);
-        if (Math.abs(scrollDistance) > 10) {
-            if (scrollDistance > 0) {
-                xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_UP);
-                xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_UP);
-            } else {
-                xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_DOWN);
-                xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_DOWN);
-            }
         }
+        xServer.injectPointerButtonPress(Pointer.Button.BUTTON_RIGHT);
+        xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_RIGHT);
     }
-
-    private void handleTwoFingerTap(MotionEvent event) {
-        if (event.getPointerCount() == 2) {
-            if (xServer.isRelativeMouseMovement()) {
-                xServer.getWinHandler().mouseEvent(MouseEventFlags.RIGHTDOWN, 0, 0, 0);
-                xServer.getWinHandler().mouseEvent(MouseEventFlags.RIGHTUP, 0, 0, 0);
-            }
-            else {
-                xServer.injectPointerButtonPress(Pointer.Button.BUTTON_RIGHT);
-                xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_RIGHT);
-            }
-        }
-    }
-
-
 
     private void handleFingerUp(Finger finger1) {
         switch (numFingers) {
@@ -454,11 +571,11 @@ public class TouchpadView extends View {
                     };
                     postDelayed(clickDelay, CLICK_DELAYED_TIME);
                 }
-                else if (finger1.isTap()) pressPointerButtonLeft(finger1);
+                else if (tapToClickEnabled && finger1.isTap()) pressPointerButtonLeft(finger1);
                 break;
             case 2:
                 Finger finger2 = findSecondFinger(finger1);
-                if (finger2 != null && finger1.isTap()) pressPointerButtonRight(finger1);
+                if (tapToClickEnabled && finger2 != null && finger1.isTap()) pressPointerButtonRight(finger1);
                 break;
             case 4:
                 if (fourFingersTapCallback != null) {
@@ -475,6 +592,7 @@ public class TouchpadView extends View {
     }
 
     private void handleFingerMove(Finger finger1) {
+        if (finger1.travelDistance() >= MAX_TAP_TRAVEL_DISTANCE) longPressHandler.removeCallbacks(longPressRunnable);
         boolean skipPointerMove = false;
 
         Finger finger2 = numFingers == 2 ? findSecondFinger(finger1) : null;
@@ -497,7 +615,7 @@ public class TouchpadView extends View {
                 }
                 scrolling = true;
             }
-            else if (currDistance >= MAX_TWO_FINGERS_SCROLL_DISTANCE && !xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT) &&
+            else if (tapToClickEnabled && currDistance >= MAX_TWO_FINGERS_SCROLL_DISTANCE && !xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT) &&
                      finger2.travelDistance() < MAX_TAP_TRAVEL_DISTANCE) {
                 pressPointerButtonLeft(finger1);
                 skipPointerMove = true;
@@ -505,8 +623,9 @@ public class TouchpadView extends View {
         }
 
         if (!scrolling && numFingers <= 2 && !skipPointerMove) {
-            int dx = finger1.deltaX();
-            int dy = finger1.deltaY();
+            finger1.accumulateDelta();
+            int dx = finger1.motion.x();
+            int dy = finger1.motion.y();
 
             if (simTouchScreen) {
                 if (System.currentTimeMillis() - finger1.touchTime > CLICK_DELAYED_TIME)
@@ -559,30 +678,42 @@ public class TouchpadView extends View {
         }
     }
 
+    /** Touch Speed: finger on the free touch area, Trackpad elements and mouse-move buttons. */
     public void setSensitivity(float sensitivity) {
         this.sensitivity = sensitivity;
     }
 
-    private int lastMouseMoveX;
-    private int lastMouseMoveY;
+    public float getSensitivity() {
+        return sensitivity;
+    }
+
+    /** The fixed pointer acceleration every touch path applies after the speed. */
+    public static float accelerate(float delta) {
+        return Math.abs(delta) > CURSOR_ACCELERATION_THRESHOLD ? delta * CURSOR_ACCELERATION : delta;
+    }
+
+    // Mouse-move buttons (ControlElement BUTTON with mouseMoveMode) drag the cursor like a
+    // finger on the touch area, so they share the Touch Speed.
+    private float lastMouseMoveX;
+    private float lastMouseMoveY;
+    private final MotionAccumulator mouseMoveMotion = new MotionAccumulator();
 
     public void mouseMove(float x, float y, int action) {
         float[] transformedPoint = XForm.transformPoint(xform, x, y);
-        int tx = (int)transformedPoint[0];
-        int ty = (int)transformedPoint[1];
+        float tx = transformedPoint[0];
+        float ty = transformedPoint[1];
 
         switch (action) {
             case MotionEvent.ACTION_DOWN:
                 lastMouseMoveX = tx;
                 lastMouseMoveY = ty;
+                mouseMoveMotion.reset();
                 break;
             case MotionEvent.ACTION_MOVE: {
-                float dxF = (tx - lastMouseMoveX) * sensitivity;
-                if (Math.abs(dxF) > CURSOR_ACCELERATION_THRESHOLD) dxF *= CURSOR_ACCELERATION;
-                float dyF = (ty - lastMouseMoveY) * sensitivity;
-                if (Math.abs(dyF) > CURSOR_ACCELERATION_THRESHOLD) dyF *= CURSOR_ACCELERATION;
-                int dx = Mathf.roundPoint(dxF);
-                int dy = Mathf.roundPoint(dyF);
+                mouseMoveMotion.add(accelerate((tx - lastMouseMoveX) * sensitivity),
+                                    accelerate((ty - lastMouseMoveY) * sensitivity));
+                int dx = mouseMoveMotion.x();
+                int dy = mouseMoveMotion.y();
                 lastMouseMoveX = tx;
                 lastMouseMoveY = ty;
 
@@ -731,6 +862,54 @@ public class TouchpadView extends View {
         xServer.setSimulateTouchScreen(this.simTouchScreen);
     }
 
+    // Trackpad / Touchscreen. Applied from the next touch on; any held buttons and tracked
+    // fingers are dropped right away so nothing stays pressed across the switch.
+    public void setTouchMode(int mode) {
+        if (mode != MODE_TOUCHSCREEN) mode = MODE_TRACKPAD;
+        setSimTouchScreen(false);
+        xServer.setSimulateTouchScreen(mode == MODE_TOUCHSCREEN);
+        if (touchMode == mode) return;
+        touchMode = mode;
+        resetInputState();
+    }
+
+    public int getTouchMode() {
+        return touchMode;
+    }
+
+    public void setTapToClickEnabled(boolean enabled) {
+        tapToClickEnabled = enabled;
+        if (!enabled) resetInputState();
+    }
+
+    public boolean isTapToClickEnabled() {
+        return tapToClickEnabled;
+    }
+
+    public void setPointerIdsToIgnore(Set<Integer> ids) {
+        pointerIdsToIgnore.clear();
+        pointerIdsToIgnore.addAll(ids);
+    }
+
+    // Releases every button this view may be holding and forgets all fingers.
+    public void resetInputState() {
+        longPressHandler.removeCallbacks(longPressRunnable);
+        longPressActive = false;
+        continueClick = false;
+        scrolling = false;
+        scrollAccumY = 0;
+        for (byte i = 0; i < MAX_FINGERS; i++) fingers[i] = null;
+        numFingers = 0;
+        fingerPointerButtonLeft = null;
+        fingerPointerButtonRight = null;
+        tsPrimaryId = -1;
+        tsSecondaryId = -1;
+        gestureMode = -1;
+        if (xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT)) xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_LEFT);
+        if (xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_RIGHT)) xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_RIGHT);
+        if (xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_MIDDLE)) xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_MIDDLE);
+    }
+
     public boolean isSimTouchScreen() {
         return simTouchScreen;
     }
@@ -742,5 +921,6 @@ public class TouchpadView extends View {
     
     public void setMouseEnabled(boolean enabled) {
         this.mouseEnabled = enabled;
+        if (!enabled) resetInputState();
     }
 }

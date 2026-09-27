@@ -16,6 +16,7 @@ import androidx.core.graphics.ColorUtils;
 
 import com.winlator.cmod.core.CubicBezierInterpolator;
 import com.winlator.cmod.math.Mathf;
+import com.winlator.cmod.math.MotionAccumulator;
 import com.winlator.cmod.widget.InputControlsView;
 import com.winlator.cmod.widget.TouchHaptics;
 import com.winlator.cmod.widget.TouchpadView;
@@ -103,6 +104,7 @@ public class ControlElement {
     private Range range;
     private byte orientation;
     private PointF currentPosition;
+    private final MotionAccumulator trackpadMotion = new MotionAccumulator();
 
     // ---------- Dynamic stick (STICK only, off by default) ----------
     // The stick has a fixed square zone around its home position. A touch in the zone but off
@@ -413,6 +415,10 @@ public class ControlElement {
 
     public boolean isCapturing(int pointerId) {
         return pointerId != -1 && currentPointerId == pointerId;
+    }
+
+    public int getCurrentPointerId() {
+        return currentPointerId;
     }
 
     public boolean isCapturingAnyPointer() {
@@ -1124,6 +1130,7 @@ public class ControlElement {
                 if (type == Type.TRACKPAD) {
                     if (currentPosition == null) currentPosition = new PointF();
                     currentPosition.set(x, y);
+                    trackpadMotion.reset();
                 }
                 return handleTouchMove(pointerId, x, y);
             }
@@ -1258,24 +1265,32 @@ public class ControlElement {
                 } else {
                     
                     final boolean[] states = {deltaY <= -TRACKPAD_MIN_SPEED, deltaX >= TRACKPAD_MIN_SPEED, deltaY >= TRACKPAD_MIN_SPEED, deltaX <= -TRACKPAD_MIN_SPEED};
-                    int cursorDx = 0;
-                    int cursorDy = 0;
+                    // Mouse-bound directions move the cursor like a finger on the touch area:
+                    // same Touch Speed and acceleration, with the sub-pixel remainder carried.
+                    // (This path used to ignore every speed setting.)
+                    float speed = touchpadView.getSensitivity();
+                    float cursorX = 0;
+                    float cursorY = 0;
 
                     for (byte i = 0; i < 4; i++) {
                         float value = (i == 1 || i == 3 ? deltaX : deltaY);
                         Binding binding = getBindingAt(i);
-                        if (Math.abs(value) > TouchpadView.CURSOR_ACCELERATION_THRESHOLD) value *= TouchpadView.CURSOR_ACCELERATION;
                         if (binding == Binding.MOUSE_MOVE_LEFT || binding == Binding.MOUSE_MOVE_RIGHT) {
-                            cursorDx = Mathf.roundPoint(value);
+                            cursorX = TouchpadView.accelerate(value * speed);
                         }
                         else if (binding == Binding.MOUSE_MOVE_UP || binding == Binding.MOUSE_MOVE_DOWN) {
-                            cursorDy = Mathf.roundPoint(value);
+                            cursorY = TouchpadView.accelerate(value * speed);
                         }
                         else {
+                            if (Math.abs(value) > TouchpadView.CURSOR_ACCELERATION_THRESHOLD) value *= TouchpadView.CURSOR_ACCELERATION;
                             inputControlsView.handleInputEvent(binding, states[i], value);
                             this.states[i] = states[i];
                         }
                     }
+
+                    trackpadMotion.add(cursorX, cursorY);
+                    int cursorDx = trackpadMotion.x();
+                    int cursorDy = trackpadMotion.y();
 
                     if (cursorDx != 0 || cursorDy != 0)  {
                         XServer xServer = inputControlsView.getXServer();

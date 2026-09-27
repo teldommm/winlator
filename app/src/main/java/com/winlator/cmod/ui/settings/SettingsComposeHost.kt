@@ -97,7 +97,8 @@ data class SettingsModel(
     val losslessDllAvailable: Boolean,
     val winlatorPath: String,
     val shortcutPath: String,
-    val cursorSpeedPercent: Int,
+    val cursorSpeedPercent: Int, // Touch speed (pref "cursor_speed")
+    val mouseSpeedPercent: Int,  // Mouse speed (pref "mouse_speed"), captured pointer only
     val cursorLock: Boolean,
     val xInput: Boolean,
     val useDri3: Boolean,
@@ -129,6 +130,7 @@ interface SettingsCallbacks {
     fun onChooseShortcutPath()
     fun onBooleanChanged(key: String, value: Boolean)
     fun onCursorSpeedChanged(percent: Int)
+    fun onMouseSpeedChanged(percent: Int)
     fun onCustomApiKeyChanged(value: String)
     fun onContentsUrlChanged(value: String)
     fun onWineDebugChannelsChanged(value: String)
@@ -229,11 +231,15 @@ internal fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) 
             item("xserver-title") { SectionTitle(stringResource(R.string.xserver)) }
             item("xserver") {
                 GroupCard {
-                    CursorSpeedRow(model.cursorSpeedPercent, callbacks::onCursorSpeedChanged)
-                    GroupDivider()
-                    ToggleRow(stringResource(R.string.use_dri3_extension), model.useDri3) { callbacks.onBooleanChanged("use_dri3", it) }
+                    SpeedRow("Touch speed", model.cursorSpeedPercent, callbacks::onCursorSpeedChanged)
                     GroupDivider()
                     ToggleRow("Capture External Pointer", model.cursorLock) { callbacks.onBooleanChanged("cursor_lock", it) }
+                    GroupDivider()
+                    // Scales the physical mouse only while it's captured; uncaptured it
+                    // positions the cursor absolutely, so there's nothing to scale.
+                    SpeedRow("Mouse speed", model.mouseSpeedPercent, callbacks::onMouseSpeedChanged)
+                    GroupDivider()
+                    ToggleRow(stringResource(R.string.use_dri3_extension), model.useDri3) { callbacks.onBooleanChanged("use_dri3", it) }
                     GroupDivider()
                     ToggleRow("Disable Xinput (Used for Exclusive M/KB support)", model.xInput) { callbacks.onBooleanChanged("xinput_toggle", it) }
                 }
@@ -375,11 +381,11 @@ private fun ToggleRow(title: String, checked: Boolean, onChecked: (Boolean) -> U
 }
 
 @Composable
-private fun CursorSpeedRow(value: Int, onChanged: (Int) -> Unit) {
+private fun SpeedRow(title: String, value: Int, onChanged: (Int) -> Unit) {
     var draft by remember(value) { mutableFloatStateOf(value.coerceIn(10, 200).toFloat()) }
     Column(Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Cursor speed", modifier = Modifier.weight(1f))
+            Text(title, modifier = Modifier.weight(1f))
             Text("${draft.roundToInt()}%", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Slider(

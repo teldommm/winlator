@@ -35,21 +35,23 @@ data class InputPanelState(
     val profiles: List<InputProfileOption>,
     val selectedProfileId: Int, // -1 = disabled
     val showTouchscreenControls: Boolean,
-    val touchscreenTimeout: Boolean,
     val touchscreenHaptics: Boolean,
     val controlsOpacityPercent: Int,
     val relativeMouse: Boolean,
-    val disableMouse: Boolean
+    val disableMouse: Boolean,
+    val touchMode: Int,          // TouchpadView.MODE_TRACKPAD (0) / MODE_TOUCHSCREEN (1)
+    val touchSpeedPercent: Int,  // global Touch Speed, 10..200 (Settings > Touch speed)
+    val mouseSpeedPercent: Int,  // global Mouse Speed, 10..200 (Settings > Mouse speed)
+    val tapToClick: Boolean
 )
 
 interface InputPanelCallbacks {
-    // Fired whenever the profile picker or any of the three touchscreen switches changes —
-    // always carries the full current snapshot of all four, mirroring the old
-    // applySidebarInputControls(), which re-read all four every time any one of them changed.
+    // Fired whenever the profile picker or either touchscreen switch changes — always carries
+    // the full current snapshot, mirroring the old applySidebarInputControls(), which re-read
+    // everything every time any one of them changed.
     fun onControlsSettingsChanged(
         profileId: Int,
         showTouchscreenControls: Boolean,
-        touchscreenTimeout: Boolean,
         touchscreenHaptics: Boolean
     )
 
@@ -58,6 +60,12 @@ interface InputPanelCallbacks {
     fun onControlsOpacity(percent: Int, commit: Boolean)
     fun onShowKeyboard()
     fun onVibration()
+    fun onTouchMode(mode: Int)
+    /** commit = false while dragging (live), true once on release (persist). */
+    fun onTouchSpeed(percent: Int, commit: Boolean)
+    /** commit = false while dragging (live), true once on release (persist). */
+    fun onMouseSpeed(percent: Int, commit: Boolean)
+    fun onTapToClick(enabled: Boolean)
     fun onRelativeMouse(enabled: Boolean)
     fun onDisableMouse(enabled: Boolean)
 }
@@ -76,13 +84,14 @@ object InputSidebarPanelHost {
 private fun InputSidebarPanel(state: InputPanelState, callbacks: InputPanelCallbacks) {
     var profileId by remember { mutableStateOf(state.selectedProfileId) }
     var showControls by remember { mutableStateOf(state.showTouchscreenControls) }
-    var timeout by remember { mutableStateOf(state.touchscreenTimeout) }
     var haptics by remember { mutableStateOf(state.touchscreenHaptics) }
     var relativeMouse by remember { mutableStateOf(state.relativeMouse) }
     var disableMouse by remember { mutableStateOf(state.disableMouse) }
+    var touchMode by remember { mutableStateOf(state.touchMode) }
+    var tapToClick by remember { mutableStateOf(state.tapToClick) }
 
     fun pushControlsSettings() {
-        callbacks.onControlsSettingsChanged(profileId, showControls, timeout, haptics)
+        callbacks.onControlsSettingsChanged(profileId, showControls, haptics)
     }
 
     Column(
@@ -112,14 +121,6 @@ private fun InputSidebarPanel(state: InputPanelState, callbacks: InputPanelCallb
                 }
             )
             SidebarInlineToggle(
-                label = stringResource(R.string.enable_touchscreen_timeout),
-                checked = timeout,
-                onCheckedChange = {
-                    timeout = it
-                    pushControlsSettings()
-                }
-            )
-            SidebarInlineToggle(
                 label = stringResource(R.string.enable_touchscreen_haptics),
                 checked = haptics,
                 onCheckedChange = {
@@ -144,6 +145,65 @@ private fun InputSidebarPanel(state: InputPanelState, callbacks: InputPanelCallb
                 },
                 onValueChangeFinished = { callbacks.onControlsOpacity(opacityDraft.toInt(), true) },
                 valueRange = 10f..100f
+            )
+        }
+
+        // Touch: the finger on the free area, Trackpad elements and mouse-move buttons all
+        // follow Touch Speed. The profile's own speed only drives its stick/button mouse moves
+        // (Input Controls > Stick Mouse Speed), so this number is the real touch speed.
+        SidebarGap()
+        SidebarCard {
+            SidebarDropdownField(
+                caption = "Touch Mode",
+                options = listOf("Trackpad", "Touchscreen"),
+                selectedIndex = if (touchMode == 1) 1 else 0,
+                onSelect = { index ->
+                    touchMode = index
+                    callbacks.onTouchMode(index)
+                }
+            )
+            Spacer(Modifier.height(6.dp))
+            var touchSpeedDraft by remember {
+                mutableStateOf(state.touchSpeedPercent.coerceIn(10, 200).toFloat())
+            }
+            SidebarSlider(
+                label = "Touch Speed",
+                valueText = "${touchSpeedDraft.roundToInt()}%",
+                value = touchSpeedDraft,
+                onValueChange = {
+                    touchSpeedDraft = it
+                    callbacks.onTouchSpeed(it.roundToInt(), false)
+                },
+                onValueChangeFinished = { callbacks.onTouchSpeed(touchSpeedDraft.roundToInt(), true) },
+                valueRange = 10f..200f
+            )
+            SidebarInlineToggle(
+                label = "Tap to Click",
+                checked = tapToClick,
+                onCheckedChange = {
+                    tapToClick = it
+                    callbacks.onTapToClick(it)
+                }
+            )
+        }
+
+        // Physical mouse. Only applies while the pointer is captured (Settings > Capture
+        // External Pointer); an uncaptured mouse positions the cursor absolutely.
+        SidebarGap()
+        SidebarCard {
+            var mouseSpeedDraft by remember {
+                mutableStateOf(state.mouseSpeedPercent.coerceIn(10, 200).toFloat())
+            }
+            SidebarSlider(
+                label = "Mouse Speed",
+                valueText = "${mouseSpeedDraft.roundToInt()}%",
+                value = mouseSpeedDraft,
+                onValueChange = {
+                    mouseSpeedDraft = it
+                    callbacks.onMouseSpeed(it.roundToInt(), false)
+                },
+                onValueChangeFinished = { callbacks.onMouseSpeed(mouseSpeedDraft.roundToInt(), true) },
+                valueRange = 10f..200f
             )
         }
 

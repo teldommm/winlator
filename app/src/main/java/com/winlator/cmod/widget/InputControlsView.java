@@ -45,6 +45,7 @@ import com.winlator.cmod.inputcontrols.ExternalController;
 import com.winlator.cmod.inputcontrols.ExternalControllerBinding;
 import com.winlator.cmod.inputcontrols.GamepadState;
 import com.winlator.cmod.math.Mathf;
+import com.winlator.cmod.math.MotionAccumulator;
 import com.winlator.cmod.ui.inputcontrols.EditorCanvasColors;
 import com.winlator.cmod.winhandler.MouseEventFlags;
 import com.winlator.cmod.winhandler.WinHandler;
@@ -136,6 +137,8 @@ public class InputControlsView extends View {
     private final android.util.SparseArray<Bitmap> icons = new android.util.SparseArray<>();
     private Timer mouseMoveTimer;
     private final PointF mouseMoveOffset = new PointF();
+    // Full deflection at 100% Stick Mouse Speed = 10 px per 60 Hz tick (600 px/s), as before.
+    private static final float STICK_MOUSE_PIXELS_PER_TICK = 10f;
     private boolean showTouchscreenControls = true;
     private int activeTouchPointerCount = 0;
 
@@ -639,26 +642,37 @@ public class InputControlsView extends View {
     private void createMouseMoveTimer() {
         WinHandler winHandler = xServer.getWinHandler();
         if (mouseMoveTimer == null && profile != null) {
-            final float cursorSpeed = profile.getCursorSpeed();
             mouseMoveTimer = new Timer();
             mouseMoveTimer.schedule(new TimerTask() {
+                // Only touched from this timer thread.
+                private final MotionAccumulator motion = new MotionAccumulator();
+
                 @Override
                 public void run() {
-                    if (mouseMoveOffset.x != 0 || mouseMoveOffset.y != 0) {// Only move if there's an offset
-                        if (xServer.isRelativeMouseMovement())
-                            winHandler.mouseEvent(MouseEventFlags.MOVE, (int) (mouseMoveOffset.x * cursorSpeed * 10), (int) (mouseMoveOffset.y * cursorSpeed * 10), 0);
-                        else
-                            xServer.injectPointerMoveDelta(
-                                (int) (mouseMoveOffset.x * cursorSpeed * 10),
-                                (int) (mouseMoveOffset.y * cursorSpeed * 10)
-                            );
+                    float offsetX = mouseMoveOffset.x;
+                    float offsetY = mouseMoveOffset.y;
+                    if (offsetX == 0 && offsetY == 0) {
+                        motion.reset();
+                        return;
                     }
+                    // Stick Mouse Speed is read every tick (it used to be frozen when the timer
+                    // was first created, so switching profiles kept the old speed), and the
+                    // remainder is carried instead of truncated, which used to swallow small
+                    // deflections entirely.
+                    ControlsProfile activeProfile = profile;
+                    float speed = activeProfile != null ? activeProfile.getCursorSpeed() : 1.0f;
+                    motion.add(offsetX * speed * STICK_MOUSE_PIXELS_PER_TICK, offsetY * speed * STICK_MOUSE_PIXELS_PER_TICK);
+                    int dx = motion.x();
+                    int dy = motion.y();
+                    if (dx == 0 && dy == 0) return;
+                    if (xServer.isRelativeMouseMovement())
+                        winHandler.mouseEvent(MouseEventFlags.MOVE, dx, dy, 0);
+                    else
+                        xServer.injectPointerMoveDelta(dx, dy);
                 }
             }, 0, 1000 / 60); // 60 FPS
         }
     }
-
-
 
     private void processJoystickInput(ExternalController controller) {
         final int[] axes = {
@@ -828,28 +842,35 @@ public class InputControlsView extends View {
                             }
                         }
                     }
-                    if (!handled) touchpadView.onTouchEvent(event);
+                    if (!handled) forwardToTouchpad(event);
+                    else syncCapturedPointers();
                     break;
                 }
                 case MotionEvent.ACTION_MOVE: {
+                    // The touchpad gets the whole event at most once (it used to receive it once
+                    // per unhandled pointer, so e.g. a two-finger scroll was processed twice).
+                    boolean anyUnhandled = false;
                     for (byte i = 0, count = (byte)event.getPointerCount(); i < count; i++) {
                         float x = event.getX(i);
                         float y = event.getY(i);
                         int pid = event.getPointerId(i);
 
-                        handled = trySwipe(pid, x, y);
+                        boolean pointerHandled = trySwipe(pid, x, y);
                         for (ControlElement element : profile.getElements()) {
-                            if (element.handleTouchMove(pid, x, y)) handled = true;
+                            if (element.handleTouchMove(pid, x, y)) pointerHandled = true;
                         }
-                        if (!handled) touchpadView.onTouchEvent(event);
+                        if (!pointerHandled) anyUnhandled = true;
                     }
+                    if (anyUnhandled) forwardToTouchpad(event);
                     break;
                 }
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_POINTER_UP:
                 case MotionEvent.ACTION_CANCEL:
                     for (ControlElement element : profile.getElements()) if (element.handleTouchUp(pointerId)) handled = true;
-                    if (!handled) touchpadView.onTouchEvent(event);
+                    // A cancel always reaches the touchpad too, so it can drop its fingers/buttons.
+                    if (!handled || actionMasked == MotionEvent.ACTION_CANCEL) forwardToTouchpad(event);
+                    else syncCapturedPointers();
                     break;
             }
         }
@@ -1088,6 +1109,27 @@ public class InputControlsView extends View {
     // A finger holding a swipe-enabled control that has slid off it onto another swipe-enabled,
     // currently free control: release the first and press the second, without lifting. Both
     // ends must have Swipeable on (off by default), so existing layouts behave exactly as before.
+    // Tells the touchpad which pointers are held by on-screen controls, so those fingers never
+    // count as trackpad/touchscreen fingers (e.g. a finger on a stick becoming "the" touch).
+    private final java.util.HashSet<Integer> capturedPointerIds = new java.util.HashSet<>();
+
+    private void syncCapturedPointers() {
+        if (touchpadView == null) return;
+        capturedPointerIds.clear();
+        if (profile != null) {
+            for (ControlElement element : profile.getElements()) {
+                int id = element.getCurrentPointerId();
+                if (id != -1) capturedPointerIds.add(id);
+            }
+        }
+        touchpadView.setPointerIdsToIgnore(capturedPointerIds);
+    }
+
+    private void forwardToTouchpad(MotionEvent event) {
+        syncCapturedPointers();
+        touchpadView.onTouchEvent(event);
+    }
+
     private boolean trySwipe(int pointerId, float x, float y) {
         ControlElement source = null;
         for (ControlElement element : profile.getElements()) {
