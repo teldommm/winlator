@@ -16,6 +16,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -35,8 +36,10 @@ import androidx.compose.material.icons.outlined.DragIndicator
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material3.ripple
+import com.winlator.cmod.ui.SidebarChoiceItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -58,6 +61,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.winlator.cmod.ui.SidebarMenu
@@ -77,6 +81,8 @@ interface ControlsEditorActions {
     // The Activity builds the settings model for the selected element and calls showSettings().
     fun onOpenSettings()
     fun onSchemeColorSelected(color: Int)
+    // Switch the editor to another profile (chosen from the toolbar's profile menu).
+    fun onSelectProfile(profileId: Int)
 }
 
 // Floating chrome of the controls editor: a draggable toolbar and the element-settings panel
@@ -93,7 +99,9 @@ interface ControlsEditorActions {
 class ControlsEditorOverlay(
     private val container: FrameLayout,
     private val canvas: InputControlsView,
-    profileName: String,
+    private val profileIds: List<Int>,
+    private val profileNames: List<String>,
+    currentProfileId: Int,
     private val schemeColors: List<Int>,
     schemeColor: Int,
     private val actions: ControlsEditorActions,
@@ -102,6 +110,8 @@ class ControlsEditorOverlay(
     private val density = container.resources.displayMetrics.density
     private val touchSlop = ViewConfiguration.get(container.context).scaledTouchSlop
 
+    private val currentProfileIdState = mutableIntStateOf(currentProfileId)
+    private val profileMenuOpen = mutableStateOf(false)
     private val hasSelection = mutableStateOf(false)
     private val undoAvailable = mutableStateOf(false)
     private val schemeColorState = mutableIntStateOf(schemeColor)
@@ -136,8 +146,19 @@ class ControlsEditorOverlay(
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
                 WinZOverlayTheme {
+                    val currentId = currentProfileIdState.intValue
+                    val currentIndex = profileIds.indexOf(currentId)
                     EditorToolbar(
-                        profileName = profileName,
+                        profileName = profileNames.getOrElse(currentIndex) { "" },
+                        profileNames = profileNames,
+                        currentProfileIndex = currentIndex,
+                        profileMenuOpen = profileMenuOpen.value,
+                        onProfileMenuDismiss = { profileMenuOpen.value = false },
+                        onProfileSelected = { index ->
+                            profileMenuOpen.value = false
+                            val id = profileIds.getOrNull(index)
+                            if (id != null && id != currentProfileIdState.intValue) actions.onSelectProfile(id)
+                        },
                         hasSelection = hasSelection.value,
                         undoAvailable = undoAvailable.value,
                         settingsOpen = panelOpen.value,
@@ -203,6 +224,15 @@ class ControlsEditorOverlay(
     }
 
     // ---------- Java-facing API ----------
+
+    // After the Activity has switched profiles.
+    fun setProfile(profileId: Int, schemeColor: Int) {
+        currentProfileIdState.intValue = profileId
+        schemeColorState.intValue = schemeColor
+        hasSelection.value = false
+        undoAvailable.value = false
+        panelOpen.value = false
+    }
 
     fun setHasSelection(value: Boolean) {
         hasSelection.value = value
@@ -283,7 +313,12 @@ class ControlsEditorOverlay(
                     positionPanel(animate = false)
                 }
             }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> toolbarDragging = false
+            MotionEvent.ACTION_UP -> {
+                // A tap on the handle (no drag) opens the profile menu.
+                if (!toolbarDragging && profileIds.isNotEmpty()) profileMenuOpen.value = true
+                toolbarDragging = false
+            }
+            MotionEvent.ACTION_CANCEL -> toolbarDragging = false
         }
         return true
     }
@@ -364,6 +399,11 @@ private fun FloatingSurface(content: @Composable () -> Unit) {
 @Composable
 private fun EditorToolbar(
     profileName: String,
+    profileNames: List<String>,
+    currentProfileIndex: Int,
+    profileMenuOpen: Boolean,
+    onProfileMenuDismiss: () -> Unit,
+    onProfileSelected: (Int) -> Unit,
     hasSelection: Boolean,
     undoAvailable: Boolean,
     settingsOpen: Boolean,
@@ -383,45 +423,59 @@ private fun EditorToolbar(
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Drag handle: the grip + profile label. Buttons elsewhere keep their own taps.
-            Row(
-                modifier = Modifier
-                    .clip(MaterialTheme.shapes.medium)
-                    .pointerInteropFilter(onTouchEvent = onDragEvent)
-                    .padding(start = 2.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Outlined.DragIndicator, contentDescription = "Move toolbar", tint = colors.onSurfaceVariant, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(6.dp))
-                Column {
-                    Text(
-                        "PROFILE",
-                        style = MaterialTheme.typography.labelLarge.copy(fontSize = 11.sp, lineHeight = 14.sp, letterSpacing = 0.6.sp),
-                        fontWeight = FontWeight.SemiBold,
-                        color = colors.onSurfaceVariant
+            // Drag handle + profile switcher: drag it to move the toolbar, tap it to pick
+            // another profile. Buttons elsewhere keep their own taps.
+            Box {
+                Row(
+                    modifier = Modifier
+                        .clip(MaterialTheme.shapes.medium)
+                        .pointerInteropFilter(onTouchEvent = onDragEvent)
+                        .padding(start = 2.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Outlined.DragIndicator, contentDescription = "Move toolbar", tint = colors.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Column {
+                        Text(
+                            "PROFILE",
+                            style = MaterialTheme.typography.labelLarge.copy(fontSize = 11.sp, lineHeight = 14.sp, letterSpacing = 0.6.sp),
+                            fontWeight = FontWeight.SemiBold,
+                            color = colors.onSurfaceVariant
+                        )
+                        Text(
+                            profileName,
+                            style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp, lineHeight = 18.sp),
+                            fontWeight = FontWeight.SemiBold,
+                            color = colors.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 150.dp)
+                        )
+                    }
+                    Icon(
+                        Icons.Outlined.ExpandMore,
+                        contentDescription = "Switch profile",
+                        tint = if (profileMenuOpen) controlAccentColor() else colors.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 2.dp).size(18.dp)
                     )
-                    Text(
-                        profileName,
-                        style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp, lineHeight = 18.sp),
-                        fontWeight = FontWeight.SemiBold,
-                        color = colors.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.widthIn(max = 160.dp)
-                    )
+                }
+                SidebarMenu(expanded = profileMenuOpen, onDismissRequest = onProfileMenuDismiss) {
+                    profileNames.forEachIndexed { index, name ->
+                        SidebarChoiceItem(name, index == currentProfileIndex) { onProfileSelected(index) }
+                    }
                 }
             }
             ToolbarDivider()
-            ToolbarButton(Icons.Outlined.Add, "Add element", onClick = onAdd)
-            ToolbarButton(Icons.Outlined.Delete, "Remove element", enabled = hasSelection, onClick = onRemove)
-            ToolbarButton(Icons.Outlined.ContentCopy, "Duplicate element", enabled = hasSelection, onClick = onDuplicate)
-            ToolbarButton(Icons.AutoMirrored.Outlined.Undo, "Undo", enabled = undoAvailable, onClick = onUndo)
+            ToolbarButton(Icons.Outlined.Add, "Add element", iconSize = 24.dp, onClick = onAdd)
+            ToolbarButton(Icons.Outlined.Delete, "Remove element", iconSize = 22.dp, enabled = hasSelection, onClick = onRemove)
+            ToolbarButton(Icons.Outlined.ContentCopy, "Duplicate element", iconSize = 20.dp, enabled = hasSelection, onClick = onDuplicate)
+            ToolbarButton(Icons.AutoMirrored.Outlined.Undo, "Undo", iconSize = 23.dp, enabled = undoAvailable, onClick = onUndo)
             ToolbarDivider()
-            ToolbarButton(Icons.Outlined.Tune, "Element settings", enabled = hasSelection || settingsOpen, active = settingsOpen, onClick = onSettings)
+            ToolbarButton(Icons.Outlined.Tune, "Element settings", iconSize = 21.dp, enabled = hasSelection || settingsOpen, active = settingsOpen, onClick = onSettings)
 
             var schemeOpen by remember { mutableStateOf(false) }
             Box {
-                ToolbarButton(Icons.Outlined.Palette, "Scheme color", active = schemeOpen) { schemeOpen = true }
+                ToolbarButton(Icons.Outlined.Palette, "Scheme color", iconSize = 20.dp, active = schemeOpen) { schemeOpen = true }
                 SidebarMenu(expanded = schemeOpen, onDismissRequest = { schemeOpen = false }) {
                     Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
                         Text(
@@ -456,28 +510,38 @@ private fun ToolbarDivider() {
     )
 }
 
+// Fixed 40×40 cell for every tool, no Material IconButton: its 48dp minimum touch target
+// was stretching the 40dp buttons unevenly inside the row. Icon sizes are set per icon to even
+// out how big the glyphs *look* — the Material outlines fill very different parts of their
+// 24dp box (the "+" ~14dp, the copy icon ~19×22dp).
 @Composable
 private fun ToolbarButton(
     icon: ImageVector,
     description: String,
+    iconSize: Dp = 22.dp,
     enabled: Boolean = true,
     active: Boolean = false,
     onClick: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
-    val accent = controlAccentColor()
-    IconButton(
-        onClick = onClick,
-        enabled = enabled,
+    val tint = when {
+        !enabled -> colors.onSurfaceVariant.copy(alpha = 0.38f)
+        active -> controlAccentColor()
+        else -> colors.onSurface
+    }
+    Box(
         modifier = Modifier
             .size(40.dp)
             .clip(MaterialTheme.shapes.medium)
-            .then(if (active) Modifier.background(colors.surfaceVariant) else Modifier),
-        colors = IconButtonDefaults.iconButtonColors(
-            contentColor = if (active) accent else colors.onSurface,
-            disabledContentColor = colors.onSurfaceVariant.copy(alpha = 0.38f)
-        )
+            .then(if (active) Modifier.background(colors.surfaceVariant) else Modifier)
+            .clickable(
+                enabled = enabled,
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple(),
+                onClick = onClick
+            ),
+        contentAlignment = Alignment.Center
     ) {
-        Icon(icon, contentDescription = description, modifier = Modifier.size(20.dp))
+        Icon(icon, contentDescription = description, tint = tint, modifier = Modifier.size(iconSize))
     }
 }

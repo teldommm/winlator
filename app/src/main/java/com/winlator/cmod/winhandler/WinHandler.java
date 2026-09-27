@@ -75,6 +75,11 @@ public class WinHandler {
     private LocalServerSocket vibrationServer;
     private volatile boolean vibrationRunning = false;
     private boolean[] vibrationEnabledSlots = new boolean[MAX_CONTROLLERS];
+    // Per slot: uptime until which a rumble started here is still playing. A "stop" from the
+    // game only cancels the vibrator while its own rumble is running — games send zero-rumble
+    // updates freely, and Vibrator.cancel() also killed the on-screen controls' touch clicks
+    // (on the phone vibrator the two share the same app vibration).
+    private final long[] rumbleUntil = new long[MAX_CONTROLLERS];
 
     private boolean xinputDisabled;
     private boolean xinputDisabledInitialized = false;
@@ -450,8 +455,10 @@ public class WinHandler {
         } else {
             vibrator.vibrate(duration);
         }
-    } else {
+        rumbleUntil[slot] = android.os.SystemClock.uptimeMillis() + duration;
+    } else if (android.os.SystemClock.uptimeMillis() < rumbleUntil[slot]) {
         vibrator.cancel();
+        rumbleUntil[slot] = 0;
     }
 }
 

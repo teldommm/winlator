@@ -122,6 +122,7 @@ data class ControlElementSettingsModel(
     val showDynamicStick: Boolean,
     val dynamicStick: Boolean,
     val zoneScalePercent: Int,
+    val followSpeedPercent: Int,
     val showSwipeable: Boolean,
     val swipeable: Boolean,
     val swipeableBlocked: Boolean,
@@ -216,6 +217,19 @@ internal fun ColumnScope.ControlElementSettingsPanelContent(
                     cb::onZoneScalePreview,
                     cb::onZoneScaleChanged,
                     valueLabel = { String.format("%.1f\u00D7", it / 100f) }
+                )
+                Spacer(Modifier.height(6.dp))
+                PercentSlider(
+                    "Follow Speed",
+                    model.followSpeedPercent,
+                    0f..100f,
+                    onPreview = {},
+                    onChange = cb::onFollowSpeedChanged
+                )
+                Text(
+                    "Lower = more overshoot allowed before the stick moves, and a softer glide after the finger.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }

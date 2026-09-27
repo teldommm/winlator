@@ -17,6 +17,7 @@ import androidx.core.graphics.ColorUtils;
 import com.winlator.cmod.core.CubicBezierInterpolator;
 import com.winlator.cmod.math.Mathf;
 import com.winlator.cmod.widget.InputControlsView;
+import com.winlator.cmod.widget.TouchHaptics;
 import com.winlator.cmod.widget.TouchpadView;
 import com.winlator.cmod.winhandler.MouseEventFlags;
 import com.winlator.cmod.winhandler.WinHandler;
@@ -118,6 +119,24 @@ public class ControlElement {
     // Runtime centre while a dynamic stick is held away from home.
     private boolean anchorActive = false;
     private float anchorX, anchorY;
+
+    // Follow tuning. followSpeed 0..1 (per element, shown as 0–100%) sets both:
+    //  - slack: how far past the stick's radius the finger may go before the stick starts to
+    //    move (1.6× radius at 0 … 1.15× at 1). Output is already maxed at the rim, so the slack
+    //    only absorbs overshoot; it doesn't cost any control.
+    //  - smoothing: the stick glides towards its target with a time-based exponential ease
+    //    (time constant 160 ms at 0 … 40 ms at 1), independent of the touch sample rate.
+    public static final float DEFAULT_FOLLOW_SPEED = 0.5f;
+    private float followSpeed = DEFAULT_FOLLOW_SPEED;
+    private float anchorTargetX, anchorTargetY;
+    private long lastAnchorNanos;
+    private float lastFingerX, lastFingerY;
+    private boolean anchorTickScheduled = false;
+    // Keeps the glide going while the finger holds still (no MOVE events arrive then).
+    private final Runnable anchorTick = () -> {
+        anchorTickScheduled = false;
+        if (currentPointerId != -1 && anchorActive) handleTouchMove(currentPointerId, lastFingerX, lastFingerY);
+    };
     private RangeScroller scroller;
     private CubicBezierInterpolator interpolator;
     private Object touchTime;
@@ -240,6 +259,14 @@ public class ControlElement {
         anchorActive = false;
     }
 
+    public float getFollowSpeed() {
+        return followSpeed;
+    }
+
+    public void setFollowSpeed(float followSpeed) {
+        this.followSpeed = Math.max(0f, Math.min(1f, followSpeed));
+    }
+
     public float getZoneScale() {
         return zoneScale;
     }
@@ -272,21 +299,75 @@ public class ControlElement {
         return handleTouchMove(pointerId, x, y);
     }
 
+    // Places the stick immediately (spawn under the finger), clamped into the zone.
+    private void moveAnchorTo(float cx, float cy) {
+        anchorX = clampAnchorX(cx);
+        anchorY = clampAnchorY(cy);
+        anchorTargetX = anchorX;
+        anchorTargetY = anchorY;
+        lastAnchorNanos = System.nanoTime();
+        anchorActive = true;
+    }
+
     // Keeps the whole stick inside the zone (the home centre is always allowed, even when the
     // zone is cut by the screen edge).
-    private void moveAnchorTo(float cx, float cy) {
+    private float clampAnchorX(float cx) {
         Rect box = getBoundingBox();
         float radius = box.width() * 0.5f;
         RectF zone = getDynamicZone();
-        float homeX = box.centerX();
-        float homeY = box.centerY();
-        float minX = Math.min(zone.left + radius, homeX);
-        float maxX = Math.max(zone.right - radius, homeX);
-        float minY = Math.min(zone.top + radius, homeY);
-        float maxY = Math.max(zone.bottom - radius, homeY);
-        anchorX = Math.max(minX, Math.min(maxX, cx));
-        anchorY = Math.max(minY, Math.min(maxY, cy));
-        anchorActive = true;
+        float home = box.centerX();
+        return Math.max(Math.min(zone.left + radius, home), Math.min(Math.max(zone.right - radius, home), cx));
+    }
+
+    private float clampAnchorY(float cy) {
+        Rect box = getBoundingBox();
+        float radius = box.width() * 0.5f;
+        RectF zone = getDynamicZone();
+        float home = box.centerY();
+        return Math.max(Math.min(zone.top + radius, home), Math.min(Math.max(zone.bottom - radius, home), cy));
+    }
+
+    // One follow step for the finger at (fx, fy): retarget if it is beyond the slack distance,
+    // then ease the stick towards the target by the time elapsed since the previous step.
+    private void updateDynamicAnchor(float fx, float fy, float radius) {
+        lastFingerX = fx;
+        lastFingerY = fy;
+        long now = System.nanoTime();
+        if (!anchorActive) {
+            Rect box = getBoundingBox();
+            anchorX = anchorTargetX = box.centerX();
+            anchorY = anchorTargetY = box.centerY();
+            lastAnchorNanos = now;
+            anchorActive = true;
+        }
+
+        float slack = radius * (1.6f - 0.45f * followSpeed);
+        float dx = fx - anchorX;
+        float dy = fy - anchorY;
+        float distance = (float) Math.hypot(dx, dy);
+        if (distance > slack) {
+            float pull = (distance - slack) / distance;
+            anchorTargetX = clampAnchorX(anchorX + dx * pull);
+            anchorTargetY = clampAnchorY(anchorY + dy * pull);
+        } else {
+            // Finger came back inside: stop where the stick is.
+            anchorTargetX = anchorX;
+            anchorTargetY = anchorY;
+        }
+
+        float dtMs = Math.min(50f, (now - lastAnchorNanos) / 1_000_000f);
+        lastAnchorNanos = now;
+        float tauMs = 160f - 120f * followSpeed;
+        float alpha = 1f - (float) Math.exp(-dtMs / tauMs);
+        anchorX += (anchorTargetX - anchorX) * alpha;
+        anchorY += (anchorTargetY - anchorY) * alpha;
+
+        if (Math.hypot(anchorTargetX - anchorX, anchorTargetY - anchorY) > 0.5f) {
+            if (!anchorTickScheduled) {
+                anchorTickScheduled = true;
+                inputControlsView.postOnAnimation(anchorTick);
+            }
+        }
     }
 
     private float stickCenterX(Rect box) {
@@ -312,6 +393,21 @@ public class ControlElement {
         if (!swipeable) return false;
         if (type == Type.D_PAD) return true;
         return type == Type.BUTTON && !toggleSwitch && !mouseMoveMode;
+    }
+
+    // Haptic weight for the moment this element takes a finger. D-pads return NONE: they pulse
+    // per direction from handleTouchMove (a press from rest, a lighter tick when rolling to
+    // another direction), so a touch in the D-pad's dead centre doesn't click.
+    public int getTouchDownHaptic() {
+        switch (type) {
+            case D_PAD:
+                return TouchHaptics.NONE;
+            case STICK:
+            case TRACKPAD:
+                return TouchHaptics.GRAB;
+            default:
+                return TouchHaptics.PRESS;
+        }
     }
 
     public boolean isCapturing(int pointerId) {
@@ -969,6 +1065,7 @@ public class ControlElement {
             if (dynamicStick) {
                 elementJSONObject.put("dynamicStick", true);
                 elementJSONObject.put("zoneScale", Float.valueOf(zoneScale));
+                elementJSONObject.put("followSpeed", Float.valueOf(followSpeed));
             }
             if (customIconPath != null) elementJSONObject.put("customIconPath", customIconPath);
 
@@ -1058,16 +1155,13 @@ public class ControlElement {
                 float offsetY = y - cy;
 
                 if (isDynamicStick() && !inputControlsView.isEditMode()) {
-                    float distance = (float) Math.hypot(offsetX, offsetY);
-                    if (distance > radius) {
-                        // Drag the stick so the finger stays on its rim, within the zone.
-                        float pull = (distance - radius) / distance;
-                        moveAnchorTo(cx + offsetX * pull, cy + offsetY * pull);
-                        cx = anchorX;
-                        cy = anchorY;
-                        offsetX = x - cx;
-                        offsetY = y - cy;
-                    }
+                    // Follow with slack + smoothing (see followSpeed). While the stick lags
+                    // behind, the finger is past the rim and the output simply stays maxed.
+                    updateDynamicAnchor(x, y, radius);
+                    cx = anchorX;
+                    cy = anchorY;
+                    offsetX = x - cx;
+                    offsetY = y - cy;
                 }
 
                 if (Mathf.lengthSq(offsetX, offsetY) > radius * radius) {
@@ -1194,12 +1288,23 @@ public class ControlElement {
             else {
                 final boolean[] states = {deltaY <= -DPAD_DEAD_ZONE, deltaX >= DPAD_DEAD_ZONE, deltaY >= DPAD_DEAD_ZONE, deltaX <= -DPAD_DEAD_ZONE};
 
+                // Haptics on rising edges only: a direction that wasn't held before. From rest
+                // that's a press; rolling to another direction without lifting is a lighter
+                // tick. Releasing a direction or returning to centre is silent.
+                boolean hadDirection = this.states[0] || this.states[1] || this.states[2] || this.states[3];
+                boolean newDirection = false;
+
                 for (byte i = 0; i < 4; i++) {
                     float value = i == 1 || i == 3 ? deltaX : deltaY;
                     Binding binding = getBindingAt(i);
                     boolean state = binding.isMouseMove() ? (states[i] || states[(i+2)%4]) : states[i];
+                    if (state && !this.states[i]) newDirection = true;
                     inputControlsView.handleInputEvent(binding, state, value);
                     this.states[i] = state;
+                }
+
+                if (type == Type.D_PAD && newDirection) {
+                    inputControlsView.playTouchHaptic(hadDirection ? TouchHaptics.TICK : TouchHaptics.PRESS);
                 }
             }
 
@@ -1260,6 +1365,10 @@ public class ControlElement {
                 else if (type == Type.STICK) {
                     // Dynamic stick: straight back home (no return animation, by design).
                     anchorActive = false;
+                    if (anchorTickScheduled) {
+                        inputControlsView.removeCallbacks(anchorTick);
+                        anchorTickScheduled = false;
+                    }
                     invalidateSelf();
                 }
 

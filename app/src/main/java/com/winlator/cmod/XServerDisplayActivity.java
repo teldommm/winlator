@@ -1976,9 +1976,17 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
             @Override
             public void onEditProfiles(int selectedProfileId) {
-                Intent intent = new Intent(XServerDisplayActivity.this, MainActivity.class);
-                intent.putExtra("edit_input_controls", true);
-                intent.putExtra("selected_profile_id", selectedProfileId >= 0 ? selectedProfileId : 0);
+                // A profile is active -> straight into the controls editor on it (it can switch
+                // profiles itself). Controls Disabled -> the Input Controls screen, as before.
+                Intent intent;
+                if (selectedProfileId >= 0 && inputControlsManager.getProfile(selectedProfileId) != null) {
+                    intent = new Intent(XServerDisplayActivity.this, ControlsEditorActivity.class);
+                    intent.putExtra("profile_id", selectedProfileId);
+                } else {
+                    intent = new Intent(XServerDisplayActivity.this, MainActivity.class);
+                    intent.putExtra("edit_input_controls", true);
+                    intent.putExtra("selected_profile_id", selectedProfileId >= 0 ? selectedProfileId : 0);
+                }
                 editInputControlsCallback = () -> {
                     hideInputControls();
                     inputControlsManager.loadProfiles(true);

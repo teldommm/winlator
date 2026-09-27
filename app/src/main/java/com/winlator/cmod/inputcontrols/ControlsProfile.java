@@ -279,6 +279,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             element.setSwipeable(elementJSONObject.optBoolean("swipeable", false));
             element.setDynamicStick(elementJSONObject.optBoolean("dynamicStick", false));
             element.setZoneScale((float) elementJSONObject.optDouble("zoneScale", ControlElement.DEFAULT_ZONE_SCALE));
+            element.setFollowSpeed((float) elementJSONObject.optDouble("followSpeed", ControlElement.DEFAULT_FOLLOW_SPEED));
             if (elementJSONObject.has("customIconPath")) element.setCustomIconPath(elementJSONObject.getString("customIconPath"));
             JSONArray bindingsJSONArray = elementJSONObject.getJSONArray("bindings");
             for (int j = 0; j < bindingsJSONArray.length(); j++) {

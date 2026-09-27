@@ -101,10 +101,24 @@ public class ControlsEditorActivity extends AppCompatActivity {
         ArrayList<Integer> schemeColors = new ArrayList<>();
         for (int color : PALETTE_COLORS) schemeColors.add(color);
 
+        // Same list (and order) as the Input Controls screen shows.
+        ArrayList<Integer> profileIds = new ArrayList<>();
+        ArrayList<String> profileNames = new ArrayList<>();
+        for (ControlsProfile p : new InputControlsManager(this).getProfiles()) {
+            profileIds.add(p.id);
+            profileNames.add(p.getName());
+        }
+        if (!profileIds.contains(profile.id)) {
+            profileIds.add(0, profile.id);
+            profileNames.add(0, profile.getName());
+        }
+
         overlay = new ControlsEditorOverlay(
                 container,
                 inputControlsView,
-                profile.getName(),
+                profileIds,
+                profileNames,
+                profile.id,
                 schemeColors,
                 profile.getThemeColor(),
                 new ControlsEditorActions() {
@@ -146,6 +160,11 @@ public class ControlsEditorActivity extends AppCompatActivity {
                         } else {
                             Toast.makeText(ControlsEditorActivity.this, "No control element selected", Toast.LENGTH_SHORT).show();
                         }
+                    }
+
+                    @Override
+                    public void onSelectProfile(int profileId) {
+                        switchProfile(profileId);
                     }
 
                     @Override
@@ -221,6 +240,25 @@ public class ControlsEditorActivity extends AppCompatActivity {
     // stays open while the person taps other elements on the canvas.
     private ControlElement target() {
         return inputControlsView.getSelectedElement();
+    }
+
+    // Switches the editor to another profile in place. Every edit here is already saved as it
+    // happens (Custom Text is flushed first), so nothing is lost from the one being left.
+    private void switchProfile(int profileId) {
+        if (profile != null && profile.id == profileId) return;
+        flushPendingTextSave();
+        endEdit();
+        ControlsProfile next = InputControlsManager.loadProfile(this, ControlsProfile.getProfileFile(this, profileId));
+        if (next == null) {
+            Toast.makeText(this, "Profile not found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        pendingIconElement = null;
+        profile = next;
+        inputControlsView.setProfile(profile);
+        overlay.setProfile(profile.id, profile.getThemeColor());
+        getIntent().putExtra("profile_id", profile.id);
+        inputControlsView.invalidate();
     }
 
     private void beginEdit(ControlElement element) {
@@ -392,6 +430,15 @@ public class ControlsEditorActivity extends AppCompatActivity {
             }
 
             @Override
+            public void onFollowSpeedChanged(int percent) {
+                ControlElement e = target();
+                if (e == null) return;
+                startEdit(e);
+                e.setFollowSpeed(percent / 100f);
+                commit(e);
+            }
+
+            @Override
             public void onSwipeableChanged(boolean enabled) {
                 ControlElement e = target();
                 if (e == null) return;
@@ -546,6 +593,7 @@ public class ControlsEditorActivity extends AppCompatActivity {
                 showDynamicStick,
                 element.getDynamicStickFlag(),
                 Math.round(element.getZoneScale() * 100),
+                Math.round(element.getFollowSpeed() * 100),
                 showSwipeable,
                 element.isSwipeable(),
                 swipeableBlocked,

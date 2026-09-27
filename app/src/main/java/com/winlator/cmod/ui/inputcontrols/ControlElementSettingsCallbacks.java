@@ -27,6 +27,8 @@ public interface ControlElementSettingsCallbacks {
     // Zone side in percent of the stick's diameter (150..500); preview = live, unsaved.
     void onZoneScalePreview(int percent);
     void onZoneScaleChanged(int percent);
+    // 0..100; committed on slider release only (nothing to preview in the editor).
+    void onFollowSpeedChanged(int percent);
     void onTextChanged(String text);
 
     // iconKey is either "builtin:<id>" or "path:<absolutePath>", as produced by

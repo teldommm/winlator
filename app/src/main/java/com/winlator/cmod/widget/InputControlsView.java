@@ -98,6 +98,11 @@ public class InputControlsView extends View {
     private static final float GUIDE_MAGNET = 0.6f;
 
     private EditorListener editorListener;
+
+    // Touchscreen control haptics (see TouchHaptics). The switch is re-read at the start of
+    // every touch event; the default matches what the in-game sidebar shows (off).
+    private TouchHaptics touchHaptics;
+    private boolean touchHapticsEnabled = false;
     private EditorCanvasColors canvasColors;
     private int touchSlop;
     private int activeEditPointerId = -1;
@@ -539,11 +544,25 @@ public class InputControlsView extends View {
     }
 
     public synchronized void setProfile(ControlsProfile profile) {
+        ControlElement previousSelection = selectedElement;
+        if (editMode) {
+            // Switching profiles inside the editor: land any glide on the old profile first,
+            // and drop the undo step — it points at the old profile's elements.
+            finishPendingAnimations();
+            setUndo(null);
+            guideLineX = Float.NaN;
+            guideLineY = Float.NaN;
+        }
         if (profile != null) {
             this.profile = profile;
             deselectAllElements();
         }
         else this.profile = null;
+        selectedElement = null;
+        if (editMode) {
+            invalidate();
+            if (previousSelection != null && editorListener != null) editorListener.onSelectionChanged(null);
+        }
     }
 
     public boolean isShowTouchscreenControls() {
@@ -756,7 +775,8 @@ public class InputControlsView extends View {
     @Override
     public boolean onTouchEvent(MotionEvent event) {
 
-        boolean hapticsEnabled = preferences.getBoolean("touchscreen_haptics_enabled", true);
+        boolean hapticsEnabled = preferences.getBoolean("touchscreen_haptics_enabled", false);
+        touchHapticsEnabled = hapticsEnabled && !editMode;
 
         // Do not let the auto-hide runnable hide controls while a finger is still down.
         // This fixes controls disappearing under load or while holding a stick/button.
@@ -779,22 +799,18 @@ public class InputControlsView extends View {
                     float y = event.getY(actionIndex);
 
                     touchpadView.setPointerButtonLeftEnabled(true);
+                    boolean hapticPlayed = false;
                     for (ControlElement element : profile.getElements()) {
                         if (element.handleTouchDown(pointerId, x, y)) {
                             handled = true;
-
-                            // Trigger haptic feedback for input controls
-                            if (hapticsEnabled) {
-                                Vibrator vibrator = (Vibrator) getContext().getSystemService(Context.VIBRATOR_SERVICE);
-                                if (vibrator != null && vibrator.hasVibrator()) {
-                                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                                        vibrator.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE));
-                                    } else {
-                                        vibrator.vibrate(50); // Legacy method for older Android versions
-                                    }
-
+                            // One pulse per touch even if overlapping elements both took it.
+                            // D-pads report their own (per direction) from ControlElement.
+                            if (!hapticPlayed) {
+                                int kind = element.getTouchDownHaptic();
+                                if (kind != TouchHaptics.NONE) {
+                                    playTouchHaptic(kind);
+                                    hapticPlayed = true;
                                 }
-
                             }
                         }
                         if (element.getBindingAt(0) == Binding.MOUSE_LEFT_BUTTON) {
@@ -807,6 +823,7 @@ public class InputControlsView extends View {
                         for (ControlElement element : profile.getElements()) {
                             if (element.handleDynamicZoneTouchDown(pointerId, x, y)) {
                                 handled = true;
+                                playTouchHaptic(TouchHaptics.GRAB);
                                 break;
                             }
                         }
@@ -820,7 +837,7 @@ public class InputControlsView extends View {
                         float y = event.getY(i);
                         int pid = event.getPointerId(i);
 
-                        handled = trySwipe(pid, x, y, hapticsEnabled);
+                        handled = trySwipe(pid, x, y);
                         for (ControlElement element : profile.getElements()) {
                             if (element.handleTouchMove(pid, x, y)) handled = true;
                         }
@@ -1071,7 +1088,7 @@ public class InputControlsView extends View {
     // A finger holding a swipe-enabled control that has slid off it onto another swipe-enabled,
     // currently free control: release the first and press the second, without lifting. Both
     // ends must have Swipeable on (off by default), so existing layouts behave exactly as before.
-    private boolean trySwipe(int pointerId, float x, float y, boolean hapticsEnabled) {
+    private boolean trySwipe(int pointerId, float x, float y) {
         ControlElement source = null;
         for (ControlElement element : profile.getElements()) {
             if (element.isCapturing(pointerId)) {
@@ -1085,21 +1102,19 @@ public class InputControlsView extends View {
             if (target == source || !target.isSwipeEnabled() || target.isCapturingAnyPointer() || !target.containsPoint(x, y)) continue;
             source.handleTouchUp(pointerId);
             if (target.handleTouchDown(pointerId, x, y)) {
-                if (hapticsEnabled) vibrateTouch();
+                playTouchHaptic(target.getTouchDownHaptic());
             }
             return true;
         }
         return false;
     }
 
-    private void vibrateTouch() {
-        Vibrator vibrator = (Vibrator) getContext().getSystemService(Context.VIBRATOR_SERVICE);
-        if (vibrator == null || !vibrator.hasVibrator()) return;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            vibrator.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE));
-        } else {
-            vibrator.vibrate(50);
-        }
+    // Called by the touch code here and by ControlElement (D-pad direction changes). No-op in
+    // the editor and when the sidebar's touchscreen vibration is off.
+    public void playTouchHaptic(int kind) {
+        if (!touchHapticsEnabled || kind == TouchHaptics.NONE) return;
+        if (touchHaptics == null) touchHaptics = new TouchHaptics(getContext());
+        touchHaptics.play(kind);
     }
 
     // ======================= Edit-mode touch: drag, magnets, crosshair =======================
