@@ -203,11 +203,6 @@ internal fun ColumnScope.ControlElementSettingsPanelContent(
         if (model.showDynamicStick) {
             Spacer(Modifier.height(6.dp))
             SettingSwitchRow("Dynamic Stick", model.dynamicStick, cb::onDynamicStickChanged)
-            Text(
-                "Touching the zone outside the stick moves the stick under the finger; sliding past its edge drags it along. The zone is shown only here in the editor.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
             if (model.dynamicStick) {
                 Spacer(Modifier.height(8.dp))
                 PercentSlider(
@@ -251,12 +246,6 @@ internal fun ColumnScope.ControlElementSettingsPanelContent(
         if (model.showSwipeable) {
             if (!model.showToggleSwitch) Spacer(Modifier.height(10.dp))
             SettingSwitchRow("Swipe Between Buttons", model.swipeable, cb::onSwipeableChanged)
-            Text(
-                if (model.swipeableBlocked) "Has no effect while Toggle Switch or Relative Mouse Move is on."
-                else "Sliding a finger onto another button with this option presses it without lifting.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
 
         if (model.showTextAndIcon) {
