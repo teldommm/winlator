@@ -10,10 +10,10 @@ import android.os.VibratorManager;
 // Haptic feedback for the on-screen controls (the sidebar's touchscreen "Vibration" switch).
 //
 // Replaces the old 50 ms one-shot at default amplitude, which on the linear motors of current
-// phones feels like a buzz rather than a click. Three weights:
+// phones feels like a buzz rather than a click. Two weights:
 //   PRESS — a button press, a D-pad direction from rest, a swipe onto another button
 //   TICK  — the D-pad rolling to another direction without lifting (lighter than a press)
-//   GRAB  — taking a stick / trackpad (incl. a dynamic stick spawning under the finger)
+// Sticks (fixed and dynamic) and trackpads don't vibrate at all: continuous input.
 //
 // Each weight is built once, best available first:
 //   Android 11+ composition primitives (crispest, if the motor supports them)
@@ -27,7 +27,6 @@ public final class TouchHaptics {
     public static final int NONE = -1;
     public static final int PRESS = 0;
     public static final int TICK = 1;
-    public static final int GRAB = 2;
 
     // Ticks closer together than this are dropped, so a finger wobbling on a D-pad boundary
     // can't turn into a continuous rattle.
@@ -36,7 +35,6 @@ public final class TouchHaptics {
     private final Vibrator vibrator;
     private final VibrationEffect pressEffect;
     private final VibrationEffect tickEffect;
-    private final VibrationEffect grabEffect;
     private long lastTickAt;
 
     public TouchHaptics(Context context) {
@@ -51,9 +49,8 @@ public final class TouchHaptics {
         if (vibrator != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             pressEffect = build(VibrationEffect.Composition.PRIMITIVE_CLICK, 0.85f, 1 /* EFFECT_CLICK */, 16, 190);
             tickEffect = build(VibrationEffect.Composition.PRIMITIVE_TICK, 0.7f, 2 /* EFFECT_TICK */, 8, 120);
-            grabEffect = build(VibrationEffect.Composition.PRIMITIVE_CLICK, 0.55f, 2 /* EFFECT_TICK */, 12, 150);
         } else {
-            pressEffect = tickEffect = grabEffect = null;
+            pressEffect = tickEffect = null;
         }
     }
 
@@ -71,10 +68,10 @@ public final class TouchHaptics {
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            VibrationEffect effect = kind == PRESS ? pressEffect : kind == TICK ? tickEffect : grabEffect;
+            VibrationEffect effect = kind == TICK ? tickEffect : pressEffect;
             if (effect != null) vibrator.vibrate(effect);
         } else {
-            vibrator.vibrate(kind == PRESS ? 16 : kind == TICK ? 8 : 12);
+            vibrator.vibrate(kind == TICK ? 8 : 16);
         }
     }
 

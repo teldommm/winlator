@@ -106,9 +106,10 @@ private fun LandscapeDetail(title: String, subtitle: String, artwork: Bitmap?, f
             onClick = callbacks::onBack,
             modifier = Modifier.align(Alignment.TopStart).padding(start = 18.dp, top = 16.dp).size(44.dp),
             shape = RoundedCornerShape(12.dp),
-            color = Color.Black.copy(.62f),
-            contentColor = Color.White,
-            border = BorderStroke(1.dp, Color.White.copy(.16f))
+            // Theme gray (was a black square) — same fill/outline family as the app's buttons.
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(.92f),
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back", modifier = Modifier.size(24.dp))
@@ -180,9 +181,10 @@ private fun PortraitDetail(title: String, subtitle: String, artwork: Bitmap?, fa
                 onClick = callbacks::onBack,
                 modifier = Modifier.align(Alignment.TopStart).padding(start = 14.dp, top = 14.dp).size(44.dp),
                 shape = RoundedCornerShape(12.dp),
-                color = Color.Black.copy(.62f),
-                contentColor = Color.White,
-                border = BorderStroke(1.dp, Color.White.copy(.16f))
+                // Theme gray (was a black square) — same fill/outline family as the app's buttons.
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(.92f),
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back", modifier = Modifier.size(24.dp))
@@ -217,13 +219,10 @@ private fun DetailAction(icon: ImageVector, label: String, modifier: Modifier, o
         onClick = onClick,
         modifier = modifier.height(54.dp),
         shape = RoundedCornerShape(12.dp),
-        color = when {
-            destructive -> MaterialTheme.colorScheme.errorContainer.copy(.22f)
-            accent -> accentColor
-            else -> MaterialTheme.colorScheme.surface.copy(.90f)
-        },
+        // Destructive keeps the regular fill and outline; only its icon and label are red.
+        color = if (accent) accentColor else MaterialTheme.colorScheme.surface.copy(.90f),
         contentColor = tint,
-        border = BorderStroke(1.dp, if (destructive) MaterialTheme.colorScheme.error.copy(.62f) else if (accent) accentColor else MaterialTheme.colorScheme.outlineVariant)
+        border = BorderStroke(1.dp, if (accent) accentColor else MaterialTheme.colorScheme.outlineVariant)
     ) {
         Row(Modifier.fillMaxSize().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, null)

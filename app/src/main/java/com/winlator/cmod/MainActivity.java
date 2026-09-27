@@ -153,8 +153,9 @@ public class MainActivity extends AppCompatActivity {
 
         if (!editInputControls) {
             if (!ImageFsInstaller.installIfNeeded(this, () -> requestAppPermissions())) {
-                if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED)
-                    startForegroundService(notificationService);
+                // Keep-alive doesn't depend on the notification permission: a foreground
+                // service runs without it (its notification is just hidden on Android 13+).
+                NotificationService.startLibrary(this);
             }
         }
     }
@@ -179,7 +180,7 @@ public class MainActivity extends AppCompatActivity {
 
         if (requestCode == PERMISSION_POST_NOTIFICATIONS_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED)
-                startForegroundService(notificationService);
+                NotificationService.startLibrary(this);
         } else if (requestCode == PERMISSION_WRITE_EXTERNAL_STORAGE_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED)
                 requestAppPermissions();
@@ -209,6 +210,9 @@ public class MainActivity extends AppCompatActivity {
         if (!hasManageStoragePermission) {
             showAllFilesAccessDialog();
         }
+
+        // Also reached after a first-run ImageFs install, where onCreate didn't start it.
+        NotificationService.startLibrary(this);
     }
 
     public boolean isOrientationLocked() {

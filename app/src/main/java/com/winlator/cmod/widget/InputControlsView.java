@@ -823,7 +823,7 @@ public class InputControlsView extends View {
                         for (ControlElement element : profile.getElements()) {
                             if (element.handleDynamicZoneTouchDown(pointerId, x, y)) {
                                 handled = true;
-                                playTouchHaptic(TouchHaptics.GRAB);
+                                // No haptic: sticks are silent by design.
                                 break;
                             }
                         }

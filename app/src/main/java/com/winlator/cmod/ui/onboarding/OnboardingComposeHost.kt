@@ -254,7 +254,10 @@ private fun OnboardingFlow(
         it.installed && (it.type == "Wine" || it.type == "Proton") && !it.runtimeIdentifier.isNullOrBlank()
     }
 
-    LaunchedEffect(containerReady.value, page) {
+    // Advance to Access when the first container *becomes* ready while on Runtime. Keyed on
+    // the ready flag only: it used to be keyed on the page too, so pressing Back on the
+    // permissions screen (page = Runtime, container already ready) bounced straight back.
+    LaunchedEffect(containerReady.value) {
         if (!managerMode && page == OnboardingPage.Runtime && containerReady.value) {
             page = OnboardingPage.Access
         }
@@ -302,7 +305,13 @@ private fun OnboardingFlow(
             onContinue = { runtime ->
                 if (ready.value && hasInstalledRuntime && !containerPreparing.value) {
                     cb.onRuntimeSelected(runtime)
-                    prepareInitialContainer(activity, runtime, containerPreparing, containerReady)
+                    if (containerReady.value) {
+                        // Came back here from Access: the container already exists, so
+                        // Continue just goes forward again (the effect above won't re-fire).
+                        page = OnboardingPage.Access
+                    } else {
+                        prepareInitialContainer(activity, runtime, containerPreparing, containerReady)
+                    }
                 }
             }
         )

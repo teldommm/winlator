@@ -88,7 +88,6 @@ public class WinlatorHUD extends View {
             "/sys/class/kgsl/kgsl-3d0/devfreq/gpu_load",
             "/sys/class/misc/mali0/device/utilisation",
             "/sys/class/misc/mali0/device/utilization",
-            "/sys/class/misc/mali0/device/gpuinfo",
             "/sys/devices/platform/mali/utilization",
             "/sys/kernel/gpu/gpu_busy",
             "/sys/devices/platform/gpusysfs/gpu_busy",
@@ -104,8 +103,10 @@ public class WinlatorHUD extends View {
 
     private static final String[] GPU_USAGE_FILES = {
             "gpu_busy_percentage", "gpu_busy_percent", "gpu_load", "utilisation",
-            "utilization", "load", "gpu_busy", "gpuinfo"
+            "utilization", "load", "gpu_busy"
     };
+    // (Mali's "gpuinfo" used to be read here as a busy-time counter; it is a static description
+    // like "Mali-G710 10 cores r0p0 0xA862", so it produced either nothing or a garbage percent.)
 
     private static final String[] GPU_NODE_TOKENS = {
             "gpu", "mali", "g3d", "kgsl", "panfrost", "pvr", "powervr", "xclipse", "sgpu"
@@ -204,11 +205,27 @@ public class WinlatorHUD extends View {
     private long lastBatteryRegisterNs = 0;
 
     private String[] gpuPaths = new String[0];
+    // Only "no readable GPU node exists at all". Read failures are never latched any more:
+    // the old code gave up for good after 3 failed reads and left the last value frozen.
     private boolean gpuUnavailable;
     private int gpuConsecutiveFailures;
-    private Long lastMaliGpuInfoMs;
-    private long lastMaliGpuInfoWallMs;
-    private boolean battFailed = false;
+    private int battConsecutiveFailures;
+    // After this many failed reads in a row the metric shows N/A (and keeps being retried).
+    private static final int FAILURES_BEFORE_NA = 3;
+
+    // Frame-generation rate is only trusted while it is fresh and real frames are arriving;
+    // otherwise a stalled game kept showing the last generated rate (e.g. 120) instead of 0.
+    private static final long FRAME_GEN_RATE_MAX_AGE_NS = 500_000_000L;
+    private volatile long frameGenRateAtNs = 0L;
+
+    // Set on the stats thread when a value string changed; widths are then measured on the UI
+    // thread (Paint isn't thread-safe, and the UI thread draws with the same Paints).
+    private volatile boolean statsDirty = false;
+    private boolean layoutCharging = false;
+
+    private final Runnable applyStatsRunnable = this::applyStatsOnUi;
+    private final View.OnLayoutChangeListener parentLayoutListener =
+            (v, l, t, r, b, ol, ot, orr, ob) -> clampToParent(false);
 
     private final Runnable redrawRunnable = () -> {
         redrawScheduled = false;
@@ -233,6 +250,11 @@ public class WinlatorHUD extends View {
         TSR = 11f * density;
         PAD = 6f * density;
         CORNER = 5f * density;
+
+        // Scale from the top-left corner, so the saved x/y is where the HUD's corner really is
+        // (scaling around the centre pushed a scaled-up HUD past the screen edge).
+        setPivotX(0f);
+        setPivotY(0f);
 
         initPaints(density);
         detectGpuPathsOnce();
@@ -410,6 +432,7 @@ public class WinlatorHUD extends View {
      *  actually running; 0 means "not generating right now", so the plain measured FPS shows. */
     public void setFrameGenPresentedRate(float rate) {
         frameGenPresentedRate = rate;
+        frameGenRateAtNs = System.nanoTime();
     }
 
     public void setIsNative(boolean n) {
@@ -422,10 +445,34 @@ public class WinlatorHUD extends View {
             readStats();
         } catch (Exception ignored) {}
 
-        if (userEnabled && statsHandler != null) {
-            statsHandler.postDelayed(statsRunnable, STATS_INTERVAL_MS);
+        // Reschedule only on the looper this run belongs to: after a stop/start the field may
+        // already point at a new thread, and posting there would start a second cadence.
+        Handler handler = statsHandler;
+        if (userEnabled && handler != null && handler.getLooper() == Looper.myLooper()) {
+            handler.postDelayed(statsRunnable, STATS_INTERVAL_MS);
         }
-        uiHandler.post(this::invalidate);
+        uiHandler.post(applyStatsRunnable);
+    }
+
+    // UI thread: measure whatever the stats thread changed, then redraw. Relayout when the
+    // charge state flips, since that changes the vertical row count / reserved width.
+    private void applyStatsOnUi() {
+        if (statsDirty) {
+            statsDirty = false;
+            wDynGpu = pVal.measureText(strGpu);
+            wDynCpuUsage = pVal.measureText(strCpuUsage);
+            wDynCpuTemp = pVal.measureText(strCpuTemp);
+            wDynRam = pVal.measureText(strRam);
+            wDynPwr = pVal.measureText(strPwr);
+            wDynTmp = pVal.measureText(strTmp);
+        }
+        boolean charging = snapCharging;
+        if (charging != layoutCharging) {
+            layoutCharging = charging;
+            requestRelayout();
+        } else {
+            invalidate();
+        }
     }
 
     private void readStats() {
@@ -450,17 +497,16 @@ public class WinlatorHUD extends View {
             if (value != snapGpu) {
                 snapGpu = value;
                 strGpu = value + "%";
-                wDynGpu = pVal.measureText(strGpu);
+                statsDirty = true;
             }
             return;
         }
 
-        if (++gpuConsecutiveFailures >= 3) {
-            gpuUnavailable = true;
-            if (snapGpu < 0) {
-                strGpu = "N/A";
-                wDynGpu = pVal.measureText(strGpu);
-            }
+        // Keep retrying every cycle; after a few misses show N/A rather than a stale number.
+        if (++gpuConsecutiveFailures >= FAILURES_BEFORE_NA && snapGpu != -1) {
+            snapGpu = -1;
+            strGpu = "N/A";
+            statsDirty = true;
         }
     }
 
@@ -473,24 +519,10 @@ public class WinlatorHUD extends View {
                 if (parts.length < 2) return -1;
                 long busy = Long.parseLong(parts[0]);
                 long total = Long.parseLong(parts[1]);
-                return total > 0L ? clampPercent((int) ((busy * 100L) / total)) : -1;
-            }
-
-            if (path.endsWith("/gpuinfo")) {
-                String line = readFirstLine(path);
-                if (line == null) return -1;
-                String[] parts = line.trim().split("\\s+");
-                long gpuMs = Long.parseLong(parts[parts.length - 1]);
-                long nowMs = SystemClock.elapsedRealtime();
-                Long oldGpuMs = lastMaliGpuInfoMs;
-                long oldWallMs = lastMaliGpuInfoWallMs;
-                lastMaliGpuInfoMs = gpuMs;
-                lastMaliGpuInfoWallMs = nowMs;
-                if (oldGpuMs == null || oldWallMs <= 0L) return -1;
-                long wallDelta = nowMs - oldWallMs;
-                long gpuDelta = Math.max(0L, gpuMs - oldGpuMs);
-                return wallDelta > 0L
-                        ? clampPercent((int) ((gpuDelta * 100L) / wallDelta)) : -1;
+                // "0 0" = the GPU was idle / power-collapsed for the whole window: that's 0%,
+                // not a failed read (treating it as a failure is what froze the GPU value).
+                if (total <= 0L) return 0;
+                return clampPercent((int) ((busy * 100L) / total));
             }
 
             if (path.endsWith("/proc/mtk_mali/utilization")) {
@@ -522,6 +554,10 @@ public class WinlatorHUD extends View {
         String line = readFirstLine(path);
         if (line == null) return -1;
         for (String token : line.trim().split("\\s+")) {
+            // devfreq "load" is "<busy%>@<freq>" (e.g. "45@585000000Hz"): only the part
+            // before '@' is the load. Gluing all digits together overflowed parseInt.
+            int at = token.indexOf('@');
+            if (at >= 0) token = token.substring(0, at);
             String digits = token.replaceAll("[^0-9]", "");
             if (!digits.isEmpty()) {
                 try {
@@ -555,8 +591,7 @@ public class WinlatorHUD extends View {
         snapCpuTemp = temp;
         strCpuUsage = usage >= 0 ? usage + "%" : "N/A";
         strCpuTemp = temp > 0 ? temp + "°C" : "N/A";
-        wDynCpuUsage = pVal.measureText(strCpuUsage);
-        wDynCpuTemp = pVal.measureText(strCpuTemp);
+        statsDirty = true;
     }
 
     private void readRam() {
@@ -578,13 +613,13 @@ public class WinlatorHUD extends View {
             if (value != snapRam) {
                 snapRam = value;
                 strRam = value >= 0 ? value + "%" : "N/A";
-                wDynRam = pVal.measureText(strRam);
+                statsDirty = true;
             }
         } catch (Exception e) {
             if (snapRam != -1) {
                 snapRam = -1;
                 strRam = "N/A";
-                wDynRam = pVal.measureText(strRam);
+                statsDirty = true;
             }
         }
     }
@@ -598,8 +633,6 @@ public class WinlatorHUD extends View {
     }
 
     private void readBattery() {
-        if (battFailed) return;
-
         try {
             long now = System.nanoTime();
             if (cachedBatteryIntent == null
@@ -616,7 +649,7 @@ public class WinlatorHUD extends View {
             if (tempC != snapTmp) {
                 snapTmp = tempC;
                 strTmp = tempC > 0 ? tempC + "°C" : "N/A";
-                wDynTmp = pVal.measureText(strTmp);
+                statsDirty = true;
             }
 
             snapPct = batt.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
@@ -653,10 +686,19 @@ public class WinlatorHUD extends View {
                 snapMw = mw;
                 strPwr = mw > 0
                         ? String.format(Locale.US, "%.1fW", mw / 1000f) : "N/A";
-                wDynPwr = pVal.measureText(strPwr);
+                statsDirty = true;
             }
+            battConsecutiveFailures = 0;
         } catch (Exception e) {
-            battFailed = true;
+            // Used to disable battery reading for good (PWR/BAT frozen). Now: retry every
+            // cycle, and show N/A after a few misses in a row.
+            if (++battConsecutiveFailures >= FAILURES_BEFORE_NA && (snapMw != -1 || snapTmp != -1)) {
+                snapMw = -1;
+                snapTmp = -1;
+                strPwr = "N/A";
+                strTmp = "N/A";
+                statsDirty = true;
+            }
         }
     }
 
@@ -698,7 +740,9 @@ public class WinlatorHUD extends View {
         int frames = frameAccum.getAndSet(0);
         float measuredFps = frames * 1_000_000_000f / dt;
         float genRate = frameGenPresentedRate;
-        snapFps = genRate > 0f ? genRate : measuredFps;
+        boolean genFresh = frames > 0 && genRate > 0f
+                && now - frameGenRateAtNs < FRAME_GEN_RATE_MAX_AGE_NS;
+        snapFps = genFresh ? genRate : measuredFps;
         lastFpsNs = now;
 
         String value = String.format(Locale.US, "%.0f", snapFps);
@@ -1132,6 +1176,7 @@ public class WinlatorHUD extends View {
                 if (dragging) {
                     setX(startX + dx);
                     setY(startY + dy);
+                    clampToParent(false);
                 }
                 return true;
 
@@ -1168,11 +1213,15 @@ public class WinlatorHUD extends View {
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
         prefs.registerOnSharedPreferenceChangeListener(prefListener);
+        if (getParent() instanceof View) ((View) getParent()).addOnLayoutChangeListener(parentLayoutListener);
         if (userEnabled) {
             uiHandler.removeCallbacks(redrawRunnable);
             redrawScheduled = false;
             setVisibility(VISIBLE);
             scheduleRedraw();
+            // onDetachedFromWindow stopped the stats thread; without this GPU/CPU/RAM/PWR
+            // stayed frozen after a re-attach while FPS kept updating.
+            startStatsThread();
         }
     }
 
@@ -1180,6 +1229,8 @@ public class WinlatorHUD extends View {
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         prefs.unregisterOnSharedPreferenceChangeListener(prefListener);
+        if (getParent() instanceof View) ((View) getParent()).removeOnLayoutChangeListener(parentLayoutListener);
+        uiHandler.removeCallbacks(applyStatsRunnable);
         uiHandler.removeCallbacks(redrawRunnable);
         stopStatsThread();
         redrawScheduled = false;
@@ -1215,6 +1266,32 @@ public class WinlatorHUD extends View {
         prefs.edit().putFloat(KEY_X, getX()).putFloat(KEY_Y, getY()).apply();
     }
 
+    // Keeps the (scaled) HUD fully on screen. Runs on drag, on (re)layout of the HUD or its
+    // parent (rotation, resolution change) and after a size change; a saved position that is
+    // off screen is pulled back and, when persist is set, re-saved.
+    private void clampToParent(boolean persist) {
+        if (!(getParent() instanceof View)) return;
+        View parent = (View) getParent();
+        int pw = parent.getWidth();
+        int ph = parent.getHeight();
+        if (pw <= 0 || ph <= 0 || getWidth() <= 0 || getHeight() <= 0) return;
+        float maxX = Math.max(0f, pw - getWidth() * getScaleX());
+        float maxY = Math.max(0f, ph - getHeight() * getScaleY());
+        float x = Math.max(0f, Math.min(maxX, getX()));
+        float y = Math.max(0f, Math.min(maxY, getY()));
+        if (x != getX() || y != getY()) {
+            setX(x);
+            setY(y);
+            if (persist) savePosition();
+        }
+    }
+
+    @Override
+    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+        super.onLayout(changed, left, top, right, bottom);
+        if (changed) clampToParent(false);
+    }
+
     private void scheduleRedraw() {
         if (!redrawScheduled) {
             redrawScheduled = true;
@@ -1240,6 +1317,11 @@ public class WinlatorHUD extends View {
             uiHandler.removeCallbacks(redrawRunnable);
             redrawScheduled = false;
             uiHandler.postDelayed(this::ensureVisible, 150);
+            startStatsThread();
+        } else if (visibility != VISIBLE) {
+            // Game not on screen: stop polling sysfs. Besides wasting battery, the idle GPU
+            // while in another app used to trip the (now removed) permanent GPU "failure" latch.
+            stopStatsThread();
         }
     }
 
@@ -1479,6 +1561,7 @@ public class WinlatorHUD extends View {
     public void setHudScale(float scale, boolean persist) {
         setScaleX(scale);
         setScaleY(scale);
+        clampToParent(persist);
         if (persist) prefs.edit().putFloat(KEY_SCALE, scale).apply();
     }
 

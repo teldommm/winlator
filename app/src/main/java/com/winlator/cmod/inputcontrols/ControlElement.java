@@ -397,14 +397,15 @@ public class ControlElement {
 
     // Haptic weight for the moment this element takes a finger. D-pads return NONE: they pulse
     // per direction from handleTouchMove (a press from rest, a lighter tick when rolling to
-    // another direction), so a touch in the D-pad's dead centre doesn't click.
+    // another direction), so a touch in the D-pad's dead centre doesn't click. Sticks (fixed
+    // and dynamic) and trackpads are deliberately silent: continuous input, like a real
+    // thumbstick.
     public int getTouchDownHaptic() {
         switch (type) {
             case D_PAD:
-                return TouchHaptics.NONE;
             case STICK:
             case TRACKPAD:
-                return TouchHaptics.GRAB;
+                return TouchHaptics.NONE;
             default:
                 return TouchHaptics.PRESS;
         }

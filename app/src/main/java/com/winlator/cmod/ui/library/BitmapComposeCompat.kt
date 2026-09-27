@@ -669,14 +669,10 @@ private fun LibraryActionTileCompat(
         onClick = click,
         modifier = modifier,
         shape = RoundedCornerShape(13.dp),
-        color = if (destructive)
-            MaterialTheme.colorScheme.errorContainer.copy(alpha = .22f)
-        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .42f),
-        border = BorderStroke(
-            1.dp,
-            if (destructive) MaterialTheme.colorScheme.error.copy(alpha = .46f)
-            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = .70f)
-        )
+        // Same fill and outline for every tile; "Remove from library" differs only by its red
+        // icon and label.
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .42f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .70f))
     ) {
         Row(
             modifier = Modifier.padding(
