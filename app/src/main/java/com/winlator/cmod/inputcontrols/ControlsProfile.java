@@ -168,6 +168,12 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
         elementsLoaded = true;
     }
 
+    public void addElementAt(int index, ControlElement element) {
+        if (index < 0 || index > elements.size()) elements.add(element);
+        else elements.add(index, element);
+        elementsLoaded = true;
+    }
+
     public void removeElement(ControlElement element) {
         elements.remove(element);
         elementsLoaded = true;
@@ -231,28 +237,13 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
             JSONArray elementsJSONArray = profileJSONObject.getJSONArray("elements");
             for (int i = 0; i < elementsJSONArray.length(); i++) {
                 JSONObject elementJSONObject = elementsJSONArray.getJSONObject(i);
-                ControlElement element = new ControlElement(inputControlsView);
-                element.setType(ControlElement.Type.valueOf(elementJSONObject.getString("type")));
-                element.setShape(ControlElement.Shape.valueOf(elementJSONObject.getString("shape")));
-                element.setToggleSwitch(elementJSONObject.getBoolean("toggleSwitch"));
-                element.setX((int)(elementJSONObject.getDouble("x") * inputControlsView.getMaxWidth()));
-                element.setY((int)(elementJSONObject.getDouble("y") * inputControlsView.getMaxHeight()));
-                element.setScale((float)elementJSONObject.getDouble("scale"));
-                element.setText(elementJSONObject.getString("text"));
-                element.setIconId(elementJSONObject.getInt("iconId"));
-                if (elementJSONObject.has("range")) element.setRange(ControlElement.Range.valueOf(elementJSONObject.getString("range")));
-                if (elementJSONObject.has("orientation")) element.setOrientation((byte)elementJSONObject.getInt("orientation"));
-                if (elementJSONObject.has("opacity")) element.setOpacity((float)elementJSONObject.getDouble("opacity"));
-                if (elementJSONObject.has("customColor")) element.setCustomColor(elementJSONObject.getInt("customColor"));
-                if (elementJSONObject.has("mouseMoveMode")) element.setMouseMoveMode(elementJSONObject.getBoolean("mouseMoveMode"));
-                if (elementJSONObject.has("customIconPath")) element.setCustomIconPath(elementJSONObject.getString("customIconPath"));
+                ControlElement element = elementFromJSON(elementJSONObject, inputControlsView);
+                // Same as before the refactor: one broken element aborts the load.
+                if (element == null) throw new JSONException("Invalid control element at index " + i);
 
                 boolean hasGamepadBinding = true;
-                JSONArray bindingsJSONArray = elementJSONObject.getJSONArray("bindings");
-                for (int j = 0; j < bindingsJSONArray.length(); j++) {
-                    Binding binding = Binding.fromString(bindingsJSONArray.getString(j));
-                    element.setBindingAt(j, Binding.fromString(bindingsJSONArray.getString(j)));
-                    if (!binding.isGamepad()) hasGamepadBinding = false;
+                for (int j = 0; j < element.getBindingCount(); j++) {
+                    if (!element.getBindingAt(j).isGamepad()) hasGamepadBinding = false;
                 }
 
                 if (!virtualGamepad && hasGamepadBinding) virtualGamepad = true;
@@ -262,6 +253,42 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
         }
         catch (JSONException e) {
             e.printStackTrace();
+        }
+    }
+
+    // One element from its saved JSON (the same shape ControlElement.toJSONObject() writes).
+    // Shared by loadElements() and the editor's Duplicate action, so a copy carries every field
+    // exactly the way a reload would.
+    public static ControlElement elementFromJSON(JSONObject elementJSONObject, InputControlsView inputControlsView) {
+        if (elementJSONObject == null) return null;
+        try {
+            ControlElement element = new ControlElement(inputControlsView);
+            element.setType(ControlElement.Type.valueOf(elementJSONObject.getString("type")));
+            element.setShape(ControlElement.Shape.valueOf(elementJSONObject.getString("shape")));
+            element.setToggleSwitch(elementJSONObject.getBoolean("toggleSwitch"));
+            element.setX((int)(elementJSONObject.getDouble("x") * inputControlsView.getMaxWidth()));
+            element.setY((int)(elementJSONObject.getDouble("y") * inputControlsView.getMaxHeight()));
+            element.setScale((float)elementJSONObject.getDouble("scale"));
+            element.setText(elementJSONObject.getString("text"));
+            element.setIconId(elementJSONObject.getInt("iconId"));
+            if (elementJSONObject.has("range")) element.setRange(ControlElement.Range.valueOf(elementJSONObject.getString("range")));
+            if (elementJSONObject.has("orientation")) element.setOrientation((byte)elementJSONObject.getInt("orientation"));
+            if (elementJSONObject.has("opacity")) element.setOpacity((float)elementJSONObject.getDouble("opacity"));
+            if (elementJSONObject.has("customColor")) element.setCustomColor(elementJSONObject.getInt("customColor"));
+            if (elementJSONObject.has("mouseMoveMode")) element.setMouseMoveMode(elementJSONObject.getBoolean("mouseMoveMode"));
+            element.setSwipeable(elementJSONObject.optBoolean("swipeable", false));
+            element.setDynamicStick(elementJSONObject.optBoolean("dynamicStick", false));
+            element.setZoneScale((float) elementJSONObject.optDouble("zoneScale", ControlElement.DEFAULT_ZONE_SCALE));
+            if (elementJSONObject.has("customIconPath")) element.setCustomIconPath(elementJSONObject.getString("customIconPath"));
+            JSONArray bindingsJSONArray = elementJSONObject.getJSONArray("bindings");
+            for (int j = 0; j < bindingsJSONArray.length(); j++) {
+                element.setBindingAt(j, Binding.fromString(bindingsJSONArray.getString(j)));
+            }
+            return element;
+        }
+        catch (JSONException e) {
+            e.printStackTrace();
+            return null;
         }
     }
 }

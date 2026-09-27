@@ -37,6 +37,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.winlator.cmod.ui.theme.accentSwitchColors
@@ -261,6 +262,8 @@ internal fun SidebarMenu(
         expanded = expanded,
         onDismissRequest = onDismissRequest,
         modifier = Modifier.widthIn(min = 160.dp, max = 300.dp).heightIn(max = 360.dp),
+        // Opens just below its anchor with a small gap instead of touching it.
+        offset = DpOffset(0.dp, 4.dp),
         shape = sidebarMenuShape(),
         containerColor = MaterialTheme.colorScheme.surface,
         content = content

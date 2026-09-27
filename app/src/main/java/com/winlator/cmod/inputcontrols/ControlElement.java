@@ -9,6 +9,7 @@ import android.graphics.PointF;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.view.MotionEvent;
 
 import androidx.core.graphics.ColorUtils;
@@ -80,6 +81,10 @@ public class ControlElement {
     private short y;
     private boolean selected = false;
     private boolean toggleSwitch = false;
+    // Slide-between-buttons (a finger sliding off this control onto another swipe-enabled one
+    // presses that one without lifting). Off by default for every element, including all
+    // existing profiles: it is only written to / read from JSON when turned on.
+    private boolean swipeable = false;
     private float opacity = 1.0f;
     private int customColor = 0; 
     private ColorFilter customColorFilter = null;
@@ -97,6 +102,22 @@ public class ControlElement {
     private Range range;
     private byte orientation;
     private PointF currentPosition;
+
+    // ---------- Dynamic stick (STICK only, off by default) ----------
+    // The stick has a fixed square zone around its home position. A touch in the zone but off
+    // the stick spawns the stick under the finger; a finger that leaves the stick's radius drags
+    // the stick along (finger stays on the rim). Both are bounded by the zone. On release the
+    // stick is back home immediately. Home = the saved x/y, which is never modified at runtime,
+    // so nothing of this leaks into the profile.
+    public static final float DEFAULT_ZONE_SCALE = 3.0f;
+    public static final float MIN_ZONE_SCALE = 1.5f;
+    public static final float MAX_ZONE_SCALE = 5.0f;
+    private boolean dynamicStick = false;
+    // Zone side as a multiple of the stick's diameter, so it follows Scale.
+    private float zoneScale = DEFAULT_ZONE_SCALE;
+    // Runtime centre while a dynamic stick is held away from home.
+    private boolean anchorActive = false;
+    private float anchorX, anchorY;
     private RangeScroller scroller;
     private CubicBezierInterpolator interpolator;
     private Object touchTime;
@@ -204,6 +225,101 @@ public class ControlElement {
 
     public boolean isMouseMoveMode() {
         return mouseMoveMode;
+    }
+
+    public boolean isDynamicStick() {
+        return dynamicStick && type == Type.STICK;
+    }
+
+    public boolean getDynamicStickFlag() {
+        return dynamicStick;
+    }
+
+    public void setDynamicStick(boolean dynamicStick) {
+        this.dynamicStick = dynamicStick;
+        anchorActive = false;
+    }
+
+    public float getZoneScale() {
+        return zoneScale;
+    }
+
+    public void setZoneScale(float zoneScale) {
+        this.zoneScale = Math.max(MIN_ZONE_SCALE, Math.min(MAX_ZONE_SCALE, zoneScale));
+    }
+
+    // The zone square, centred on the stick's home position and cut to the screen.
+    public RectF getDynamicZone() {
+        Rect box = getBoundingBox();
+        float half = box.width() * 0.5f * zoneScale;
+        float cx = box.centerX();
+        float cy = box.centerY();
+        return new RectF(
+                Math.max(0, cx - half),
+                Math.max(0, cy - half),
+                Math.min(inputControlsView.getMaxWidth(), cx + half),
+                Math.min(inputControlsView.getMaxHeight(), cy + half)
+        );
+    }
+
+    // Second-pass touch-down used by InputControlsView only when no element took the pointer
+    // by its own bounds — so buttons sitting inside a stick's zone always win.
+    public boolean handleDynamicZoneTouchDown(int pointerId, float x, float y) {
+        if (!isDynamicStick() || currentPointerId != -1 || inputControlsView.isEditMode()) return false;
+        if (!getDynamicZone().contains(x, y)) return false;
+        currentPointerId = pointerId;
+        moveAnchorTo(x, y);
+        return handleTouchMove(pointerId, x, y);
+    }
+
+    // Keeps the whole stick inside the zone (the home centre is always allowed, even when the
+    // zone is cut by the screen edge).
+    private void moveAnchorTo(float cx, float cy) {
+        Rect box = getBoundingBox();
+        float radius = box.width() * 0.5f;
+        RectF zone = getDynamicZone();
+        float homeX = box.centerX();
+        float homeY = box.centerY();
+        float minX = Math.min(zone.left + radius, homeX);
+        float maxX = Math.max(zone.right - radius, homeX);
+        float minY = Math.min(zone.top + radius, homeY);
+        float maxY = Math.max(zone.bottom - radius, homeY);
+        anchorX = Math.max(minX, Math.min(maxX, cx));
+        anchorY = Math.max(minY, Math.min(maxY, cy));
+        anchorActive = true;
+    }
+
+    private float stickCenterX(Rect box) {
+        return anchorActive ? anchorX : box.centerX();
+    }
+
+    private float stickCenterY(Rect box) {
+        return anchorActive ? anchorY : box.centerY();
+    }
+
+    public boolean isSwipeable() {
+        return swipeable;
+    }
+
+    public void setSwipeable(boolean swipeable) {
+        this.swipeable = swipeable;
+    }
+
+    // Whether this element takes part in sliding right now. Toggle switches and relative-mouse
+    // buttons are left out even when the flag is on: sliding off a toggle would flip it, and a
+    // relative-mouse button uses the finger's movement itself.
+    public boolean isSwipeEnabled() {
+        if (!swipeable) return false;
+        if (type == Type.D_PAD) return true;
+        return type == Type.BUTTON && !toggleSwitch && !mouseMoveMode;
+    }
+
+    public boolean isCapturing(int pointerId) {
+        return pointerId != -1 && currentPointerId == pointerId;
+    }
+
+    public boolean isCapturingAnyPointer() {
+        return currentPointerId != -1;
     }
 
     public void setMouseMoveMode(boolean mouseMoveMode) {
@@ -618,7 +734,14 @@ public class ControlElement {
                         drawSoftCircle(canvas, cx, cy, w * 0.5f, active, accent, true);
                         break;
                     }
-                    case RECT:
+                    // RECT and ROUND_RECT used to share one branch (both drawn as a pill), so
+                    // switching between them changed nothing. RECT is now a rectangle with the
+                    // same small corner radius as SQUARE; ROUND_RECT keeps the pill shape.
+                    case RECT: {
+                        float radius = snappingSize * 1.05f * scale;
+                        drawSoftRoundRect(canvas, boundingBox.left, boundingBox.top, boundingBox.right, boundingBox.bottom, radius, active);
+                        break;
+                    }
                     case ROUND_RECT: {
                         float radius = h * 0.45f;
                         drawSoftRoundRect(canvas, boundingBox.left, boundingBox.top, boundingBox.right, boundingBox.bottom, radius, active);
@@ -730,8 +853,9 @@ public class ControlElement {
             }
 
             case STICK: {
-                float cx = boundingBox.centerX();
-                float cy = boundingBox.centerY();
+                // Runtime centre: home, or where a dynamic stick currently is.
+                float cx = stickCenterX(boundingBox);
+                float cy = stickCenterY(boundingBox);
                 float outer = boundingBox.height() * 0.5f;
                 float innerRing = outer * 0.52f;
                 float thumbRadius = outer * 0.42f;
@@ -750,8 +874,11 @@ public class ControlElement {
                 setupPaint(paint, Paint.Style.STROKE, withAlpha(getThemeColor(), active ? 235 : 205), Math.max(1f, snappingSize * 0.22f * scale));
                 canvas.drawCircle(cx, cy, innerRing, paint);
 
-                float thumbstickX = getCurrentPosition().x;
-                float thumbstickY = getCurrentPosition().y;
+                // Thumb follows the finger only while held; otherwise it sits in the centre. (The
+                // cached position used to stay behind when the stick was moved in the editor.)
+                boolean held = currentPointerId != -1 && currentPosition != null;
+                float thumbstickX = held ? currentPosition.x : cx;
+                float thumbstickY = held ? currentPosition.y : cy;
 
                 setupPaint(paint, Paint.Style.FILL, withAlpha(DARK_SURFACE, 190), 0);
                 canvas.drawCircle(thumbstickX, thumbstickY, thumbRadius, paint);
@@ -838,6 +965,11 @@ public class ControlElement {
             if (opacity != 1.0f) elementJSONObject.put("opacity", opacity);
             if (customColor != 0) elementJSONObject.put("customColor", customColor);
             if (mouseMoveMode) elementJSONObject.put("mouseMoveMode", true);
+            if (swipeable) elementJSONObject.put("swipeable", true);
+            if (dynamicStick) {
+                elementJSONObject.put("dynamicStick", true);
+                elementJSONObject.put("zoneScale", Float.valueOf(zoneScale));
+            }
             if (customIconPath != null) elementJSONObject.put("customIconPath", customIconPath);
 
             if (type == Type.RANGE_BUTTON && range != null) {
@@ -919,6 +1051,34 @@ public class ControlElement {
                 deltaY = deltaPoint[1];
                 currentPosition.set(x, y);
             }
+            else if (type == Type.STICK) {
+                float cx = stickCenterX(boundingBox);
+                float cy = stickCenterY(boundingBox);
+                float offsetX = x - cx;
+                float offsetY = y - cy;
+
+                if (isDynamicStick() && !inputControlsView.isEditMode()) {
+                    float distance = (float) Math.hypot(offsetX, offsetY);
+                    if (distance > radius) {
+                        // Drag the stick so the finger stays on its rim, within the zone.
+                        float pull = (distance - radius) / distance;
+                        moveAnchorTo(cx + offsetX * pull, cy + offsetY * pull);
+                        cx = anchorX;
+                        cy = anchorY;
+                        offsetX = x - cx;
+                        offsetY = y - cy;
+                    }
+                }
+
+                if (Mathf.lengthSq(offsetX, offsetY) > radius * radius) {
+                    float angle = (float)Math.atan2(offsetY, offsetX);
+                    offsetX = (float)(Math.cos(angle) * radius);
+                    offsetY = (float)(Math.sin(angle) * radius);
+                }
+
+                deltaX = Mathf.clamp(offsetX / radius, -1, 1);
+                deltaY = Mathf.clamp(offsetY / radius, -1, 1);
+            }
             else {
                 float localX = x - boundingBox.left;
                 float localY = y - boundingBox.top;
@@ -938,8 +1098,8 @@ public class ControlElement {
 
             if (type == Type.STICK) {
                 if (currentPosition == null) currentPosition = new PointF();
-                currentPosition.x = boundingBox.left + deltaX * radius + radius;
-                currentPosition.y = boundingBox.top + deltaY * radius + radius;
+                currentPosition.x = stickCenterX(boundingBox) + deltaX * radius;
+                currentPosition.y = stickCenterY(boundingBox) + deltaY * radius;
                 float adjDeltaX = (Math.abs(deltaX) < Math.abs(deltaY) * STICK_CROSS_ZONE) ? 0 : deltaX;
                 float adjDeltaY = (Math.abs(deltaY) < Math.abs(deltaX) * STICK_CROSS_ZONE) ? 0 : deltaY;
                 
@@ -1098,6 +1258,8 @@ public class ControlElement {
                     scroller.handleTouchUp();
                 }
                 else if (type == Type.STICK) {
+                    // Dynamic stick: straight back home (no return animation, by design).
+                    anchorActive = false;
                     invalidateSelf();
                 }
 

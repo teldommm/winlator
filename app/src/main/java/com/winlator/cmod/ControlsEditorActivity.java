@@ -20,7 +20,6 @@ import java.util.Arrays;
 import java.util.List;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.compose.ui.platform.ComposeView;
 import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.R;
@@ -29,10 +28,9 @@ import com.winlator.cmod.ui.inputcontrols.ControlElementBindingRow;
 import com.winlator.cmod.ui.inputcontrols.ControlElementIcon;
 import com.winlator.cmod.ui.inputcontrols.ControlElementIconTint;
 import com.winlator.cmod.ui.inputcontrols.ControlElementSettingsCallbacks;
-import com.winlator.cmod.ui.inputcontrols.ControlElementSettingsComposeHost;
 import com.winlator.cmod.ui.inputcontrols.ControlElementSettingsModel;
-import com.winlator.cmod.ui.inputcontrols.ControlsEditorToolbarComposeHost;
-import com.winlator.cmod.ui.inputcontrols.SchemeColorComposeDialog;
+import com.winlator.cmod.ui.inputcontrols.ControlsEditorActions;
+import com.winlator.cmod.ui.inputcontrols.ControlsEditorOverlay;
 
 import com.winlator.cmod.inputcontrols.Binding;
 import com.winlator.cmod.inputcontrols.ControlElement;
@@ -51,7 +49,24 @@ public class ControlsEditorActivity extends AppCompatActivity {
     private static final String BUILTIN_ICON_PREFIX = "builtin:";
     private static final String CUSTOM_ICON_PREFIX = "path:";
 
-    private ComposeView elementSettingsView;
+    private ControlsEditorOverlay overlay;
+
+    private final android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
+    // Custom Text is saved this long after the last keystroke instead of on every letter
+    // (profile.save() rewrites the whole profile JSON).
+    private static final long TEXT_SAVE_DELAY_MS = 400;
+    private boolean textSavePending = false;
+    private final Runnable textSaveRunnable = () -> {
+        textSavePending = false;
+        profile.save();
+        endEdit();
+    };
+    // One settings "edit" = one undo step: opened by the first change (snapshot taken), closed
+    // when it is committed. A slider drag or a burst of typing is therefore undone as a whole.
+    private boolean editOpen = false;
+    // Decoded icon bitmaps, built once (see getIconCache()); rebuilt only after an icon file
+    // is added or overridden.
+    private List<CachedIcon> iconCache;
 
     private static File getCustomIconsDir() {
         return new File(Environment.getExternalStorageDirectory(), "winlator/custom_icons");
@@ -83,29 +98,107 @@ public class ControlsEditorActivity extends AppCompatActivity {
         FrameLayout container = findViewById(R.id.FLContainer);
         container.addView(inputControlsView, 0);
 
-        container.addView(ControlsEditorToolbarComposeHost.create(
-                this,
+        ArrayList<Integer> schemeColors = new ArrayList<>();
+        for (int color : PALETTE_COLORS) schemeColors.add(color);
+
+        overlay = new ControlsEditorOverlay(
+                container,
+                inputControlsView,
                 profile.getName(),
-                () -> {
-                    if (!inputControlsView.addElement()) {
-                        Toast.makeText(this, "No profile selected", Toast.LENGTH_SHORT).show();
+                schemeColors,
+                profile.getThemeColor(),
+                new ControlsEditorActions() {
+                    @Override
+                    public void onAddElement() {
+                        flushPendingTextSave();
+                        if (!inputControlsView.addElement()) {
+                            Toast.makeText(ControlsEditorActivity.this, "No profile selected", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+
+                    @Override
+                    public void onRemoveElement() {
+                        flushPendingTextSave();
+                        if (!inputControlsView.removeElement()) {
+                            Toast.makeText(ControlsEditorActivity.this, "No control element selected", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+
+                    @Override
+                    public void onDuplicateElement() {
+                        flushPendingTextSave();
+                        if (!inputControlsView.duplicateElement()) {
+                            Toast.makeText(ControlsEditorActivity.this, "No control element selected", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+
+                    @Override
+                    public void onUndo() {
+                        flushPendingTextSave();
+                        inputControlsView.undo();
+                    }
+
+                    @Override
+                    public void onOpenSettings() {
+                        ControlElement element = inputControlsView.getSelectedElement();
+                        if (element != null) {
+                            overlay.showSettings(buildElementSettingsModel(element));
+                        } else {
+                            Toast.makeText(ControlsEditorActivity.this, "No control element selected", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+
+                    @Override
+                    public void onSchemeColorSelected(int color) {
+                        profile.setThemeColor(color);
+                        profile.save();
+                        inputControlsView.invalidate();
                     }
                 },
-                () -> {
-                    if (!inputControlsView.removeElement()) {
-                        Toast.makeText(this, "No control element selected", Toast.LENGTH_SHORT).show();
-                    }
-                },
-                () -> {
-                    ControlElement selectedElement = inputControlsView.getSelectedElement();
-                    if (selectedElement != null) {
-                        showControlElementSettings();
-                    } else {
-                        Toast.makeText(this, "No control element selected", Toast.LENGTH_SHORT).show();
-                    }
-                },
-                this::showSchemeColorPicker
-        ));
+                createSettingsCallbacks()
+        );
+
+        inputControlsView.setEditorListener(new InputControlsView.EditorListener() {
+            @Override
+            public void onSelectionChanged(ControlElement element) {
+                flushPendingTextSave();
+                overlay.setHasSelection(element != null);
+                if (!overlay.isSettingsOpen()) return;
+                // The panel has no scrim: picking another element re-targets it, tapping empty
+                // canvas (nothing selected) closes it.
+                if (element != null) {
+                    overlay.updateSettings(buildElementSettingsModel(element));
+                    overlay.onCanvasChanged();
+                } else {
+                    overlay.hideSettings();
+                }
+            }
+
+            @Override
+            public void onElementsChanged() {
+                overlay.onCanvasChanged();
+                // Pinch-scale and undo change what the panel shows.
+                ControlElement selected = inputControlsView.getSelectedElement();
+                if (selected != null) refreshElementSettings(selected);
+            }
+
+            @Override
+            public void onElementGestureChanged(boolean active) {
+                if (active) flushPendingTextSave();
+                overlay.setDimmed(active);
+            }
+
+            @Override
+            public void onUndoAvailabilityChanged(boolean available) {
+                overlay.setUndoAvailable(available);
+            }
+        });
+    }
+
+    @Override
+    protected void onPause() {
+        flushPendingTextSave();
+        super.onPause();
     }
 
     @Override
@@ -124,118 +217,220 @@ public class ControlsEditorActivity extends AppCompatActivity {
         }, 500);
     }
 
-    private void showSchemeColorPicker() {
-        ArrayList<Integer> colors = new ArrayList<>();
-        for (int color : PALETTE_COLORS) colors.add(color);
-        SchemeColorComposeDialog.show(this, colors, profile.getThemeColor(), color -> {
-            profile.setThemeColor(color);
-            profile.save();
-            inputControlsView.invalidate();
-        });
+    // Every settings edit applies to whatever element is selected *now*: the floating panel
+    // stays open while the person taps other elements on the canvas.
+    private ControlElement target() {
+        return inputControlsView.getSelectedElement();
     }
 
-    private void showControlElementSettings() {
-        final ControlElement element = inputControlsView.getSelectedElement();
-        if (element == null) return;
+    private void beginEdit(ControlElement element) {
+        if (editOpen) return;
+        inputControlsView.recordElementSnapshot(element);
+        editOpen = true;
+    }
 
-        ControlElementSettingsCallbacks callbacks = new ControlElementSettingsCallbacks() {
+    // Any edit other than typing first closes a pending text burst, so the two end up as
+    // separate undo steps.
+    private void startEdit(ControlElement element) {
+        flushPendingTextSave();
+        beginEdit(element);
+    }
+
+    private void endEdit() {
+        editOpen = false;
+    }
+
+    private void commit(ControlElement element) {
+        profile.save();
+        inputControlsView.invalidate();
+        refreshElementSettings(element);
+        endEdit();
+    }
+
+    private void flushPendingTextSave() {
+        if (!textSavePending) return;
+        handler.removeCallbacks(textSaveRunnable);
+        textSaveRunnable.run();
+    }
+
+    private ControlElementSettingsCallbacks createSettingsCallbacks() {
+        return new ControlElementSettingsCallbacks() {
             @Override
             public void onTypeChanged(int index) {
-                element.setType(ControlElement.Type.values()[index]);
-                profile.save();
-                inputControlsView.invalidate();
-                refreshElementSettings(element);
+                ControlElement e = target();
+                if (e == null) return;
+                startEdit(e);
+                e.setType(ControlElement.Type.values()[index]);
+                commit(e);
             }
 
             @Override
             public void onShapeChanged(int index) {
-                element.setShape(ControlElement.Shape.values()[index]);
-                profile.save();
-                inputControlsView.invalidate();
-                refreshElementSettings(element);
+                ControlElement e = target();
+                if (e == null) return;
+                startEdit(e);
+                e.setShape(ControlElement.Shape.values()[index]);
+                commit(e);
             }
 
             @Override
             public void onRangeChanged(int index) {
-                element.setRange(ControlElement.Range.values()[index]);
-                profile.save();
-                inputControlsView.invalidate();
-                refreshElementSettings(element);
+                ControlElement e = target();
+                if (e == null) return;
+                startEdit(e);
+                e.setRange(ControlElement.Range.values()[index]);
+                commit(e);
             }
 
             @Override
             public void onOrientationChanged(boolean vertical) {
-                element.setOrientation((byte) (vertical ? 1 : 0));
-                profile.save();
-                inputControlsView.invalidate();
-                refreshElementSettings(element);
+                ControlElement e = target();
+                if (e == null) return;
+                startEdit(e);
+                e.setOrientation((byte) (vertical ? 1 : 0));
+                commit(e);
             }
 
             @Override
             public void onColumnsChanged(int columns) {
-                element.setBindingCount(columns);
-                profile.save();
+                ControlElement e = target();
+                if (e == null) return;
+                startEdit(e);
+                e.setBindingCount(columns);
+                commit(e);
+            }
+
+            @Override
+            public void onScalePreview(int percent) {
+                ControlElement e = target();
+                if (e == null) return;
+                startEdit(e);
+                e.setScale(percent / 100f);
                 inputControlsView.invalidate();
-                refreshElementSettings(element);
             }
 
             @Override
             public void onScaleChanged(int percent) {
-                element.setScale(percent / 100f);
-                profile.save();
+                ControlElement e = target();
+                if (e == null) return;
+                startEdit(e);
+                e.setScale(percent / 100f);
+                commit(e);
+                overlay.onCanvasChanged();
+            }
+
+            @Override
+            public void onOpacityPreview(int percent) {
+                ControlElement e = target();
+                if (e == null) return;
+                startEdit(e);
+                e.setOpacity(percent / 100f);
                 inputControlsView.invalidate();
-                refreshElementSettings(element);
             }
 
             @Override
             public void onOpacityChanged(int percent) {
-                element.setOpacity(percent / 100f);
-                profile.save();
-                inputControlsView.invalidate();
-                refreshElementSettings(element);
+                ControlElement e = target();
+                if (e == null) return;
+                startEdit(e);
+                e.setOpacity(percent / 100f);
+                commit(e);
             }
 
             @Override
             public void onColorSelected(int color) {
-                element.setCustomColor(color);
-                profile.save();
-                inputControlsView.invalidate();
-                refreshElementSettings(element);
+                ControlElement e = target();
+                if (e == null) return;
+                startEdit(e);
+                e.setCustomColor(color);
+                commit(e);
             }
 
             @Override
             public void onToggleSwitchChanged(boolean enabled) {
-                element.setToggleSwitch(enabled);
-                profile.save();
-                refreshElementSettings(element);
+                ControlElement e = target();
+                if (e == null) return;
+                startEdit(e);
+                e.setToggleSwitch(enabled);
+                commit(e);
             }
 
             @Override
             public void onMouseMoveModeChanged(boolean enabled) {
-                element.setMouseMoveMode(enabled);
-                profile.save();
+                ControlElement e = target();
+                if (e == null) return;
+                startEdit(e);
+                e.setMouseMoveMode(enabled);
+                commit(e);
+            }
+
+            @Override
+            public void onDynamicStickChanged(boolean enabled) {
+                ControlElement e = target();
+                if (e == null) return;
+                startEdit(e);
+                e.setDynamicStick(enabled);
+                commit(e);
+            }
+
+            @Override
+            public void onZoneScalePreview(int percent) {
+                ControlElement e = target();
+                if (e == null) return;
+                startEdit(e);
+                e.setZoneScale(percent / 100f);
                 inputControlsView.invalidate();
-                refreshElementSettings(element);
+            }
+
+            @Override
+            public void onZoneScaleChanged(int percent) {
+                ControlElement e = target();
+                if (e == null) return;
+                startEdit(e);
+                e.setZoneScale(percent / 100f);
+                commit(e);
+            }
+
+            @Override
+            public void onSwipeableChanged(boolean enabled) {
+                ControlElement e = target();
+                if (e == null) return;
+                startEdit(e);
+                e.setSwipeable(enabled);
+                commit(e);
             }
 
             @Override
             public void onTextChanged(String text) {
-                element.setText(text);
-                profile.save();
+                ControlElement e = target();
+                if (e == null) return;
+                // Not startEdit(): consecutive keystrokes belong to the same edit.
+                beginEdit(e);
+                e.setText(text);
                 inputControlsView.invalidate();
-                refreshElementSettings(element);
+                refreshElementSettings(e);
+                handler.removeCallbacks(textSaveRunnable);
+                textSavePending = true;
+                handler.postDelayed(textSaveRunnable, TEXT_SAVE_DELAY_MS);
             }
 
             @Override
             public void onIconSelected(String iconKey) {
-                applyIconSelection(element, iconKey);
-                refreshElementSettings(element);
+                ControlElement e = target();
+                if (e == null) return;
+                startEdit(e);
+                applyIconSelection(e, iconKey);
+                refreshElementSettings(e);
+                endEdit();
             }
 
             @Override
             public void onIconLongPress(String iconKey) {
+                ControlElement e = target();
+                if (e == null) return;
                 if (iconKey.startsWith(BUILTIN_ICON_PREFIX)) {
-                    pendingIconElement = element;
+                    flushPendingTextSave();
+                    pendingIconElement = e;
                     pendingBuiltinOverrideId = Byte.parseByte(iconKey.substring(BUILTIN_ICON_PREFIX.length()));
                     launchIconPicker();
                 }
@@ -243,54 +438,60 @@ public class ControlsEditorActivity extends AppCompatActivity {
 
             @Override
             public void onRemoveIcon() {
-                element.setCustomIconPath(null);
-                profile.save();
-                inputControlsView.invalidate();
-                refreshElementSettings(element);
+                ControlElement e = target();
+                if (e == null) return;
+                startEdit(e);
+                e.setCustomIconPath(null);
+                commit(e);
             }
 
             @Override
             public void onBrowseIcon() {
-                pendingIconElement = element;
+                ControlElement e = target();
+                if (e == null) return;
+                flushPendingTextSave();
+                pendingIconElement = e;
                 pendingBuiltinOverrideId = -1;
                 launchIconPicker();
             }
 
             @Override
             public void onBindingSourceTypeChanged(int bindingIndex, int sourceTypeIndex) {
+                ControlElement e = target();
+                if (e == null) return;
+                startEdit(e);
                 Binding[] values = bindingValuesForSourceType(sourceTypeIndex);
-                element.setBindingAt(bindingIndex, values.length > 0 ? values[0] : Binding.NONE);
-                profile.save();
-                inputControlsView.invalidate();
-                refreshElementSettings(element);
+                e.setBindingAt(bindingIndex, values.length > 0 ? values[0] : Binding.NONE);
+                commit(e);
             }
 
             @Override
             public void onBindingValueChanged(int bindingIndex, int optionIndex) {
-                int sourceTypeIndex = sourceTypeIndexForBinding(element, bindingIndex);
+                ControlElement e = target();
+                if (e == null) return;
+                int sourceTypeIndex = sourceTypeIndexForBinding(e, bindingIndex);
                 Binding[] values = bindingValuesForSourceType(sourceTypeIndex);
                 Binding binding = (optionIndex >= 0 && optionIndex < values.length) ? values[optionIndex] : Binding.NONE;
-                if (binding != element.getBindingAt(bindingIndex)) {
-                    element.setBindingAt(bindingIndex, binding);
-                    profile.save();
-                    inputControlsView.invalidate();
+                if (binding != e.getBindingAt(bindingIndex)) {
+                    startEdit(e);
+                    e.setBindingAt(bindingIndex, binding);
+                    commit(e);
+                } else {
+                    refreshElementSettings(e);
                 }
-                refreshElementSettings(element);
             }
 
             @Override
             public void onDone() {
-                elementSettingsView = null;
+                // Panel closed: write out any Custom Text still waiting for its debounce.
+                flushPendingTextSave();
             }
         };
-
-        elementSettingsView = ControlElementSettingsComposeHost.create(this, buildElementSettingsModel(element), callbacks);
-        ControlElementSettingsComposeHost.show(this, elementSettingsView);
     }
 
     private void refreshElementSettings(ControlElement element) {
-        if (elementSettingsView != null) {
-            ControlElementSettingsComposeHost.update(elementSettingsView, buildElementSettingsModel(element));
+        if (overlay != null && element != null && element == inputControlsView.getSelectedElement()) {
+            overlay.updateSettings(buildElementSettingsModel(element));
         }
     }
 
@@ -310,6 +511,9 @@ public class ControlsEditorActivity extends AppCompatActivity {
         boolean showMouseMoveMode = type == ControlElement.Type.BUTTON;
         boolean showOrientation = type == ControlElement.Type.RANGE_BUTTON;
         boolean showColumns = type == ControlElement.Type.RANGE_BUTTON;
+        boolean showSwipeable = type == ControlElement.Type.BUTTON || type == ControlElement.Type.D_PAD;
+        boolean showDynamicStick = type == ControlElement.Type.STICK;
+        boolean swipeableBlocked = type == ControlElement.Type.BUTTON && (element.isToggleSwitch() || element.isMouseMoveMode());
 
         ArrayList<Integer> colorList = new ArrayList<>();
         for (int color : PALETTE_COLORS) colorList.add(color);
@@ -339,6 +543,12 @@ public class ControlsEditorActivity extends AppCompatActivity {
                 element.isToggleSwitch(),
                 showMouseMoveMode,
                 element.isMouseMoveMode(),
+                showDynamicStick,
+                element.getDynamicStickFlag(),
+                Math.round(element.getZoneScale() * 100),
+                showSwipeable,
+                element.isSwipeable(),
+                swipeableBlocked,
                 showTextAndIcon,
                 text != null ? text : "",
                 buildIconList(element),
@@ -408,10 +618,48 @@ public class ControlsEditorActivity extends AppCompatActivity {
         inputControlsView.invalidate();
     }
 
+    private static final class CachedIcon {
+        final String key;
+        final Bitmap bitmap;
+        final ControlElementIconTint tint;
+        final boolean dimmed;
+        final boolean longPressable;
+        final String customPath;  // non-null for custom icons
+        final byte builtinId;     // for built-ins
+
+        CachedIcon(String key, Bitmap bitmap, ControlElementIconTint tint, boolean dimmed, boolean longPressable, String customPath, byte builtinId) {
+            this.key = key;
+            this.bitmap = bitmap;
+            this.tint = tint;
+            this.dimmed = dimmed;
+            this.longPressable = longPressable;
+            this.customPath = customPath;
+            this.builtinId = builtinId;
+        }
+    }
+
+    private List<CachedIcon> getIconCache() {
+        if (iconCache == null) iconCache = loadIconCache();
+        return iconCache;
+    }
+
+    // Only the per-element "selected" flag is computed here; bitmaps come from the cache, so
+    // refreshing the panel (every edit, every re-target) no longer decodes every PNG again.
     private List<ControlElementIcon> buildIconList(ControlElement element) {
         ArrayList<ControlElementIcon> icons = new ArrayList<>();
         String currentPath = element.getCustomIconPath();
         byte selectedId = element.getIconId();
+        for (CachedIcon icon : getIconCache()) {
+            boolean selected = icon.customPath != null
+                    ? icon.customPath.equals(currentPath)
+                    : icon.builtinId == selectedId && currentPath == null;
+            icons.add(new ControlElementIcon(icon.key, icon.bitmap, selected, icon.tint, icon.dimmed, icon.longPressable));
+        }
+        return icons;
+    }
+
+    private List<CachedIcon> loadIconCache() {
+        ArrayList<CachedIcon> icons = new ArrayList<>();
 
         File iconsDir = getCustomIconsDir();
         if (iconsDir.exists()) {
@@ -423,9 +671,8 @@ public class ControlsEditorActivity extends AppCompatActivity {
                     Bitmap bmp = loadAndScaleBitmap(file.getAbsolutePath());
                     if (bmp == null) continue;
                     String filePath = file.getAbsolutePath();
-                    boolean selected = filePath.equals(currentPath);
                     ControlElementIconTint tint = isDarkBitmap(bmp) ? ControlElementIconTint.INVERT : ControlElementIconTint.NONE;
-                    icons.add(new ControlElementIcon(CUSTOM_ICON_PREFIX + filePath, bmp, selected, tint, false, false));
+                    icons.add(new CachedIcon(CUSTOM_ICON_PREFIX + filePath, bmp, tint, false, false, filePath, (byte) 0));
                 }
             }
         }
@@ -462,8 +709,7 @@ public class ControlsEditorActivity extends AppCompatActivity {
             }
 
             boolean hasOverride = overrideFile.exists();
-            boolean selected = id == selectedId && currentPath == null;
-            icons.add(new ControlElementIcon(BUILTIN_ICON_PREFIX + id, bmp, selected, ControlElementIconTint.BLUE, hasOverride, true));
+            icons.add(new CachedIcon(BUILTIN_ICON_PREFIX + id, bmp, ControlElementIconTint.BLUE, hasOverride, true, null, id));
         }
 
         return icons;
@@ -578,13 +824,16 @@ public class ControlsEditorActivity extends AppCompatActivity {
                 loaded.recycle();
 
                 inputControlsView.invalidateIconCache();
+                iconCache = null;
 
                 if (pendingIconElement != null) {
+                    startEdit(pendingIconElement);
                     pendingIconElement.setCustomIconPath(dest.getAbsolutePath());
                     pendingIconElement.setIconId(0);
                     profile.save();
                     inputControlsView.invalidate();
                     refreshElementSettings(pendingIconElement);
+                    endEdit();
                     pendingIconElement = null;
                 }
             } catch (Exception e) {

@@ -13,9 +13,20 @@ public interface ControlElementSettingsCallbacks {
     void onColumnsChanged(int columns);
     void onScaleChanged(int percent);
     void onOpacityChanged(int percent);
+
+    // Live, unsaved updates while a slider is being dragged (the panel no longer covers the
+    // canvas, so the element can follow the thumb). The matching on...Changed call on release
+    // commits and saves.
+    void onScalePreview(int percent);
+    void onOpacityPreview(int percent);
     void onColorSelected(int color);
     void onToggleSwitchChanged(boolean enabled);
     void onMouseMoveModeChanged(boolean enabled);
+    void onSwipeableChanged(boolean enabled);
+    void onDynamicStickChanged(boolean enabled);
+    // Zone side in percent of the stick's diameter (150..500); preview = live, unsaved.
+    void onZoneScalePreview(int percent);
+    void onZoneScaleChanged(int percent);
     void onTextChanged(String text);
 
     // iconKey is either "builtin:<id>" or "path:<absolutePath>", as produced by

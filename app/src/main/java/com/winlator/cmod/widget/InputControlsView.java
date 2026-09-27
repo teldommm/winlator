@@ -1,5 +1,8 @@
 package com.winlator.cmod.widget;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ValueAnimator;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -8,6 +11,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.ColorFilter;
+import android.graphics.DashPathEffect;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.Point;
@@ -15,15 +19,20 @@ import android.graphics.PointF;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.Rect;
+import android.graphics.RectF;
+import android.os.Build;
 import android.os.Handler;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.util.Log;
+import android.view.HapticFeedbackConstants;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.PointerIcon;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.FrameLayout;
 
 import androidx.preference.PreferenceManager;
@@ -36,10 +45,13 @@ import com.winlator.cmod.inputcontrols.ExternalController;
 import com.winlator.cmod.inputcontrols.ExternalControllerBinding;
 import com.winlator.cmod.inputcontrols.GamepadState;
 import com.winlator.cmod.math.Mathf;
+import com.winlator.cmod.ui.inputcontrols.EditorCanvasColors;
 import com.winlator.cmod.winhandler.MouseEventFlags;
 import com.winlator.cmod.winhandler.WinHandler;
 import com.winlator.cmod.xserver.Pointer;
 import com.winlator.cmod.xserver.XServer;
+
+import org.json.JSONObject;
 
 import java.io.File;
 import java.io.IOException;
@@ -62,6 +74,56 @@ public class InputControlsView extends View {
     private float offsetX;
     private float offsetY;
     private ControlElement selectedElement;
+
+    // ---------- Editor (edit mode only) ----------
+    // Listener the ControlsEditorActivity uses to keep its floating toolbar/settings panel in
+    // sync with what happens on the canvas.
+    public interface EditorListener {
+        void onSelectionChanged(ControlElement element);
+        // Fired after a drag has fully settled (position is final and saved), and after
+        // add/duplicate/undo — anything that changes where elements sit.
+        void onElementsChanged();
+        void onUndoAvailabilityChanged(boolean available);
+        // True while an element is being dragged or pinch-scaled on the canvas (the floating
+        // toolbar/panel dim themselves so what's underneath stays visible).
+        void onElementGestureChanged(boolean active);
+    }
+
+    private static final long SETTLE_DURATION_MS = 120;
+    // Fraction of one grid cell within which an axis sticks to a grid line while dragging.
+    private static final float GRID_MAGNET = 0.3f;
+    // Fraction of one grid cell within which an axis sticks to an alignment guide (screen
+    // centre, another element's centre/edges). Larger than the grid magnet on purpose: guides
+    // are rare and meaningful, grid lines are everywhere.
+    private static final float GUIDE_MAGNET = 0.6f;
+
+    private EditorListener editorListener;
+    private EditorCanvasColors canvasColors;
+    private int touchSlop;
+    private int activeEditPointerId = -1;
+    private float downTouchX, downTouchY;
+    private boolean draggingElement = false;
+    private int dragStartX, dragStartY;
+    // Live (unsnapped-to-int) crosshair position; `cursor` keeps the settled grid node that
+    // addElement() uses.
+    private float cursorX, cursorY;
+    // Alignment guide currently being snapped to, per axis (NaN = none). Drawn as accent lines.
+    private float guideLineX = Float.NaN, guideLineY = Float.NaN;
+    private ValueAnimator elementSettleAnimator;
+    private ValueAnimator cursorAnimator;
+    private Runnable undoAction;
+
+    // Pinch-to-scale of the selected element (second finger down while it is held).
+    private static final float MIN_ELEMENT_SCALE = 0.5f;
+    private static final float MAX_ELEMENT_SCALE = 2.0f;
+    private boolean pinching = false;
+    // After a pinch the rest of the gesture is ignored until every finger is up, so the
+    // remaining finger doesn't start dragging the element it was just scaling.
+    private boolean gestureConsumed = false;
+    private int pinchPointerId = -1;
+    private float pinchStartDistance;
+    private float pinchStartScale;
+    private boolean elementGestureActive = false;
     private ControlsProfile profile;
     private float overlayOpacity = DEFAULT_OVERLAY_OPACITY;
     private TouchpadView touchpadView;
@@ -142,6 +204,14 @@ public class InputControlsView extends View {
 
     public void setEditMode(boolean editMode) {
         this.editMode = editMode;
+        if (editMode) {
+            canvasColors = EditorCanvasColors.resolve(getContext());
+            touchSlop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
+        }
+    }
+
+    public void setEditorListener(EditorListener listener) {
+        this.editorListener = listener;
     }
 
     public boolean isEditMode() {
@@ -203,10 +273,14 @@ public class InputControlsView extends View {
 
         if (profile != null && showTouchscreenControls && !isFocusedOnStick()) {
             if (!profile.isElementsLoaded()) profile.loadElements(this);
+            if (editMode) drawDynamicZones(canvas);
+
             for (ControlElement element : profile.getElements()) {
                 element.draw(canvas);
             }
         }
+
+        if (editMode) drawGuides(canvas);
 
         super.onDraw(canvas);
     }
@@ -249,54 +323,91 @@ public class InputControlsView extends View {
     }
 
     private void drawGrid(Canvas canvas) {
+        EditorCanvasColors colors = canvasColors != null ? canvasColors : EditorCanvasColors.resolve(getContext());
         paint.setStyle(Paint.Style.FILL);
         paint.setStrokeWidth(snappingSize * 0.0625f);
-        paint.setColor(0xff000000);
-        canvas.drawColor(Color.BLACK);
+        canvas.drawColor(colors.background);
 
         paint.setAntiAlias(false);
-        paint.setColor(0xff303030);
+        paint.setColor(colors.gridLine);
 
         int width = getMaxWidth();
         int height = getMaxHeight();
 
-        for (int i = 0; i < width; i += snappingSize) {
-            canvas.drawLine(i, 0, i, height, paint);
-            canvas.drawLine(0, i, width, i, paint);
-        }
+        for (int i = 0; i <= width; i += snappingSize) canvas.drawLine(i, 0, i, height, paint);
+        for (int i = 0; i <= height; i += snappingSize) canvas.drawLine(0, i, width, i, paint);
 
         float cx = Mathf.roundTo(width * 0.5f, snappingSize);
         float cy = Mathf.roundTo(height * 0.5f, snappingSize);
-        paint.setColor(0xff424242);
+        paint.setColor(colors.gridCenter);
 
-        for (int i = 0; i < width; i += snappingSize * 2) {
-            canvas.drawLine(cx, i, cx, i + snappingSize, paint);
-            canvas.drawLine(i, cy, i + snappingSize, cy, paint);
-        }
+        for (int i = 0; i < height; i += snappingSize * 2) canvas.drawLine(cx, i, cx, i + snappingSize, paint);
+        for (int i = 0; i < width; i += snappingSize * 2) canvas.drawLine(i, cy, i + snappingSize, cy, paint);
 
         paint.setAntiAlias(true);
     }
 
     private void drawCursor(Canvas canvas) {
+        EditorCanvasColors colors = canvasColors != null ? canvasColors : EditorCanvasColors.resolve(getContext());
         paint.setStyle(Paint.Style.FILL);
         paint.setStrokeWidth(snappingSize * 0.0625f);
-        paint.setColor(0xffc62828);
+        paint.setColor(colors.cursor);
 
         paint.setAntiAlias(false);
-        canvas.drawLine(0, cursor.y, getMaxWidth(), cursor.y, paint);
-        canvas.drawLine(cursor.x, 0, cursor.x, getMaxHeight(), paint);
+        canvas.drawLine(0, cursorY, getMaxWidth(), cursorY, paint);
+        canvas.drawLine(cursorX, 0, cursorX, getMaxHeight(), paint);
 
         paint.setAntiAlias(true);
     }
 
+    // Editor only: the zone of every dynamic stick as a dashed square (stronger when selected),
+    // under the controls. Never drawn in game.
+    private final DashPathEffect zoneDash = new DashPathEffect(new float[]{12f, 10f}, 0f);
+
+    private void drawDynamicZones(Canvas canvas) {
+        if (profile == null) return;
+        EditorCanvasColors colors = canvasColors != null ? canvasColors : EditorCanvasColors.resolve(getContext());
+        for (ControlElement element : profile.getElements()) {
+            if (!element.isDynamicStick()) continue;
+            RectF zone = element.getDynamicZone();
+            boolean selected = element == selectedElement;
+
+            paint.setPathEffect(null);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor((colors.guide & 0x00FFFFFF) | ((selected ? 0x22 : 0x10) << 24));
+            canvas.drawRect(zone, paint);
+
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(Math.max(2f, snappingSize * 0.1f));
+            paint.setColor((colors.guide & 0x00FFFFFF) | ((selected ? 0xCC : 0x66) << 24));
+            paint.setPathEffect(zoneDash);
+            canvas.drawRect(zone, paint);
+        }
+        paint.setPathEffect(null);
+        paint.setStyle(Paint.Style.FILL);
+    }
+
+    private void drawGuides(Canvas canvas) {
+        if (Float.isNaN(guideLineX) && Float.isNaN(guideLineY)) return;
+        EditorCanvasColors colors = canvasColors != null ? canvasColors : EditorCanvasColors.resolve(getContext());
+        paint.setStyle(Paint.Style.FILL);
+        paint.setStrokeWidth(Math.max(2f, snappingSize * 0.125f));
+        paint.setColor(colors.guide);
+        if (!Float.isNaN(guideLineX)) canvas.drawLine(guideLineX, 0, guideLineX, getHeight(), paint);
+        if (!Float.isNaN(guideLineY)) canvas.drawLine(0, guideLineY, getWidth(), guideLineY, paint);
+    }
+
     public synchronized boolean addElement() {
         if (editMode && profile != null) {
+            finishPendingAnimations();
             ControlElement element = new ControlElement(this);
             element.setX(cursor.x);
             element.setY(cursor.y);
             profile.addElement(element);
             profile.save();
             selectElement(element);
+            setUndo(() -> removeWithoutUndo(element));
+            notifyElementsChanged();
             return true;
         }
         else return false;
@@ -304,13 +415,101 @@ public class InputControlsView extends View {
 
     public synchronized boolean removeElement() {
         if (editMode && selectedElement != null && profile != null) {
-            profile.removeElement(selectedElement);
-            selectedElement = null;
+            finishPendingAnimations();
+            final ControlElement removed = selectedElement;
+            final int index = profile.getElements().indexOf(removed);
+            profile.removeElement(removed);
+            selectElement(null);
             profile.save();
             invalidate();
+            setUndo(() -> {
+                profile.addElementAt(index, removed);
+                profile.save();
+                selectElement(removed);
+                notifyElementsChanged();
+            });
             return true;
         }
         else return false;
+    }
+
+    // Copy of the selected element (same JSON round-trip the profile loader uses, so every
+    // field comes along), dropped a few grid cells down-right of the original and selected.
+    public synchronized boolean duplicateElement() {
+        if (!editMode || selectedElement == null || profile == null || snappingSize <= 0) return false;
+        finishPendingAnimations();
+        ControlElement copy = ControlsProfile.elementFromJSON(selectedElement.toJSONObject(), this);
+        if (copy == null) return false;
+        int step = snappingSize * 4;
+        copy.setX(clampInt(selectedElement.getX() + step, 0, getMaxWidth()));
+        copy.setY(clampInt(selectedElement.getY() + step, 0, getMaxHeight()));
+        profile.addElement(copy);
+        profile.save();
+        selectElement(copy);
+        setUndo(() -> removeWithoutUndo(copy));
+        notifyElementsChanged();
+        return true;
+    }
+
+    public synchronized boolean undo() {
+        if (!editMode || undoAction == null) return false;
+        finishPendingAnimations();
+        Runnable action = undoAction;
+        setUndo(null);
+        action.run();
+        invalidate();
+        return true;
+    }
+
+    public boolean canUndo() {
+        return undoAction != null;
+    }
+
+    // Records the element's current state as the one-step undo, for edits made outside the
+    // canvas (the settings panel). Undo swaps in a fresh copy built from the snapshot — the same
+    // JSON round-trip the profile loader uses — at the same list index, with the exact position.
+    public synchronized void recordElementSnapshot(final ControlElement element) {
+        if (element == null || profile == null) return;
+        final JSONObject snapshot = element.toJSONObject();
+        if (snapshot == null) return;
+        final int x = element.getX();
+        final int y = element.getY();
+        setUndo(() -> {
+            int index = profile.getElements().indexOf(element);
+            if (index < 0) return;
+            ControlElement restored = ControlsProfile.elementFromJSON(snapshot, this);
+            if (restored == null) return;
+            restored.setX(x);
+            restored.setY(y);
+            profile.removeElement(element);
+            profile.addElementAt(index, restored);
+            profile.save();
+            selectElement(restored);
+            notifyElementsChanged();
+        });
+    }
+
+    private void removeWithoutUndo(ControlElement element) {
+        profile.removeElement(element);
+        if (selectedElement == element) selectElement(null);
+        profile.save();
+        notifyElementsChanged();
+    }
+
+    private void setUndo(Runnable action) {
+        boolean before = undoAction != null;
+        undoAction = action;
+        if (editorListener != null && before != (action != null)) {
+            editorListener.onUndoAvailabilityChanged(action != null);
+        }
+    }
+
+    private void notifyElementsChanged() {
+        if (editorListener != null) editorListener.onElementsChanged();
+    }
+
+    private static int clampInt(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     public ControlElement getSelectedElement() {
@@ -325,12 +524,14 @@ public class InputControlsView extends View {
     }
 
     private void selectElement(ControlElement element) {
+        ControlElement previous = selectedElement;
         deselectAllElements();
         if (element != null) {
             selectedElement = element;
             selectedElement.setSelected(true);
         }
         invalidate();
+        if (editorListener != null && previous != element) editorListener.onSelectionChanged(element);
     }
 
     public synchronized ControlsProfile getProfile() {
@@ -562,37 +763,7 @@ public class InputControlsView extends View {
         updateTouchscreenTimeout(event);
 
         if (editMode && readyToDraw) {
-            switch (event.getAction()) {
-                case MotionEvent.ACTION_DOWN: {
-                    float x = event.getX();
-                    float y = event.getY();
-
-                    ControlElement element = intersectElement(x, y);
-                    moveCursor = true;
-                    if (element != null) {
-                        offsetX = x - element.getX();
-                        offsetY = y - element.getY();
-                        moveCursor = false;
-                    }
-
-                    selectElement(element);
-                    break;
-                }
-                case MotionEvent.ACTION_MOVE: {
-                    if (selectedElement != null) {
-                        selectedElement.setX((int)Mathf.roundTo(event.getX() - offsetX, snappingSize));
-                        selectedElement.setY((int)Mathf.roundTo(event.getY() - offsetY, snappingSize));
-                        invalidate();
-                    }
-                    break;
-                }
-                case MotionEvent.ACTION_UP: {
-                    if (selectedElement != null && profile != null) profile.save();
-                    if (moveCursor) cursor.set((int)Mathf.roundTo(event.getX(), snappingSize), (int)Mathf.roundTo(event.getY(), snappingSize));
-                    invalidate();
-                    break;
-                }
-            }
+            handleEditTouch(event);
         }
 
         if (!editMode && profile != null) {
@@ -630,6 +801,16 @@ public class InputControlsView extends View {
                             touchpadView.setPointerButtonLeftEnabled(false);
                         }
                     }
+                    // Second pass: only a touch nobody took by their own bounds may spawn a
+                    // dynamic stick from its zone — buttons inside a zone keep priority.
+                    if (!handled) {
+                        for (ControlElement element : profile.getElements()) {
+                            if (element.handleDynamicZoneTouchDown(pointerId, x, y)) {
+                                handled = true;
+                                break;
+                            }
+                        }
+                    }
                     if (!handled) touchpadView.onTouchEvent(event);
                     break;
                 }
@@ -639,7 +820,7 @@ public class InputControlsView extends View {
                         float y = event.getY(i);
                         int pid = event.getPointerId(i);
 
-                        handled = false;
+                        handled = trySwipe(pid, x, y, hapticsEnabled);
                         for (ControlElement element : profile.getElements()) {
                             if (element.handleTouchMove(pid, x, y)) handled = true;
                         }
@@ -886,5 +1067,363 @@ public class InputControlsView extends View {
             }
         }
         return cached;
+    }
+    // A finger holding a swipe-enabled control that has slid off it onto another swipe-enabled,
+    // currently free control: release the first and press the second, without lifting. Both
+    // ends must have Swipeable on (off by default), so existing layouts behave exactly as before.
+    private boolean trySwipe(int pointerId, float x, float y, boolean hapticsEnabled) {
+        ControlElement source = null;
+        for (ControlElement element : profile.getElements()) {
+            if (element.isCapturing(pointerId)) {
+                source = element;
+                break;
+            }
+        }
+        if (source == null || !source.isSwipeEnabled() || source.containsPoint(x, y)) return false;
+
+        for (ControlElement target : profile.getElements()) {
+            if (target == source || !target.isSwipeEnabled() || target.isCapturingAnyPointer() || !target.containsPoint(x, y)) continue;
+            source.handleTouchUp(pointerId);
+            if (target.handleTouchDown(pointerId, x, y)) {
+                if (hapticsEnabled) vibrateTouch();
+            }
+            return true;
+        }
+        return false;
+    }
+
+    private void vibrateTouch() {
+        Vibrator vibrator = (Vibrator) getContext().getSystemService(Context.VIBRATOR_SERVICE);
+        if (vibrator == null || !vibrator.hasVibrator()) return;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE));
+        } else {
+            vibrator.vibrate(50);
+        }
+    }
+
+    // ======================= Edit-mode touch: drag, magnets, crosshair =======================
+
+    private void handleEditTouch(MotionEvent event) {
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN: {
+                finishPendingAnimations();
+                gestureConsumed = false;
+                pinching = false;
+                activeEditPointerId = event.getPointerId(0);
+                float x = event.getX();
+                float y = event.getY();
+                downTouchX = x;
+                downTouchY = y;
+                draggingElement = false;
+
+                ControlElement element = intersectElement(x, y);
+                moveCursor = element == null;
+                if (element != null) {
+                    offsetX = x - element.getX();
+                    offsetY = y - element.getY();
+                    dragStartX = element.getX();
+                    dragStartY = element.getY();
+                }
+                else {
+                    // Crosshair glides to the tap point instead of teleporting there.
+                    animateCursorTo(x, y, null);
+                }
+                selectElement(element);
+                break;
+            }
+            case MotionEvent.ACTION_POINTER_DOWN: {
+                if (gestureConsumed || pinching || moveCursor || selectedElement == null) break;
+                if (draggingElement) {
+                    // Land the drag first (glide jumps to its end, position is saved).
+                    draggingElement = false;
+                    settleElement(selectedElement);
+                    finishPendingAnimations();
+                }
+                int newIndex = event.getActionIndex();
+                int firstIndex = event.findPointerIndex(activeEditPointerId);
+                if (firstIndex < 0) break;
+                float distance = (float) Math.hypot(event.getX(newIndex) - event.getX(firstIndex), event.getY(newIndex) - event.getY(firstIndex));
+                if (distance < touchSlop) break;
+                recordElementSnapshot(selectedElement);
+                pinching = true;
+                pinchPointerId = event.getPointerId(newIndex);
+                pinchStartDistance = distance;
+                pinchStartScale = selectedElement.getScale();
+                setElementGestureActive(true);
+                break;
+            }
+            case MotionEvent.ACTION_MOVE: {
+                if (gestureConsumed) break;
+                if (pinching) {
+                    updatePinch(event);
+                    break;
+                }
+                int index = event.findPointerIndex(activeEditPointerId);
+                if (index < 0) break;
+                float x = event.getX(index);
+                float y = event.getY(index);
+
+                if (selectedElement != null && !moveCursor) {
+                    if (!draggingElement) {
+                        if (Math.hypot(x - downTouchX, y - downTouchY) < touchSlop) break;
+                        // Re-anchor at the moment the drag starts so the element doesn't jump
+                        // by the slop distance.
+                        draggingElement = true;
+                        offsetX = x - selectedElement.getX();
+                        offsetY = y - selectedElement.getY();
+                        setElementGestureActive(true);
+                    }
+                    dragElementTo(x - offsetX, y - offsetY);
+                }
+                else if (moveCursor) {
+                    if (cursorAnimator != null) cursorAnimator.cancel();
+                    cursorX = x;
+                    cursorY = y;
+                    invalidate();
+                }
+                break;
+            }
+            case MotionEvent.ACTION_POINTER_UP: {
+                int liftedId = event.getPointerId(event.getActionIndex());
+                if (pinching && (liftedId == pinchPointerId || liftedId == activeEditPointerId)) {
+                    endPinch();
+                    break;
+                }
+                if (gestureConsumed) break;
+                // A second finger lifting doesn't end the gesture; the first one lifting does.
+                if (liftedId == activeEditPointerId) endEditGesture(event, event.getActionIndex());
+                break;
+            }
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL: {
+                if (pinching) endPinch();
+                if (gestureConsumed) {
+                    gestureConsumed = false;
+                    activeEditPointerId = -1;
+                    break;
+                }
+                int index = event.findPointerIndex(activeEditPointerId);
+                endEditGesture(event, Math.max(index, 0));
+                break;
+            }
+        }
+    }
+
+    private void endEditGesture(MotionEvent event, int pointerIndex) {
+        if (activeEditPointerId == -1) return;
+        activeEditPointerId = -1;
+
+        if (selectedElement != null && draggingElement) {
+            draggingElement = false;
+            setElementGestureActive(false);
+            settleElement(selectedElement);
+        }
+        else if (moveCursor) {
+            float x = event.getX(pointerIndex);
+            float y = event.getY(pointerIndex);
+            float targetX = Mathf.roundTo(x, snappingSize);
+            float targetY = Mathf.roundTo(y, snappingSize);
+            cursor.set((int) targetX, (int) targetY);
+            animateCursorTo(targetX, targetY, null);
+        }
+        invalidate();
+    }
+
+    private void updatePinch(MotionEvent event) {
+        ControlElement element = selectedElement;
+        int a = event.findPointerIndex(activeEditPointerId);
+        int b = event.findPointerIndex(pinchPointerId);
+        if (element == null || a < 0 || b < 0 || pinchStartDistance <= 0) return;
+        float distance = (float) Math.hypot(event.getX(b) - event.getX(a), event.getY(b) - event.getY(a));
+        float scale = pinchStartScale * distance / pinchStartDistance;
+        // 5% steps, same granularity the settings slider effectively lands on.
+        scale = Math.round(scale * 20f) / 20f;
+        scale = Math.max(MIN_ELEMENT_SCALE, Math.min(MAX_ELEMENT_SCALE, scale));
+        if (scale != element.getScale()) {
+            element.setScale(scale);
+            invalidate();
+        }
+    }
+
+    private void endPinch() {
+        pinching = false;
+        pinchPointerId = -1;
+        gestureConsumed = true;
+        draggingElement = false;
+        setElementGestureActive(false);
+        if (profile != null) profile.save();
+        invalidate();
+        notifyElementsChanged();
+    }
+
+    private void setElementGestureActive(boolean active) {
+        if (elementGestureActive == active) return;
+        elementGestureActive = active;
+        if (editorListener != null) editorListener.onElementGestureChanged(active);
+    }
+
+    private void dragElementTo(float rawX, float rawY) {
+        ControlElement element = selectedElement;
+        if (element == null || snappingSize <= 0) return;
+
+        Rect box = element.getBoundingBox();
+        float halfW = box.width() * 0.5f;
+        float halfH = box.height() * 0.5f;
+
+        float prevGuideX = guideLineX, prevGuideY = guideLineY;
+        float[] snappedX = snapAxis(element, rawX, halfW, true);
+        float[] snappedY = snapAxis(element, rawY, halfH, false);
+        guideLineX = snappedX[1];
+        guideLineY = snappedY[1];
+
+        element.setX(Math.round(snappedX[0]));
+        element.setY(Math.round(snappedY[0]));
+
+        // Tick when a guide is newly acquired (not on grid lines — they're every cell and
+        // would turn into a constant buzz).
+        boolean newGuide = (!Float.isNaN(guideLineX) && guideLineX != prevGuideX)
+                || (!Float.isNaN(guideLineY) && guideLineY != prevGuideY);
+        if (newGuide) snapHaptic();
+
+        invalidate();
+    }
+
+    // Returns {position, guideLine (NaN if the axis is on the grid or free)}.
+    // Guides win over grid lines; either only applies within its magnet radius, otherwise the
+    // axis follows the finger freely.
+    private float[] snapAxis(ControlElement dragged, float value, float half, boolean horizontal) {
+        float bestDistance = snappingSize * GUIDE_MAGNET;
+        float bestPosition = Float.NaN;
+        float bestLine = Float.NaN;
+
+        float screenCenter = Mathf.roundTo((horizontal ? getMaxWidth() : getMaxHeight()) * 0.5f, snappingSize);
+        float d = Math.abs(value - screenCenter);
+        if (d <= bestDistance) {
+            bestDistance = d;
+            bestPosition = screenCenter;
+            bestLine = screenCenter;
+        }
+
+        // Screen edges, one grid cell in: my start edge to the leading margin, my end edge to
+        // the trailing one.
+        float extent = horizontal ? getMaxWidth() : getMaxHeight();
+        float edgeMargin = snappingSize;
+        d = Math.abs((value - half) - edgeMargin);
+        if (d < bestDistance) { bestDistance = d; bestPosition = edgeMargin + half; bestLine = edgeMargin; }
+        d = Math.abs((value + half) - (extent - edgeMargin));
+        if (d < bestDistance) { bestDistance = d; bestPosition = extent - edgeMargin - half; bestLine = extent - edgeMargin; }
+
+        if (profile != null) {
+            for (ControlElement other : profile.getElements()) {
+                if (other == dragged) continue;
+                Rect box = other.getBoundingBox();
+                float center = horizontal ? other.getX() : other.getY();
+                float start = horizontal ? box.left : box.top;
+                float end = horizontal ? box.right : box.bottom;
+
+                // centre ↔ centre
+                d = Math.abs(value - center);
+                if (d < bestDistance) { bestDistance = d; bestPosition = center; bestLine = center; }
+                // my start edge ↔ their start edge
+                d = Math.abs((value - half) - start);
+                if (d < bestDistance) { bestDistance = d; bestPosition = start + half; bestLine = start; }
+                // my end edge ↔ their end edge
+                d = Math.abs((value + half) - end);
+                if (d < bestDistance) { bestDistance = d; bestPosition = end - half; bestLine = end; }
+            }
+        }
+
+        if (!Float.isNaN(bestPosition)) return new float[]{bestPosition, bestLine};
+
+        float grid = Mathf.roundTo(value, snappingSize);
+        if (Math.abs(value - grid) <= snappingSize * GRID_MAGNET) return new float[]{grid, Float.NaN};
+        return new float[]{value, Float.NaN};
+    }
+
+    // On release: an axis held by a guide keeps it, a free axis glides to the nearest grid
+    // line. The profile is saved (and undo recorded) only once the glide has finished.
+    private void settleElement(final ControlElement element) {
+        final float fromX = element.getX();
+        final float fromY = element.getY();
+        final float toX = Float.isNaN(guideLineX) ? Mathf.roundTo(fromX, snappingSize) : fromX;
+        final float toY = Float.isNaN(guideLineY) ? Mathf.roundTo(fromY, snappingSize) : fromY;
+        final int startX = dragStartX, startY = dragStartY;
+
+        elementSettleAnimator = ValueAnimator.ofFloat(0f, 1f);
+        elementSettleAnimator.setDuration(SETTLE_DURATION_MS);
+        elementSettleAnimator.setInterpolator(new DecelerateInterpolator());
+        elementSettleAnimator.addUpdateListener(animation -> {
+            float t = (float) animation.getAnimatedValue();
+            element.setX(Math.round(fromX + (toX - fromX) * t));
+            element.setY(Math.round(fromY + (toY - fromY) * t));
+            invalidate();
+        });
+        elementSettleAnimator.addListener(new AnimatorListenerAdapter() {
+            private boolean done = false;
+
+            @Override
+            public void onAnimationCancel(Animator animation) {
+                finish();
+            }
+
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                finish();
+            }
+
+            private void finish() {
+                if (done) return;
+                done = true;
+                element.setX(Math.round(toX));
+                element.setY(Math.round(toY));
+                guideLineX = Float.NaN;
+                guideLineY = Float.NaN;
+                elementSettleAnimator = null;
+                if (profile != null) profile.save();
+                if (element.getX() != startX || element.getY() != startY) {
+                    setUndo(() -> {
+                        element.setX(startX);
+                        element.setY(startY);
+                        profile.save();
+                        selectElement(element);
+                        notifyElementsChanged();
+                    });
+                }
+                invalidate();
+                notifyElementsChanged();
+            }
+        });
+        elementSettleAnimator.start();
+    }
+
+    private void animateCursorTo(final float toX, final float toY, Runnable onEnd) {
+        if (cursorAnimator != null) cursorAnimator.cancel();
+        final float fromX = cursorX;
+        final float fromY = cursorY;
+        cursorAnimator = ValueAnimator.ofFloat(0f, 1f);
+        cursorAnimator.setDuration(SETTLE_DURATION_MS);
+        cursorAnimator.setInterpolator(new DecelerateInterpolator());
+        cursorAnimator.addUpdateListener(animation -> {
+            float t = (float) animation.getAnimatedValue();
+            cursorX = fromX + (toX - fromX) * t;
+            cursorY = fromY + (toY - fromY) * t;
+            invalidate();
+        });
+        cursorAnimator.start();
+    }
+
+    // Jumps any running glide to its end state (saving the settled element) before a new
+    // gesture or an add/remove/duplicate/undo acts on the canvas.
+    private void finishPendingAnimations() {
+        if (elementSettleAnimator != null) elementSettleAnimator.end();
+        if (cursorAnimator != null) cursorAnimator.end();
+    }
+
+    private void snapHaptic() {
+        int constant = Build.VERSION.SDK_INT >= 34
+                ? HapticFeedbackConstants.SEGMENT_TICK
+                : HapticFeedbackConstants.CLOCK_TICK;
+        performHapticFeedback(constant);
     }
 }
