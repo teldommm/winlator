@@ -328,8 +328,8 @@ private fun RoundAction(icon: androidx.compose.ui.graphics.vector.ImageVector, d
 }
 
 // The profile's own cursor speed ("cursorSpeed" in the .icp): only stick / D-pad / button and
-// external-gamepad MOUSE_MOVE bindings use it. Touch and physical-mouse speeds are the global
-// Touch speed / Mouse speed settings, so none of these multiply each other.
+// external-gamepad MOUSE_MOVE bindings use it. Touch and physical-mouse movement use the global
+// Cursor speed setting, so the two never multiply each other.
 @Composable
 private fun StickMouseSpeedCard(initialPercent: Int, onChanged: (Int) -> Unit) {
     var speed by remember(initialPercent) { mutableFloatStateOf(initialPercent.toFloat()) }

@@ -678,7 +678,7 @@ public class TouchpadView extends View {
         }
     }
 
-    /** Touch Speed: finger on the free touch area, Trackpad elements and mouse-move buttons. */
+    /** Cursor Speed: finger on the free touch area, Trackpad elements and mouse-move buttons. */
     public void setSensitivity(float sensitivity) {
         this.sensitivity = sensitivity;
     }
@@ -693,7 +693,7 @@ public class TouchpadView extends View {
     }
 
     // Mouse-move buttons (ControlElement BUTTON with mouseMoveMode) drag the cursor like a
-    // finger on the touch area, so they share the Touch Speed.
+    // finger on the touch area, so they share the Cursor Speed.
     private float lastMouseMoveX;
     private float lastMouseMoveY;
     private final MotionAccumulator mouseMoveMotion = new MotionAccumulator();

@@ -21,7 +21,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     public final int id;
     private String name;
     public static final float MIN_CURSOR_SPEED = 0.1f;
-    // Same 10..200 % range as Touch Speed and Mouse Speed; stored values above it (older
+    // Same 10..200 % range as Cursor Speed; stored values above it (older
     // profiles) are clamped on load.
     public static final float MAX_CURSOR_SPEED = 2.0f;
     private float cursorSpeed = 1.0f;
@@ -55,7 +55,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     /**
      * Stick Mouse Speed: how fast stick / D-pad / button / external-gamepad MOUSE_MOVE bindings
      * move the cursor (1.0 = 100%). It no longer scales the touch area, which uses the global
-     * Touch Speed on its own.
+     * Cursor Speed on its own.
      *
      * Sanitized because the loader passes NaN when the .icp has no "cursorSpeed" field (and
      * JSONObject.put() rejects NaN, which made save() fail), and to drop float noise such as

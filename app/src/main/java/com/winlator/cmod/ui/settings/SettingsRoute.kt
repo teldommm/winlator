@@ -158,7 +158,6 @@ internal class SettingsScreenState(
             resolveStoredPath("winlator_path_uri", AppDefaults.DEFAULT_WINLATOR_PATH),
             resolveStoredPath("shortcuts_export_path_uri", AppDefaults.DEFAULT_SHORTCUT_EXPORT_PATH),
             (preferences.getFloat("cursor_speed", 1.0f) * 100.0f).roundToInt(),
-            (preferences.getFloat("mouse_speed", 1.0f) * 100.0f).roundToInt(),
             preferences.getBoolean("cursor_lock", true),
             preferences.getBoolean("xinput_toggle", false),
             preferences.getBoolean("use_dri3", true),
@@ -323,12 +322,6 @@ internal class SettingsScreenState(
     override fun onCursorSpeedChanged(percent: Int) {
         val clamped = percent.coerceIn(10, 200)
         preferences.edit().putFloat("cursor_speed", clamped / 100.0f).apply()
-        rebuild()
-    }
-
-    override fun onMouseSpeedChanged(percent: Int) {
-        val clamped = percent.coerceIn(10, 200)
-        preferences.edit().putFloat("mouse_speed", clamped / 100.0f).apply()
         rebuild()
     }
 

@@ -40,8 +40,7 @@ data class InputPanelState(
     val relativeMouse: Boolean,
     val disableMouse: Boolean,
     val touchMode: Int,          // TouchpadView.MODE_TRACKPAD (0) / MODE_TOUCHSCREEN (1)
-    val touchSpeedPercent: Int,  // global Touch Speed, 10..200 (Settings > Touch speed)
-    val mouseSpeedPercent: Int,  // global Mouse Speed, 10..200 (Settings > Mouse speed)
+    val cursorSpeedPercent: Int, // global Cursor Speed, 10..200 (Settings > Cursor speed)
     val tapToClick: Boolean
 )
 
@@ -62,9 +61,7 @@ interface InputPanelCallbacks {
     fun onVibration()
     fun onTouchMode(mode: Int)
     /** commit = false while dragging (live), true once on release (persist). */
-    fun onTouchSpeed(percent: Int, commit: Boolean)
-    /** commit = false while dragging (live), true once on release (persist). */
-    fun onMouseSpeed(percent: Int, commit: Boolean)
+    fun onCursorSpeed(percent: Int, commit: Boolean)
     fun onTapToClick(enabled: Boolean)
     fun onRelativeMouse(enabled: Boolean)
     fun onDisableMouse(enabled: Boolean)
@@ -148,8 +145,8 @@ private fun InputSidebarPanel(state: InputPanelState, callbacks: InputPanelCallb
             )
         }
 
-        // Touch: the finger on the free area, Trackpad elements and mouse-move buttons all
-        // follow Touch Speed. The profile's own speed only drives its stick/button mouse moves
+        // Cursor Speed: the finger on the free area, Trackpad elements, mouse-move buttons and a
+        // captured physical mouse all follow it. The profile's own speed only drives its stick/button mouse moves
         // (Input Controls > Stick Mouse Speed), so this number is the real touch speed.
         SidebarGap()
         SidebarCard {
@@ -163,18 +160,18 @@ private fun InputSidebarPanel(state: InputPanelState, callbacks: InputPanelCallb
                 }
             )
             Spacer(Modifier.height(6.dp))
-            var touchSpeedDraft by remember {
-                mutableStateOf(state.touchSpeedPercent.coerceIn(10, 200).toFloat())
+            var cursorSpeedDraft by remember {
+                mutableStateOf(state.cursorSpeedPercent.coerceIn(10, 200).toFloat())
             }
             SidebarSlider(
-                label = "Touch Speed",
-                valueText = "${touchSpeedDraft.roundToInt()}%",
-                value = touchSpeedDraft,
+                label = "Cursor Speed",
+                valueText = "${cursorSpeedDraft.roundToInt()}%",
+                value = cursorSpeedDraft,
                 onValueChange = {
-                    touchSpeedDraft = it
-                    callbacks.onTouchSpeed(it.roundToInt(), false)
+                    cursorSpeedDraft = it
+                    callbacks.onCursorSpeed(it.roundToInt(), false)
                 },
-                onValueChangeFinished = { callbacks.onTouchSpeed(touchSpeedDraft.roundToInt(), true) },
+                onValueChangeFinished = { callbacks.onCursorSpeed(cursorSpeedDraft.roundToInt(), true) },
                 valueRange = 10f..200f
             )
             SidebarInlineToggle(
@@ -184,26 +181,6 @@ private fun InputSidebarPanel(state: InputPanelState, callbacks: InputPanelCallb
                     tapToClick = it
                     callbacks.onTapToClick(it)
                 }
-            )
-        }
-
-        // Physical mouse. Only applies while the pointer is captured (Settings > Capture
-        // External Pointer); an uncaptured mouse positions the cursor absolutely.
-        SidebarGap()
-        SidebarCard {
-            var mouseSpeedDraft by remember {
-                mutableStateOf(state.mouseSpeedPercent.coerceIn(10, 200).toFloat())
-            }
-            SidebarSlider(
-                label = "Mouse Speed",
-                valueText = "${mouseSpeedDraft.roundToInt()}%",
-                value = mouseSpeedDraft,
-                onValueChange = {
-                    mouseSpeedDraft = it
-                    callbacks.onMouseSpeed(it.roundToInt(), false)
-                },
-                onValueChangeFinished = { callbacks.onMouseSpeed(mouseSpeedDraft.roundToInt(), true) },
-                valueRange = 10f..200f
             )
         }
 

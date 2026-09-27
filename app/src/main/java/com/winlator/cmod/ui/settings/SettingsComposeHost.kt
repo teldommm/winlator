@@ -97,8 +97,7 @@ data class SettingsModel(
     val losslessDllAvailable: Boolean,
     val winlatorPath: String,
     val shortcutPath: String,
-    val cursorSpeedPercent: Int, // Touch speed (pref "cursor_speed")
-    val mouseSpeedPercent: Int,  // Mouse speed (pref "mouse_speed"), captured pointer only
+    val cursorSpeedPercent: Int, // Cursor speed (pref "cursor_speed"): touch and captured mouse
     val cursorLock: Boolean,
     val xInput: Boolean,
     val useDri3: Boolean,
@@ -130,7 +129,6 @@ interface SettingsCallbacks {
     fun onChooseShortcutPath()
     fun onBooleanChanged(key: String, value: Boolean)
     fun onCursorSpeedChanged(percent: Int)
-    fun onMouseSpeedChanged(percent: Int)
     fun onCustomApiKeyChanged(value: String)
     fun onContentsUrlChanged(value: String)
     fun onWineDebugChannelsChanged(value: String)
@@ -231,13 +229,9 @@ internal fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) 
             item("xserver-title") { SectionTitle(stringResource(R.string.xserver)) }
             item("xserver") {
                 GroupCard {
-                    SpeedRow("Touch speed", model.cursorSpeedPercent, callbacks::onCursorSpeedChanged)
+                    SpeedRow("Cursor speed", model.cursorSpeedPercent, callbacks::onCursorSpeedChanged)
                     GroupDivider()
                     ToggleRow("Capture External Pointer", model.cursorLock) { callbacks.onBooleanChanged("cursor_lock", it) }
-                    GroupDivider()
-                    // Scales the physical mouse only while it's captured; uncaptured it
-                    // positions the cursor absolutely, so there's nothing to scale.
-                    SpeedRow("Mouse speed", model.mouseSpeedPercent, callbacks::onMouseSpeedChanged)
                     GroupDivider()
                     ToggleRow(stringResource(R.string.use_dri3_extension), model.useDri3) { callbacks.onBooleanChanged("use_dri3", it) }
                     GroupDivider()

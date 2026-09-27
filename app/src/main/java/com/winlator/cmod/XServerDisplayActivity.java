@@ -205,11 +205,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private SidebarRailState sidebarRailState;
     private IngameSidebarController ingameSidebar;
     private WineRequestHandler wineRequestHandler;
-    // Touch Speed (pref "cursor_speed"): finger on the touch area, Trackpad elements and
-    // mouse-move buttons. Applied on its own — the active profile no longer multiplies it.
+    // Cursor Speed (pref "cursor_speed"): one shared speed for the finger on the touch area,
+    // Trackpad elements, mouse-move buttons and a captured physical mouse (nobody plays with
+    // both at once). The active profile doesn't multiply it.
     private float globalCursorSpeed = 1.0f;
-    // Mouse Speed (pref "mouse_speed"): physical mouse while the pointer is captured.
-    private float mouseSpeed = 1.0f;
     private final com.winlator.cmod.math.MotionAccumulator capturedMouseMotion = new com.winlator.cmod.math.MotionAccumulator();
     // Touch surface mode (sidebar "Touch Mode"); starts from the shortcut's simTouchScreen
     // setting. Sidebar changes last for this session only — the shortcut is never rewritten
@@ -739,9 +738,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
             case MotionEvent.ACTION_MOVE:
             case MotionEvent.ACTION_HOVER_MOVE: {
                 // Captured pointer: getX()/getY() are the device's relative counts. Scale them by
-                // Mouse Speed and carry the fraction, so low speeds don't round fine motion away.
+                // Cursor Speed and carry the fraction, so fine motion isn't rounded away.
                 float[] p = XForm.transformPoint(xform, event.getX(), event.getY());
-                capturedMouseMotion.add(p[0] * mouseSpeed, p[1] * mouseSpeed);
+                capturedMouseMotion.add(p[0] * globalCursorSpeed, p[1] * globalCursorSpeed);
                 int dx = capturedMouseMotion.x();
                 int dy = capturedMouseMotion.y();
                 if (dx == 0 && dy == 0) break;
@@ -1244,7 +1243,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
         rootView.addView(xServerView);
 
         globalCursorSpeed = clampSpeedPercent(Math.round(preferences.getFloat("cursor_speed", 1.0f) * 100f)) / 100f;
-        mouseSpeed = clampSpeedPercent(Math.round(preferences.getFloat("mouse_speed", 1.0f) * 100f)) / 100f;
         touchpadView = new TouchpadView(this, xServer, timeoutHandler, hideControlsRunnable);
         touchpadView.setSensitivity(globalCursorSpeed);
         touchpadView.setTapToClickEnabled(preferences.getBoolean("touch_tap_to_click", true));
@@ -2028,18 +2026,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
 
             @Override
-            public void onTouchSpeed(int percent, boolean commit) {
+            public void onCursorSpeed(int percent, boolean commit) {
                 globalCursorSpeed = clampSpeedPercent(percent) / 100f;
                 if (touchpadView != null) touchpadView.setSensitivity(globalCursorSpeed);
-                // Same global setting as Settings > Touch speed.
+                // Same global setting as Settings > Cursor speed.
                 if (commit) preferences.edit().putFloat("cursor_speed", globalCursorSpeed).apply();
-            }
-
-            @Override
-            public void onMouseSpeed(int percent, boolean commit) {
-                mouseSpeed = clampSpeedPercent(percent) / 100f;
-                // Same global setting as Settings > Mouse speed.
-                if (commit) preferences.edit().putFloat("mouse_speed", mouseSpeed).apply();
             }
 
             @Override
@@ -2083,7 +2074,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     isMouseDisabled,
                     touchMode,
                     Math.round(globalCursorSpeed * 100f),
-                    Math.round(mouseSpeed * 100f),
                     touchpadView == null || touchpadView.isTapToClickEnabled()
             );
             InputSidebarPanelHost.attach(ingameSidebar, R.id.LLSubInput, state, callbacks);
@@ -2091,7 +2081,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         refreshInputPanel.run();
     }
 
-    /** Touch Speed / Mouse Speed share the Settings range: 10..200 %. */
+    /** Cursor Speed uses the Settings range: 10..200 %. */
     private static int clampSpeedPercent(int percent) {
         return Math.max(10, Math.min(200, percent));
     }
@@ -2189,7 +2179,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         inputControlsView.setVisibility(View.VISIBLE);
         inputControlsView.requestFocus();
 
-        // Touch Speed only: the profile's own speed now drives just its stick/button mouse moves.
+        // Cursor Speed only: the profile's own speed now drives just its stick/button mouse moves.
         touchpadView.setSensitivity(globalCursorSpeed);
         touchpadView.setPointerButtonRightEnabled(false);
 

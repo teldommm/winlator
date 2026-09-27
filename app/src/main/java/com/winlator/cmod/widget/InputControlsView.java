@@ -806,6 +806,13 @@ public class InputControlsView extends View {
             int actionMasked = event.getActionMasked();
             boolean handled = false;
 
+            // A new gesture starts with no finger down, so any element still claiming a pointer
+            // is left over from a gesture that never ended properly (e.g. cancelled by the
+            // sidebar or a system gesture). Release it first: otherwise it stays pressed and,
+            // since the touchpad ignores pointers held by controls, that pointer id (usually 0,
+            // the first finger) would be ignored by the trackpad from then on.
+            if (actionMasked == MotionEvent.ACTION_DOWN) releaseStaleElements();
+
             switch (actionMasked) {
                 case MotionEvent.ACTION_DOWN:
                 case MotionEvent.ACTION_POINTER_DOWN: {
@@ -864,12 +871,15 @@ public class InputControlsView extends View {
                     if (anyUnhandled) forwardToTouchpad(event);
                     break;
                 }
+                case MotionEvent.ACTION_CANCEL:
+                    // Cancel ends the gesture for every pointer, not just the one at actionIndex.
+                    releaseStaleElements();
+                    forwardToTouchpad(event);
+                    break;
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_POINTER_UP:
-                case MotionEvent.ACTION_CANCEL:
                     for (ControlElement element : profile.getElements()) if (element.handleTouchUp(pointerId)) handled = true;
-                    // A cancel always reaches the touchpad too, so it can drop its fingers/buttons.
-                    if (!handled || actionMasked == MotionEvent.ACTION_CANCEL) forwardToTouchpad(event);
+                    if (!handled) forwardToTouchpad(event);
                     else syncCapturedPointers();
                     break;
             }
@@ -1123,6 +1133,15 @@ public class InputControlsView extends View {
             }
         }
         touchpadView.setPointerIdsToIgnore(capturedPointerIds);
+    }
+
+    private void releaseStaleElements() {
+        if (profile == null) return;
+        for (ControlElement element : profile.getElements()) {
+            int id = element.getCurrentPointerId();
+            if (id != -1) element.handleTouchUp(id);
+        }
+        syncCapturedPointers();
     }
 
     private void forwardToTouchpad(MotionEvent event) {

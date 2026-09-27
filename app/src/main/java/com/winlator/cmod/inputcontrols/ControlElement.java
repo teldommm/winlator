@@ -1266,7 +1266,7 @@ public class ControlElement {
                     
                     final boolean[] states = {deltaY <= -TRACKPAD_MIN_SPEED, deltaX >= TRACKPAD_MIN_SPEED, deltaY >= TRACKPAD_MIN_SPEED, deltaX <= -TRACKPAD_MIN_SPEED};
                     // Mouse-bound directions move the cursor like a finger on the touch area:
-                    // same Touch Speed and acceleration, with the sub-pixel remainder carried.
+                    // same Cursor Speed and acceleration, with the sub-pixel remainder carried.
                     // (This path used to ignore every speed setting.)
                     float speed = touchpadView.getSensitivity();
                     float cursorX = 0;
