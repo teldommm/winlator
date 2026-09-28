@@ -61,7 +61,7 @@ import com.winlator.cmod.R
 import com.winlator.cmod.ui.theme.controlAccentColor
 import com.winlator.cmod.ui.theme.destructiveColor
 import com.winlator.cmod.ui.theme.dividerColor
-import com.winlator.cmod.ui.theme.sidebarCardFillColor
+import com.winlator.cmod.ui.theme.sidebarRailHighlightColor
 import kotlinx.coroutines.launch
 
 // One selectable rail entry (Graphics/Screen/Input/FPS/TaskManager). `id` reuses the
@@ -209,7 +209,7 @@ private fun RailCell(
     // Fade the highlight by alpha only. It used to animate the colour to Color.Transparent,
     // which is transparent *black*: the colour interpolation passed through dark grey, so the
     // cell you left flashed a black square for a moment.
-    val fillColor = sidebarCardFillColor()
+    val fillColor = sidebarRailHighlightColor()
     val highlight by animateFloatAsState(
         targetValue = if (selected) 1f else 0f,
         animationSpec = tween(150),
@@ -282,7 +282,7 @@ private fun RailSessionButton(state: SidebarRailState, callbacks: SidebarRailCal
     val paused = state.paused
     val destructive = destructiveColor()
     val accent = controlAccentColor()
-    val baseFill = sidebarCardFillColor()
+    val baseFill = sidebarRailHighlightColor()
     val fill by animateColorAsState(
         if (exitMode) destructive.copy(alpha = 0.22f) else baseFill,
         label = "sessionFill"

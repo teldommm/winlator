@@ -167,6 +167,17 @@ fun sidebarCardFillColor(): Color =
         MaterialTheme.colorScheme.surface
     }
 
+// Highlight for the in-game sidebar rail (selected section, the Pause / Exit cell). Dark keeps
+// its card fill. White and AMOLED used colorScheme.surface for that fill, which is the very
+// colour the rail itself is painted with, so the selection was invisible there. They now get a
+// neutral onSurface tint instead: a light grey on White, a dark grey on AMOLED.
+@Composable
+fun sidebarRailHighlightColor(): Color = when (WinlatorThemeManager.currentTheme()) {
+    WinlatorThemeType.BLACK -> sidebarCardFillColor()
+    WinlatorThemeType.WHITE -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f)
+    else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f)
+}
+
 // One border and one divider color for the whole app (borders used to be drawn at nine
 // different outlineVariant alphas, list dividers at six). Card/field/dialog outlines use
 // hairlineColor(); separators between rows inside a card or list use dividerColor().
