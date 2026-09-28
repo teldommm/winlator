@@ -83,8 +83,6 @@ data class InputControlsModel(
     val profiles: List<InputProfileItem>,
     val selectedProfileId: Int,
     val opacityPercent: Int,
-    // Selected profile's Stick Mouse Speed in percent; null when no profile is selected.
-    val stickMouseSpeedPercent: Int?,
     val controllers: List<InputControllerItem>
 )
 
@@ -92,7 +90,6 @@ data class InputControlsModel(
 interface InputControlsCallbacks {
     fun onProfileSelected(profileId: Int)
     fun onOpacityChanged(percent: Int)
-    fun onStickMouseSpeedChanged(percent: Int)
     fun onAddProfile()
     fun onEditProfile()
     fun onDuplicateProfile()
@@ -132,9 +129,6 @@ internal fun InputControlsScreen(model: InputControlsModel, callbacks: InputCont
                 ) {
                     item { ProfileSection(model, selectedName, callbacks) }
                     item { OpacityCard(model.opacityPercent, callbacks::onOpacityChanged) }
-                    model.stickMouseSpeedPercent?.let { speed ->
-                        item(key = "stick-speed-${model.selectedProfileId}") { StickMouseSpeedCard(speed, callbacks::onStickMouseSpeedChanged) }
-                    }
                     item { TransferActions(callbacks) }
                     item { EditorButton(callbacks) }
                 }
@@ -173,9 +167,6 @@ private fun PortraitContent(model: InputControlsModel, selectedName: String, cal
     ) {
         item { ProfileSection(model, selectedName, callbacks) }
         item { OpacityCard(model.opacityPercent, callbacks::onOpacityChanged) }
-        model.stickMouseSpeedPercent?.let { speed ->
-            item(key = "stick-speed-${model.selectedProfileId}") { StickMouseSpeedCard(speed, callbacks::onStickMouseSpeedChanged) }
-        }
         item { TransferActions(callbacks) }
         item { EditorButton(callbacks) }
         item {
@@ -325,26 +316,6 @@ private fun RoundAction(icon: androidx.compose.ui.graphics.vector.ImageVector, d
         border = BorderStroke(1.dp, hairlineColor())
     ) {
         IconButton(onClick = onClick) { Icon(icon, description, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
-    }
-}
-
-// The profile's own cursor speed ("cursorSpeed" in the .icp): only stick / D-pad / button and
-// external-gamepad MOUSE_MOVE bindings use it. Touch and physical-mouse movement use the global
-// Cursor speed setting, so the two never multiply each other.
-@Composable
-private fun StickMouseSpeedCard(initialPercent: Int, onChanged: (Int) -> Unit) {
-    var speed by remember(initialPercent) { mutableFloatStateOf(initialPercent.toFloat()) }
-    SettingsCard(title = "Stick Mouse Speed") {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            Text("${speed.roundToInt()}%", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Slider(
-            value = speed,
-            onValueChange = { speed = it },
-            onValueChangeFinished = { onChanged(speed.roundToInt()) },
-            modifier = Modifier.fillMaxWidth(), valueRange = 10f..200f,
-            colors = SliderDefaults.colors(thumbColor = controlAccentColor(), activeTrackColor = controlAccentColor())
-        )
     }
 }
 

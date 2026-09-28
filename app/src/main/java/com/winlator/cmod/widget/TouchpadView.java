@@ -25,6 +25,7 @@ import com.winlator.cmod.R;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.math.Mathf;
 import com.winlator.cmod.math.MotionAccumulator;
+import com.winlator.cmod.math.PointerAccel;
 import com.winlator.cmod.math.XForm;
 import com.winlator.cmod.renderer.ViewTransformation;
 import com.winlator.cmod.winhandler.MouseEventFlags;
@@ -33,15 +34,25 @@ import com.winlator.cmod.xserver.Pointer;
 import com.winlator.cmod.xserver.XServer;
 
 public class TouchpadView extends View {
-    private static final byte MAX_FINGERS = 4;
+    // Indexed by pointer id; on-screen controls hold pointers too, so a touch-area finger can get
+    // a high id (it used to be 4, and a 5th finger was ignored while 4 were on controls).
+    private static final byte MAX_FINGERS = 10;
     private static final short MAX_TWO_FINGERS_SCROLL_DISTANCE = 350;
     public static final byte MAX_TAP_TRAVEL_DISTANCE = 10;
     public static final short MAX_TAP_MILLISECONDS = 200;
     public static final float CURSOR_ACCELERATION = 1.25f;
     public static final byte CURSOR_ACCELERATION_THRESHOLD = 6;
+    // Touch-area gesture thresholds in dp of the physical screen. They used to be X-server pixels,
+    // so taps and scrolling got stricter or looser with the game resolution.
+    private static final float TAP_TRAVEL_DP = 8f;
+    private static final float SCROLL_STEP_DP = 36f;
+    // How long a synthesized click (tap, long press) keeps the button down, so games that poll
+    // the button state once per frame still see it.
+    private static final long CLICK_HOLD_MS = 30;
     private final Finger[] fingers = new Finger[MAX_FINGERS];
     private byte numFingers = 0;
-    private float sensitivity = 1.0f;
+    // volatile: InputControlsView's stick mouse timer reads it from its own thread.
+    private volatile float sensitivity = 1.0f;
     private Finger fingerPointerButtonLeft;
     private Finger fingerPointerButtonRight;
     private float scrollAccumY = 0;
@@ -58,6 +69,10 @@ public class TouchpadView extends View {
     private float resolutionScale;
     private static final int UPDATE_FORM_DELAYED_TIME = 50;
     private boolean mouseEnabled = true;
+    private float density = 1f;
+    // With two fingers on the touch area only one moves the cursor: the first one that travels
+    // past the tap distance (the other one is holding a drag or just resting).
+    private Finger cursorFinger;
 
     // ---------- Touch mode ----------
     // TRACKPAD: relative cursor (tap = click, two-finger tap = right click, scroll, drag).
@@ -111,6 +126,7 @@ public class TouchpadView extends View {
     public TouchpadView(Context context, XServer xServer) {
         super(context);
         this.xServer = xServer;
+        density = context.getResources().getDisplayMetrics().density;
 
         setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         setBackground(createTransparentBg());
@@ -168,8 +184,20 @@ public class TouchpadView extends View {
         private float lastFy;
         private final MotionAccumulator motion = new MotionAccumulator();
         private final long touchTime;
+        // Physical screen position: gesture thresholds and finger speed are measured here, so
+        // they don't depend on the game resolution.
+        private final float startRawX;
+        private final float startRawY;
+        private float rawX;
+        private float rawY;
+        private float lastRawX;
+        private float lastRawY;
+        private final PointerAccel accel = new PointerAccel(density);
 
-        public Finger(float x, float y) {
+        public Finger(float x, float y, long eventTimeMs) {
+            startRawX = rawX = lastRawX = x;
+            startRawY = rawY = lastRawY = y;
+            accel.reset(eventTimeMs);
             float[] transformedPoint = XForm.transformPoint(xform, x, y);
             this.fx = this.lastFx = transformedPoint[0];
             this.fy = this.lastFy = transformedPoint[1];
@@ -183,6 +211,10 @@ public class TouchpadView extends View {
             lastY = this.y;
             lastFx = fx;
             lastFy = fy;
+            lastRawX = rawX;
+            lastRawY = rawY;
+            rawX = x;
+            rawY = y;
             float[] transformedPoint = XForm.transformPoint(xform, x, y);
             fx = transformedPoint[0];
             fy = transformedPoint[1];
@@ -190,17 +222,22 @@ public class TouchpadView extends View {
             this.y = (int)fy;
         }
 
-        /** Scales the last move by the touch speed and returns it as whole pixels in {@link #motion}. */
-        private void accumulateDelta() {
-            motion.add(accelerate((fx - lastFx) * sensitivity), accelerate((fy - lastFy) * sensitivity));
+        /**
+         * Scales the last move by the touch speed and the velocity-based acceleration (one gain
+         * for the whole vector) and returns it as whole pixels in {@link #motion}.
+         */
+        private void accumulateDelta(long eventTimeMs) {
+            float gain = accel.gain(rawX - lastRawX, rawY - lastRawY, eventTimeMs);
+            motion.add((fx - lastFx) * sensitivity * gain, (fy - lastFy) * sensitivity * gain);
         }
 
         private boolean isTap() {
-            return (System.currentTimeMillis() - touchTime) < MAX_TAP_MILLISECONDS && travelDistance() < MAX_TAP_TRAVEL_DISTANCE;
+            return (System.currentTimeMillis() - touchTime) < MAX_TAP_MILLISECONDS && travelDistance() < TAP_TRAVEL_DP;
         }
 
+        /** Distance from the touch-down point, in dp of the physical screen. */
         private float travelDistance() {
-            return (float)Math.hypot(x - startX, y - startY);
+            return (float)Math.hypot(rawX - startRawX, rawY - startRawY) / density;
         }
     }
 
@@ -305,7 +342,7 @@ public class TouchpadView extends View {
                 if (event.isFromSource(InputDevice.SOURCE_MOUSE)) return true;
                 scrollAccumY = 0;
                 scrolling = false;
-                fingers[pointerId] = new Finger(event.getX(actionIndex), event.getY(actionIndex));
+                fingers[pointerId] = new Finger(event.getX(actionIndex), event.getY(actionIndex), event.getEventTime());
                 numFingers++;
                 if (numFingers == 1 && !simTouchScreen) {
                     longPressActive = false;
@@ -345,11 +382,7 @@ public class TouchpadView extends View {
                 break;
             case MotionEvent.ACTION_MOVE:
                 if (event.isFromSource(InputDevice.SOURCE_MOUSE)) {
-                    float[] transformedPoint = XForm.transformPoint(xform, event.getX(), event.getY());
-                    if (xServer.isRelativeMouseMovement())
-                        xServer.getWinHandler().mouseEvent(MouseEventFlags.MOVE, (int)transformedPoint[0], (int)transformedPoint[1], 0);
-                    else
-                        xServer.injectPointerMove((int)transformedPoint[0], (int)transformedPoint[1]);
+                    externalMouseMoveTo(event.getX(), event.getY());
                 } else {
                     for (byte i = 0; i < MAX_FINGERS; i++) {
                         if (fingers[i] != null) {
@@ -364,7 +397,7 @@ public class TouchpadView extends View {
                             int pointerIndex = event.findPointerIndex(i);
                             if (pointerIndex >= 0) {
                                 fingers[i].update(event.getX(pointerIndex), event.getY(pointerIndex));
-                                handleFingerMove(fingers[i]);
+                                handleFingerMove(fingers[i], event.getEventTime());
                             } else {
                                 handleFingerUp(fingers[i]);
                                 fingers[i] = null;
@@ -531,13 +564,20 @@ public class TouchpadView extends View {
         if (!tapToClickEnabled || numFingers != 1) return;
         Finger finger = null;
         for (byte i = 0; i < MAX_FINGERS; i++) if (fingers[i] != null) { finger = fingers[i]; break; }
-        if (finger == null || finger.travelDistance() >= MAX_TAP_TRAVEL_DISTANCE) return;
+        if (finger == null || finger.travelDistance() >= TAP_TRAVEL_DP) return;
         longPressActive = true;
         if (xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT)) {
             xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_LEFT);
         }
-        xServer.injectPointerButtonPress(Pointer.Button.BUTTON_RIGHT);
-        xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_RIGHT);
+        // Held for CLICK_HOLD_MS like a tap click (press + release in the same instant could be
+        // missed by games that poll the button state per frame).
+        if (!xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_RIGHT)) {
+            xServer.injectPointerButtonPress(Pointer.Button.BUTTON_RIGHT);
+            postDelayed(() -> {
+                if (xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_RIGHT))
+                    xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_RIGHT);
+            }, CLICK_HOLD_MS);
+        }
     }
 
     private void handleFingerUp(Finger finger1) {
@@ -558,7 +598,7 @@ public class TouchpadView extends View {
                 break;
             case 4:
                 if (fourFingersTapCallback != null) {
-                    for (byte i = 0; i < 4; i++) {
+                    for (byte i = 0; i < MAX_FINGERS; i++) {
                         if (fingers[i] != null && !fingers[i].isTap()) return;
                     }
                     fourFingersTapCallback.run();
@@ -570,8 +610,8 @@ public class TouchpadView extends View {
         releasePointerButtonRight(finger1);
     }
 
-    private void handleFingerMove(Finger finger1) {
-        if (finger1.travelDistance() >= MAX_TAP_TRAVEL_DISTANCE) longPressHandler.removeCallbacks(longPressRunnable);
+    private void handleFingerMove(Finger finger1, long eventTimeMs) {
+        if (finger1.travelDistance() >= TAP_TRAVEL_DP) longPressHandler.removeCallbacks(longPressRunnable);
         boolean skipPointerMove = false;
 
         Finger finger2 = numFingers == 2 ? findSecondFinger(finger1) : null;
@@ -580,14 +620,16 @@ public class TouchpadView extends View {
             float currDistance = (float)Math.hypot(finger1.x - finger2.x, finger1.y - finger2.y) * resolutionScale;
 
             if (currDistance < MAX_TWO_FINGERS_SCROLL_DISTANCE) {
-                scrollAccumY += ((finger1.y + finger2.y) * 0.5f) - (finger1.lastY + finger2.lastY) * 0.5f;
+                // Midpoint movement in dp: each finger contributes only its own half. (Each call
+                // used to add the whole midpoint change, so one finger's move was counted twice.)
+                scrollAccumY += (finger1.rawY - finger1.lastRawY) * 0.5f / density;
 
-                if (scrollAccumY < -100) {
+                if (scrollAccumY < -SCROLL_STEP_DP) {
                     xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_DOWN);
                     xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_DOWN);
                     scrollAccumY = 0;
                 }
-                else if (scrollAccumY > 100) {
+                else if (scrollAccumY > SCROLL_STEP_DP) {
                     xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_UP);
                     xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_UP);
                     scrollAccumY = 0;
@@ -595,14 +637,24 @@ public class TouchpadView extends View {
                 scrolling = true;
             }
             else if (tapToClickEnabled && currDistance >= MAX_TWO_FINGERS_SCROLL_DISTANCE && !xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT) &&
-                     finger2.travelDistance() < MAX_TAP_TRAVEL_DISTANCE) {
+                     finger2.travelDistance() < TAP_TRAVEL_DP) {
                 pressPointerButtonLeft(finger1);
                 skipPointerMove = true;
             }
         }
 
-        if (!scrolling && numFingers <= 2 && !skipPointerMove) {
-            finger1.accumulateDelta();
+        boolean drivesCursor = true;
+        if (cursorFinger != null && !isActiveFinger(cursorFinger)) cursorFinger = null;
+        if (numFingers <= 1) {
+            if (finger1.travelDistance() >= TAP_TRAVEL_DP) cursorFinger = finger1;
+        }
+        else {
+            if (cursorFinger == null && finger1.travelDistance() >= TAP_TRAVEL_DP) cursorFinger = finger1;
+            drivesCursor = finger1 == cursorFinger;
+        }
+
+        if (!scrolling && numFingers <= 2 && !skipPointerMove && drivesCursor) {
+            finger1.accumulateDelta(eventTimeMs);
             int dx = finger1.motion.x();
             int dy = finger1.motion.y();
 
@@ -616,6 +668,11 @@ public class TouchpadView extends View {
             }
             else xServer.injectPointerMoveDelta(dx, dy);
         }
+    }
+
+    private boolean isActiveFinger(Finger finger) {
+        for (byte i = 0; i < MAX_FINGERS; i++) if (fingers[i] == finger) return true;
+        return false;
     }
 
     private Finger findSecondFinger(Finger finger) {
@@ -657,7 +714,10 @@ public class TouchpadView extends View {
         }
     }
 
-    /** Cursor Speed: finger on the free touch area, Trackpad elements and mouse-move buttons. */
+    /**
+     * Cursor Speed: finger on the free touch area, Trackpad elements, mouse-move buttons and
+     * stick / D-pad / gamepad MOUSE_MOVE bindings.
+     */
     public void setSensitivity(float sensitivity) {
         this.sensitivity = sensitivity;
     }
@@ -666,9 +726,8 @@ public class TouchpadView extends View {
         return sensitivity;
     }
 
-    /** The fixed pointer acceleration every touch path applies after the speed. */
-    public static float accelerate(float delta) {
-        return Math.abs(delta) > CURSOR_ACCELERATION_THRESHOLD ? delta * CURSOR_ACCELERATION : delta;
+    public float getDensity() {
+        return density;
     }
 
     // Mouse-move buttons (ControlElement BUTTON with mouseMoveMode) drag the cursor like a
@@ -676,8 +735,12 @@ public class TouchpadView extends View {
     private float lastMouseMoveX;
     private float lastMouseMoveY;
     private final MotionAccumulator mouseMoveMotion = new MotionAccumulator();
+    private float lastMouseMoveRawX;
+    private float lastMouseMoveRawY;
+    private PointerAccel mouseMoveAccel;
 
     public void mouseMove(float x, float y, int action) {
+        if (mouseMoveAccel == null) mouseMoveAccel = new PointerAccel(density);
         float[] transformedPoint = XForm.transformPoint(xform, x, y);
         float tx = transformedPoint[0];
         float ty = transformedPoint[1];
@@ -686,11 +749,17 @@ public class TouchpadView extends View {
             case MotionEvent.ACTION_DOWN:
                 lastMouseMoveX = tx;
                 lastMouseMoveY = ty;
+                lastMouseMoveRawX = x;
+                lastMouseMoveRawY = y;
                 mouseMoveMotion.reset();
+                mouseMoveAccel.reset(android.os.SystemClock.uptimeMillis());
                 break;
             case MotionEvent.ACTION_MOVE: {
-                mouseMoveMotion.add(accelerate((tx - lastMouseMoveX) * sensitivity),
-                                    accelerate((ty - lastMouseMoveY) * sensitivity));
+                float gain = mouseMoveAccel.gain(x - lastMouseMoveRawX, y - lastMouseMoveRawY, android.os.SystemClock.uptimeMillis());
+                lastMouseMoveRawX = x;
+                lastMouseMoveRawY = y;
+                mouseMoveMotion.add((tx - lastMouseMoveX) * sensitivity * gain,
+                                    (ty - lastMouseMoveY) * sensitivity * gain);
                 int dx = mouseMoveMotion.x();
                 int dy = mouseMoveMotion.y();
                 lastMouseMoveX = tx;
@@ -713,6 +782,66 @@ public class TouchpadView extends View {
 
     public void setFourFingersTapCallback(Runnable fourFingersTapCallback) {
         this.fourFingersTapCallback = fourFingersTapCallback;
+    }
+
+    // ---------- Physical mouse without pointer capture ----------
+    // Relative Mouse needs deltas, but an uncaptured mouse reports its absolute position; that
+    // position used to be sent as if it were a delta, which flung the cursor / camera. Deltas are
+    // now taken from the previous position (scaled by Cursor Speed, like a captured mouse).
+    private boolean externalMouseAnchored = false;
+    private float externalMouseLastX;
+    private float externalMouseLastY;
+    private final MotionAccumulator externalMouseMotion = new MotionAccumulator();
+
+    private void externalMouseMoveTo(float x, float y) {
+        float[] p = XForm.transformPoint(xform, x, y);
+        if (!xServer.isRelativeMouseMovement()) {
+            externalMouseAnchored = false;
+            xServer.injectPointerMove((int) p[0], (int) p[1]);
+            return;
+        }
+        if (!externalMouseAnchored) {
+            externalMouseAnchored = true;
+            externalMouseLastX = p[0];
+            externalMouseLastY = p[1];
+            externalMouseMotion.reset();
+            return;
+        }
+        externalMouseMotion.add((p[0] - externalMouseLastX) * sensitivity, (p[1] - externalMouseLastY) * sensitivity);
+        externalMouseLastX = p[0];
+        externalMouseLastY = p[1];
+        int dx = externalMouseMotion.x();
+        int dy = externalMouseMotion.y();
+        if (dx != 0 || dy != 0) xServer.getWinHandler().mouseEvent(MouseEventFlags.MOVE, dx, dy, 0);
+    }
+
+    // ---------- Mouse wheel ----------
+    // One path for every physical wheel (captured or not). Fractional values from smooth-scrolling
+    // wheels and laptop touchpads are accumulated instead of dropped, a value of 2 gives two
+    // notches, and Relative Mouse gets the Windows standard 120 per notch (it used to be 1 for an
+    // uncaptured mouse and 270 for a captured one).
+    private static final int WHEEL_DELTA = 120;
+    private float wheelAccum = 0;
+
+    /** Vertical wheel movement in notches (positive = up / away from the user). */
+    public void injectWheel(float scrollY) {
+        if (scrollY == 0) return;
+        if (Math.signum(scrollY) != Math.signum(wheelAccum)) wheelAccum = 0;
+        wheelAccum += scrollY;
+        int notches = (int) wheelAccum;
+        if (notches == 0) return;
+        wheelAccum -= notches;
+        if (xServer.isRelativeMouseMovement()) {
+            WinHandler winHandler = xServer.getWinHandler();
+            if (winHandler != null) winHandler.mouseEvent(MouseEventFlags.WHEEL, 0, 0, notches * WHEEL_DELTA);
+        }
+        else {
+            Pointer.Button button = notches > 0 ? Pointer.Button.BUTTON_SCROLL_UP : Pointer.Button.BUTTON_SCROLL_DOWN;
+            for (int i = Math.abs(notches); i > 0; i--) {
+                xServer.injectPointerButtonPress(button);
+                xServer.injectPointerButtonRelease(button);
+            }
+        }
     }
 
     public boolean onExternalMouseEvent(MotionEvent event) {
@@ -758,32 +887,19 @@ public class TouchpadView extends View {
                     }
                     handled = true;
                     break;
+                case MotionEvent.ACTION_HOVER_ENTER:
+                case MotionEvent.ACTION_HOVER_EXIT:
+                    // Re-anchor: the next relative delta starts from where the mouse comes back.
+                    externalMouseAnchored = false;
+                    handled = true;
+                    break;
                 case MotionEvent.ACTION_MOVE:
                 case MotionEvent.ACTION_HOVER_MOVE:
-                    float[] transformedPoint = XForm.transformPoint(xform, event.getX(), event.getY());
-                    if (xServer.isRelativeMouseMovement())
-                        xServer.getWinHandler().mouseEvent(MouseEventFlags.MOVE, (int)transformedPoint[0], (int)transformedPoint[1], 0);
-                    else
-                        xServer.injectPointerMove((int)transformedPoint[0], (int)transformedPoint[1]);
+                    externalMouseMoveTo(event.getX(), event.getY());
                     handled = true;
                     break;
                 case MotionEvent.ACTION_SCROLL:
-                    float scrollY = event.getAxisValue(MotionEvent.AXIS_VSCROLL);
-                    if (scrollY <= -1.0f) {
-                        if (xServer.isRelativeMouseMovement())
-                            xServer.getWinHandler().mouseEvent(MouseEventFlags.WHEEL, 0, 0, (int)scrollY);
-                        else {
-                            xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_DOWN);
-                            xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_DOWN);
-                        }
-                    } else if (scrollY >= 1.0f) {
-                        if (xServer.isRelativeMouseMovement())
-                            xServer.getWinHandler().mouseEvent(MouseEventFlags.WHEEL, 0, 0,(int)scrollY);
-                        else {
-                            xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_UP);
-                            xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_UP);
-                        }
-                    }
+                    injectWheel(event.getAxisValue(MotionEvent.AXIS_VSCROLL));
                     handled = true;
                     break;
             }
@@ -863,6 +979,9 @@ public class TouchpadView extends View {
         scrollAccumY = 0;
         for (byte i = 0; i < MAX_FINGERS; i++) fingers[i] = null;
         numFingers = 0;
+        cursorFinger = null;
+        externalMouseAnchored = false;
+        wheelAccum = 0;
         fingerPointerButtonLeft = null;
         fingerPointerButtonRight = null;
         tsPrimaryId = -1;

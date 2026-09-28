@@ -22,10 +22,12 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.os.Build;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.util.Log;
+import android.view.Choreographer;
 import android.view.HapticFeedbackConstants;
 import android.view.InputDevice;
 import android.view.KeyEvent;
@@ -59,8 +61,11 @@ import org.json.JSONObject;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class InputControlsView extends View {
     public static final float DEFAULT_OVERLAY_OPACITY = 0.85f;
@@ -136,10 +141,38 @@ public class InputControlsView extends View {
     private TouchpadView touchpadView;
     private XServer xServer;
     private final android.util.SparseArray<Bitmap> icons = new android.util.SparseArray<>();
-    private Timer mouseMoveTimer;
-    private final PointF mouseMoveOffset = new PointF();
-    // Full deflection at 100% Stick Mouse Speed = 10 px per 60 Hz tick (600 px/s), as before.
-    private static final float STICK_MOUSE_PIXELS_PER_TICK = 10f;
+    // ---------- Stick mouse (MOUSE_MOVE bindings on sticks, D-pads, buttons, gamepads) ----------
+    // Full deflection at 100% Cursor Speed = 600 px/s (the old 10 px per 60 Hz tick), now scaled
+    // by the real frame time so the speed no longer depends on how often the loop runs.
+    private static final float STICK_MOUSE_PIXELS_PER_SECOND = 600f;
+    // Response curve applied after the radial dead zone: 1 = linear, 2 = quadratic. 1.5 keeps the
+    // top end close to the old linear feel while giving much finer control near the centre.
+    public static final float STICK_MOUSE_CURVE = 1.5f;
+    // Longest frame gap fed into one step, so a stall (GC, app switch) can't fling the cursor.
+    private static final float STICK_MOUSE_MAX_DT = 0.05f;
+
+    private static final int MOUSE_DIR_UP = 1, MOUSE_DIR_RIGHT = 2, MOUSE_DIR_DOWN = 4, MOUSE_DIR_LEFT = 8;
+    // Digital sources (buttons, key-style D-pad presses): one bit per held direction, so
+    // releasing LEFT while RIGHT is still held no longer stops the cursor.
+    private final AtomicInteger mouseHeldDirs = new AtomicInteger();
+    // Per-axis analog sources that still come through handleInputEvent with an offset
+    // (on-screen D-pad element, gamepad triggers): packed (x, y).
+    private final AtomicLong mouseLegacyAnalog = new AtomicLong(packMouse(0, 0));
+    // 2D analog sources (on-screen sticks, gamepad sticks/hats), already shaped, keyed by source:
+    // several can be active at once and releasing one doesn't cancel the others.
+    private final Map<Object, Long> mouseAnalogSources = new ConcurrentHashMap<>();
+
+    // Vsync-driven loop on its own looper thread (Choreographer works on any Looper thread),
+    // running only while some source is non-zero.
+    private final Object mouseMoveLock = new Object();
+    private HandlerThread mouseMoveThread;
+    private Handler mouseMoveHandler;
+    private final AtomicBoolean mouseMoveRunning = new AtomicBoolean();
+    // Only touched on mouseMoveThread.
+    private Choreographer mouseMoveChoreographer;
+    private long mouseMoveLastFrameNanos;
+    private final MotionAccumulator mouseMoveMotion = new MotionAccumulator();
+    private final Choreographer.FrameCallback mouseMoveFrame = this::onMouseMoveFrame;
     private boolean showTouchscreenControls = true;
 
     // ---------- Touchscreen Timeout (auto-hide) ----------
@@ -557,6 +590,8 @@ public class InputControlsView extends View {
             deselectAllElements();
         }
         else this.profile = null;
+        // Inputs held on the previous profile's elements must not keep moving the cursor.
+        clearStickMouseSources();
         selectedElement = null;
         if (editMode) {
             invalidate();
@@ -619,7 +654,6 @@ public class InputControlsView extends View {
 
     public void setXServer(XServer xServer) {
         this.xServer = xServer;
-        createMouseMoveTimer();
     }
 
     public int getMaxWidth() {
@@ -628,8 +662,7 @@ public class InputControlsView extends View {
 
     @Override
     protected void onDetachedFromWindow() {
-        if (mouseMoveTimer != null)
-            mouseMoveTimer.cancel();
+        stopMouseMoveThread();
         autoHideHandler.removeCallbacks(concealRunnable);
         super.onDetachedFromWindow();
     }
@@ -638,39 +671,163 @@ public class InputControlsView extends View {
         return (int)Mathf.roundTo(getHeight(), snappingSize);
     }
 
-    private void createMouseMoveTimer() {
-        WinHandler winHandler = xServer.getWinHandler();
-        if (mouseMoveTimer == null && profile != null) {
-            mouseMoveTimer = new Timer();
-            mouseMoveTimer.schedule(new TimerTask() {
-                // Only touched from this timer thread.
-                private final MotionAccumulator motion = new MotionAccumulator();
+    // ---------- Stick mouse loop ----------
 
-                @Override
-                public void run() {
-                    float offsetX = mouseMoveOffset.x;
-                    float offsetY = mouseMoveOffset.y;
-                    if (offsetX == 0 && offsetY == 0) {
-                        motion.reset();
-                        return;
-                    }
-                    // Stick Mouse Speed is read every tick (it used to be frozen when the timer
-                    // was first created, so switching profiles kept the old speed), and the
-                    // remainder is carried instead of truncated, which used to swallow small
-                    // deflections entirely.
-                    ControlsProfile activeProfile = profile;
-                    float speed = activeProfile != null ? activeProfile.getCursorSpeed() : 1.0f;
-                    motion.add(offsetX * speed * STICK_MOUSE_PIXELS_PER_TICK, offsetY * speed * STICK_MOUSE_PIXELS_PER_TICK);
-                    int dx = motion.x();
-                    int dy = motion.y();
-                    if (dx == 0 && dy == 0) return;
-                    if (xServer.isRelativeMouseMovement())
-                        winHandler.mouseEvent(MouseEventFlags.MOVE, dx, dy, 0);
-                    else
-                        xServer.injectPointerMoveDelta(dx, dy);
-                }
-            }, 0, 1000 / 60); // 60 FPS
+    private static long packMouse(float x, float y) {
+        return ((long) Float.floatToRawIntBits(x) << 32) | (Float.floatToRawIntBits(y) & 0xFFFFFFFFL);
+    }
+
+    private static float unpackMouseX(long v) {
+        return Float.intBitsToFloat((int) (v >>> 32));
+    }
+
+    private static float unpackMouseY(long v) {
+        return Float.intBitsToFloat((int) v);
+    }
+
+    /**
+     * Radial dead zone + rescale + response curve for a stick vector in [-1, 1]². Output starts
+     * at 0 right at the edge of the dead zone (it used to jump straight to 0.15) and keeps the
+     * input direction; full deflection still maps to 1. Returns {x, y}.
+     */
+    public static float[] shapeStickMouse(float x, float y) {
+        float magnitude = (float) Math.sqrt(x * x + y * y);
+        float deadZone = ControlElement.STICK_DEAD_ZONE;
+        if (magnitude <= deadZone) return new float[]{0f, 0f};
+        float t = (Math.min(magnitude, 1f) - deadZone) / (1f - deadZone);
+        float scale = (float) Math.pow(t, STICK_MOUSE_CURVE) / magnitude;
+        return new float[]{x * scale, y * scale};
+    }
+
+    /** Unit direction of a MOUSE_MOVE binding: {dx, dy}. */
+    public static int[] mouseMoveDirection(Binding binding) {
+        switch (binding) {
+            case MOUSE_MOVE_LEFT:  return new int[]{-1, 0};
+            case MOUSE_MOVE_RIGHT: return new int[]{1, 0};
+            case MOUSE_MOVE_UP:    return new int[]{0, -1};
+            case MOUSE_MOVE_DOWN:  return new int[]{0, 1};
+            default:               return new int[]{0, 0};
         }
+    }
+
+    /**
+     * Sets a 2D analog source (already shaped, in [-1, 1]); (0, 0) removes it. Sources are
+     * summed, so e.g. two sticks or a stick and a gamepad don't cancel each other on release.
+     */
+    public void setStickMouse(Object source, float x, float y) {
+        if (x == 0f && y == 0f) mouseAnalogSources.remove(source);
+        else {
+            mouseAnalogSources.put(source, packMouse(x, y));
+            wakeMouseMove();
+        }
+    }
+
+    private void setMouseHeld(int dirBit, boolean held) {
+        if (held) {
+            mouseHeldDirs.getAndUpdate(v -> v | dirBit);
+            wakeMouseMove();
+        }
+        else mouseHeldDirs.getAndUpdate(v -> v & ~dirBit);
+    }
+
+    private void setMouseLegacyAxis(boolean horizontal, float value) {
+        long prev, next;
+        do {
+            prev = mouseLegacyAnalog.get();
+            next = horizontal ? packMouse(value, unpackMouseY(prev)) : packMouse(unpackMouseX(prev), value);
+        } while (!mouseLegacyAnalog.compareAndSet(prev, next));
+        if (value != 0f) wakeMouseMove();
+    }
+
+    private void clearStickMouseSources() {
+        mouseHeldDirs.set(0);
+        mouseLegacyAnalog.set(packMouse(0, 0));
+        mouseAnalogSources.clear();
+    }
+
+    /** Current combined stick-mouse vector, each axis clamped to [-1, 1]. */
+    private float[] currentStickMouse() {
+        int held = mouseHeldDirs.get();
+        float x = ((held & MOUSE_DIR_RIGHT) != 0 ? 1 : 0) - ((held & MOUSE_DIR_LEFT) != 0 ? 1 : 0);
+        float y = ((held & MOUSE_DIR_DOWN) != 0 ? 1 : 0) - ((held & MOUSE_DIR_UP) != 0 ? 1 : 0);
+        long legacy = mouseLegacyAnalog.get();
+        x += unpackMouseX(legacy);
+        y += unpackMouseY(legacy);
+        for (Long v : mouseAnalogSources.values()) {
+            x += unpackMouseX(v);
+            y += unpackMouseY(v);
+        }
+        return new float[]{Mathf.clamp(x, -1, 1), Mathf.clamp(y, -1, 1)};
+    }
+
+    private void wakeMouseMove() {
+        if (!mouseMoveRunning.compareAndSet(false, true)) return;
+        Handler handler;
+        synchronized (mouseMoveLock) {
+            if (mouseMoveThread == null) {
+                mouseMoveThread = new HandlerThread("StickMouse", android.os.Process.THREAD_PRIORITY_DISPLAY);
+                mouseMoveThread.start();
+                mouseMoveHandler = new Handler(mouseMoveThread.getLooper());
+            }
+            handler = mouseMoveHandler;
+        }
+        handler.post(() -> {
+            // Thread-local: always this looper's instance (the thread is recreated after detach).
+            mouseMoveChoreographer = Choreographer.getInstance();
+            mouseMoveLastFrameNanos = 0;
+            mouseMoveMotion.reset();
+            mouseMoveChoreographer.postFrameCallback(mouseMoveFrame);
+        });
+    }
+
+    private void stopMouseMoveThread() {
+        clearStickMouseSources();
+        synchronized (mouseMoveLock) {
+            if (mouseMoveThread != null) {
+                mouseMoveThread.quitSafely();
+                mouseMoveThread = null;
+                mouseMoveHandler = null;
+            }
+        }
+        // The old looper is gone; the next wake starts a fresh thread and Choreographer.
+        mouseMoveRunning.set(false);
+    }
+
+    private void onMouseMoveFrame(long frameTimeNanos) {
+        float[] v = currentStickMouse();
+        if (v[0] == 0f && v[1] == 0f) {
+            // Idle: stop re-posting. Re-check after clearing the flag so an input that arrived in
+            // between (and saw the loop as still running) isn't lost.
+            mouseMoveRunning.set(false);
+            v = currentStickMouse();
+            if ((v[0] == 0f && v[1] == 0f) || !mouseMoveRunning.compareAndSet(false, true)) {
+                mouseMoveMotion.reset();
+                mouseMoveLastFrameNanos = 0;
+                return;
+            }
+        }
+        mouseMoveChoreographer.postFrameCallback(mouseMoveFrame);
+
+        float dt = mouseMoveLastFrameNanos == 0 ? 1f / 60f : (frameTimeNanos - mouseMoveLastFrameNanos) / 1e9f;
+        mouseMoveLastFrameNanos = frameTimeNanos;
+        if (dt <= 0f) return;
+        dt = Math.min(dt, STICK_MOUSE_MAX_DT);
+
+        // Stick / D-pad / button / gamepad mouse moves follow the global Cursor Speed (the in-game
+        // sidebar slider), same as the touch area. Read every frame, so the slider applies live.
+        TouchpadView tp = touchpadView;
+        float speed = tp != null ? tp.getSensitivity() : 1.0f;
+        float step = speed * STICK_MOUSE_PIXELS_PER_SECOND * dt;
+        mouseMoveMotion.add(v[0] * step, v[1] * step);
+        int dx = mouseMoveMotion.x();
+        int dy = mouseMoveMotion.y();
+        XServer server = xServer;
+        if ((dx == 0 && dy == 0) || server == null) return;
+        if (server.isRelativeMouseMovement()) {
+            WinHandler winHandler = server.getWinHandler();
+            if (winHandler != null) winHandler.mouseEvent(MouseEventFlags.MOVE, dx, dy, 0);
+        }
+        else server.injectPointerMoveDelta(dx, dy);
     }
 
     private void processJoystickInput(ExternalController controller) {
@@ -685,13 +842,17 @@ public class InputControlsView extends View {
                 controller.state.getDPadX(), controller.state.getDPadY()
         };
 
+        // MOUSE_MOVE bindings on a stick or hat are handled per pair as one 2D vector (radial
+        // dead zone + curve, direction taken from the binding), not per axis below.
+        processJoystickMouse(controller, axes, values);
+
         for (int i = 0; i < axes.length; i++) {
             float value = values[i];
             if (Math.abs(value) > ControlElement.STICK_DEAD_ZONE) {
                 byte sign = Mathf.sign(value);
                 int keyCode = ExternalControllerBinding.getKeyCodeForAxis(axes[i], sign);
                 ExternalControllerBinding controllerBinding = controller.getControllerBinding(keyCode);
-                if (controllerBinding != null) {
+                if (controllerBinding != null && !controllerBinding.getBinding().isMouseMove()) {
                     handleInputEvent(controller, controllerBinding.getBinding(), true, value, false);
                 }
             } else {
@@ -699,7 +860,7 @@ public class InputControlsView extends View {
                 for (byte sign = -1; sign <= 1; sign += 2) {
                     int keyCode = ExternalControllerBinding.getKeyCodeForAxis(axes[i], sign);
                     ExternalControllerBinding controllerBinding = controller.getControllerBinding(keyCode);
-                    if (controllerBinding != null) {
+                    if (controllerBinding != null && !controllerBinding.getBinding().isMouseMove()) {
                         handleInputEvent(controller, controllerBinding.getBinding(), false, value, false);
                     }
                 }
@@ -716,6 +877,44 @@ public class InputControlsView extends View {
         if (winHandler != null) {
             winHandler.sendGamepadState(controller);
         }
+    }
+
+    private static Binding axisBinding(ExternalController controller, int axis, int sign) {
+        ExternalControllerBinding b = controller.getControllerBinding(
+                ExternalControllerBinding.getKeyCodeForAxis(axis, (byte) sign));
+        return b != null ? b.getBinding() : null;
+    }
+
+    private void processJoystickMouse(ExternalController controller, int[] axes, float[] values) {
+        boolean any = false;
+        float outX = 0f, outY = 0f;
+        for (int p = 0; p + 1 < axes.length; p += 2) {
+            Binding xNeg = axisBinding(controller, axes[p], -1), xPos = axisBinding(controller, axes[p], 1);
+            Binding yNeg = axisBinding(controller, axes[p + 1], -1), yPos = axisBinding(controller, axes[p + 1], 1);
+            boolean xMouse = (xNeg != null && xNeg.isMouseMove()) || (xPos != null && xPos.isMouseMove());
+            boolean yMouse = (yNeg != null && yNeg.isMouseMove()) || (yPos != null && yPos.isMouseMove());
+            if (!xMouse && !yMouse) continue;
+            any = true;
+
+            float vx = xMouse ? values[p] : 0f;
+            float vy = yMouse ? values[p + 1] : 0f;
+            // The hat is digital (-1/0/1): no dead zone or curve, and diagonals stay (1, 1).
+            float[] shaped = axes[p] == MotionEvent.AXIS_HAT_X ? new float[]{vx, vy} : shapeStickMouse(vx, vy);
+
+            for (int a = 0; a < 2; a++) {
+                float c = shaped[a];
+                if (c == 0f) continue;
+                Binding b = a == 0 ? (c > 0 ? xPos : xNeg) : (c > 0 ? yPos : yNeg);
+                if (b == null || !b.isMouseMove()) continue;
+                int[] dir = mouseMoveDirection(b);
+                float m = Math.abs(c);
+                outX += dir[0] * m;
+                outY += dir[1] * m;
+            }
+        }
+        Object key = "gamepad:" + controller.getId();
+        if (any) setStickMouse(key, Mathf.clamp(outX, -1, 1), Mathf.clamp(outY, -1, 1));
+        else mouseAnalogSources.remove(key);
     }
 
     private void processTriggerInput(ExternalController controller, float value, int keyCode, boolean sendUpdate) {
@@ -1086,13 +1285,23 @@ public class InputControlsView extends View {
             }
         }
         else {
-            if (binding == Binding.MOUSE_MOVE_LEFT || binding == Binding.MOUSE_MOVE_RIGHT) {
-                mouseMoveOffset.x = isActionDown ? (offset != 0 ? offset : (binding == Binding.MOUSE_MOVE_LEFT ? -1 : 1)) : 0;
-                if (isActionDown) createMouseMoveTimer();
-            }
-            else if (binding == Binding.MOUSE_MOVE_DOWN || binding == Binding.MOUSE_MOVE_UP) {
-                mouseMoveOffset.y = isActionDown ? (offset != 0 ? offset : (binding == Binding.MOUSE_MOVE_UP ? -1 : 1)) : 0;
-                if (isActionDown) createMouseMoveTimer();
+            if (binding.isMouseMove()) {
+                boolean horizontal = binding == Binding.MOUSE_MOVE_LEFT || binding == Binding.MOUSE_MOVE_RIGHT;
+                int dirBit = binding == Binding.MOUSE_MOVE_UP ? MOUSE_DIR_UP
+                        : binding == Binding.MOUSE_MOVE_RIGHT ? MOUSE_DIR_RIGHT
+                        : binding == Binding.MOUSE_MOVE_DOWN ? MOUSE_DIR_DOWN : MOUSE_DIR_LEFT;
+                if (!isActionDown) {
+                    setMouseHeld(dirBit, false);
+                    setMouseLegacyAxis(horizontal, 0f);
+                }
+                else if (offset == 0) setMouseHeld(dirBit, true);
+                else {
+                    // Analog per-axis source: magnitude from the offset, direction from the
+                    // binding (it used to follow the offset's sign, so a binding mapped against
+                    // the axis moved the cursor the wrong way).
+                    int[] dir = mouseMoveDirection(binding);
+                    setMouseLegacyAxis(horizontal, Math.min(Math.abs(offset), 1f) * (horizontal ? dir[0] : dir[1]));
+                }
             }
             else {
                 Pointer.Button pointerButton = binding.getPointerButton();

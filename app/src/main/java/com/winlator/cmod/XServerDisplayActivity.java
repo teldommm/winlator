@@ -735,22 +735,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 break;
             }
             case MotionEvent.ACTION_SCROLL: {
-                float scrollY = event.getAxisValue(MotionEvent.AXIS_VSCROLL);
-                if (scrollY <= -1.0f) {
-                    if (xServer.isRelativeMouseMovement()) {
-                        winHandler.mouseEvent(MouseEventFlags.WHEEL, 0, 0, (int) scrollY * 270);
-                    } else {
-                        xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_DOWN);
-                        xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_DOWN);
-                    }
-                } else if (scrollY >= 1.0f) {
-                    if (xServer.isRelativeMouseMovement()) {
-                        winHandler.mouseEvent(MouseEventFlags.WHEEL, 0, 0, (int) scrollY * 270);
-                    } else {
-                        xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_UP);
-                        xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_UP);
-                    }
-                }
+                // Same wheel path as an uncaptured mouse: accumulated, 120 per notch.
+                touchpadView.injectWheel(event.getAxisValue(MotionEvent.AXIS_VSCROLL));
                 break;
             }
         }
@@ -2092,7 +2078,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         inputControlsView.setVisibility(View.VISIBLE);
         inputControlsView.requestFocus();
 
-        // Cursor Speed only: the profile's own speed now drives just its stick/button mouse moves.
+        // One global Cursor Speed for touch and for the profile's stick/button mouse moves.
         touchpadView.setSensitivity(globalCursorSpeed);
 
         inputControlsView.invalidate();

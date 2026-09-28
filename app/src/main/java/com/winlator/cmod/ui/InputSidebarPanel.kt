@@ -40,7 +40,7 @@ data class InputPanelState(
     val controlsOpacityPercent: Int,
     val relativeMouse: Boolean,
     val touchMode: Int,          // TouchpadView.MODE_TRACKPAD (0) / MODE_TOUCHSCREEN (1) / MODE_OFF (2)
-    val cursorSpeedPercent: Int, // global Cursor Speed, 10..200 (Settings > Cursor speed)
+    val cursorSpeedPercent: Int, // global Cursor Speed, 10..200 (Settings > Cursor speed); also drives stick mouse
     val tapToClick: Boolean
 )
 
@@ -159,10 +159,9 @@ private fun InputSidebarPanel(state: InputPanelState, callbacks: InputPanelCallb
 
         // Touch Mode: how the finger on the free area drives the mouse — Trackpad, Touchscreen,
         // or Off (the touch surface does nothing; what used to be "Disable Mouse").
-        // Cursor Speed stays in all three: Trackpad elements, mouse-move buttons and a captured
-        // physical mouse follow it too, and none of those depend on the touch surface. The
-        // profile's own speed only drives its stick/button mouse moves (Input Controls > Stick
-        // Mouse Speed).
+        // Cursor Speed stays in all three: Trackpad elements, mouse-move buttons, stick / D-pad /
+        // gamepad mouse moves and a captured physical mouse follow it too, and none of those
+        // depend on the touch surface.
         SidebarGap()
         SidebarCard {
             SidebarDropdownField(

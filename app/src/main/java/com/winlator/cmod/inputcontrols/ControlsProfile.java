@@ -53,9 +53,10 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     }
 
     /**
-     * Stick Mouse Speed: how fast stick / D-pad / button / external-gamepad MOUSE_MOVE bindings
-     * move the cursor (1.0 = 100%). It no longer scales the touch area, which uses the global
-     * Cursor Speed on its own.
+     * Legacy "cursorSpeed" from the .icp. Nothing reads it at runtime any more: stick / D-pad /
+     * button / external-gamepad MOUSE_MOVE bindings follow the global Cursor Speed (in-game
+     * sidebar / Settings). Still loaded and saved so profiles round-trip unchanged for other
+     * Winlator builds that do use it.
      *
      * Sanitized because the loader passes NaN when the .icp has no "cursorSpeed" field (and
      * JSONObject.put() rejects NaN, which made save() fail), and to drop float noise such as

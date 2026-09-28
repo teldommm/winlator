@@ -105,6 +105,18 @@ public class ControlElement {
     private byte orientation;
     private PointF currentPosition;
     private final MotionAccumulator trackpadMotion = new MotionAccumulator();
+    // Trackpad with mouse bindings: same velocity-based acceleration as the free touch area.
+    private com.winlator.cmod.math.PointerAccel trackpadAccel;
+    // Trackpad with gamepad bindings (camera): finger velocity (dp/s, smoothed) drives the stick,
+    // and a per-frame tick eases it back to centre once the finger stops without lifting.
+    public static final float TRACKPAD_FULL_SPEED_DP = 300f;
+    private static final float TRACKPAD_STILL_S = 0.03f;
+    private static final float TRACKPAD_DECAY_TAU_S = 0.05f;
+    private float trackpadVelX, trackpadVelY;
+    private long trackpadLastMoveMs;
+    private long trackpadLastTickMs;
+    private boolean trackpadTickScheduled;
+    private final Runnable trackpadTick = this::onTrackpadStickTick;
 
     // ---------- Dynamic stick (STICK only, off by default) ----------
     // The stick has a fixed square zone around its home position. A touch in the zone but off
@@ -1131,11 +1143,91 @@ public class ControlElement {
                     if (currentPosition == null) currentPosition = new PointF();
                     currentPosition.set(x, y);
                     trackpadMotion.reset();
+                    if (trackpadAccel == null) trackpadAccel = new com.winlator.cmod.math.PointerAccel(screenDensity());
+                    trackpadAccel.reset(android.os.SystemClock.uptimeMillis());
+                    trackpadVelX = trackpadVelY = 0;
+                    trackpadLastMoveMs = 0;
                 }
                 return handleTouchMove(pointerId, x, y);
             }
         }
         else return false;
+    }
+
+    private float screenDensity() {
+        return inputControlsView.getResources().getDisplayMetrics().density;
+    }
+
+    /** Trackpad (gamepad bindings): current velocity -> radial stick deflection. */
+    private void sendTrackpadStick(Binding firstBinding) {
+        if (interpolator == null) interpolator = new CubicBezierInterpolator();
+        interpolator.set(0.075f, 0.95f, 0.45f, 0.95f);
+        float speed = (float) Math.hypot(trackpadVelX, trackpadVelY);
+        float outX = 0f, outY = 0f;
+        if (speed > 0.001f) {
+            float m = interpolator.getInterpolation(Math.min(1f, speed / TRACKPAD_FULL_SPEED_DP));
+            outX = trackpadVelX / speed * m;
+            outY = trackpadVelY / speed * m;
+        }
+        inputControlsView.handleStickInput(firstBinding, outX, outY);
+    }
+
+    private void scheduleTrackpadTick() {
+        if (trackpadTickScheduled) return;
+        trackpadTickScheduled = true;
+        trackpadLastTickMs = android.os.SystemClock.uptimeMillis();
+        inputControlsView.postOnAnimation(trackpadTick);
+    }
+
+    // Per frame while the trackpad is held: once no move has arrived for TRACKPAD_STILL_S, the
+    // velocity decays exponentially and the stick eases back to centre.
+    private void onTrackpadStickTick() {
+        trackpadTickScheduled = false;
+        if (currentPointerId == -1 || type != Type.TRACKPAD) return;
+        Binding firstBinding = getBindingAt(0);
+        if (!firstBinding.isGamepad()) return;
+        long now = android.os.SystemClock.uptimeMillis();
+        float tickDt = (now - trackpadLastTickMs) / 1000f;
+        trackpadLastTickMs = now;
+        if ((now - trackpadLastMoveMs) / 1000f > TRACKPAD_STILL_S) {
+            float k = (float) Math.exp(-tickDt / TRACKPAD_DECAY_TAU_S);
+            trackpadVelX *= k;
+            trackpadVelY *= k;
+            if (Math.hypot(trackpadVelX, trackpadVelY) < 5f) {
+                trackpadVelX = trackpadVelY = 0;
+                inputControlsView.handleStickInput(firstBinding, 0f, 0f);
+                return;
+            }
+            sendTrackpadStick(firstBinding);
+        }
+        trackpadTickScheduled = true;
+        inputControlsView.postOnAnimation(trackpadTick);
+    }
+
+    /**
+     * Feeds this stick / D-pad's MOUSE_MOVE bindings as one 2D source. (x, y) is the signed
+     * deflection; each component picks the binding for its direction (UP/RIGHT/DOWN/LEFT slots),
+     * and the cursor moves the way that binding says.
+     */
+    private void applyMouseMoveBindings(float x, float y) {
+        float outX = 0f, outY = 0f;
+        if (x != 0f) {
+            Binding b = getBindingAt(x > 0 ? 1 : 3);
+            if (b.isMouseMove()) {
+                int[] dir = InputControlsView.mouseMoveDirection(b);
+                outX += dir[0] * Math.abs(x);
+                outY += dir[1] * Math.abs(x);
+            }
+        }
+        if (y != 0f) {
+            Binding b = getBindingAt(y > 0 ? 2 : 0);
+            if (b.isMouseMove()) {
+                int[] dir = InputControlsView.mouseMoveDirection(b);
+                outX += dir[0] * Math.abs(y);
+                outY += dir[1] * Math.abs(y);
+            }
+        }
+        inputControlsView.setStickMouse(this, Mathf.clamp(outX, -1, 1), Mathf.clamp(outY, -1, 1));
     }
 
     public boolean handleTouchMove(int pointerId, float x, float y) {
@@ -1145,6 +1237,8 @@ public class ControlElement {
         }
         else if (pointerId == currentPointerId && (type == Type.D_PAD || type == Type.STICK || type == Type.TRACKPAD)) {
             float deltaX, deltaY;
+            // Trackpad only: this move in physical screen pixels (for speed / acceleration).
+            float rawDx = 0f, rawDy = 0f;
             Rect boundingBox = getBoundingBox();
             float radius = boundingBox.width() * 0.5f;
             TouchpadView touchpadView =  inputControlsView.getTouchpadView();
@@ -1154,6 +1248,8 @@ public class ControlElement {
                 float[] deltaPoint = touchpadView.computeDeltaPoint(currentPosition.x, currentPosition.y, x, y);
                 deltaX = deltaPoint[0];
                 deltaY = deltaPoint[1];
+                rawDx = x - currentPosition.x;
+                rawDy = y - currentPosition.y;
                 currentPosition.set(x, y);
             }
             else if (type == Type.STICK) {
@@ -1225,13 +1321,20 @@ public class ControlElement {
                         this.states[i] = true;
                     }
                 } else {
+                    // Mouse-move bindings: the raw 2D deflection (no per-axis dead zone and no
+                    // cross-zone snapping to the axes, both of which made diagonal aiming coarse)
+                    // through the radial dead zone + response curve.
+                    float[] shaped = InputControlsView.shapeStickMouse(deltaX, deltaY);
+                    applyMouseMoveBindings(shaped[0], shaped[1]);
+
+                    // Key bindings keep the axis snapping (right for WASD-style movement).
                     final boolean[] states = {adjDeltaY <= -STICK_DEAD_ZONE, adjDeltaX >= STICK_DEAD_ZONE, adjDeltaY >= STICK_DEAD_ZONE, adjDeltaX <= -STICK_DEAD_ZONE};
                     for (byte i = 0; i < 4; i++) {
-                        float value = i == 1 || i == 3 ? adjDeltaX : adjDeltaY;
                         Binding binding = getBindingAt(i);
-                        boolean state = binding.isMouseMove() ? (states[i] || states[(i+2)%4]) : states[i];
-                        inputControlsView.handleInputEvent(binding, state, value);
-                        this.states[i] = state;
+                        if (binding.isMouseMove()) continue;
+                        float value = i == 1 || i == 3 ? adjDeltaX : adjDeltaY;
+                        inputControlsView.handleInputEvent(binding, states[i], value);
+                        this.states[i] = states[i];
                     }
                 }
                 invalidateSelf();
@@ -1240,25 +1343,22 @@ public class ControlElement {
                 
                 Binding firstBinding = getBindingAt(0);
                 if (firstBinding.isGamepad()) {
-                    
-                    if (interpolator == null) interpolator = new CubicBezierInterpolator();
-                    interpolator.set(0.075f, 0.95f, 0.45f, 0.95f);
-                    
-                    float valueX = deltaX;
-                    float valueY = deltaY;
-                    if (Math.abs(valueX) > TRACKPAD_ACCELERATION_THRESHOLD) valueX *= STICK_SENSITIVITY;
-                    if (Math.abs(valueY) > TRACKPAD_ACCELERATION_THRESHOLD) valueY *= STICK_SENSITIVITY;
-                    
-                    float interpX = interpolator.getInterpolation(Math.min(1.0f, Math.abs(valueX / TRACKPAD_MAX_SPEED)));
-                    float interpY = interpolator.getInterpolation(Math.min(1.0f, Math.abs(valueY / TRACKPAD_MAX_SPEED)));
-                    
-                    float finalX = Mathf.clamp(interpX * Mathf.sign(valueX), -1, 1);
-                    float finalY = Mathf.clamp(interpY * Mathf.sign(valueY), -1, 1);
-                    
-                    
-                    inputControlsView.handleStickInput(firstBinding, finalX, finalY);
-                    
-                    
+                    // Velocity, not per-event delta: the old mapping read the delta of one touch
+                    // event, so the same swipe gave half the stick at 120 Hz, and a finger that
+                    // stopped without lifting either kept the camera spinning (no more events) or
+                    // snapped it to 0 (a zero-delta event). The tick below eases it back instead.
+                    long now = android.os.SystemClock.uptimeMillis();
+                    float dt = trackpadLastMoveMs == 0 ? 1f / 60f : (now - trackpadLastMoveMs) / 1000f;
+                    dt = Math.max(0.004f, Math.min(0.05f, dt));
+                    trackpadLastMoveMs = now;
+                    float density = screenDensity();
+                    float vx = rawDx / density / dt;
+                    float vy = rawDy / density / dt;
+                    trackpadVelX = trackpadVelX * 0.5f + vx * 0.5f;
+                    trackpadVelY = trackpadVelY * 0.5f + vy * 0.5f;
+                    sendTrackpadStick(firstBinding);
+                    scheduleTrackpadTick();
+
                     for (byte i = 0; i < 4; i++) {
                         this.states[i] = true;
                     }
@@ -1269,6 +1369,8 @@ public class ControlElement {
                     // same Cursor Speed and acceleration, with the sub-pixel remainder carried.
                     // (This path used to ignore every speed setting.)
                     float speed = touchpadView.getSensitivity();
+                    if (trackpadAccel == null) trackpadAccel = new com.winlator.cmod.math.PointerAccel(screenDensity());
+                    float gain = trackpadAccel.gain(rawDx, rawDy, android.os.SystemClock.uptimeMillis());
                     float cursorX = 0;
                     float cursorY = 0;
 
@@ -1276,10 +1378,10 @@ public class ControlElement {
                         float value = (i == 1 || i == 3 ? deltaX : deltaY);
                         Binding binding = getBindingAt(i);
                         if (binding == Binding.MOUSE_MOVE_LEFT || binding == Binding.MOUSE_MOVE_RIGHT) {
-                            cursorX = TouchpadView.accelerate(value * speed);
+                            cursorX = value * speed * gain;
                         }
                         else if (binding == Binding.MOUSE_MOVE_UP || binding == Binding.MOUSE_MOVE_DOWN) {
-                            cursorY = TouchpadView.accelerate(value * speed);
+                            cursorY = value * speed * gain;
                         }
                         else {
                             if (Math.abs(value) > TouchpadView.CURSOR_ACCELERATION_THRESHOLD) value *= TouchpadView.CURSOR_ACCELERATION;
@@ -1310,10 +1412,18 @@ public class ControlElement {
                 boolean hadDirection = this.states[0] || this.states[1] || this.states[2] || this.states[3];
                 boolean newDirection = false;
 
+                // Mouse-move bindings: same per-axis D-pad gate and finger-position magnitude as
+                // before, but as one 2D source with the direction taken from the binding.
+                applyMouseMoveBindings(states[1] || states[3] ? deltaX : 0f, states[0] || states[2] ? deltaY : 0f);
                 for (byte i = 0; i < 4; i++) {
-                    float value = i == 1 || i == 3 ? deltaX : deltaY;
                     Binding binding = getBindingAt(i);
-                    boolean state = binding.isMouseMove() ? (states[i] || states[(i+2)%4]) : states[i];
+                    if (binding.isMouseMove()) {
+                        if (states[i] && !this.states[i]) newDirection = true;
+                        this.states[i] = states[i];
+                        continue;
+                    }
+                    float value = i == 1 || i == 3 ? deltaX : deltaY;
+                    boolean state = states[i];
                     if (state && !this.states[i]) newDirection = true;
                     inputControlsView.handleInputEvent(binding, state, value);
                     this.states[i] = state;
@@ -1364,15 +1474,22 @@ public class ControlElement {
                 
                 
                 
+                if (type == Type.TRACKPAD) {
+                    inputControlsView.removeCallbacks(trackpadTick);
+                    trackpadTickScheduled = false;
+                    trackpadVelX = trackpadVelY = 0;
+                    trackpadLastMoveMs = 0;
+                }
                 if ((type == Type.STICK || type == Type.TRACKPAD) && getBindingAt(0).isGamepad()) {
                     inputControlsView.handleStickInput(getBindingAt(0), 0f, 0f);
                     for (byte i = 0; i < states.length; i++) states[i] = false;
                 }
                 else {
                     for (byte i = 0; i < states.length; i++) {
-                        if (states[i]) inputControlsView.handleInputEvent(getBindingAt(i), false);
+                        if (states[i] && !getBindingAt(i).isMouseMove()) inputControlsView.handleInputEvent(getBindingAt(i), false);
                         states[i] = false;
                     }
+                    if (type == Type.STICK || type == Type.D_PAD) inputControlsView.setStickMouse(this, 0f, 0f);
                 }
 
                 if (type == Type.RANGE_BUTTON) {
