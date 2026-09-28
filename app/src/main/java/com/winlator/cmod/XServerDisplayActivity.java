@@ -1492,6 +1492,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
     // composed off-screen) — only the Task Manager's 1s process poll needs to stop.
     private void onSidebarClosed() {
         if (taskManagerSidebar != null) taskManagerSidebar.stop();
+        // The combined Pause / Exit cell always reopens on Pause.
+        if (sidebarRailState != null) sidebarRailState.setExitMode(false);
         // Drop focus from a sidebar text field so it applies its value, the IME goes away and
         // key events return to the X server.
         if (com.winlator.cmod.ui.SidebarTextInputFocus.active) {
