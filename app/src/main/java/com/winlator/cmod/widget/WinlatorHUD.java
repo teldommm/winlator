@@ -38,6 +38,7 @@ public class WinlatorHUD extends View {
     private static final String KEY_SCALE = "hud_scale";
     private static final String KEY_ALPHA = "hud_alpha_int";
     private static final String KEY_VERT = "hud_vertical";
+    private static final String KEY_ALIGN_RIGHT = "hud_align_right";
     public static final String KEY_DUAL_CELL = "hud_dual_cell_correction";
 
     public static final int SHOW_FPS = 1;
@@ -189,6 +190,13 @@ public class WinlatorHUD extends View {
 
     private float touchX, touchY, startX, startY;
     private boolean dragging = false;
+
+    // The view is measured at its *reserved* width (worst-case values, CHG slot, ...), but only
+    // the current content is drawn. It used to be drawn at the left of that box, so the empty
+    // reserved part kept the visible HUD away from the right screen edge (in horizontal layout
+    // by a lot). Now the content hugs the box edge on the side of the screen it sits on, the
+    // clamp works on the visible part, and on the right side the HUD grows to the left.
+    private boolean alignRight = false;
     private long touchDownMs = 0;
     private boolean redrawScheduled = false;
 
@@ -470,6 +478,8 @@ public class WinlatorHUD extends View {
         } else {
             invalidate();
         }
+        // Content width follows the values; keep the visible HUD on screen as it changes.
+        clampToParent(false);
     }
 
     private void readStats() {
@@ -651,7 +661,12 @@ public class WinlatorHUD extends View {
 
             snapPct = batt.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
             int status = batt.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
-            boolean charging = status == BatteryManager.BATTERY_STATUS_CHARGING
+            int plugged = batt.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0);
+            // CHG = on external power. Status alone missed plugged-in states that report
+            // NOT_CHARGING / DISCHARGING: charge limit (80-85 %), battery protection, thermal
+            // pause and bypass ("power the device, not the battery") gaming modes.
+            boolean charging = plugged != 0
+                    || status == BatteryManager.BATTERY_STATUS_CHARGING
                     || status == BatteryManager.BATTERY_STATUS_FULL;
 
             int voltageMv = batt.getIntExtra(BatteryManager.EXTRA_VOLTAGE, 0);
@@ -662,8 +677,8 @@ public class WinlatorHUD extends View {
                 }
             }
 
-            float amps = getBatteryCurrentAmps();
-            float watts = (amps > 0f && voltageMv > 0)
+            float amps = getBatteryCurrentAmps(charging);
+            float watts = (amps >= 0f && voltageMv > 0)
                     ? (voltageMv / 1000f) * amps : -1f;
 
             if (watts <= 0f) {
@@ -675,13 +690,13 @@ public class WinlatorHUD extends View {
                 watts *= 2f;
             }
 
-            int mw = watts > 0f ? Math.round(watts * 1000f) : -1;
+            int mw = watts >= 0f ? Math.round(watts * 1000f) : -1;
             boolean chargingChanged = charging != snapCharging;
             snapCharging = charging;
 
             if (mw != snapMw || chargingChanged) {
                 snapMw = mw;
-                strPwr = mw > 0
+                strPwr = mw >= 0
                         ? String.format(Locale.US, "%.1fW", mw / 1000f) : "N/A";
                 statsDirty = true;
             }
@@ -699,16 +714,32 @@ public class WinlatorHUD extends View {
         }
     }
 
-    private float getBatteryCurrentAmps() {
-        long raw = 0L;
+    // Set once a reading proves the source reports microamps (the documented unit); some
+    // devices report milliamps instead, which is what the < 20000 guess is for.
+    private static volatile boolean currentIsMicroAmps = false;
+
+    /**
+     * Battery current magnitude in A, -1 if unavailable. On external power a net current of 0 is
+     * a real reading (the charger covers the whole load, e.g. bypass charging / charge limit) and
+     * returns 0, so PWR shows 0.0W instead of N/A.
+     */
+    private float getBatteryCurrentAmps(boolean onExternalPower) {
+        long raw = Long.MIN_VALUE;
         if (batteryManager != null) {
             raw = batteryManager.getLongProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW);
         }
-        if (raw == 0L || raw == Long.MIN_VALUE) raw = readFirstSysFsLong(CURRENT_CHANNELS);
-        if (raw == 0L || raw == Long.MIN_VALUE) return -1f;
+        if (raw == Long.MIN_VALUE || (raw == 0L && !onExternalPower)) {
+            long sysfs = readFirstSysFsLong(CURRENT_CHANNELS);
+            if (sysfs != 0L) raw = sysfs;
+        }
+        if (raw == Long.MIN_VALUE) return -1f;
+        if (raw == 0L) return onExternalPower ? 0f : -1f;
 
         long magnitude = Math.abs(raw);
-        return magnitude < 20000L ? magnitude / 1000f : magnitude / 1_000_000f;
+        if (magnitude >= 20000L) currentIsMicroAmps = true;
+        // Sticky unit: a small microamp reading near 0 A while charging (e.g. 15000 uA) used to
+        // be read as 15 A and showed a huge PWR spike.
+        return currentIsMicroAmps || magnitude >= 20000L ? magnitude / 1_000_000f : magnitude / 1000f;
     }
 
     private long readFirstSysFsLong(String[] paths) {
@@ -761,8 +792,11 @@ public class WinlatorHUD extends View {
                 lastBgAlpha = targetAlpha;
             }
 
+            int save = canvas.save();
+            canvas.translate(visibleOffset(), 0f);
             if (vertical) drawVertical(canvas);
             else drawHorizontal(canvas);
+            canvas.restoreToCount(save);
         } catch (Exception ignored) {}
     }
 
@@ -1131,6 +1165,44 @@ public class WinlatorHUD extends View {
         return width;
     }
 
+    /** Width of what is actually drawn (unscaled view px). */
+    private float visibleWidth() {
+        float content = vertical ? measureVerticalContent() : measureHorizontalContent();
+        return Math.min(getWidth(), content);
+    }
+
+    /** Left edge of the drawn content inside the view (unscaled view px). */
+    private float visibleOffset() {
+        return alignRight ? Math.max(0f, getWidth() - visibleWidth()) : 0f;
+    }
+
+    /**
+     * Picks the side the content hugs from where the visible HUD is (right half of the screen =
+     * right-aligned). When the side flips, X is compensated so the visible HUD doesn't jump.
+     */
+    private void updateAlignment(float parentWidth) {
+        float s = getScaleX();
+        float offset = visibleOffset();
+        float centre = getX() + (offset + visibleWidth() * 0.5f) * s;
+        boolean right = centre > parentWidth * 0.5f;
+        if (right == alignRight) return;
+        alignRight = right;
+        float shift = (offset - visibleOffset()) * s;
+        setX(getX() + shift);
+        // Mid-drag the position is recomputed from the drag origin on every move: shift the
+        // origin too, or the compensation would be undone on the next event.
+        startX += shift;
+        invalidate();
+    }
+
+    @Override
+    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+        super.onSizeChanged(w, h, oldw, oldh);
+        // Right-aligned: keep the right edge where it was when the reserved width changes
+        // (orientation toggle, CHG slot, wider values), so the HUD grows / shrinks to the left.
+        if (alignRight && oldw > 0 && w != oldw) setX(getX() - (w - oldw) * getScaleX());
+    }
+
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         float lineH = TS + PAD * 2;
@@ -1158,6 +1230,9 @@ public class WinlatorHUD extends View {
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
                 if (event.getPointerCount() > 1) return true;
+                // Touches on the empty reserved part of the box go to the game, not the HUD.
+                float offset = visibleOffset();
+                if (event.getX() < offset || event.getX() > offset + visibleWidth()) return false;
                 touchX = event.getRawX();
                 touchY = event.getRawY();
                 startX = getX();
@@ -1260,7 +1335,11 @@ public class WinlatorHUD extends View {
     }
 
     private void savePosition() {
-        prefs.edit().putFloat(KEY_X, getX()).putFloat(KEY_Y, getY()).apply();
+        prefs.edit()
+                .putFloat(KEY_X, getX())
+                .putFloat(KEY_Y, getY())
+                .putBoolean(KEY_ALIGN_RIGHT, alignRight)
+                .apply();
     }
 
     // Keeps the (scaled) HUD fully on screen. Runs on drag, on (re)layout of the HUD or its
@@ -1272,9 +1351,15 @@ public class WinlatorHUD extends View {
         int pw = parent.getWidth();
         int ph = parent.getHeight();
         if (pw <= 0 || ph <= 0 || getWidth() <= 0 || getHeight() <= 0) return;
-        float maxX = Math.max(0f, pw - getWidth() * getScaleX());
+        updateAlignment(pw);
+        // Clamp the visible part, not the reserved box: the box may stick out past a screen edge
+        // on the side the content doesn't hug.
+        float s = getScaleX();
+        float offset = visibleOffset() * s;
+        float minX = -offset;
+        float maxX = Math.max(minX, pw - offset - visibleWidth() * s);
         float maxY = Math.max(0f, ph - getHeight() * getScaleY());
-        float x = Math.max(0f, Math.min(maxX, getX()));
+        float x = Math.max(minX, Math.min(maxX, getX()));
         float y = Math.max(0f, Math.min(maxY, getY()));
         if (x != getX() || y != getY()) {
             setX(x);
@@ -1351,6 +1436,7 @@ public class WinlatorHUD extends View {
         float scale = prefs.getFloat(KEY_SCALE, 1f);
         setScaleX(scale);
         setScaleY(scale);
+        alignRight = prefs.getBoolean(KEY_ALIGN_RIGHT, false);
         setX(prefs.getFloat(KEY_X, DEFAULT_POS));
         setY(prefs.getFloat(KEY_Y, DEFAULT_POS));
         userEnabled = false;
@@ -1574,6 +1660,7 @@ public class WinlatorHUD extends View {
     public void resetLayout() {
         uiHandler.post(() -> {
             resetSavedLayout(getContext());
+            alignRight = false;
             setX(DEFAULT_POS);
             setY(DEFAULT_POS);
             setScaleX(1f);
@@ -1592,6 +1679,7 @@ public class WinlatorHUD extends View {
                 .remove(KEY_SCALE)
                 .remove(KEY_ALPHA)
                 .remove(KEY_VERT)
+                .remove(KEY_ALIGN_RIGHT)
                 .apply();
     }
 

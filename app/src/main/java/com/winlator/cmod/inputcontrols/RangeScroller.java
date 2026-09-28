@@ -110,7 +110,10 @@ public class RangeScroller {
             float position = element.getOrientation() == 0 ? x : y;
             float deltaPosition = position - lastPosition;
 
-            if (Math.abs(deltaPosition) >= TouchpadView.MAX_TAP_TRAVEL_DISTANCE) {
+            // Same tap slop as the touch area, in dp (was 10 raw px: ~3-4 dp on most phones, so a
+            // slightly shaky tap turned into a scroll).
+            float slopPx = TouchpadView.TAP_TRAVEL_DP * inputControlsView.getResources().getDisplayMetrics().density;
+            if (Math.abs(deltaPosition) >= slopPx) {
                 scrolling = true;
                 destroyTimer();
             }

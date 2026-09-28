@@ -38,13 +38,10 @@ public class TouchpadView extends View {
     // a high id (it used to be 4, and a 5th finger was ignored while 4 were on controls).
     private static final byte MAX_FINGERS = 10;
     private static final short MAX_TWO_FINGERS_SCROLL_DISTANCE = 350;
-    public static final byte MAX_TAP_TRAVEL_DISTANCE = 10;
     public static final short MAX_TAP_MILLISECONDS = 200;
-    public static final float CURSOR_ACCELERATION = 1.25f;
-    public static final byte CURSOR_ACCELERATION_THRESHOLD = 6;
     // Touch-area gesture thresholds in dp of the physical screen. They used to be X-server pixels,
     // so taps and scrolling got stricter or looser with the game resolution.
-    private static final float TAP_TRAVEL_DP = 8f;
+    public static final float TAP_TRAVEL_DP = 8f;
     private static final float SCROLL_STEP_DP = 36f;
     // How long a synthesized click (tap, long press) keeps the button down, so games that poll
     // the button state once per frame still see it.
@@ -60,13 +57,6 @@ public class TouchpadView extends View {
     private final XServer xServer;
     private Runnable fourFingersTapCallback;
     private final float[] xform = XForm.getInstance();
-    private boolean simTouchScreen = false;
-    private boolean continueClick = true;
-    private int lastTouchedPosX;
-    private int lastTouchedPosY;
-    private static final Byte CLICK_DELAYED_TIME = 50;
-    private static final Byte EFFECTIVE_TOUCH_DISTANCE = 20;
-    private float resolutionScale;
     private static final int UPDATE_FORM_DELAYED_TIME = 50;
     private boolean mouseEnabled = true;
     private float density = 1f;
@@ -105,8 +95,10 @@ public class TouchpadView extends View {
     // Touchscreen: own pointer tracking (independent of the event's pointer order, so a finger
     // on a stick can't become "the" touch).
     private static final long TOUCHSCREEN_DOUBLE_TAP_MS = 500;
-    private static final float TOUCHSCREEN_DOUBLE_TAP_DISTANCE = 100f;
-    private static final float TOUCHSCREEN_SCROLL_STEP = 100f;
+    // In dp of the physical screen (were 100 raw px and 100 X-server px: the first depended on
+    // the screen density, the second on the game resolution).
+    private static final float TOUCHSCREEN_DOUBLE_TAP_DISTANCE_DP = 36f;
+    private static final float TOUCHSCREEN_SCROLL_STEP_DP = 36f;
     private int tsPrimaryId = -1;
     private int tsSecondaryId = -1;
     private boolean tsScrolled = false;
@@ -154,7 +146,6 @@ public class TouchpadView extends View {
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
         updateXform(w, h, xServer.screenInfo.width, xServer.screenInfo.height);
-        resolutionScale = 1000.0f / Math.min(xServer.screenInfo.width, xServer.screenInfo.height);
     }
 
     private void updateXform(int outerWidth, int outerHeight, int innerWidth, int innerHeight) {
@@ -172,10 +163,6 @@ public class TouchpadView extends View {
     private class Finger {
         private int x;
         private int y;
-        private final int startX;
-        private final int startY;
-        private int lastX;
-        private int lastY;
         // Unrounded X-screen position: deltas are taken from these so sub-pixel finger motion
         // isn't lost before the speed is applied (the int fields stay for absolute use).
         private float fx;
@@ -201,14 +188,12 @@ public class TouchpadView extends View {
             float[] transformedPoint = XForm.transformPoint(xform, x, y);
             this.fx = this.lastFx = transformedPoint[0];
             this.fy = this.lastFy = transformedPoint[1];
-            this.x = this.startX = this.lastX = (int)transformedPoint[0];
-            this.y = this.startY = this.lastY = (int)transformedPoint[1];
+            this.x = (int)transformedPoint[0];
+            this.y = (int)transformedPoint[1];
             touchTime = System.currentTimeMillis();
         }
 
         public void update(float x, float y) {
-            lastX = this.x;
-            lastY = this.y;
             lastFx = fx;
             lastFy = fy;
             lastRawX = rawX;
@@ -344,40 +329,12 @@ public class TouchpadView extends View {
                 scrolling = false;
                 fingers[pointerId] = new Finger(event.getX(actionIndex), event.getY(actionIndex), event.getEventTime());
                 numFingers++;
-                if (numFingers == 1 && !simTouchScreen) {
+                if (numFingers == 1) {
                     longPressActive = false;
                     longPressHandler.removeCallbacks(longPressRunnable);
                     longPressHandler.postDelayed(longPressRunnable, LONG_PRESS_RIGHT_CLICK_MS);
                 } else {
                     longPressHandler.removeCallbacks(longPressRunnable);
-                }
-                if (simTouchScreen) {
-                    final Runnable clickDelay = () -> {
-                        if (continueClick) {
-                            xServer.injectPointerMove(lastTouchedPosX, lastTouchedPosY);
-                            xServer.injectPointerButtonPress(Pointer.Button.BUTTON_LEFT);
-                        }
-                    };
-                    if (pointerId == 0) {
-                        continueClick = true;
-                        if (Math.hypot(fingers[0].x - lastTouchedPosX, fingers[0].y - lastTouchedPosY) * resolutionScale > EFFECTIVE_TOUCH_DISTANCE) {
-                            lastTouchedPosX = fingers[0].x;
-                            lastTouchedPosY = fingers[0].y;
-                        }
-                        postDelayed(clickDelay, CLICK_DELAYED_TIME);
-                    } else if (pointerId == 1) {
-                        // When put a finger on InputControl, such as a button.
-                        // The pointerId that TouchPadView got won't increase from 1, so map 1 as 0 here.
-                        if (numFingers < 2) {
-                            continueClick = true;
-                            if (Math.hypot(fingers[1].x - lastTouchedPosX, fingers[1].y - lastTouchedPosY) * resolutionScale > EFFECTIVE_TOUCH_DISTANCE) {
-                                lastTouchedPosX = fingers[1].x;
-                                lastTouchedPosY = fingers[1].y;
-                            }
-                            postDelayed(clickDelay, CLICK_DELAYED_TIME);
-                        } else
-                            continueClick = System.currentTimeMillis() - fingers[0].touchTime > CLICK_DELAYED_TIME;
-                    }
                 }
                 break;
             case MotionEvent.ACTION_MOVE:
@@ -472,7 +429,7 @@ public class TouchpadView extends View {
                     if (Float.isNaN(midY)) break;
                     tsScrollAccum += midY - tsScrollLastY;
                     tsScrollLastY = midY;
-                    if (Math.abs(tsScrollAccum) >= TOUCHSCREEN_SCROLL_STEP) {
+                    if (Math.abs(tsScrollAccum) >= TOUCHSCREEN_SCROLL_STEP_DP) {
                         // Scrolling: never keep the left button held while doing it.
                         if (xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT)) {
                             xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_LEFT);
@@ -499,8 +456,7 @@ public class TouchpadView extends View {
                         if (xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT)) {
                             xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_LEFT);
                         }
-                        xServer.injectPointerButtonPress(Pointer.Button.BUTTON_RIGHT);
-                        xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_RIGHT);
+                        clickRightHeld();
                     }
                     tsSecondaryId = -1;
                 } else if (pointerId == tsPrimaryId) {
@@ -529,7 +485,7 @@ public class TouchpadView extends View {
         int x = (int) p[0];
         int y = (int) p[1];
         long now = System.currentTimeMillis();
-        boolean near = Math.hypot(rawX - lastTapRawX, rawY - lastTapRawY) < TOUCHSCREEN_DOUBLE_TAP_DISTANCE;
+        boolean near = Math.hypot(rawX - lastTapRawX, rawY - lastTapRawY) / density < TOUCHSCREEN_DOUBLE_TAP_DISTANCE_DP;
         if (now - lastTapDownTime < TOUCHSCREEN_DOUBLE_TAP_MS && near) {
             // Second tap of a double tap: hit exactly the same spot as the first.
             x = lastTapX;
@@ -548,15 +504,12 @@ public class TouchpadView extends View {
         }
     }
 
-    // Average transformed Y of the two touchscreen fingers, NaN if either is gone.
+    // Average Y of the two touchscreen fingers in dp of the physical screen, NaN if either is gone.
     private float touchscreenMidY(MotionEvent event) {
         int a = event.findPointerIndex(tsPrimaryId);
         int b = event.findPointerIndex(tsSecondaryId);
         if (a < 0 || b < 0) return Float.NaN;
-        float[] pa = XForm.transformPoint(xform, event.getX(a), event.getY(a));
-        float ya = pa[1];
-        float[] pb = XForm.transformPoint(xform, event.getX(b), event.getY(b));
-        return (ya + pb[1]) * 0.5f;
+        return (event.getY(a) + event.getY(b)) * 0.5f / density;
     }
 
     // Trackpad long press: one finger held still for LONG_PRESS_RIGHT_CLICK_MS = right click.
@@ -569,28 +522,24 @@ public class TouchpadView extends View {
         if (xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT)) {
             xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_LEFT);
         }
-        // Held for CLICK_HOLD_MS like a tap click (press + release in the same instant could be
-        // missed by games that poll the button state per frame).
-        if (!xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_RIGHT)) {
-            xServer.injectPointerButtonPress(Pointer.Button.BUTTON_RIGHT);
-            postDelayed(() -> {
-                if (xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_RIGHT))
-                    xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_RIGHT);
-            }, CLICK_HOLD_MS);
-        }
+        clickRightHeld();
+    }
+
+    // Right click held for CLICK_HOLD_MS like a tap click (press + release in the same instant
+    // could be missed by games that poll the button state once per frame).
+    private void clickRightHeld() {
+        if (xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_RIGHT)) return;
+        xServer.injectPointerButtonPress(Pointer.Button.BUTTON_RIGHT);
+        postDelayed(() -> {
+            if (xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_RIGHT))
+                xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_RIGHT);
+        }, CLICK_HOLD_MS);
     }
 
     private void handleFingerUp(Finger finger1) {
         switch (numFingers) {
             case 1:
-                if (simTouchScreen) {
-                    final Runnable clickDelay = () -> {
-                        if (continueClick)
-                            xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_LEFT);
-                    };
-                    postDelayed(clickDelay, CLICK_DELAYED_TIME);
-                }
-                else if (tapToClickEnabled && finger1.isTap()) pressPointerButtonLeft(finger1);
+                if (tapToClickEnabled && finger1.isTap()) pressPointerButtonLeft(finger1);
                 break;
             case 2:
                 Finger finger2 = findSecondFinger(finger1);
@@ -658,11 +607,7 @@ public class TouchpadView extends View {
             int dx = finger1.motion.x();
             int dy = finger1.motion.y();
 
-            if (simTouchScreen) {
-                if (System.currentTimeMillis() - finger1.touchTime > CLICK_DELAYED_TIME)
-                    xServer.injectPointerMove(finger1.x, finger1.y);
-            }
-            else if (xServer.isRelativeMouseMovement()) {
+            if (xServer.isRelativeMouseMovement()) {
                 WinHandler winHandler = xServer.getWinHandler();
                 winHandler.mouseEvent(MouseEventFlags.MOVE, dx, dy, 0);
             }
@@ -936,11 +881,6 @@ public class TouchpadView extends View {
         return stateListDrawable;
     }
 
-    public void setSimTouchScreen(boolean simTouchScreen) {
-        this.simTouchScreen = simTouchScreen;
-        xServer.setSimulateTouchScreen(this.simTouchScreen);
-    }
-
     // Trackpad / Touchscreen. Applied from the next touch on; any held buttons and tracked
     // fingers are dropped right away so nothing stays pressed across the switch.
     public void setTouchMode(int mode) {
@@ -974,7 +914,6 @@ public class TouchpadView extends View {
     public void resetInputState() {
         longPressHandler.removeCallbacks(longPressRunnable);
         longPressActive = false;
-        continueClick = false;
         scrolling = false;
         scrollAccumY = 0;
         for (byte i = 0; i < MAX_FINGERS; i++) fingers[i] = null;
@@ -990,10 +929,6 @@ public class TouchpadView extends View {
         if (xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT)) xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_LEFT);
         if (xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_RIGHT)) xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_RIGHT);
         if (xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_MIDDLE)) xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_MIDDLE);
-    }
-
-    public boolean isSimTouchScreen() {
-        return simTouchScreen;
     }
 
     public void toggleFullscreen() {

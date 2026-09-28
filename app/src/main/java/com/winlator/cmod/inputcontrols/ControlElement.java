@@ -36,8 +36,6 @@ public class ControlElement {
     public static final float STICK_SENSITIVITY = 2.0f;
     public static final float STICK_CROSS_ZONE = 0.3f;
     public static final float TRACKPAD_MIN_SPEED = 0.8f;
-    public static final float TRACKPAD_MAX_SPEED = 20.0f;
-    public static final byte TRACKPAD_ACCELERATION_THRESHOLD = 4;
     public static final short BUTTON_MIN_TIME_TO_KEEP_PRESSED = 300;
     public enum Type {
         BUTTON, D_PAD, RANGE_BUTTON, STICK, TRACKPAD;
@@ -1384,7 +1382,6 @@ public class ControlElement {
                             cursorY = value * speed * gain;
                         }
                         else {
-                            if (Math.abs(value) > TouchpadView.CURSOR_ACCELERATION_THRESHOLD) value *= TouchpadView.CURSOR_ACCELERATION;
                             inputControlsView.handleInputEvent(binding, states[i], value);
                             this.states[i] = states[i];
                         }

@@ -15,7 +15,6 @@ import android.graphics.DashPathEffect;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.Point;
-import android.graphics.PointF;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.Rect;
@@ -161,6 +160,8 @@ public class InputControlsView extends View {
     // 2D analog sources (on-screen sticks, gamepad sticks/hats), already shaped, keyed by source:
     // several can be active at once and releasing one doesn't cancel the others.
     private final Map<Object, Long> mouseAnalogSources = new ConcurrentHashMap<>();
+    // External gamepad: last side of each stick/hat axis, per controller id (main thread only).
+    private final Map<String, byte[]> joystickAxisSides = new java.util.HashMap<>();
 
     // Vsync-driven loop on its own looper thread (Choreographer works on any Looper thread),
     // running only while some source is non-zero.
@@ -846,25 +847,29 @@ public class InputControlsView extends View {
         // dead zone + curve, direction taken from the binding), not per axis below.
         processJoystickMouse(controller, axes, values);
 
+        // Per axis, the side (-1 / 0 / +1) it was on at the previous event. A binding is released
+        // when its side is left, not only when the axis comes back inside the dead zone: a fast
+        // flick from one edge to the other can skip the dead zone between two events, which left
+        // the first direction's key stuck. Release goes first, so two directions bound to the
+        // same gamepad axis don't zero the new value.
+        byte[] sides = joystickAxisSides.get(controller.getId());
+        if (sides == null) {
+            sides = new byte[axes.length];
+            joystickAxisSides.put(controller.getId(), sides);
+        }
         for (int i = 0; i < axes.length; i++) {
             float value = values[i];
-            if (Math.abs(value) > ControlElement.STICK_DEAD_ZONE) {
-                byte sign = Mathf.sign(value);
-                int keyCode = ExternalControllerBinding.getKeyCodeForAxis(axes[i], sign);
-                ExternalControllerBinding controllerBinding = controller.getControllerBinding(keyCode);
-                if (controllerBinding != null && !controllerBinding.getBinding().isMouseMove()) {
-                    handleInputEvent(controller, controllerBinding.getBinding(), true, value, false);
-                }
-            } else {
-                // Handle releasing the bindings when the axis returns to deadzone
-                for (byte sign = -1; sign <= 1; sign += 2) {
-                    int keyCode = ExternalControllerBinding.getKeyCodeForAxis(axes[i], sign);
-                    ExternalControllerBinding controllerBinding = controller.getControllerBinding(keyCode);
-                    if (controllerBinding != null && !controllerBinding.getBinding().isMouseMove()) {
-                        handleInputEvent(controller, controllerBinding.getBinding(), false, value, false);
-                    }
-                }
+            byte side = Math.abs(value) > ControlElement.STICK_DEAD_ZONE ? Mathf.sign(value) : 0;
+            byte prev = sides[i];
+            if (prev != 0 && prev != side) {
+                Binding b = axisBinding(controller, axes[i], prev);
+                if (b != null && !b.isMouseMove()) handleInputEvent(controller, b, false, 0, false);
             }
+            if (side != 0) {
+                Binding b = axisBinding(controller, axes[i], side);
+                if (b != null && !b.isMouseMove()) handleInputEvent(controller, b, true, value, false);
+            }
+            sides[i] = side;
         }
 
         // Handle Analog Triggers (L2/R2)
