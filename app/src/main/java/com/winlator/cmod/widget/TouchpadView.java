@@ -885,7 +885,6 @@ public class TouchpadView extends View {
     // fingers are dropped right away so nothing stays pressed across the switch.
     public void setTouchMode(int mode) {
         if (mode != MODE_TOUCHSCREEN) mode = MODE_TRACKPAD;
-        setSimTouchScreen(false);
         xServer.setSimulateTouchScreen(mode == MODE_TOUCHSCREEN);
         if (touchMode == mode) return;
         touchMode = mode;
