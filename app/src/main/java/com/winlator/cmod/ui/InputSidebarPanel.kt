@@ -39,8 +39,7 @@ data class InputPanelState(
     val touchscreenHaptics: Boolean,
     val controlsOpacityPercent: Int,
     val relativeMouse: Boolean,
-    val disableMouse: Boolean,
-    val touchMode: Int,          // TouchpadView.MODE_TRACKPAD (0) / MODE_TOUCHSCREEN (1)
+    val touchMode: Int,          // TouchpadView.MODE_TRACKPAD (0) / MODE_TOUCHSCREEN (1) / MODE_OFF (2)
     val cursorSpeedPercent: Int, // global Cursor Speed, 10..200 (Settings > Cursor speed)
     val tapToClick: Boolean
 )
@@ -55,7 +54,7 @@ interface InputPanelCallbacks {
         touchscreenHaptics: Boolean
     )
 
-    /** Session-only, like the mouse toggles (the shortcut sets the start value). */
+    /** Global setting, saved immediately (like show controls / haptics). */
     fun onTouchscreenTimeout(enabled: Boolean)
 
     fun onEditProfiles(selectedProfileId: Int)
@@ -63,12 +62,12 @@ interface InputPanelCallbacks {
     fun onControlsOpacity(percent: Int, commit: Boolean)
     fun onShowKeyboard()
     fun onVibration()
+    /** TouchpadView.MODE_TRACKPAD / MODE_TOUCHSCREEN / MODE_OFF (touch surface off). */
     fun onTouchMode(mode: Int)
     /** commit = false while dragging (live), true once on release (persist). */
     fun onCursorSpeed(percent: Int, commit: Boolean)
     fun onTapToClick(enabled: Boolean)
     fun onRelativeMouse(enabled: Boolean)
-    fun onDisableMouse(enabled: Boolean)
 }
 
 object InputSidebarPanelHost {
@@ -88,7 +87,6 @@ private fun InputSidebarPanel(state: InputPanelState, callbacks: InputPanelCallb
     var haptics by remember { mutableStateOf(state.touchscreenHaptics) }
     var timeout by remember { mutableStateOf(state.touchscreenTimeout) }
     var relativeMouse by remember { mutableStateOf(state.relativeMouse) }
-    var disableMouse by remember { mutableStateOf(state.disableMouse) }
     var touchMode by remember { mutableStateOf(state.touchMode) }
     var tapToClick by remember { mutableStateOf(state.tapToClick) }
 
@@ -113,6 +111,24 @@ private fun InputSidebarPanel(state: InputPanelState, callbacks: InputPanelCallb
                 },
                 onEditClick = { callbacks.onEditProfiles(profileId) }
             )
+            // Opacity belongs to the selected layout, so it only shows while one is selected.
+            if (profileId != -1) {
+                Spacer(Modifier.height(6.dp))
+                var opacityDraft by remember {
+                    mutableStateOf(state.controlsOpacityPercent.coerceIn(10, 100).toFloat())
+                }
+                SidebarSlider(
+                    label = "Controls Opacity",
+                    valueText = "${opacityDraft.roundToInt()}%",
+                    value = opacityDraft,
+                    onValueChange = {
+                        opacityDraft = it
+                        callbacks.onControlsOpacity(it.toInt(), false)
+                    },
+                    onValueChangeFinished = { callbacks.onControlsOpacity(opacityDraft.toInt(), true) },
+                    valueRange = 10f..100f
+                )
+            }
             Spacer(Modifier.height(6.dp))
             SidebarInlineToggle(
                 label = stringResource(R.string.show_touchscreen_controls),
@@ -141,33 +157,18 @@ private fun InputSidebarPanel(state: InputPanelState, callbacks: InputPanelCallb
             )
         }
 
-        SidebarGap()
-        SidebarCard {
-            var opacityDraft by remember {
-                mutableStateOf(state.controlsOpacityPercent.coerceIn(10, 100).toFloat())
-            }
-            SidebarSlider(
-                label = "Controls Opacity",
-                valueText = "${opacityDraft.roundToInt()}%",
-                value = opacityDraft,
-                onValueChange = {
-                    opacityDraft = it
-                    callbacks.onControlsOpacity(it.toInt(), false)
-                },
-                onValueChangeFinished = { callbacks.onControlsOpacity(opacityDraft.toInt(), true) },
-                valueRange = 10f..100f
-            )
-        }
-
-        // Cursor Speed: the finger on the free area, Trackpad elements, mouse-move buttons and a
-        // captured physical mouse all follow it. The profile's own speed only drives its stick/button mouse moves
-        // (Input Controls > Stick Mouse Speed), so this number is the real touch speed.
+        // Touch Mode: how the finger on the free area drives the mouse — Trackpad, Touchscreen,
+        // or Off (the touch surface does nothing; what used to be "Disable Mouse").
+        // Cursor Speed stays in all three: Trackpad elements, mouse-move buttons and a captured
+        // physical mouse follow it too, and none of those depend on the touch surface. The
+        // profile's own speed only drives its stick/button mouse moves (Input Controls > Stick
+        // Mouse Speed).
         SidebarGap()
         SidebarCard {
             SidebarDropdownField(
                 caption = "Touch Mode",
-                options = listOf("Trackpad", "Touchscreen"),
-                selectedIndex = if (touchMode == 1) 1 else 0,
+                options = listOf("Trackpad", "Touchscreen", "Off"),
+                selectedIndex = touchMode.coerceIn(0, 2),
                 onSelect = { index ->
                     touchMode = index
                     callbacks.onTouchMode(index)
@@ -203,28 +204,21 @@ private fun InputSidebarPanel(state: InputPanelState, callbacks: InputPanelCallb
                 callbacks.onRelativeMouse(it)
             }
         )
-        // Works in both Touch Modes (Trackpad: taps click; Touchscreen: touching presses the
-        // button), so it sits with the mouse modifiers, not in the Touch Mode card. Has no effect
-        // while the mouse is disabled, hence greyed out then.
-        SidebarGap()
-        SidebarToggleRow(
-            label = "Tap to Click",
-            checked = tapToClick,
-            enabled = !disableMouse,
-            onCheckedChange = {
-                tapToClick = it
-                callbacks.onTapToClick(it)
-            }
-        )
-        SidebarGap()
-        SidebarToggleRow(
-            label = "Disable Mouse",
-            checked = disableMouse,
-            onCheckedChange = {
-                disableMouse = it
-                callbacks.onDisableMouse(it)
-            }
-        )
+        // Tap to Click only concerns the touch surface (Trackpad: taps click; Touchscreen: touching
+        // presses the button), so it is hidden while Touch Mode is Off. Its value is kept as is and
+        // applies again when a mode is picked. Relative Mouse stays: it also drives Trackpad
+        // elements, stick/button mouse and a physical mouse.
+        if (touchMode != 2) {
+            SidebarGap()
+            SidebarToggleRow(
+                label = "Tap to Click",
+                checked = tapToClick,
+                onCheckedChange = {
+                    tapToClick = it
+                    callbacks.onTapToClick(it)
+                }
+            )
+        }
     }
 }
 

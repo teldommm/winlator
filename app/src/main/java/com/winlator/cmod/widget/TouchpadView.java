@@ -65,6 +65,9 @@ public class TouchpadView extends View {
     // absolute X pointer events — Relative Mouse is not applied in this mode.
     public static final int MODE_TRACKPAD = 0;
     public static final int MODE_TOUCHSCREEN = 1;
+    // Touch Mode "Off" as the UI and the activity see it: not a gesture mode of this view, but
+    // setMouseEnabled(false) — the touch surface ignores the finger entirely.
+    public static final int MODE_OFF = 2;
     private int touchMode = MODE_TRACKPAD;
     // Mode captured on the first finger down and kept until every finger is up, so switching
     // modes can never re-route a gesture halfway through.

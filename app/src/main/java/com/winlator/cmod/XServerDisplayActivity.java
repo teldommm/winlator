@@ -242,8 +242,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
     // the sidebar changes it for the session only.
     private boolean isTapToClickEnabled = true;
     // Touchscreen Timeout: controls fade out after 5 s idle, the next touch only brings them
-    // back. Same model as the mouse toggles: shortcut ("touchscreenTimeout" = "1") sets the
-    // start value, the sidebar changes it for the session.
+    // back. Global pref like its Controls-card neighbours (show controls, haptics): the sidebar
+    // switch saves it.
     private boolean isTouchscreenTimeout = false;
     // Resolved once in onCreate; drives the Wine joystick registry keys and whether any fake
     // gamepad node is created at all (GamepadMode.NONE).
@@ -524,7 +524,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
             isRelativeMouseMovement = shortcut.getExtra("enableRelativeMouse").equals("1");
             isMouseDisabled = shortcut.getExtra("disableMouse").equals("1");
             isTapToClickEnabled = !shortcut.getExtra("tapToClick").equals("0");
-            isTouchscreenTimeout = shortcut.getExtra("touchscreenTimeout").equals("1");
         }
 
         this.graphicsDriverConfig = GraphicsDriverConfig.parseGraphicsDriverConfig(graphicsDriverConfig);
@@ -557,7 +556,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             @Override
             public void onUpdateWindowContent(Window window) {
                 if (!winStarted[0] && window.isApplicationWindow()) {
-                    if (!simulateTouchScreen) {
+                    if (isDrawnCursorVisible()) {
                         xServerView.setCursorVisible(true);
                     }
                     preloaderDialog.closeOnUiThread();
@@ -682,6 +681,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
         }
         return containerId;
+    }
+
+    // Touchscreen: the finger is the cursor, so the drawn one is hidden. Trackpad and Off show it
+    // (with the touch surface off, the cursor is moved by layout elements or a physical mouse).
+    private boolean isDrawnCursorVisible() {
+        return !(simulateTouchScreen && !isMouseDisabled);
     }
 
     private void handleCapturedPointer(MotionEvent event) {
@@ -1233,6 +1238,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         inputControlsView.setTouchpadView(touchpadView);
         inputControlsView.setXServer(xServer);
         inputControlsView.setVisibility(View.GONE);
+        isTouchscreenTimeout = preferences.getBoolean("touchscreen_timeout_enabled", false);
         inputControlsView.setAutoHideEnabled(isTouchscreenTimeout);
         rootView.addView(inputControlsView);
 
@@ -1284,12 +1290,13 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     showInputControls(profile);
             }
 
-            // The shortcut's "simulate touchscreen" picks the starting Touch Mode; the sidebar
-            // can switch it for the session.
+            // The shortcut's Touch Mode picks the starting mode: "simTouchScreen" = Trackpad or
+            // Touchscreen, "disableMouse" = Off (read with isMouseDisabled above). The sidebar can
+            // switch it for the session.
             String simTouchScreen = shortcut.getExtra("simTouchScreen");
             touchMode = simTouchScreen.equals("1") ? TouchpadView.MODE_TOUCHSCREEN : TouchpadView.MODE_TRACKPAD;
             touchpadView.setTouchMode(touchMode);
-            if (simulateTouchScreen) {
+            if (!isDrawnCursorVisible()) {
                 renderer.setCursorVisible(false);
             }
         }
@@ -1921,6 +1928,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             public void onTouchscreenTimeout(boolean enabled) {
                 isTouchscreenTimeout = enabled;
                 inputControlsView.setAutoHideEnabled(enabled);
+                preferences.edit().putBoolean("touchscreen_timeout_enabled", enabled).apply();
             }
 
             @Override
@@ -1974,12 +1982,21 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
             @Override
             public void onTouchMode(int mode) {
-                touchMode = mode == TouchpadView.MODE_TOUCHSCREEN ? TouchpadView.MODE_TOUCHSCREEN : TouchpadView.MODE_TRACKPAD;
-                simulateTouchScreen = touchMode == TouchpadView.MODE_TOUCHSCREEN;
-                if (touchpadView != null) touchpadView.setTouchMode(touchMode);
-                // Touchscreen: the finger is the cursor, so hide the drawn one (as the shortcut
-                // option always did); Trackpad needs it back.
-                if (xServerView != null) xServerView.setCursorVisible(!simulateTouchScreen);
+                if (mode == TouchpadView.MODE_OFF) {
+                    // Touch surface off; the last Trackpad/Touchscreen choice is kept for when a
+                    // mode is picked again.
+                    isMouseDisabled = true;
+                    if (touchpadView != null) touchpadView.setMouseEnabled(false);
+                } else {
+                    isMouseDisabled = false;
+                    touchMode = mode == TouchpadView.MODE_TOUCHSCREEN ? TouchpadView.MODE_TOUCHSCREEN : TouchpadView.MODE_TRACKPAD;
+                    simulateTouchScreen = touchMode == TouchpadView.MODE_TOUCHSCREEN;
+                    if (touchpadView != null) {
+                        touchpadView.setMouseEnabled(true);
+                        touchpadView.setTouchMode(touchMode);
+                    }
+                }
+                if (xServerView != null) xServerView.setCursorVisible(isDrawnCursorVisible());
             }
 
             @Override
@@ -2002,13 +2019,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 if (xServer != null)
                     xServer.setRelativeMouseMovement(isRelativeMouseMovement);
             }
-
-            @Override
-            public void onDisableMouse(boolean enabled) {
-                isMouseDisabled = enabled;
-                if (touchpadView != null)
-                    touchpadView.setMouseEnabled(!isMouseDisabled);
-            }
         };
 
         refreshInputPanel = () -> {
@@ -2029,8 +2039,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     preferences.getBoolean("touchscreen_haptics_enabled", false),
                     Math.round(preferences.getFloat("overlay_opacity", InputControlsView.DEFAULT_OVERLAY_OPACITY) * 100f),
                     isRelativeMouseMovement,
-                    isMouseDisabled,
-                    touchMode,
+                    isMouseDisabled ? TouchpadView.MODE_OFF : touchMode,
                     Math.round(globalCursorSpeed * 100f),
                     isTapToClickEnabled
             );

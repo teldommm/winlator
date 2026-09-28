@@ -227,13 +227,18 @@ private class ShortcutEditorStateV2(val shortcut: Shortcut) {
     var xinput by mutableStateOf((inputType and WinHandler.FLAG_INPUT_TYPE_XINPUT.toInt()) != 0)
     var dinput by mutableStateOf((inputType and WinHandler.FLAG_INPUT_TYPE_DINPUT.toInt()) != 0)
     var relativeMouse by mutableStateOf(shortcut.getExtra("enableRelativeMouse", "0") == "1")
-    var disableMouse by mutableStateOf(shortcut.getExtra("disableMouse", "0") == "1")
-    // Touch Mode keeps the old "simTouchScreen" key (1 = Touchscreen) so existing shortcuts keep it.
-    var touchMode by mutableIntStateOf(if (shortcut.getExtra("simTouchScreen", "0") == "1") 1 else 0)
+    // Touch Mode: 0 Trackpad, 1 Touchscreen, 2 Off. Stored in the existing keys so old shortcuts
+    // (and older app versions) read the same thing: "disableMouse" = 1 means Off, otherwise
+    // "simTouchScreen" = 1 means Touchscreen. Off leaves simTouchScreen alone.
+    var touchMode by mutableIntStateOf(
+        when {
+            shortcut.getExtra("disableMouse", "0") == "1" -> 2
+            shortcut.getExtra("simTouchScreen", "0") == "1" -> 1
+            else -> 0
+        }
+    )
     // On by default; stored only when turned off, like the other mouse toggles.
     var tapToClick by mutableStateOf(shortcut.getExtra("tapToClick", "1") != "0")
-    // Off by default; stored only when on.
-    var touchscreenTimeout by mutableStateOf(shortcut.getExtra("touchscreenTimeout", "0") == "1")
     var syncCpu by mutableStateOf(shortcut.getExtra("syncCpuTopology", if (container.isSyncCpuTopology()) "1" else "0") == "1")
     val cpu = mutableStateListOf<Boolean>().apply {
         val count = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)
@@ -941,8 +946,6 @@ private fun ShortcutCategoryV2(
             SettingsCard {
                 SettingMappedChoice("Controls Profile", s.controlsProfile, profiles) { s.controlsProfile = it; s.extra("controlsProfile", it.takeUnless { id -> id == "0" }) }
                 SettingsDivider()
-                SettingToggle("Touchscreen Timeout", s.touchscreenTimeout, s.controlsProfile != "0") { s.touchscreenTimeout = it; s.extra("touchscreenTimeout", if (it) "1" else null) }
-                SettingsDivider()
                 SettingToggle("Exclusive Input", s.exclusive) {
                     s.exclusive = it
                     if (!it) { s.xinput = true; s.dinput = true } else if (s.xinput && s.dinput) s.dinput = false
@@ -953,17 +956,23 @@ private fun ShortcutCategoryV2(
                 SettingsDivider()
                 SettingToggle("Enable DInput", s.dinput, s.exclusive) { s.dinput = it; if (s.exclusive && it && s.xinput) s.xinput = false; s.saveInput() }
                 SettingsDivider()
-                val touchModes = listOf("Trackpad", "Touchscreen")
-                SettingChoice("Touch Mode", touchModes[s.touchMode.coerceIn(0, 1)], touchModes) { selected ->
-                    s.touchMode = if (selected == "Touchscreen") 1 else 0
-                    s.extra("simTouchScreen", if (s.touchMode == 1) "1" else "0")
+                val touchModes = listOf("Trackpad", "Touchscreen", "Off")
+                SettingChoice("Touch Mode", touchModes[s.touchMode.coerceIn(0, 2)], touchModes) { selected ->
+                    s.touchMode = touchModes.indexOf(selected).coerceAtLeast(0)
+                    if (s.touchMode == 2) {
+                        s.extra("disableMouse", "1")
+                    } else {
+                        s.extra("disableMouse", null)
+                        s.extra("simTouchScreen", if (s.touchMode == 1) "1" else "0")
+                    }
                 }
                 SettingsDivider()
                 SettingToggle("Relative Mouse", s.relativeMouse) { s.relativeMouse = it; s.extra("enableRelativeMouse", if (it) "1" else null) }
-                SettingsDivider()
-                SettingToggle("Tap to Click", s.tapToClick, !s.disableMouse) { s.tapToClick = it; s.extra("tapToClick", if (it) null else "0") }
-                SettingsDivider()
-                SettingToggle("Disable Mouse", s.disableMouse) { s.disableMouse = it; s.extra("disableMouse", if (it) "1" else null) }
+                // Touch-surface only, so hidden while Touch Mode is Off (value kept).
+                if (s.touchMode != 2) {
+                    SettingsDivider()
+                    SettingToggle("Tap to Click", s.tapToClick) { s.tapToClick = it; s.extra("tapToClick", if (it) null else "0") }
+                }
             }
         }
 
