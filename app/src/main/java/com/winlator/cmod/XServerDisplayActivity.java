@@ -1,7 +1,5 @@
 package com.winlator.cmod;
 
-import static com.winlator.cmod.core.AppUtils.showToast;
-
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;

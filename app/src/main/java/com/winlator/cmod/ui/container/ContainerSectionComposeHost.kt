@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ChevronRight
@@ -67,6 +66,9 @@ import com.winlator.cmod.core.DefaultVersion
 import com.winlator.cmod.ui.theme.WinZTheme
 import com.winlator.cmod.ui.theme.controlAccentColor
 import com.winlator.cmod.ui.theme.accentSwitchColors
+import com.winlator.cmod.ui.theme.WinZShapes
+import com.winlator.cmod.ui.theme.hairlineColor
+import com.winlator.cmod.ui.theme.dividerColor
 
 @Stable
 interface ContainerSectionCallbacks {
@@ -362,7 +364,7 @@ private fun ContainerSectionScreen(
                                 .calculateBottomPadding()
                         )
                         .height(50.dp),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = WinZShapes.Medium,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary
@@ -641,9 +643,9 @@ private fun ReadOnlySetting(
 private fun SettingsGroup(content: @Composable () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = WinZShapes.Medium,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.78f)),
+        border = BorderStroke(1.dp, hairlineColor()),
         tonalElevation = 0.dp
     ) {
         Column { content() }
@@ -728,7 +730,7 @@ private fun ChoiceSetting(
                                 else onInstall(value)
                             },
                             modifier = Modifier.fillMaxWidth().alpha(if (installed) 1f else 0.48f),
-                            shape = RoundedCornerShape(10.dp),
+                            shape = WinZShapes.Small,
                             color = if (isSelected)
                                 accent.copy(alpha = 0.16f)
                             else Color.Transparent
@@ -819,9 +821,9 @@ private fun RendererOptionsPanel(
     )
     Surface(
         modifier = Modifier.padding(start = 65.dp, end = 12.dp, bottom = 10.dp),
-        shape = RoundedCornerShape(12.dp),
+        shape = WinZShapes.Medium,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
+        border = BorderStroke(1.dp, hairlineColor())
     ) {
         Column(Modifier.padding(vertical = 4.dp)) {
             InlineChoice(
@@ -887,9 +889,9 @@ private fun GraphicsDriverOptionsPanel(
 ) {
     Surface(
         modifier = Modifier.padding(start = 65.dp, end = 12.dp, bottom = 10.dp),
-        shape = RoundedCornerShape(12.dp),
+        shape = WinZShapes.Medium,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
+        border = BorderStroke(1.dp, hairlineColor())
     ) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
             ChoiceSetting(
@@ -960,9 +962,9 @@ private fun WrapperOptionsPanel(
 ) {
     Surface(
         modifier = Modifier.padding(start = 65.dp, end = 12.dp, bottom = 10.dp),
-        shape = RoundedCornerShape(12.dp),
+        shape = WinZShapes.Medium,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
+        border = BorderStroke(1.dp, hairlineColor())
     ) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
             if (dxvk) {
@@ -1033,7 +1035,7 @@ private fun WrapperOptionsPanel(
             Surface(
                 onClick = onManageComponents,
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(10.dp),
+                shape = WinZShapes.Small,
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.46f)
             ) {
                 Row(
@@ -1073,7 +1075,7 @@ private fun CompactTextField(
         keyboardOptions = KeyboardOptions(
             keyboardType = if (numeric) KeyboardType.Number else KeyboardType.Ascii
         ),
-        shape = RoundedCornerShape(10.dp)
+        shape = WinZShapes.Small
     )
 }
 
@@ -1110,7 +1112,7 @@ private fun CustomResolutionFields(
             label = { Text("Width") },
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            shape = RoundedCornerShape(10.dp)
+            shape = WinZShapes.Small
         )
         OutlinedTextField(
             value = height,
@@ -1119,7 +1121,7 @@ private fun CustomResolutionFields(
             label = { Text("Height") },
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            shape = RoundedCornerShape(10.dp)
+            shape = WinZShapes.Small
         )
     }
 }
@@ -1140,7 +1142,7 @@ private fun InlineChoice(label: String, selected: String, entries: Array<String>
 private fun ThinDivider() {
     HorizontalDivider(
         modifier = Modifier.padding(horizontal = 12.dp),
-        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)
+        color = dividerColor()
     )
 }
 
@@ -1148,7 +1150,7 @@ private fun ThinDivider() {
 private fun SettingIcon(icon: ImageVector) {
     Surface(
         modifier = Modifier.size(40.dp),
-        shape = RoundedCornerShape(10.dp),
+        shape = WinZShapes.Small,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f),
         contentColor = MaterialTheme.colorScheme.onSurface
     ) {
@@ -1162,7 +1164,7 @@ private fun SettingIcon(icon: ImageVector) {
 private fun GroupDivider() {
     HorizontalDivider(
         modifier = Modifier.padding(start = 65.dp, end = 12.dp),
-        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f)
+        color = dividerColor()
     )
 }
 

@@ -18,17 +18,14 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -47,6 +44,23 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.R
 import com.winlator.cmod.ui.theme.WinZTheme
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import com.winlator.cmod.ui.theme.ThemedDialog
+import com.winlator.cmod.ui.theme.WinZShapes
+import com.winlator.cmod.ui.theme.controlAccentColor
+import com.winlator.cmod.ui.theme.hairlineColor
 
 data class ExternalControllerBindingItem(
     val keyCode: Int,
@@ -108,6 +122,7 @@ private fun ExternalControllerBindingsScreen(
     val types = stringArrayResource(R.array.binding_type_entries)
     var editingKey by rememberSaveable { mutableStateOf<Int?>(null) }
     val editingItem = state.items.firstOrNull { it.keyCode == editingKey }
+    val accent = controlAccentColor()
 
     LaunchedEffect(state.activation) {
         val index = state.items.indexOfFirst { it.keyCode == state.activeKeyCode }
@@ -115,6 +130,7 @@ private fun ExternalControllerBindingsScreen(
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = { Text(title) },
@@ -125,7 +141,11 @@ private fun ExternalControllerBindingsScreen(
                             stringResource(androidx.appcompat.R.string.abc_action_bar_up_description)
                         )
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    scrolledContainerColor = MaterialTheme.colorScheme.background
+                )
             )
         }
     ) { padding ->
@@ -134,6 +154,7 @@ private fun ExternalControllerBindingsScreen(
                 Text(
                     stringResource(R.string.press_any_button_on_your_controller),
                     style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
                 )
             }
@@ -141,87 +162,149 @@ private fun ExternalControllerBindingsScreen(
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(vertical = 8.dp)
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(state.items, key = { it.keyCode }) { item ->
-                    val alpha = remember { Animatable(0f) }
+                    val flash = remember { Animatable(0f) }
                     var choosingType by remember { mutableStateOf(false) }
                     LaunchedEffect(state.activation) {
                         if (state.activeKeyCode == item.keyCode) {
-                            alpha.snapTo(0.4f)
-                            alpha.animateTo(0f, tween(200))
+                            flash.snapTo(0.4f)
+                            flash.animateTo(0f, tween(200))
                         } else {
-                            alpha.snapTo(0f)
+                            flash.snapTo(0f)
                         }
                     }
-                    Row(
-                        modifier = Modifier.fillMaxWidth()
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = alpha.value))
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    // Same card as every other list in the app; the "button pressed" flash is the
+                    // shared accent instead of the (near-white) primary.
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = WinZShapes.Medium,
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, hairlineColor())
                     ) {
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(item.title, style = MaterialTheme.typography.titleMedium)
-                            Box {
-                                OutlinedButton(onClick = { choosingType = true }) {
-                                    Text(types[item.type])
-                                }
-                                DropdownMenu(choosingType, onDismissRequest = { choosingType = false }) {
-                                    types.forEachIndexed { index, label ->
-                                        DropdownMenuItem(
-                                            text = { Text(label) },
-                                            onClick = {
-                                                choosingType = false
-                                                if (index != item.type) {
-                                                    callbacks.onBindingSelected(item.keyCode, index, 0)
+                        Row(
+                            modifier = Modifier.fillMaxWidth()
+                                .background(accent.copy(alpha = flash.value))
+                                .padding(start = 14.dp, end = 4.dp, top = 12.dp, bottom = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(item.title, style = MaterialTheme.typography.titleMedium)
+                                Box {
+                                    BindingField(types[item.type]) { choosingType = true }
+                                    DropdownMenu(
+                                        expanded = choosingType,
+                                        onDismissRequest = { choosingType = false },
+                                        shape = WinZShapes.Medium,
+                                        containerColor = MaterialTheme.colorScheme.surface
+                                    ) {
+                                        types.forEachIndexed { index, label ->
+                                            val isSelected = index == item.type
+                                            DropdownMenuItem(
+                                                text = {
+                                                    Text(
+                                                        label,
+                                                        color = if (isSelected) accent else MaterialTheme.colorScheme.onSurface,
+                                                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                                    )
+                                                },
+                                                trailingIcon = { if (isSelected) Icon(Icons.Outlined.Check, null, tint = accent) },
+                                                onClick = {
+                                                    choosingType = false
+                                                    if (index != item.type) {
+                                                        callbacks.onBindingSelected(item.keyCode, index, 0)
+                                                    }
                                                 }
-                                            }
-                                        )
+                                            )
+                                        }
                                     }
                                 }
+                                BindingField(item.binding) { editingKey = item.keyCode }
                             }
-                            OutlinedButton(onClick = { editingKey = item.keyCode }) {
-                                Text(item.binding)
+                            IconButton(onClick = { callbacks.onRemove(item.keyCode) }) {
+                                Icon(
+                                    Icons.Outlined.Delete,
+                                    stringResource(R.string.remove) + ": " + item.title,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
-                        }
-                        IconButton(onClick = { callbacks.onRemove(item.keyCode) }) {
-                            Icon(Icons.Outlined.Delete, stringResource(R.string.remove) + ": " + item.title)
                         }
                     }
-                    HorizontalDivider()
                 }
             }
         }
     }
 
+    // Was a stock Material3 AlertDialog (opaque, different surface, OS-localized Cancel);
+    // now the app's own ThemedDialog with the shared selected-item + checkmark list style.
     if (editingItem != null) {
-        AlertDialog(
-            onDismissRequest = { editingKey = null },
-            title = { Text(stringResource(R.string.binding) + ": " + editingItem.title) },
-            text = {
-                val labels = bindingLabels[editingItem.type]
-                val selectionState = rememberLazyListState(
-                    initialFirstVisibleItemIndex = labels.indexOf(editingItem.binding).coerceAtLeast(0)
-                )
-                LazyColumn(state = selectionState) {
-                    items(labels.size) { index ->
-                        TextButton(
-                            onClick = {
+        val labels = bindingLabels[editingItem.type]
+        ThemedDialog(onDismissRequest = { editingKey = null }) {
+            Text(
+                stringResource(R.string.binding) + ": " + editingItem.title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(Modifier.height(12.dp))
+            val selectionState = rememberLazyListState(
+                initialFirstVisibleItemIndex = labels.indexOf(editingItem.binding).coerceAtLeast(0)
+            )
+            LazyColumn(state = selectionState, modifier = Modifier.fillMaxWidth().heightIn(max = 380.dp)) {
+                items(labels.size) { index ->
+                    val label = labels[index]
+                    val isSelected = label == editingItem.binding
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .clip(WinZShapes.Small)
+                            .clickable {
                                 callbacks.onBindingSelected(editingItem.keyCode, editingItem.type, index)
                                 editingKey = null
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(labels[index], Modifier.fillMaxWidth())
-                        }
+                            }
+                            .padding(horizontal = 12.dp, vertical = 11.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            label,
+                            modifier = Modifier.weight(1f),
+                            color = if (isSelected) accent else MaterialTheme.colorScheme.onSurface,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                        )
+                        if (isSelected) Icon(Icons.Outlined.Check, null, tint = accent)
                     }
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = { editingKey = null }) {
-                    Text(stringResource(android.R.string.cancel))
-                }
             }
-        )
+            Spacer(Modifier.height(14.dp))
+            Row(Modifier.align(Alignment.End)) {
+                OutlinedButton(
+                    onClick = { editingKey = null },
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurface
+                    ),
+                    border = BorderStroke(1.dp, hairlineColor())
+                ) { Text(stringResource(R.string.cancel)) }
+            }
+        }
+    }
+}
+
+// Field-style picker button (value + arrow), matching the container/shortcut settings pickers
+// instead of the stock primary-tinted OutlinedButton.
+@Composable
+private fun BindingField(value: String, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().height(44.dp),
+        shape = WinZShapes.Medium,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = BorderStroke(1.dp, hairlineColor())
+    ) {
+        Row(Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(value, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Icon(Icons.Outlined.KeyboardArrowDown, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }

@@ -113,7 +113,18 @@ private val BlackColors = darkColorScheme(
     surface = Color(0xE620201F), onSurface = Color(0xFFF9F9F7),
     surfaceVariant = Color(0xFF313130), onSurfaceVariant = Color(0xFF97958D),
     outline = Color(0xFF3D3D3A), outlineVariant = Color(0xFF242423),
-    error = Color(0xFFFFB4AB), onError = Color(0xFF690005)
+    error = Color(0xFFFFB4AB), onError = Color(0xFF690005),
+    // Tokens below were unset, so Material3 filled them from its purple baseline palette
+    // (menus/app bars/dialogs with no explicit color picked those up). Same neutral ramp.
+    tertiary = Color(0xFFC3C2B7), onTertiary = Color(0xFF151515),
+    tertiaryContainer = Color(0xFF242423), onTertiaryContainer = Color(0xFFC3C2B7),
+    errorContainer = Color(0xFF93000A), onErrorContainer = Color(0xFFFFDAD6),
+    inverseSurface = Color(0xFFF9F9F7), inverseOnSurface = Color(0xFF151515), inversePrimary = Color(0xFF313130),
+    surfaceTint = Color.Transparent,
+    surfaceDim = Color(0xFF151515), surfaceBright = Color(0xFF313130),
+    surfaceContainerLowest = Color(0xFF151515), surfaceContainerLow = Color(0xFF1B1B1A),
+    surfaceContainer = Color(0xFF20201F), surfaceContainerHigh = Color(0xFF242423),
+    surfaceContainerHighest = Color(0xFF313130)
 )
 
 // Dedicated accent for Switch/Slider/button controls — intentionally NOT wired into
@@ -150,6 +161,15 @@ fun sidebarCardFillColor(): Color =
     } else {
         MaterialTheme.colorScheme.surface
     }
+
+// One border and one divider color for the whole app (borders used to be drawn at nine
+// different outlineVariant alphas, list dividers at six). Card/field/dialog outlines use
+// hairlineColor(); separators between rows inside a card or list use dividerColor().
+@Composable
+fun hairlineColor(): Color = MaterialTheme.colorScheme.outlineVariant
+
+@Composable
+fun dividerColor(): Color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
 
 // Shared Switch styling for the whole app — matches claude.ai's own switch look:
 // no visible border/outline when off, thumb stays white in both states (never gray).
@@ -191,9 +211,9 @@ fun ThemedDialogSurface(
 ) {
     Surface(
         modifier = modifier.widthIn(min = 280.dp, max = 420.dp),
-        shape = RoundedCornerShape(16.dp),
+        shape = WinZShapes.Large,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = BorderStroke(1.dp, hairlineColor())
     ) {
         Column(Modifier.padding(20.dp), content = content)
     }
@@ -209,7 +229,16 @@ private val AmoledColors = darkColorScheme(
     surface = Color(0xE6050505), onSurface = Color(0xFFF7F7F7),
     surfaceVariant = Color(0xFF0D0D0D), onSurfaceVariant = Color(0xFFAAAAAA),
     outline = Color(0xFF383838), outlineVariant = Color(0xFF202020),
-    error = Color(0xFFFFB4AB), onError = Color(0xFF690005)
+    error = Color(0xFFFFB4AB), onError = Color(0xFF690005),
+    tertiary = Color(0xFFD0D0D0), onTertiary = Color.Black,
+    tertiaryContainer = Color(0xFF101010), onTertiaryContainer = Color(0xFFECECEC),
+    errorContainer = Color(0xFF93000A), onErrorContainer = Color(0xFFFFDAD6),
+    inverseSurface = Color(0xFFF7F7F7), inverseOnSurface = Color.Black, inversePrimary = Color(0xFF191919),
+    surfaceTint = Color.Transparent,
+    surfaceDim = Color.Black, surfaceBright = Color(0xFF191919),
+    surfaceContainerLowest = Color.Black, surfaceContainerLow = Color(0xFF050505),
+    surfaceContainer = Color(0xFF0A0A0A), surfaceContainerHigh = Color(0xFF0D0D0D),
+    surfaceContainerHighest = Color(0xFF191919)
 )
 
 private val WhiteColors = lightColorScheme(
@@ -222,7 +251,16 @@ private val WhiteColors = lightColorScheme(
     surface = Color(0xE6FFFFFF), onSurface = Color(0xFF18191D),
     surfaceVariant = Color(0xFFE8E9ED), onSurfaceVariant = Color(0xFF60636B),
     outline = Color(0xFF92959D), outlineVariant = Color(0xFFD1D3D8),
-    error = Color(0xFFBA1A1A), onError = Color.White
+    error = Color(0xFFBA1A1A), onError = Color.White,
+    tertiary = Color(0xFF555861), onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFE7E8EC), onTertiaryContainer = Color(0xFF26282E),
+    errorContainer = Color(0xFFFFDAD6), onErrorContainer = Color(0xFF410002),
+    inverseSurface = Color(0xFF2E3036), inverseOnSurface = Color(0xFFF1F1F4), inversePrimary = Color(0xFFE1E3E8),
+    surfaceTint = Color.Transparent,
+    surfaceDim = Color(0xFFE1E3E8), surfaceBright = Color.White,
+    surfaceContainerLowest = Color.White, surfaceContainerLow = Color(0xFFF7F8FA),
+    surfaceContainer = Color(0xFFF0F1F4), surfaceContainerHigh = Color(0xFFE8E9ED),
+    surfaceContainerHighest = Color(0xFFE1E3E8)
 )
 
 internal fun winlatorColorScheme(theme: WinlatorThemeType): ColorScheme = when (theme) {
@@ -239,13 +277,39 @@ private val WinlatorTypography = Typography(
     titleMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold, fontSize = 17.sp, lineHeight = 23.sp),
     bodyLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 23.sp),
     bodyMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 20.sp),
-    labelLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Medium, fontSize = 15.sp, lineHeight = 20.sp)
+    labelLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Medium, fontSize = 15.sp, lineHeight = 20.sp),
+    // The styles below used to be undefined here, so they silently fell back to Material3's
+    // defaults (different font family object, extra letter-spacing up to 0.5sp) and read
+    // slightly off next to the rest of the text. Same family/zero tracking as everything above.
+    displayLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold, fontSize = 52.sp, lineHeight = 58.sp, letterSpacing = (-0.8).sp),
+    displayMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold, fontSize = 44.sp, lineHeight = 50.sp, letterSpacing = (-0.7).sp),
+    headlineSmall = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold, fontSize = 24.sp, lineHeight = 30.sp),
+    titleSmall = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 20.sp),
+    bodySmall = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Normal, fontSize = 12.sp, lineHeight = 17.sp),
+    labelMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Medium, fontSize = 13.sp, lineHeight = 18.sp),
+    labelSmall = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Medium, fontSize = 11.sp, lineHeight = 15.sp)
 )
 
+// The app's only corner radii. Every screen uses these instead of ad-hoc
+// RoundedCornerShape(N.dp) values (there used to be 14 different radii in use). Plain vals so
+// they also work outside @Composable scope; MaterialTheme.shapes points at the same objects.
+//  ExtraSmall  6dp — tiny swatches/badges
+//  Small      10dp — icon tiles, small chips, inner tiles
+//  Medium     14dp — cards, rows, fields, buttons, menus
+//  Large      18dp — big cards, panels, dialogs
+//  ExtraLarge 22dp — floating bars and hero cards
+object WinZShapes {
+    val ExtraSmall = RoundedCornerShape(6.dp)
+    val Small = RoundedCornerShape(10.dp)
+    val Medium = RoundedCornerShape(14.dp)
+    val Large = RoundedCornerShape(18.dp)
+    val ExtraLarge = RoundedCornerShape(22.dp)
+}
+
 private val WinlatorShapes = Shapes(
-    extraSmall = RoundedCornerShape(6.dp), small = RoundedCornerShape(10.dp),
-    medium = RoundedCornerShape(14.dp), large = RoundedCornerShape(18.dp),
-    extraLarge = RoundedCornerShape(22.dp)
+    extraSmall = WinZShapes.ExtraSmall, small = WinZShapes.Small,
+    medium = WinZShapes.Medium, large = WinZShapes.Large,
+    extraLarge = WinZShapes.ExtraLarge
 )
 
 @Composable

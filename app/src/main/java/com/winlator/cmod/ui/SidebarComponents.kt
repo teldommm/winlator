@@ -44,6 +44,7 @@ import com.winlator.cmod.ui.theme.accentSwitchColors
 import com.winlator.cmod.ui.theme.controlAccentColor
 import com.winlator.cmod.ui.theme.destructiveColor
 import com.winlator.cmod.ui.theme.sidebarCardFillColor
+import com.winlator.cmod.ui.theme.hairlineColor
 
 // Single source of truth for every in-game sidebar panel (Graphics/Screen/Input/HUD/
 // TaskManager). Each panel used to carry its own private copy of PanelCard/PanelActionRow/
@@ -77,10 +78,9 @@ internal object SidebarDimens {
 @Composable internal fun sidebarFieldShape() = MaterialTheme.shapes.small
 
 // ---------- Text styles ----------
-// Derived from the app's own typography via copy() instead of MaterialTheme's labelMedium/
-// labelSmall/bodySmall, which WinlatorTypography doesn't define (they'd silently fall back
-// to M3 defaults with their own letter-spacing). Kept local to the sidebar on purpose so
-// no other screen changes.
+// Sidebar-specific sizes derived from the app's typography via copy(). (WinlatorTypography
+// now defines labelMedium/labelSmall/bodySmall too, but these keep their own 13/12sp
+// metrics tuned for the sidebar's ~204dp content width.)
 
 internal object SidebarText {
     @Composable fun title(): TextStyle =
@@ -135,7 +135,7 @@ private fun Modifier.sidebarCardSurface(): Modifier {
     return this
         .clip(shape)
         .background(sidebarCardFillColor())
-        .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape)
+        .border(BorderStroke(1.dp, hairlineColor()), shape)
 }
 
 @Composable
@@ -340,7 +340,7 @@ internal fun SidebarDropdownField(
                     .height(SidebarDimens.FieldHeight)
                     .clip(shape)
                     .background(MaterialTheme.colorScheme.surface)
-                    .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape)
+                    .border(BorderStroke(1.dp, hairlineColor()), shape)
                     .clickable { expanded = true }
                     .padding(start = 12.dp, end = 8.dp),
                 verticalAlignment = Alignment.CenterVertically

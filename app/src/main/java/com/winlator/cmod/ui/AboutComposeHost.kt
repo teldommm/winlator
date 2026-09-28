@@ -27,7 +27,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -60,6 +59,9 @@ import com.winlator.cmod.MainActivity
 import com.winlator.cmod.R
 import com.winlator.cmod.ui.theme.WinZOverlayTheme
 import com.winlator.cmod.ui.theme.controlAccentColor
+import com.winlator.cmod.ui.theme.WinZShapes
+import com.winlator.cmod.ui.theme.hairlineColor
+import com.winlator.cmod.ui.theme.dividerColor
 
 // Native bridge so any Java call site (nav-drawer "About" item, Settings row) shows
 // the exact same Compose content — a single implementation, no risk of desync.
@@ -134,9 +136,9 @@ private fun AboutDialogContent(onDismiss: () -> Unit) {
     }
     Surface(
         modifier = Modifier.widthIn(max = 340.dp),
-        shape = RoundedCornerShape(16.dp),
+        shape = WinZShapes.Large,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = BorderStroke(1.dp, hairlineColor())
     ) {
         Column(Modifier.padding(20.dp).verticalScroll(rememberScrollState())) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -162,7 +164,7 @@ private fun AboutDialogContent(onDismiss: () -> Unit) {
                 Image(appIcon, null, Modifier.size(56.dp))
             }
 
-            HorizontalDivider(Modifier.padding(vertical = 14.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            HorizontalDivider(Modifier.padding(vertical = 14.dp), color = dividerColor())
 
             Text(stringResource(R.string.credits_and_third_party_apps), fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(6.dp))
@@ -197,7 +199,7 @@ private fun AboutDialogContent(onDismiss: () -> Unit) {
                 onClick = onDismiss,
                 modifier = Modifier.align(Alignment.End),
                 colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                border = BorderStroke(1.dp, hairlineColor())
             ) { Text("Close") }
         }
     }

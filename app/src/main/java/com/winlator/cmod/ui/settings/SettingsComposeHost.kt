@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Apps
@@ -83,6 +82,9 @@ import com.winlator.cmod.ui.theme.ThemedDialog
 import com.winlator.cmod.ui.theme.accentSwitchColors
 import com.winlator.cmod.ui.theme.WinlatorThemePreferenceCard
 import kotlin.math.roundToInt
+import com.winlator.cmod.ui.theme.WinZShapes
+import com.winlator.cmod.ui.theme.hairlineColor
+import com.winlator.cmod.ui.theme.dividerColor
 
 @Immutable
 data class SettingChoice(val id: String, val name: String)
@@ -291,7 +293,7 @@ internal fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) 
                 OutlinedButton(
                     onClick = { confirmReinstallImageFs = false },
                     colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    border = BorderStroke(1.dp, hairlineColor())
                 ) { Text(stringResource(R.string.cancel)) }
                 Button(
                     onClick = {
@@ -320,15 +322,15 @@ private fun SectionTitle(text: String) {
 private fun GroupCard(content: @Composable () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = WinZShapes.Medium,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = BorderStroke(1.dp, hairlineColor())
     ) { Column { content() } }
 }
 
 @Composable
 private fun GroupDivider() {
-    HorizontalDivider(Modifier.padding(horizontal = 14.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .55f))
+    HorizontalDivider(Modifier.padding(horizontal = 14.dp), color = dividerColor())
 }
 
 @Composable
@@ -336,9 +338,9 @@ private fun NavigationRow(icon: ImageVector, title: String, subtitle: String?, o
     Surface(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = WinZShapes.Medium,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = BorderStroke(1.dp, hairlineColor())
     ) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             SmallIcon(icon)
@@ -354,7 +356,7 @@ private fun NavigationRow(icon: ImageVector, title: String, subtitle: String?, o
 
 @Composable
 private fun SmallIcon(icon: ImageVector) {
-    Surface(Modifier.size(38.dp), shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+    Surface(Modifier.size(38.dp), shape = WinZShapes.Small, color = MaterialTheme.colorScheme.surfaceVariant) {
         Box(contentAlignment = Alignment.Center) { Icon(icon, null, modifier = Modifier.size(21.dp)) }
     }
 }
@@ -430,7 +432,7 @@ private fun PresetChoiceRow(
             DropdownMenu(
                 expanded = actionsOpen,
                 onDismissRequest = { actionsOpen = false },
-                shape = RoundedCornerShape(14.dp),
+                shape = WinZShapes.Medium,
                 containerColor = MaterialTheme.colorScheme.surface
             ) {
                 DropdownMenuItem(
@@ -492,7 +494,7 @@ private fun PresetChoiceRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 8.dp).padding(bottom = 10.dp)
                 )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                HorizontalDivider(color = dividerColor())
                 Spacer(Modifier.size(12.dp))
                 val accent = controlAccentColor()
                 LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
@@ -504,7 +506,7 @@ private fun PresetChoiceRow(
                                 expanded = false
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp),
+                            shape = WinZShapes.Small,
                             color = if (isSelected) accent.copy(alpha = 0.16f) else androidx.compose.ui.graphics.Color.Transparent
                         ) {
                             Row(
@@ -638,7 +640,7 @@ private fun WineDebugChannelsDialog(
             OutlinedButton(
                 onClick = onDismiss,
                 colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                border = BorderStroke(1.dp, hairlineColor())
             ) { Text("Cancel") }
             Button(
                 onClick = { onApply(allOptions.filter { it in selected }.joinToString(",")) },

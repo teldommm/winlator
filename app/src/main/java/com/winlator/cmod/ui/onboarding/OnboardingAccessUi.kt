@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.ui.theme.controlAccentColor
+import com.winlator.cmod.ui.theme.hairlineColor
 
 @Composable
 internal fun OnboardingAccessScreen(back: () -> Unit, next: () -> Unit) {
@@ -52,7 +53,7 @@ internal fun OnboardingAccessScreen(back: () -> Unit, next: () -> Unit) {
                 onClick = back,
                 modifier = Modifier.fillMaxWidth().height(48.dp),
                 colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                border = BorderStroke(1.dp, hairlineColor())
             ) { Text("Back") }
         }
     }

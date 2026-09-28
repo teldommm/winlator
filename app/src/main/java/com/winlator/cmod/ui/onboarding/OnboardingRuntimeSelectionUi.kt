@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Computer
@@ -39,6 +38,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.core.ProtonPackageManager
 import com.winlator.cmod.ui.theme.controlAccentColor
+import com.winlator.cmod.ui.theme.WinZShapes
+import com.winlator.cmod.ui.theme.hairlineColor
 
 private val bundledRuntimeId = "bundled:${ProtonPackageManager.DEFAULT_IDENTIFIER}"
 private val bundledRuntimeName = ProtonPackageManager.getPackage(ProtonPackageManager.DEFAULT_IDENTIFIER)?.title
@@ -93,9 +94,9 @@ internal fun OnboardingRuntimeSelectionScreen(
                     Spacer(Modifier.height(18.dp))
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
+                        shape = WinZShapes.Medium,
                         color = MaterialTheme.colorScheme.surface,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                        border = BorderStroke(1.dp, hairlineColor())
                     ) {
                         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Text("Preparing environment", fontWeight = FontWeight.SemiBold)
@@ -111,7 +112,7 @@ internal fun OnboardingRuntimeSelectionScreen(
                 Surface(
                     onClick = { if (!preparing) selected = id },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = WinZShapes.Medium,
                     color = if (selected == id) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
                     contentColor = if (selected == id) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                     border = BorderStroke(1.dp, if (selected == id) accent else MaterialTheme.colorScheme.outlineVariant)
@@ -129,7 +130,7 @@ internal fun OnboardingRuntimeSelectionScreen(
             }
             if (runtimes.isEmpty()) {
                 item {
-                    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surface) {
+                    Surface(Modifier.fillMaxWidth(), shape = WinZShapes.Medium, color = MaterialTheme.colorScheme.surface) {
                         Text(
                             "Install at least one Wine or Proton version to continue.",
                             Modifier.padding(16.dp),
@@ -139,15 +140,15 @@ internal fun OnboardingRuntimeSelectionScreen(
                 }
             }
         }
-        Surface(color = MaterialTheme.colorScheme.background, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .45f))) {
+        Surface(color = MaterialTheme.colorScheme.background, border = BorderStroke(1.dp, hairlineColor())) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedButton(
                     onClick = onBack,
                     enabled = !preparing,
                     modifier = Modifier.weight(1f).height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = WinZShapes.Medium,
                     colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    border = BorderStroke(1.dp, hairlineColor())
                 ) {
                     Text("Back")
                 }
@@ -155,7 +156,7 @@ internal fun OnboardingRuntimeSelectionScreen(
                     onClick = { if (selected.isNotBlank() && !preparing) onContinue(selected) },
                     enabled = selected.isNotBlank() && !preparing,
                     modifier = Modifier.weight(1f).height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = WinZShapes.Medium,
                     colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
                 ) { Text(if (preparing) "Preparing…" else "Continue") }
             }

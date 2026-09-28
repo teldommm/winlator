@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.DeleteOutline
@@ -53,6 +52,8 @@ import com.winlator.cmod.ui.theme.destructiveColor
 import androidx.compose.material.icons.automirrored.outlined.InsertDriveFile
 import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import com.winlator.cmod.ui.theme.WinZShapes
+import com.winlator.cmod.ui.theme.hairlineColor
 
 private val bundledRuntimeId = "bundled:${ProtonPackageManager.DEFAULT_IDENTIFIER}"
 private val bundledRuntimeName = ProtonPackageManager.getPackage(ProtonPackageManager.DEFAULT_IDENTIFIER)?.title
@@ -325,7 +326,7 @@ private fun ComponentList(
     LazyColumn(modifier, contentPadding = PaddingValues(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (loading) item { LoadingCard() }
         else if (list.isEmpty()) item {
-            Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surface) {
+            Surface(Modifier.fillMaxWidth(), shape = WinZShapes.Medium, color = MaterialTheme.colorScheme.surface) {
                 Text(
                     "No components available in this category.",
                     Modifier.padding(16.dp),
@@ -350,9 +351,9 @@ private fun ComponentList(
 private fun SourceSelector(local: () -> Unit) {
     Surface(
         Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = WinZShapes.Medium,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = BorderStroke(1.dp, hairlineColor())
     ) {
         Row(Modifier.height(56.dp)) {
             SourcePart(Icons.Outlined.Dns, "Winlator servers", true, {}, Modifier.weight(1f))
@@ -387,10 +388,10 @@ private fun CategorySelector(selected: String, select: (String) -> Unit) {
         componentCategories.forEach {
             Surface(
                 onClick = { select(it) },
-                shape = RoundedCornerShape(10.dp),
+                shape = WinZShapes.Small,
                 color = if (selected == it) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
                 contentColor = if (selected == it) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                border = BorderStroke(1.dp, hairlineColor())
             ) {
                 Text(it, Modifier.padding(horizontal = 13.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
             }
@@ -411,9 +412,9 @@ private fun CoreComponentCard(
 ) {
     Surface(
         Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = WinZShapes.Medium,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = BorderStroke(1.dp, hairlineColor())
     ) {
         Row(Modifier.padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.AutoMirrored.Outlined.InsertDriveFile, null, modifier = Modifier.size(28.dp))
@@ -463,9 +464,9 @@ private fun ComponentCard(
 ) {
     Surface(
         Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = WinZShapes.Medium,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = BorderStroke(1.dp, hairlineColor())
     ) {
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -522,7 +523,7 @@ private fun ComponentCard(
 private fun InstallProgressCard(label: String?, progress: Int) {
     Surface(
         Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = WinZShapes.Medium,
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = .55f))
     ) {
@@ -558,7 +559,7 @@ private fun InstallProgressCard(label: String?, progress: Int) {
 
 @Composable
 private fun LoadingCard() {
-    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surface) {
+    Surface(Modifier.fillMaxWidth(), shape = WinZShapes.Medium, color = MaterialTheme.colorScheme.surface) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 3.dp)
             Spacer(Modifier.width(12.dp))
@@ -599,7 +600,7 @@ private fun ComponentsFooter(
 ) {
     Surface(
         color = MaterialTheme.colorScheme.background,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .45f))
+        border = BorderStroke(1.dp, hairlineColor())
     ) {
         Row(
             Modifier.fillMaxWidth().padding(
@@ -611,15 +612,15 @@ private fun ComponentsFooter(
             OutlinedButton(
                 onClick = back,
                 modifier = Modifier.weight(1f).height(48.dp),
-                shape = RoundedCornerShape(12.dp),
+                shape = WinZShapes.Medium,
                 colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                border = BorderStroke(1.dp, hairlineColor())
             ) { Text("Back") }
             Button(
                 onClick = next,
                 enabled = nextEnabled,
                 modifier = Modifier.weight(1f).height(48.dp),
-                shape = RoundedCornerShape(12.dp),
+                shape = WinZShapes.Medium,
                 colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
             ) { Text(nextLabel) }
         }

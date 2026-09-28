@@ -28,7 +28,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -125,6 +124,9 @@ import org.json.JSONObject
 import java.io.File
 import java.util.Locale
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import com.winlator.cmod.ui.theme.WinZShapes
+import com.winlator.cmod.ui.theme.hairlineColor
+import androidx.compose.material3.TopAppBarDefaults
 
 private val containerComponentRowsV2 = listOf(
     "direct3d" to "Direct3D",
@@ -571,7 +573,11 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
         topBar = {
             TopAppBar(
                 title = { Text(if (editing == null) "New container" else state.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, null) } }
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, null) } },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    scrolledContainerColor = MaterialTheme.colorScheme.background
+                )
             )
         },
         bottomBar = {
@@ -584,7 +590,7 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
                         onClick = ::createContainer,
                         enabled = state.runtime.isNotBlank() && !creating,
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp).height(50.dp),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = WinZShapes.Medium,
                         colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
                     ) {
                         Text(if (creating) "Creating…" else "Create container", fontWeight = FontWeight.SemiBold)
@@ -600,9 +606,9 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
             ) {
                 Surface(
                     Modifier.width(220.dp).fillMaxHeight(),
-                    shape = RoundedCornerShape(15.dp),
+                    shape = WinZShapes.Medium,
                     color = MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    border = BorderStroke(1.dp, hairlineColor())
                 ) {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
@@ -665,7 +671,7 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
 private fun ContainerNavItemV2(label: String, selected: Boolean, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(10.dp),
+        shape = WinZShapes.Small,
         color = if (selected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
         contentColor = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
@@ -1114,7 +1120,7 @@ private fun ContainerVulkanExtensionsV2(
                 OutlinedButton(
                     onClick = { showDialog = false },
                     colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    border = BorderStroke(1.dp, hairlineColor())
                 ) { Text("Cancel") }
                 Button(
                     onClick = {

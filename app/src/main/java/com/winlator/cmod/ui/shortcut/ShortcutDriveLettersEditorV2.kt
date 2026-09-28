@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Check
@@ -45,6 +44,7 @@ import com.winlator.cmod.ui.settings.SettingsCard
 import com.winlator.cmod.ui.settings.SettingsDivider
 import com.winlator.cmod.ui.theme.controlAccentColor
 import kotlinx.coroutines.delay
+import com.winlator.cmod.ui.theme.WinZShapes
 
 private data class ShortcutDriveEntryV2(
     val letter: String,
@@ -161,7 +161,7 @@ private fun ShortcutDriveLetterRowV2(
             Surface(
                 onClick = { letterMenuOpen = true },
                 modifier = Modifier.width(72.dp),
-                shape = RoundedCornerShape(10.dp),
+                shape = WinZShapes.Small,
                 color = MaterialTheme.colorScheme.surfaceVariant
             ) {
                 Row(
@@ -176,7 +176,7 @@ private fun ShortcutDriveLetterRowV2(
             DropdownMenu(
                 expanded = letterMenuOpen,
                 onDismissRequest = { letterMenuOpen = false },
-                shape = RoundedCornerShape(14.dp),
+                shape = WinZShapes.Medium,
                 containerColor = MaterialTheme.colorScheme.surface
             ) {
                 val accent = controlAccentColor()
@@ -207,7 +207,7 @@ private fun ShortcutDriveLetterRowV2(
             singleLine = true,
             label = { Text("Path") },
             placeholder = { Text("/storage/emulated/0/...", maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            shape = RoundedCornerShape(10.dp)
+            shape = WinZShapes.Small
         )
         IconButton(onClick = onBrowse) { Icon(Icons.Outlined.FolderOpen, "Choose folder") }
         IconButton(onClick = onRemove) { Icon(Icons.Outlined.DeleteOutline, "Remove drive") }

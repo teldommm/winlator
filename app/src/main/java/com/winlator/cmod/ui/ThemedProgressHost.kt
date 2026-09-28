@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import com.winlator.cmod.ui.theme.ThemedDialogSurface
 import com.winlator.cmod.ui.theme.WinZOverlayTheme
 import com.winlator.cmod.ui.theme.controlAccentColor
+import com.winlator.cmod.ui.theme.hairlineColor
 
 // Themed replacement for the file manager's copy/move progress dialog, which used to be a plain
 // android.app.AlertDialog wrapping a manually-built LinearLayout (ProgressBar + two TextViews).
@@ -92,7 +93,7 @@ object ThemedProgressHost {
                                         onCancel.run()
                                     },
                                     colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
-                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                                    border = BorderStroke(1.dp, hairlineColor())
                                 ) { Text("Cancel") }
                             }
                         }

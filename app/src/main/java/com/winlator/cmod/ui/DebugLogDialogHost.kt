@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DeleteOutline
@@ -51,6 +50,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.R
 import com.winlator.cmod.ui.theme.WinZOverlayTheme
+import com.winlator.cmod.ui.theme.WinZShapes
+import com.winlator.cmod.ui.theme.hairlineColor
+import com.winlator.cmod.ui.theme.dividerColor
 
 // Backing store for DebugDialog's live log stream. append() only grows the list when not
 // paused (matches the old LogView.append/DebugDialog.paused gating) — the file write in
@@ -103,9 +105,9 @@ object DebugLogDialogHost {
                                 .fillMaxWidth(0.92f)
                                 .fillMaxHeight(0.82f)
                                 .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {},
-                            shape = RoundedCornerShape(20.dp),
+                            shape = WinZShapes.ExtraLarge,
                             color = MaterialTheme.colorScheme.surface,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                            border = BorderStroke(1.dp, hairlineColor())
                         ) {
                             DebugLogContent(state, onClose = dismiss)
                         }
@@ -153,7 +155,7 @@ private fun DebugLogContent(state: DebugLogState, onClose: () -> Unit) {
             }
         }
         Spacer(Modifier.height(8.dp))
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        HorizontalDivider(color = dividerColor())
         Spacer(Modifier.height(8.dp))
 
         if (state.lines.isEmpty()) {

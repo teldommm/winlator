@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
@@ -67,7 +66,7 @@ private fun ThemeChoiceRow(
     Surface(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = WinZShapes.Medium,
         color = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.90f) else MaterialTheme.colorScheme.surface,
         contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(
@@ -102,7 +101,7 @@ private fun ThemeChoiceRow(
 private fun ThemePreview(colors: ThemePreviewColors) {
     Surface(
         modifier = Modifier.size(48.dp),
-        shape = RoundedCornerShape(12.dp),
+        shape = WinZShapes.Medium,
         color = colors.background,
         border = BorderStroke(1.dp, colors.outline)
     ) {
@@ -111,7 +110,7 @@ private fun ThemePreview(colors: ThemePreviewColors) {
                 Modifier
                     .align(Alignment.TopStart)
                     .size(18.dp)
-                    .background(colors.surface, RoundedCornerShape(5.dp))
+                    .background(colors.surface, WinZShapes.ExtraSmall)
             )
             Box(
                 Modifier
@@ -133,9 +132,9 @@ fun WinlatorThemePreferenceCard(modifier: Modifier = Modifier) {
     Surface(
         onClick = { expanded = true },
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = WinZShapes.Medium,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        border = BorderStroke(1.dp, hairlineColor()),
         tonalElevation = 0.dp
     ) {
         Row(
@@ -145,7 +144,7 @@ fun WinlatorThemePreferenceCard(modifier: Modifier = Modifier) {
             Box(
                 Modifier
                     .size(40.dp)
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f), RoundedCornerShape(10.dp)),
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f), WinZShapes.Small),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(Icons.Outlined.Palette, contentDescription = null, modifier = Modifier.size(22.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -181,7 +180,7 @@ fun WinlatorThemePreferenceCard(modifier: Modifier = Modifier) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                HorizontalDivider(color = dividerColor())
                 Spacer(Modifier.size(12.dp))
                 WinlatorThemeChoices(
                     selected = current,

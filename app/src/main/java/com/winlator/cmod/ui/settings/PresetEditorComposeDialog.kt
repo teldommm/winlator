@@ -32,7 +32,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
@@ -70,6 +69,9 @@ import com.winlator.cmod.ui.theme.WinZOverlayTheme
 import com.winlator.cmod.ui.theme.accentSwitchColors
 import com.winlator.cmod.ui.theme.controlAccentColor
 import androidx.compose.material.icons.automirrored.outlined.HelpOutline
+import com.winlator.cmod.ui.theme.WinZShapes
+import com.winlator.cmod.ui.theme.hairlineColor
+import com.winlator.cmod.ui.theme.dividerColor
 
 data class PresetEditorVariable(
     val name: String,
@@ -200,9 +202,9 @@ private fun ColumnScope.PresetEditorScreen(
     )
     Surface(
         modifier = Modifier.fillMaxWidth().weight(1f),
-        shape = RoundedCornerShape(10.dp),
+        shape = WinZShapes.Small,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
+        border = BorderStroke(1.dp, hairlineColor())
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxWidth(),
@@ -219,7 +221,7 @@ private fun ColumnScope.PresetEditorScreen(
                 if (variable != variables.last()) {
                     HorizontalDivider(
                         modifier = Modifier.padding(horizontal = 12.dp),
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+                        color = dividerColor()
                     )
                 }
             }
@@ -233,7 +235,7 @@ private fun ColumnScope.PresetEditorScreen(
             onClick = onCancel,
             modifier = Modifier.weight(1f),
             colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            border = BorderStroke(1.dp, hairlineColor())
         ) { Text("Cancel") }
         Button(
             onClick = {
@@ -318,9 +320,9 @@ private fun PresetVariableRow(
                         onClick = { expanded = true },
                         enabled = !readOnly,
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(9.dp),
+                        shape = WinZShapes.Small,
                         color = MaterialTheme.colorScheme.surface,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                        border = BorderStroke(1.dp, hairlineColor())
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 11.dp),
@@ -337,7 +339,7 @@ private fun PresetVariableRow(
                         expanded = expanded,
                         onDismissRequest = { expanded = false },
                         modifier = Modifier.widthIn(min = 220.dp, max = 380.dp).heightIn(max = 420.dp),
-                        shape = RoundedCornerShape(14.dp),
+                        shape = WinZShapes.Medium,
                         containerColor = MaterialTheme.colorScheme.surface
                     ) {
                         val accent = controlAccentColor()

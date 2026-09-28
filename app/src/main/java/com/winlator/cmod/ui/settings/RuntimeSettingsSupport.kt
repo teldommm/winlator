@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -74,6 +73,9 @@ import java.io.File
 import java.io.FileOutputStream
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
+import com.winlator.cmod.ui.theme.WinZShapes
+import com.winlator.cmod.ui.theme.hairlineColor
+import com.winlator.cmod.ui.theme.dividerColor
 
 internal data class VersionCatalog(val all: List<String>, val installed: Set<String>)
 internal data class DriverOption(
@@ -510,9 +512,9 @@ private fun settingChoiceSelected(label: String, selected: String): String =
 internal fun SettingsCard(content: @Composable () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = WinZShapes.Medium,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .72f))
+        border = BorderStroke(1.dp, hairlineColor())
     ) {
         Column { content() }
     }
@@ -522,7 +524,7 @@ internal fun SettingsCard(content: @Composable () -> Unit) {
 internal fun SettingsDivider() {
     HorizontalDivider(
         modifier = Modifier.padding(horizontal = 14.dp),
-        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .52f)
+        color = dividerColor()
     )
 }
 
@@ -537,22 +539,22 @@ private fun WallpaperPreview() {
 
     Surface(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(12.dp),
+        shape = WinZShapes.Medium,
         color = MaterialTheme.colorScheme.surfaceVariant,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .65f))
+        border = BorderStroke(1.dp, hairlineColor())
     ) {
         if (bitmap != null) {
             Image(
                 bitmap = bitmap.asImageBitmap(),
                 contentDescription = "Wallpaper preview",
-                modifier = Modifier.fillMaxWidth().height(132.dp).clip(RoundedCornerShape(12.dp)),
+                modifier = Modifier.fillMaxWidth().height(132.dp).clip(WinZShapes.Medium),
                 contentScale = ContentScale.Crop
             )
         } else {
             Image(
                 painter = painterResource(R.drawable.wallpaper),
                 contentDescription = "Wallpaper preview",
-                modifier = Modifier.fillMaxWidth().height(132.dp).clip(RoundedCornerShape(12.dp)),
+                modifier = Modifier.fillMaxWidth().height(132.dp).clip(WinZShapes.Medium),
                 contentScale = ContentScale.Crop
             )
         }
@@ -598,7 +600,7 @@ internal fun SettingChoice(
                 expanded = expanded,
                 onDismissRequest = { expanded = false },
                 modifier = Modifier.widthIn(min = 220.dp, max = 420.dp).heightIn(max = 480.dp),
-                shape = RoundedCornerShape(14.dp),
+                shape = WinZShapes.Medium,
                 containerColor = MaterialTheme.colorScheme.surface
             ) {
                 val accent = controlAccentColor()
@@ -676,7 +678,7 @@ internal fun SettingWineRuntimeChoice(
             expanded = expanded,
             onDismissRequest = { expanded = false },
             modifier = Modifier.widthIn(min = 260.dp, max = 460.dp).heightIn(max = 500.dp),
-            shape = RoundedCornerShape(14.dp),
+            shape = WinZShapes.Medium,
             containerColor = MaterialTheme.colorScheme.surface
         ) {
             val accent = controlAccentColor()
@@ -744,7 +746,7 @@ internal fun SettingInstallChoice(
             expanded = expanded,
             onDismissRequest = { expanded = false },
             modifier = Modifier.widthIn(min = 240.dp, max = 440.dp).heightIn(max = 480.dp),
-            shape = RoundedCornerShape(14.dp),
+            shape = WinZShapes.Medium,
             containerColor = MaterialTheme.colorScheme.surface
         ) {
             val accent = controlAccentColor()
@@ -815,7 +817,7 @@ internal fun SettingDriverChoice(
             expanded = expanded,
             onDismissRequest = { expanded = false },
             modifier = Modifier.widthIn(min = 260.dp, max = 460.dp).heightIn(max = 500.dp),
-            shape = RoundedCornerShape(14.dp),
+            shape = WinZShapes.Medium,
             containerColor = MaterialTheme.colorScheme.surface
         ) {
             val accent = controlAccentColor()
@@ -887,7 +889,7 @@ internal fun SettingText(
         modifier = Modifier.fillMaxWidth().padding(12.dp),
         minLines = minLines,
         maxLines = if (minLines > 1) 5 else 1,
-        shape = RoundedCornerShape(10.dp),
+        shape = WinZShapes.Small,
         keyboardOptions = KeyboardOptions(imeAction = if (minLines > 1) ImeAction.Default else ImeAction.Done),
         keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
     )
@@ -909,7 +911,7 @@ internal fun CpuSelectorRow(
                 val accent = controlAccentColor()
                 Surface(
                     onClick = { onToggle(index, !selected[index]) },
-                    shape = RoundedCornerShape(9.dp),
+                    shape = WinZShapes.Small,
                     color = if (selected[index]) accent else Color.Transparent,
                     contentColor = if (selected[index]) Color.White else MaterialTheme.colorScheme.onSurface,
                     border = BorderStroke(1.dp, if (selected[index]) accent else MaterialTheme.colorScheme.outlineVariant)

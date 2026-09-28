@@ -31,6 +31,8 @@ import androidx.compose.ui.unit.dp
 import com.winlator.cmod.ui.theme.ThemedDialogSurface
 import com.winlator.cmod.ui.theme.WinZOverlayTheme
 import com.winlator.cmod.ui.theme.controlAccentColor
+import com.winlator.cmod.ui.theme.hairlineColor
+import com.winlator.cmod.ui.theme.dividerColor
 
 // Themed replacement for DownloadProgressDialog's internals — a compact circular-progress +
 // message card, with an optional Cancel row, instead of a plain android.app.Dialog inflating
@@ -87,7 +89,7 @@ object ThemedDownloadProgressHost {
                             }
                             if (onCancel != null) {
                                 Spacer(Modifier.height(16.dp))
-                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                                HorizontalDivider(color = dividerColor())
                                 Spacer(Modifier.height(12.dp))
                                 Row(Modifier.align(Alignment.End)) {
                                     OutlinedButton(
@@ -96,7 +98,7 @@ object ThemedDownloadProgressHost {
                                             onCancel.run()
                                         },
                                         colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
-                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                                        border = BorderStroke(1.dp, hairlineColor())
                                     ) { Text("Cancel") }
                                 }
                             }

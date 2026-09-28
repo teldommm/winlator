@@ -23,7 +23,6 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PageSize
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material3.Icon
@@ -55,6 +54,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.withContext
 import kotlin.math.absoluteValue
+import com.winlator.cmod.ui.theme.WinZShapes
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -142,7 +142,7 @@ internal fun LandscapePagerCore(
                                 modifier = Modifier
                                     .size(206.dp, 322.dp)
                                     .scale(cardScale),
-                                shape = RoundedCornerShape(16.dp),
+                                shape = WinZShapes.Large,
                                 color = Color.Black.copy(.30f),
                                 border = BorderStroke(if (selected) 2.dp else 1.dp, Color.White.copy(if (selected) .88f else .20f))
                             ) {
@@ -159,7 +159,7 @@ internal fun LandscapePagerCore(
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Surface(
                             onClick = { callbacks.onOpen(item.shortcutPath) },
-                            shape = RoundedCornerShape(11.dp),
+                            shape = WinZShapes.Small,
                             color = Color.White.copy(.20f),
                             contentColor = Color.White,
                             border = BorderStroke(1.dp, Color.White.copy(.22f))

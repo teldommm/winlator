@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DeleteOutline
@@ -58,6 +57,8 @@ import com.winlator.cmod.ui.theme.controlAccentColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import com.winlator.cmod.ui.theme.WinZShapes
+import com.winlator.cmod.ui.theme.hairlineColor
 
 interface GameDetailCallbacks {
     fun onBack()
@@ -105,11 +106,11 @@ private fun LandscapeDetail(title: String, subtitle: String, artwork: Bitmap?, f
         Surface(
             onClick = callbacks::onBack,
             modifier = Modifier.align(Alignment.TopStart).padding(start = 18.dp, top = 16.dp).size(44.dp),
-            shape = RoundedCornerShape(12.dp),
+            shape = WinZShapes.Medium,
             // Theme gray (was a black square) — same fill/outline family as the app's buttons.
             color = MaterialTheme.colorScheme.surfaceVariant.copy(.92f),
             contentColor = MaterialTheme.colorScheme.onSurface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            border = BorderStroke(1.dp, hairlineColor())
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back", modifier = Modifier.size(24.dp))
@@ -122,7 +123,7 @@ private fun LandscapeDetail(title: String, subtitle: String, artwork: Bitmap?, f
         ) {
             Surface(
                 modifier = Modifier.weight(1f).fillMaxHeight().widthIn(max = 590.dp),
-                shape = RoundedCornerShape(20.dp),
+                shape = WinZShapes.ExtraLarge,
                 color = Color.Black.copy(.42f),
                 border = BorderStroke(1.dp, Color.White.copy(.16f))
             ) {
@@ -144,7 +145,7 @@ private fun LandscapeDetail(title: String, subtitle: String, artwork: Bitmap?, f
                     Button(
                         onClick = callbacks::onPlay,
                         modifier = Modifier.fillMaxWidth().height(52.dp),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = WinZShapes.Medium,
                         colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
                     ) {
                         Icon(Icons.Outlined.PlayArrow, null)
@@ -180,11 +181,11 @@ private fun PortraitDetail(title: String, subtitle: String, artwork: Bitmap?, fa
             Surface(
                 onClick = callbacks::onBack,
                 modifier = Modifier.align(Alignment.TopStart).padding(start = 14.dp, top = 14.dp).size(44.dp),
-                shape = RoundedCornerShape(12.dp),
+                shape = WinZShapes.Medium,
                 // Theme gray (was a black square) — same fill/outline family as the app's buttons.
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(.92f),
                 contentColor = MaterialTheme.colorScheme.onSurface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                border = BorderStroke(1.dp, hairlineColor())
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back", modifier = Modifier.size(24.dp))
@@ -199,7 +200,7 @@ private fun PortraitDetail(title: String, subtitle: String, artwork: Bitmap?, fa
             Button(
                 onClick = callbacks::onPlay,
                 modifier = Modifier.fillMaxWidth().height(54.dp),
-                shape = RoundedCornerShape(12.dp),
+                shape = WinZShapes.Medium,
                 colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
             ) { Icon(Icons.Outlined.PlayArrow, null); Spacer(Modifier.size(8.dp)); Text("Play", fontWeight = FontWeight.Bold) }
             DetailAction(Icons.Outlined.Settings, "Configure", Modifier.fillMaxWidth(), callbacks::onConfigure)
@@ -218,9 +219,9 @@ private fun DetailAction(icon: ImageVector, label: String, modifier: Modifier, o
     Surface(
         onClick = onClick,
         modifier = modifier.height(54.dp),
-        shape = RoundedCornerShape(12.dp),
+        shape = WinZShapes.Medium,
         // Destructive keeps the regular fill and outline; only its icon and label are red.
-        color = if (accent) accentColor else MaterialTheme.colorScheme.surface.copy(.90f),
+        color = if (accent) accentColor else MaterialTheme.colorScheme.surface,
         contentColor = tint,
         border = BorderStroke(1.dp, if (accent) accentColor else MaterialTheme.colorScheme.outlineVariant)
     ) {

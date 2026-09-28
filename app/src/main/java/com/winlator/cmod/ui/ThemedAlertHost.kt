@@ -28,7 +28,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
@@ -60,6 +59,9 @@ import com.winlator.cmod.ui.theme.WinZOverlayTheme
 import com.winlator.cmod.ui.theme.controlAccentColor
 import com.winlator.cmod.ui.theme.destructiveColor
 import java.util.function.Consumer
+import com.winlator.cmod.ui.theme.WinZShapes
+import com.winlator.cmod.ui.theme.hairlineColor
+import com.winlator.cmod.ui.theme.dividerColor
 
 // Native bridge so plain Java call sites (component/driver/runtime delete confirmations,
 // "in use" warnings, etc.) get the exact same card look and button styling as every
@@ -85,7 +87,7 @@ object ThemedAlertHost {
                 OutlinedButton(
                     onClick = dismiss,
                     colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    border = BorderStroke(1.dp, hairlineColor())
                 ) { Text("Cancel") }
                 Button(
                     onClick = { dismiss(); onConfirm.run() },
@@ -137,7 +139,7 @@ object ThemedAlertHost {
                 OutlinedButton(
                     onClick = dismiss,
                     colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    border = BorderStroke(1.dp, hairlineColor())
                 ) { Text("Cancel") }
                 Button(
                     onClick = { dismiss(); onConfirm.accept(value) },
@@ -177,7 +179,7 @@ object ThemedAlertHost {
                     Surface(
                         onClick = { dismiss(); option.onClick.run() },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = WinZShapes.Medium,
                         color = MaterialTheme.colorScheme.surfaceVariant,
                         contentColor = if (option.destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
                     ) {
@@ -192,7 +194,7 @@ object ThemedAlertHost {
                 OutlinedButton(
                     onClick = dismiss,
                     colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    border = BorderStroke(1.dp, hairlineColor())
                 ) { Text(cancelLabel) }
             }
         }
@@ -244,7 +246,7 @@ object ThemedAlertHost {
                         }
                     }
                     if (index != items.lastIndex) {
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        HorizontalDivider(color = dividerColor())
                     }
                 }
             }
@@ -301,7 +303,7 @@ object ThemedAlertHost {
                 OutlinedButton(
                     onClick = dismiss,
                     colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    border = BorderStroke(1.dp, hairlineColor())
                 ) { Text("Cancel") }
                 Button(
                     onClick = {

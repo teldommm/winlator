@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ContentCut
@@ -71,6 +70,9 @@ import java.util.Locale
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import com.winlator.cmod.ui.ShellChrome
 import com.winlator.cmod.ui.library.LibraryImageCache
+import com.winlator.cmod.ui.theme.WinZShapes
+import com.winlator.cmod.ui.theme.hairlineColor
+import com.winlator.cmod.ui.theme.dividerColor
 
 // One row in the file listing — a file or a folder in the current directory.
 data class FileEntryUiModel(
@@ -153,9 +155,9 @@ internal fun FileManagerScreen(model: FileManagerModel, callbacks: FileManagerCa
             Surface(
                 onClick = { driveSheetOpen = true },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
+                shape = WinZShapes.Medium,
                 color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                border = BorderStroke(1.dp, hairlineColor())
             ) {
                 Row(
                     modifier = Modifier
@@ -183,9 +185,9 @@ internal fun FileManagerScreen(model: FileManagerModel, callbacks: FileManagerCa
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 4.dp),
-            shape = RoundedCornerShape(12.dp),
+            shape = WinZShapes.Medium,
             color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            border = BorderStroke(1.dp, hairlineColor())
         ) {
             Text(
                 model.currentPath,
@@ -205,7 +207,7 @@ internal fun FileManagerScreen(model: FileManagerModel, callbacks: FileManagerCa
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
         )
 
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        HorizontalDivider(color = dividerColor())
 
         // In portrait MainShell's bottom nav floats over this tab; keep the paste button and the
         // last rows above it (File Manager used to be a detail screen in portrait, without the nav).
@@ -224,7 +226,7 @@ internal fun FileManagerScreen(model: FileManagerModel, callbacks: FileManagerCa
                         FileRow(entry = entry, callbacks = callbacks)
                         HorizontalDivider(
                             modifier = Modifier.padding(start = 73.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                            color = dividerColor()
                         )
                     }
                 }
@@ -261,9 +263,9 @@ internal fun FileManagerScreen(model: FileManagerModel, callbacks: FileManagerCa
 private fun StorageMeter(usedText: String, percent: Int, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = WinZShapes.Medium,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = BorderStroke(1.dp, hairlineColor())
     ) {
         Column(Modifier.padding(horizontal = 13.dp, vertical = 10.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -331,7 +333,7 @@ private fun FileRow(entry: FileEntryUiModel, callbacks: FileManagerCallbacks) {
             expanded = menuExpanded,
             onDismissRequest = { menuExpanded = false },
             modifier = Modifier.widthIn(min = 200.dp, max = 320.dp),
-            shape = RoundedCornerShape(14.dp),
+            shape = WinZShapes.Medium,
             containerColor = MaterialTheme.colorScheme.surface
         ) {
             if (entry.isExecutable) {
@@ -460,7 +462,7 @@ private fun DriveSelectorSheet(
                 Surface(
                     onClick = { onSelect(option.id) },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = WinZShapes.Medium,
                     color = if (option.selected) accent.copy(alpha = 0.16f) else Color.Transparent
                 ) {
                     Row(

@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Settings
@@ -31,6 +30,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.R
+import com.winlator.cmod.ui.theme.WinZShapes
+import com.winlator.cmod.ui.theme.hairlineColor
 
 // Landscape counterpart of PortraitBottomNavigation: Library / Input Controls / Settings as one
 // floating group pinned top-end (MainShell places it in ShellChrome's header band). It used to be
@@ -44,9 +45,9 @@ import com.winlator.cmod.R
 internal fun LandscapeNavGroup(selected: Int, onNavigate: (Int) -> Unit, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
+        shape = WinZShapes.Large,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = BorderStroke(1.dp, hairlineColor())
     ) {
         Row(Modifier.padding(3.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
             NavCell(Icons.Outlined.Home, "Library", selected == R.id.main_menu_shortcuts) {
@@ -87,11 +88,11 @@ private fun NavCell(icon: ImageVector, description: String, selected: Boolean, o
                 scaleX = scale
                 scaleY = scale
             }
-            .clip(RoundedCornerShape(12.dp))
+            .clip(WinZShapes.Medium)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Surface(shape = RoundedCornerShape(12.dp), color = pill, modifier = Modifier.size(44.dp)) {
+        Surface(shape = WinZShapes.Medium, color = pill, modifier = Modifier.size(44.dp)) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(icon, description, tint = tint, modifier = Modifier.size(23.dp))
             }

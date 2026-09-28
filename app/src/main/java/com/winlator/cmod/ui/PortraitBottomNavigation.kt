@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Settings
@@ -39,6 +38,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.winlator.cmod.R
+import com.winlator.cmod.ui.theme.WinZShapes
+import com.winlator.cmod.ui.theme.hairlineColor
 
 // Portrait bottom navigation (Library / Input Controls / Settings). Rendered by MainShell
 // (ui/shell/MainShell.kt) as a floating bar over the tab content; it no longer has its own
@@ -57,9 +58,9 @@ internal fun PortraitBottomNavigation(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth().height(64.dp),
-        shape = RoundedCornerShape(25.dp),
+        shape = WinZShapes.ExtraLarge,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = BorderStroke(1.dp, hairlineColor())
     ) {
         Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.SpaceEvenly) {
             PortraitNavItem(Icons.Outlined.Home, "Library", selected == R.id.main_menu_shortcuts) {
@@ -103,7 +104,7 @@ private fun RowScope.PortraitNavItem(icon: ImageVector, label: String, selected:
         verticalArrangement = Arrangement.Center
     ) {
         Surface(
-            shape = RoundedCornerShape(12.dp),
+            shape = WinZShapes.Medium,
             color = pillColor,
             contentColor = tint,
             modifier = Modifier

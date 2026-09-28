@@ -38,6 +38,7 @@ import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.getValue
 import androidx.compose.animation.core.animateFloatAsState
+import com.winlator.cmod.ui.theme.hairlineColor
 
 // The whole in-game sidebar (шторка) as ONE composition.
 //
@@ -126,7 +127,7 @@ private fun IngameSidebar(
                 .shadow(elevation = 8.dp, shape = shape, clip = false)
                 .clip(shape)
                 .background(sidebarPanelColor())
-                .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape)
+                .border(BorderStroke(1.dp, hairlineColor()), shape)
         ) {
             SidebarRail(
                 state = controller.railState,

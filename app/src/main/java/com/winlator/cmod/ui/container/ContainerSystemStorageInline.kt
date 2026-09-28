@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Delete
@@ -51,6 +50,9 @@ import com.winlator.cmod.ui.theme.controlAccentColor
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Locale
+import com.winlator.cmod.ui.theme.WinZShapes
+import com.winlator.cmod.ui.theme.hairlineColor
+import com.winlator.cmod.ui.theme.dividerColor
 
 private data class InlineDrive(val letter: String, val path: String)
 
@@ -107,7 +109,7 @@ internal fun ContainerSystemInline(containerId: Int, callbacks: ContainerInlineC
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 7.dp),
             label = { Text("Container name") },
             singleLine = true,
-            shape = RoundedCornerShape(10.dp)
+            shape = WinZShapes.Small
         )
         SSDivider()
         SSChoice("HUD", arrayOf("Off", "Classic", "Modern")[hudMode.coerceIn(0, 2)], arrayOf("Off", "Classic", "Modern")) {
@@ -132,7 +134,7 @@ internal fun ContainerSystemInline(containerId: Int, callbacks: ContainerInlineC
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 7.dp),
                 label = { Text("Background color") },
                 singleLine = true,
-                shape = RoundedCornerShape(10.dp)
+                shape = WinZShapes.Small
             )
         }
         SSDivider()
@@ -209,7 +211,7 @@ internal fun ContainerStorageInline(containerId: Int, callbacks: ContainerInline
                     modifier = Modifier.weight(1f),
                     label = { Text("Target Path") },
                     singleLine = true,
-                    shape = RoundedCornerShape(10.dp)
+                    shape = WinZShapes.Small
                 )
                 OutlinedButton(
                     onClick = { browseIndex = index; picker.launch(null) },
@@ -249,9 +251,9 @@ private fun SSPanel(indented: Boolean = true, content: @Composable ColumnScope.(
             end = 12.dp,
             bottom = 10.dp
         ),
-        shape = RoundedCornerShape(13.dp),
+        shape = WinZShapes.Medium,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .20f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .58f))
+        border = BorderStroke(1.dp, hairlineColor())
     ) { Column(Modifier.padding(vertical = 4.dp), content = content) }
 }
 
@@ -282,7 +284,7 @@ private fun SSChoice(label: String, selected: String, entries: Array<String>, on
         DropdownMenu(
             expanded = open,
             onDismissRequest = { open = false },
-            shape = RoundedCornerShape(14.dp),
+            shape = WinZShapes.Medium,
             containerColor = MaterialTheme.colorScheme.surface
         ) {
             val accent = controlAccentColor()
@@ -305,9 +307,9 @@ private fun SSCompactChoice(selected: String, entries: Array<String>, onSelected
         Surface(
             onClick = { open = true },
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(9.dp),
+            shape = WinZShapes.Small,
             color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            border = BorderStroke(1.dp, hairlineColor())
         ) {
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 10.dp),
@@ -320,7 +322,7 @@ private fun SSCompactChoice(selected: String, entries: Array<String>, onSelected
         DropdownMenu(
             expanded = open,
             onDismissRequest = { open = false },
-            shape = RoundedCornerShape(14.dp),
+            shape = WinZShapes.Medium,
             containerColor = MaterialTheme.colorScheme.surface
         ) {
             val accent = controlAccentColor()
@@ -348,7 +350,7 @@ private fun SSSave(onClick: () -> Unit) {
 private fun SSDivider() {
     HorizontalDivider(
         modifier = Modifier.padding(horizontal = 12.dp),
-        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .48f)
+        color = dividerColor()
     )
 }
 

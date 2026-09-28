@@ -70,6 +70,7 @@ import com.winlator.cmod.ui.theme.accentSwitchColors
 import com.winlator.cmod.ui.theme.controlAccentColor
 import com.winlator.cmod.ui.theme.destructiveColor
 import kotlin.math.roundToInt
+import com.winlator.cmod.ui.theme.hairlineColor
 
 enum class ControlElementIconTint { NONE, INVERT, BLUE }
 
@@ -295,7 +296,7 @@ private fun SegmentButton(label: String, selected: Boolean, modifier: Modifier =
             modifier = modifier,
             shape = MaterialTheme.shapes.small,
             colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            border = BorderStroke(1.dp, hairlineColor())
         ) { Text(label) }
     }
 }
@@ -309,7 +310,7 @@ private fun SmallOutlineButton(label: String, destructive: Boolean = false, onCl
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
             contentColor = if (destructive) destructiveColor() else MaterialTheme.colorScheme.onSurface
         ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = BorderStroke(1.dp, hairlineColor())
     ) { Text(label) }
 }
 

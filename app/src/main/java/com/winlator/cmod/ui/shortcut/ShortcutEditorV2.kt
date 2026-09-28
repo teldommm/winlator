@@ -27,7 +27,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Check
@@ -131,6 +130,9 @@ import org.json.JSONArray
 import java.io.File
 import kotlin.math.roundToInt
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import com.winlator.cmod.ui.theme.WinZShapes
+import com.winlator.cmod.ui.theme.hairlineColor
+import androidx.compose.material3.TopAppBarDefaults
 
 private val shortcutComponentRowsV2 = listOf(
     "direct3d" to "Direct3D",
@@ -533,7 +535,11 @@ internal fun ShortcutEditorV2(
         topBar = {
             TopAppBar(
                 title = { Text(state.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                navigationIcon = { IconButton(onClick = ::closeEditor) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, null) } }
+                navigationIcon = { IconButton(onClick = ::closeEditor) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, null) } },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    scrolledContainerColor = MaterialTheme.colorScheme.background
+                )
             )
         }
     ) { padding ->
@@ -544,9 +550,9 @@ internal fun ShortcutEditorV2(
             ) {
                 Surface(
                     Modifier.width(220.dp).fillMaxHeight(),
-                    shape = RoundedCornerShape(15.dp),
+                    shape = WinZShapes.Medium,
                     color = MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    border = BorderStroke(1.dp, hairlineColor())
                 ) {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
@@ -616,7 +622,7 @@ private fun ShortcutNavItemV2(label: String, icon: ImageVector, selected: Boolea
     Surface(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-        shape = RoundedCornerShape(10.dp),
+        shape = WinZShapes.Small,
         color = if (selected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
         contentColor = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
     ) {
@@ -1058,14 +1064,14 @@ private fun ExecArgumentsEditorV2(value: String, onChanged: (String) -> Unit) {
                 label = { Text("Exec Arguments") },
                 modifier = Modifier.weight(1f),
                 singleLine = true,
-                shape = RoundedCornerShape(10.dp)
+                shape = WinZShapes.Small
             )
             Box {
                 TextButton(onClick = { open = true }) { Text("⋮", style = MaterialTheme.typography.headlineSmall) }
                 DropdownMenu(
                     expanded = open,
                     onDismissRequest = { open = false },
-                    shape = RoundedCornerShape(14.dp),
+                    shape = WinZShapes.Medium,
                     containerColor = MaterialTheme.colorScheme.surface
                 ) {
                     val accent = controlAccentColor()
@@ -1149,7 +1155,7 @@ private fun ShortcutVulkanExtensionsV2(context: Context, driver: String, blackli
                 OutlinedButton(
                     onClick = { showDialog = false },
                     colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    border = BorderStroke(1.dp, hairlineColor())
                 ) { Text("Cancel") }
                 Button(
                     onClick = {

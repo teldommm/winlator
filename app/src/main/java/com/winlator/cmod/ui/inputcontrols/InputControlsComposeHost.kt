@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ChevronRight
@@ -65,6 +64,8 @@ import com.winlator.cmod.ui.LandscapeScreenHeader
 import com.winlator.cmod.ui.PortraitMainHeader
 import com.winlator.cmod.ui.theme.controlAccentColor
 import kotlin.math.roundToInt
+import com.winlator.cmod.ui.theme.WinZShapes
+import com.winlator.cmod.ui.theme.hairlineColor
 
 @Immutable
 data class InputProfileItem(val id: Int, val name: String)
@@ -215,14 +216,14 @@ private fun TransferActions(callbacks: InputControlsCallbacks) {
         OutlinedButton(
             onClick = callbacks::onImportProfile,
             modifier = Modifier.weight(1f).height(48.dp),
-            shape = RoundedCornerShape(12.dp),
+            shape = WinZShapes.Medium,
             colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = accent),
             border = BorderStroke(1.dp, accent)
         ) { Icon(Icons.Outlined.FileDownload, null); Spacer(Modifier.width(8.dp)); Text("Import") }
         OutlinedButton(
             onClick = callbacks::onExportProfile,
             modifier = Modifier.weight(1f).height(48.dp),
-            shape = RoundedCornerShape(12.dp),
+            shape = WinZShapes.Medium,
             colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = accent),
             border = BorderStroke(1.dp, accent)
         ) { Icon(Icons.Outlined.FileUpload, null); Spacer(Modifier.width(8.dp)); Text("Export") }
@@ -234,7 +235,7 @@ private fun EditorButton(callbacks: InputControlsCallbacks) {
     Button(
         onClick = callbacks::onOpenEditor,
         modifier = Modifier.fillMaxWidth().height(52.dp),
-        shape = RoundedCornerShape(14.dp),
+        shape = WinZShapes.Medium,
         colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
     ) {
         Icon(Icons.Outlined.SportsEsports, null)
@@ -247,9 +248,9 @@ private fun EditorButton(callbacks: InputControlsCallbacks) {
 private fun SettingsCard(title: String, content: @Composable () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = WinZShapes.Large,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = BorderStroke(1.dp, hairlineColor())
     ) {
         Column(Modifier.padding(14.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -266,9 +267,9 @@ private fun ProfilePicker(model: InputControlsModel, selectedName: String, callb
         Surface(
             onClick = { expanded = true },
             modifier = Modifier.fillMaxWidth().height(50.dp),
-            shape = RoundedCornerShape(12.dp),
+            shape = WinZShapes.Medium,
             color = MaterialTheme.colorScheme.surfaceVariant,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+            border = BorderStroke(1.dp, hairlineColor())
         ) {
             Row(modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(selectedName, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -279,7 +280,7 @@ private fun ProfilePicker(model: InputControlsModel, selectedName: String, callb
             expanded = expanded,
             onDismissRequest = { expanded = false },
             modifier = Modifier.fillMaxWidth(0.82f),
-            shape = RoundedCornerShape(14.dp),
+            shape = WinZShapes.Medium,
             containerColor = MaterialTheme.colorScheme.surface
         ) {
             val accent = controlAccentColor()
@@ -321,7 +322,7 @@ private fun RoundAction(icon: androidx.compose.ui.graphics.vector.ImageVector, d
         modifier = Modifier.size(44.dp),
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surfaceVariant,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = BorderStroke(1.dp, hairlineColor())
     ) {
         IconButton(onClick = onClick) { Icon(icon, description, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
@@ -367,9 +368,9 @@ private fun OpacityCard(initialPercent: Int, onOpacityChanged: (Int) -> Unit) {
 @Composable
 private fun EmptyControllers() {
     Surface(
-        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth(), shape = WinZShapes.Large,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = BorderStroke(1.dp, hairlineColor())
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(vertical = 22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(Icons.Outlined.Gamepad, null, modifier = Modifier.size(30.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -383,12 +384,12 @@ private fun EmptyControllers() {
 private fun ControllerCard(controller: InputControllerItem, callbacks: InputControlsCallbacks) {
     Surface(
         onClick = { callbacks.onOpenController(controller.index) },
-        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth(), shape = WinZShapes.Large,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = BorderStroke(1.dp, hairlineColor())
     ) {
         Row(modifier = Modifier.padding(start = 14.dp, top = 10.dp, bottom = 10.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Surface(modifier = Modifier.size(42.dp), shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+            Surface(modifier = Modifier.size(42.dp), shape = WinZShapes.Medium, color = MaterialTheme.colorScheme.surfaceVariant) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(Icons.Outlined.Gamepad, null, tint = if (controller.connected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error)
                 }

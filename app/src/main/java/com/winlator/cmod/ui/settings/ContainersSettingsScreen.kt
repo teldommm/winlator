@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ContentCopy
@@ -78,6 +77,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.winlator.cmod.ui.theme.findActivity
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import com.winlator.cmod.ui.theme.WinZShapes
+import com.winlator.cmod.ui.theme.hairlineColor
+import com.winlator.cmod.ui.theme.dividerColor
 
 // Containers list as a MainShell detail entry (replaces ContainersSettingsFragment). The
 // container editor opens as another detail entry on top (onOpenEditor); when it closes and this
@@ -171,7 +173,7 @@ private fun ContainersSettingsScreen(
             TopAppBar(
                 title = { Text("Containers") },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, null) } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background, scrolledContainerColor = MaterialTheme.colorScheme.background)
             )
         },
         floatingActionButton = {
@@ -187,7 +189,7 @@ private fun ContainersSettingsScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Surface(
                         modifier = Modifier.size(74.dp),
-                        shape = RoundedCornerShape(20.dp),
+                        shape = WinZShapes.ExtraLarge,
                         color = MaterialTheme.colorScheme.surfaceVariant
                     ) {
                         Box(contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Dns, null, modifier = Modifier.size(36.dp)) }
@@ -226,13 +228,13 @@ private fun SettingsContainerCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(15.dp),
+        shape = WinZShapes.Medium,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = BorderStroke(1.dp, hairlineColor())
     ) {
         Column {
             Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                Surface(Modifier.size(50.dp), shape = RoundedCornerShape(13.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+                Surface(Modifier.size(50.dp), shape = WinZShapes.Medium, color = MaterialTheme.colorScheme.surfaceVariant) {
                     Box(contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Dns, null, modifier = Modifier.size(26.dp)) }
                 }
                 Spacer(Modifier.width(13.dp))
@@ -243,7 +245,7 @@ private fun SettingsContainerCard(
                 Surface(
                     onClick = { onRun(container.id) },
                     modifier = Modifier.size(46.dp),
-                    shape = RoundedCornerShape(13.dp),
+                    shape = WinZShapes.Medium,
                     color = controlAccentColor(),
                     contentColor = androidx.compose.ui.graphics.Color.White
                 ) {
@@ -272,7 +274,7 @@ private fun ActionButton(icon: ImageVector, label: String, modifier: Modifier = 
         onClick = action,
         modifier = modifier,
         color = Color.Transparent,
-        shape = RoundedCornerShape(10.dp)
+        shape = WinZShapes.Small
     ) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 9.dp),
@@ -298,7 +300,7 @@ private fun ContainerMoreButton(
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            shape = RoundedCornerShape(14.dp),
+            shape = WinZShapes.Medium,
             containerColor = MaterialTheme.colorScheme.surface
         ) {
             DropdownMenuItem(
@@ -370,7 +372,7 @@ private fun ContainerPropertiesDialog(container: Container, onDismiss: () -> Uni
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            HorizontalDivider(color = dividerColor())
             if (loading) {
                 Row(
                     Modifier.fillMaxWidth().padding(vertical = 18.dp),
@@ -392,7 +394,7 @@ private fun ContainerPropertiesDialog(container: Container, onDismiss: () -> Uni
                         modifier = Modifier.size(90.dp),
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.surfaceVariant,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                        border = BorderStroke(1.dp, hairlineColor())
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -409,7 +411,7 @@ private fun ContainerPropertiesDialog(container: Container, onDismiss: () -> Uni
             OutlinedButton(
                 onClick = onDismiss,
                 colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                border = BorderStroke(1.dp, hairlineColor())
             ) { Text("Close") }
             Button(
                 enabled = !clearing,

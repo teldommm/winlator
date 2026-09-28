@@ -97,6 +97,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import com.winlator.cmod.ui.theme.WinZShapes
+import com.winlator.cmod.ui.theme.hairlineColor
+import com.winlator.cmod.ui.theme.dividerColor
 
 internal fun Bitmap.asImageBitmap(): ImageBitmap = this.composeAsImageBitmap()
 
@@ -192,9 +195,9 @@ internal fun LibraryRoot(
                     Surface(
                         onClick = { activity?.navigateToMainDestination(R.id.main_menu_file_manager) },
                         modifier = Modifier.widthIn(max = 360.dp).fillMaxWidth(),
-                        shape = RoundedCornerShape(20.dp),
+                        shape = WinZShapes.ExtraLarge,
                         color = MaterialTheme.colorScheme.surface,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                        border = BorderStroke(1.dp, hairlineColor())
                     ) {
                         Column(
                             Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 28.dp),
@@ -202,7 +205,7 @@ internal fun LibraryRoot(
                         ) {
                             Surface(
                                 modifier = Modifier.size(72.dp),
-                                shape = RoundedCornerShape(20.dp),
+                                shape = WinZShapes.ExtraLarge,
                                 color = controlAccentColor(),
                                 contentColor = Color.White
                             ) {
@@ -383,7 +386,7 @@ private fun LibraryOrientationDropdown(activity: MainActivity?, expanded: Boolea
     DropdownMenu(
         expanded = expanded,
         onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(14.dp),
+        shape = WinZShapes.Medium,
         containerColor = MaterialTheme.colorScheme.surface
     ) {
         OrientationToggleMenuItem("Lock screen orientation", orientationState.first) {
@@ -425,7 +428,7 @@ private fun LibraryTopIcon(icon: ImageVector, selected: Boolean, click: () -> Un
     Surface(
         onClick = click,
         modifier = Modifier.padding(horizontal = 3.dp),
-        shape = RoundedCornerShape(12.dp),
+        shape = WinZShapes.Medium,
         color = background,
         contentColor = content
     ) { Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) { Icon(icon, null, modifier = Modifier.size(23.dp)) } }
@@ -435,10 +438,10 @@ private fun LibraryTopIcon(icon: ImageVector, selected: Boolean, click: () -> Un
 private fun LibraryFilterChip(label: String, selected: Boolean, click: () -> Unit) {
     Surface(
         onClick = click,
-        shape = RoundedCornerShape(10.dp),
+        shape = WinZShapes.Small,
         color = if (selected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
         contentColor = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = BorderStroke(1.dp, hairlineColor())
     ) { Text(label, Modifier.padding(horizontal = 15.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge) }
 }
 
@@ -451,9 +454,9 @@ internal fun CompactArtworkCard(item: LibraryItem, cb: LibraryCallbacks) {
             onClick = { cb.onOpen(item.shortcutPath) },
             onLongClick = { cb.onAction(item.shortcutPath, LibraryComposeHost.ACTION_SETTINGS) }
         ),
-        shape = RoundedCornerShape(15.dp),
+        shape = WinZShapes.Medium,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = BorderStroke(1.dp, hairlineColor())
     ) {
         Box {
             ArtworkCompat(
@@ -476,7 +479,7 @@ internal fun CompactArtworkCard(item: LibraryItem, cb: LibraryCallbacks) {
                 ArtworkCompat(
                     item.coverPath ?: item.bannerPath ?: item.iconPath,
                     item.fallbackIcon,
-                    Modifier.size(68.dp).clip(RoundedCornerShape(11.dp))
+                    Modifier.size(68.dp).clip(WinZShapes.Small)
                 )
                 Spacer(Modifier.width(13.dp))
                 Column(Modifier.weight(1f)) {
@@ -499,9 +502,9 @@ internal fun CoverArtworkCard(item: LibraryItem, cb: LibraryCallbacks) {
             onClick = { cb.onOpen(item.shortcutPath) },
             onLongClick = { cb.onAction(item.shortcutPath, LibraryComposeHost.ACTION_SETTINGS) }
         ),
-        shape = RoundedCornerShape(16.dp),
+        shape = WinZShapes.Large,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = BorderStroke(1.dp, hairlineColor())
     ) {
         Box(Modifier.aspectRatio(.72f)) {
             ArtworkCompat(item.coverPath ?: item.bannerPath ?: item.iconPath, item.fallbackIcon, Modifier.fillMaxSize())
@@ -599,7 +602,7 @@ internal fun LibraryItemMenuCompat(item: LibraryItem, cb: LibraryCallbacks, clos
                 overflow = TextOverflow.Ellipsis
             )
             androidx.compose.material3.HorizontalDivider(
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .65f)
+                color = dividerColor()
             )
             val favoriteLabel = if (item.favorite) "Unfavorite" else "Favorite"
             Row(
@@ -668,11 +671,11 @@ private fun LibraryActionTileCompat(
     Surface(
         onClick = click,
         modifier = modifier,
-        shape = RoundedCornerShape(13.dp),
+        shape = WinZShapes.Medium,
         // Same fill and outline for every tile; "Remove from library" differs only by its red
         // icon and label.
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .42f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .70f))
+        border = BorderStroke(1.dp, hairlineColor())
     ) {
         Row(
             modifier = Modifier.padding(
@@ -701,7 +704,7 @@ private fun LibraryActionTileCompat(
 private fun LibrarySearchField(query: String, onQueryChange: (String) -> Unit, modifier: Modifier = Modifier) {
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
-    val shape = RoundedCornerShape(12.dp)
+    val shape = WinZShapes.Medium
     BasicTextField(
         value = query,
         onValueChange = onQueryChange,
@@ -717,7 +720,7 @@ private fun LibrarySearchField(query: String, onQueryChange: (String) -> Unit, m
                     .height(44.dp)
                     .clip(shape)
                     .background(MaterialTheme.colorScheme.surface)
-                    .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape)
+                    .border(BorderStroke(1.dp, hairlineColor()), shape)
                     .padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -745,7 +748,7 @@ private fun LibrarySearchField(query: String, onQueryChange: (String) -> Unit, m
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
                             .size(20.dp)
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(WinZShapes.Small)
                             .clickable { onQueryChange("") }
                     )
                 }

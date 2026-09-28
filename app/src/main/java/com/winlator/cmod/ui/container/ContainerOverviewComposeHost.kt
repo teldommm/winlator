@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DesktopWindows
 import androidx.compose.material.icons.outlined.Folder
@@ -54,6 +53,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.ui.theme.WinZTheme
+import com.winlator.cmod.ui.theme.WinZShapes
+import com.winlator.cmod.ui.theme.hairlineColor
+import com.winlator.cmod.ui.theme.dividerColor
 
 @Immutable
 data class ContainerOverviewModel(
@@ -117,7 +119,7 @@ private fun ContainerOverviewScreen(model: ContainerOverviewModel, callbacks: Co
                     onClick = callbacks::onLaunch,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)
                         .padding(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()).height(52.dp),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = WinZShapes.Medium,
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
                 ) { Text("Launch Environment", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
             }
@@ -146,9 +148,9 @@ private fun SectionGroup(
     onToggle: (String) -> Unit
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp),
+        modifier = Modifier.fillMaxWidth(), shape = WinZShapes.Medium,
         color = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .78f))
+        border = BorderStroke(1.dp, hairlineColor())
     ) {
         Column {
             sections.forEachIndexed { index, item ->
@@ -169,7 +171,7 @@ private fun SectionGroup(
                 if (index != sections.lastIndex) {
                     HorizontalDivider(
                         modifier = Modifier.padding(start = if (isExpanded) 14.dp else 68.dp, end = 14.dp),
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .58f)
+                        color = dividerColor()
                     )
                 }
             }
@@ -182,7 +184,7 @@ private fun SectionRow(item: SectionItem, expanded: Boolean, onClick: () -> Unit
     Surface(onClick = onClick, color = Color.Transparent, contentColor = MaterialTheme.colorScheme.onSurface) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Surface(
-                modifier = Modifier.size(42.dp), shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.size(42.dp), shape = WinZShapes.Small,
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .58f), contentColor = MaterialTheme.colorScheme.onSurface
             ) { Box(contentAlignment = Alignment.Center) { Icon(item.icon, null, modifier = Modifier.size(22.dp)) } }
             Spacer(Modifier.width(14.dp))

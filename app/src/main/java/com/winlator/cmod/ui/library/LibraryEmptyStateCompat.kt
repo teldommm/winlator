@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.Icon
@@ -31,6 +30,8 @@ import androidx.compose.ui.unit.dp
 import com.winlator.cmod.MainActivity
 import com.winlator.cmod.R
 import com.winlator.cmod.ui.theme.controlAccentColor
+import com.winlator.cmod.ui.theme.WinZShapes
+import com.winlator.cmod.ui.theme.hairlineColor
 
 @Composable
 internal fun LibraryRootWithoutEmptyDescription(
@@ -85,9 +86,9 @@ internal fun LibraryRootWithoutEmptyDescription(
             Surface(
                 onClick = { activity?.navigateToMainDestination(R.id.main_menu_file_manager) },
                 modifier = Modifier.fillMaxWidth(0.90f).widthIn(max = 320.dp),
-                shape = RoundedCornerShape(20.dp),
+                shape = WinZShapes.ExtraLarge,
                 color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                border = BorderStroke(1.dp, hairlineColor())
             ) {
                 Column(
                     Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 28.dp),
@@ -95,7 +96,7 @@ internal fun LibraryRootWithoutEmptyDescription(
                 ) {
                     Surface(
                         modifier = Modifier.size(72.dp),
-                        shape = RoundedCornerShape(20.dp),
+                        shape = WinZShapes.ExtraLarge,
                         color = controlAccentColor(),
                         contentColor = androidx.compose.ui.graphics.Color.White
                     ) {
@@ -118,10 +119,10 @@ internal fun LibraryRootWithoutEmptyDescription(
 @Composable
 private fun EmptyFilterChip(label: String, selected: Boolean) {
     Surface(
-        shape = RoundedCornerShape(10.dp),
+        shape = WinZShapes.Small,
         color = if (selected) MaterialTheme.colorScheme.surfaceVariant else androidx.compose.ui.graphics.Color.Transparent,
         contentColor = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = BorderStroke(1.dp, hairlineColor())
     ) {
         Text(
             label,

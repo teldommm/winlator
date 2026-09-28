@@ -71,6 +71,7 @@ import com.winlator.cmod.ui.theme.controlAccentColor
 import com.winlator.cmod.widget.InputControlsView
 import kotlin.math.hypot
 import kotlin.math.max
+import com.winlator.cmod.ui.theme.hairlineColor
 
 // Toolbar actions the Activity handles (all of them touch the profile / InputControlsView).
 interface ControlsEditorActions {
@@ -389,7 +390,7 @@ private fun FloatingSurface(content: @Composable () -> Unit) {
         shape = shape,
         color = sidebarPanelColor(),
         contentColor = MaterialTheme.colorScheme.onSurface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        border = BorderStroke(1.dp, hairlineColor()),
         content = content
     )
 }

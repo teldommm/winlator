@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DesktopWindows
 import androidx.compose.material.icons.outlined.Folder
@@ -52,6 +51,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.ui.theme.WinZTheme
+import com.winlator.cmod.ui.theme.WinZShapes
+import com.winlator.cmod.ui.theme.hairlineColor
+import com.winlator.cmod.ui.theme.dividerColor
 
 object ContainerOverviewLandscapeComposeHost {
     @JvmStatic
@@ -88,7 +90,7 @@ private fun LandscapeContainerOverview(model: ContainerOverviewModel, callbacks:
                     onClick = callbacks::onLaunch,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp)
                         .padding(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()).height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = WinZShapes.Medium,
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
                 ) { Text("Launch Environment", fontWeight = FontWeight.SemiBold) }
             }
@@ -99,9 +101,9 @@ private fun LandscapeContainerOverview(model: ContainerOverviewModel, callbacks:
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Surface(
-                modifier = Modifier.width(246.dp).fillMaxHeight(), shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.width(246.dp).fillMaxHeight(), shape = WinZShapes.Large,
                 color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .78f))
+                border = BorderStroke(1.dp, hairlineColor())
             ) {
                 Column(Modifier.fillMaxSize().padding(12.dp)) {
                     Text(model.containerName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -112,13 +114,13 @@ private fun LandscapeContainerOverview(model: ContainerOverviewModel, callbacks:
             }
 
             Surface(
-                modifier = Modifier.weight(1f).fillMaxHeight(), shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.weight(1f).fillMaxHeight(), shape = WinZShapes.Large,
                 color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .78f))
+                border = BorderStroke(1.dp, hairlineColor())
             ) {
                 Column(Modifier.fillMaxSize()) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Surface(Modifier.size(40.dp), shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .58f)) {
+                        Surface(Modifier.size(40.dp), shape = WinZShapes.Small, color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .58f)) {
                             Box(contentAlignment = Alignment.Center) { Icon(active.icon, null, modifier = Modifier.size(21.dp)) }
                         }
                         Spacer(Modifier.width(12.dp))
@@ -127,7 +129,7 @@ private fun LandscapeContainerOverview(model: ContainerOverviewModel, callbacks:
                             if (active.subtitle.isNotBlank()) Text(active.subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .58f))
+                    HorizontalDivider(color = dividerColor())
                     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         item(key = selected) {
                             when (selected) {
@@ -149,7 +151,7 @@ private fun LandscapeContainerOverview(model: ContainerOverviewModel, callbacks:
 @Composable
 private fun LandscapeSectionRow(item: LandscapeSection, selected: Boolean, onClick: () -> Unit) {
     Surface(
-        onClick = onClick, modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp), shape = RoundedCornerShape(11.dp),
+        onClick = onClick, modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp), shape = WinZShapes.Small,
         color = if (selected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
         contentColor = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
     ) {

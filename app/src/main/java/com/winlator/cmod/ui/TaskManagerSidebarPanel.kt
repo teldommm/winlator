@@ -41,6 +41,7 @@ import com.winlator.cmod.R
 import com.winlator.cmod.ui.theme.controlAccentColor
 import com.winlator.cmod.ui.theme.destructiveColor
 import com.winlator.cmod.ui.theme.sidebarCardFillColor
+import com.winlator.cmod.ui.theme.hairlineColor
 
 // One process row. rawName is the exact name WinHandler/Windows reports (used for the
 // bring-to-front/kill/affinity calls); displayName additionally carries the " *32" suffix
@@ -133,7 +134,7 @@ private fun MetricCard(modifier: Modifier, title: String, value: String) {
             .fillMaxHeight()
             .clip(shape)
             .background(sidebarCardFillColor())
-            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape)
+            .border(BorderStroke(1.dp, hairlineColor()), shape)
             .padding(horizontal = 12.dp, vertical = 9.dp)
     ) {
         Text(
@@ -163,7 +164,7 @@ private fun ProcessRow(row: ProcessRowData, callbacks: TaskManagerCallbacks) {
             .heightIn(min = 62.dp)
             .clip(shape)
             .background(sidebarCardFillColor())
-            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape)
+            .border(BorderStroke(1.dp, hairlineColor()), shape)
             .padding(start = 12.dp, end = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

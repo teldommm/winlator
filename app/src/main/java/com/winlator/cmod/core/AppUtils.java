@@ -12,10 +12,6 @@ import android.content.res.Resources;
 import android.graphics.Rect;
 import android.os.Build;
 import android.os.Looper;
-import android.text.Html;
-import android.util.TypedValue;
-import android.view.Gravity;
-import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -23,11 +19,7 @@ import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
-import android.widget.LinearLayout;
-import android.widget.PopupWindow;
 import android.widget.Spinner;
-import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.PreferenceManager;
@@ -35,13 +27,11 @@ import androidx.preference.PreferenceManager;
 import com.google.android.material.tabs.TabLayout;
 import com.winlator.cmod.R;
 
-import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Timer;
 import java.util.TimerTask;
 
 public abstract class AppUtils {
-    private static WeakReference<Toast> globalToastReference = null;
 
     public static void keepScreenOn(Activity activity) {
         activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -155,93 +145,6 @@ public abstract class AppUtils {
         int orientation = context.getResources().getConfiguration().orientation;
         float scale = orientation == Configuration.ORIENTATION_PORTRAIT ? 0.8f : 0.5f;
         return (int)UnitUtils.dpToPx(UnitUtils.pxToDp(AppUtils.getScreenWidth()) * scale);
-    }
-
-    public static Toast showToast(Context context, int textResId) {
-        return showToast(context, context.getString(textResId));
-    }
-
-    public static Toast showToast(final Context context, final String text) {
-        if (!isUiThread()) {
-            if (context instanceof Activity) {
-                ((Activity)context).runOnUiThread(() -> showToast(context, text));
-            }
-            return null;
-        }
-
-        if (globalToastReference != null) {
-            Toast toast = globalToastReference.get();
-            if (toast != null) toast.cancel();
-            globalToastReference = null;
-        }
-
-        View view = LayoutInflater.from(context).inflate(R.layout.custom_toast, null);
-        ((TextView)view.findViewById(R.id.TextView)).setText(text);
-
-        Toast toast = new Toast(context);
-        toast.setGravity(Gravity.CENTER | Gravity.BOTTOM, 0, 50);
-        toast.setDuration(text.length() >= 40 ? Toast.LENGTH_LONG : Toast.LENGTH_SHORT);
-        toast.setView(view);
-        toast.show();
-        globalToastReference = new WeakReference<>(toast);
-        return toast;
-    }
-
-    public static PopupWindow showPopupWindow(View anchor, View contentView) {
-        return showPopupWindow(anchor, contentView, 0, 0);
-    }
-
-    public static PopupWindow showPopupWindow(View anchor, View contentView, int width, int height) {
-        Context context = anchor.getContext();
-        PopupWindow popupWindow = new PopupWindow(context);
-        popupWindow.setElevation(5.0f);
-
-        if (width == 0 && height == 0) {
-            int widthMeasureSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
-            int heightMeasureSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
-            contentView.measure(widthMeasureSpec, heightMeasureSpec);
-            popupWindow.setWidth(contentView.getMeasuredWidth());
-            popupWindow.setHeight(contentView.getMeasuredHeight());
-        }
-        else {
-            if (width > 0) {
-                popupWindow.setWidth((int)UnitUtils.dpToPx(width));
-            }
-            else popupWindow.setWidth(LinearLayout.LayoutParams.WRAP_CONTENT);
-
-            if (height > 0) {
-                popupWindow.setHeight((int)UnitUtils.dpToPx(height));
-            }
-            else popupWindow.setHeight(LinearLayout.LayoutParams.WRAP_CONTENT);
-        }
-
-        popupWindow.setContentView(contentView);
-        popupWindow.setFocusable(false);
-        popupWindow.setOutsideTouchable(true);
-
-        popupWindow.update();
-        popupWindow.showAsDropDown(anchor);
-
-        popupWindow.setFocusable(true);
-        popupWindow.update();
-        return popupWindow;
-    }
-
-    public static void showHelpBox(Context context, View anchor, int textResId) {
-        showHelpBox(context, anchor, context.getString(textResId));
-    }
-
-    public static void showHelpBox(Context context, View anchor, String text) {
-        int padding = (int)UnitUtils.dpToPx(8);
-        TextView textView = new TextView(context);
-        textView.setLayoutParams(new ViewGroup.LayoutParams((int)UnitUtils.dpToPx(284), ViewGroup.LayoutParams.WRAP_CONTENT));
-        textView.setPadding(padding, padding, padding, padding);
-        textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
-        textView.setText(Html.fromHtml(text, Html.FROM_HTML_MODE_LEGACY));
-        int widthMeasureSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
-        int heightMeasureSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
-        textView.measure(widthMeasureSpec, heightMeasureSpec);
-        showPopupWindow(anchor, textView, 300, textView.getMeasuredHeight());
     }
 
     public static int getVersionCode(Context context) {
