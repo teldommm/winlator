@@ -1046,9 +1046,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
         guestProgramLauncherComponent.setGamepadEnabled(gamepadMode != GamepadMode.NONE);
 
         if (container != null) {
-            if (Byte.parseByte(startupSelection) == Container.STARTUP_SELECTION_AGGRESSIVE) {
-
-            }
             guestProgramLauncherComponent.setContainer(this.container);
             guestProgramLauncherComponent.setWineInfo(this.wineInfo);
 

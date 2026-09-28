@@ -35,6 +35,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -156,12 +157,21 @@ internal fun OnboardingComponentsScreen(
     installing: String?,
     installingLabel: String?,
     installingProgress: Int,
+    revealType: String?,
+    onRevealHandled: () -> Unit,
     managerMode: Boolean,
     onBack: () -> Unit,
     onContinue: () -> Unit,
     cb: OnboardingCallbacks
 ) {
     var category by rememberSaveable { mutableStateOf("Recommended") }
+    // After a local package installs, jump to its category so the new entry is in view.
+    LaunchedEffect(revealType) {
+        val type = revealType ?: return@LaunchedEffect
+        val target = if (type == "Wine" || type == "Proton") "Wine & Proton" else type
+        if (target in componentCategories) category = target
+        onRevealHandled()
+    }
     val landscape = LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
     val recommendedIds = remember(all) { recommendedComponentIds(all) }
     val visible = remember(all, category, recommendedIds) {
@@ -177,14 +187,14 @@ internal fun OnboardingComponentsScreen(
         it.installed && (it.type == "Wine" || it.type == "Proton") && !it.runtimeIdentifier.isNullOrBlank()
     }
     val showBundled = category == "Recommended" || category == "Wine & Proton"
-    val showLocalInstallProgress = installing == "local" || installing == "driver-local"
+    val showLocalInstallProgress = installing == "local"
 
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         if (landscape) {
             // Landscape: height is the scarce axis, so the list owns the whole width and everything
             // else is packed above it — title/subtitle and the source card share one header row,
             // category chips get a full-width row (all 8 visible on most phones), and the bundled
-            // runtime / local-install progress / local-driver action ride at the top of the list
+            // runtime and local-install progress ride at the top of the list
             // instead of a fixed side column (which used to clip at the bottom on phones).
             LandscapeComponentsHeader(
                 managerMode = managerMode,
@@ -233,9 +243,6 @@ internal fun OnboardingComponentsScreen(
                 if (showLocalInstallProgress) item(key = "local-progress") {
                     InstallProgressCard(installingLabel, installingProgress)
                 }
-                if (category == "AdrenoTools") item(key = "local-driver") {
-                    LocalDriverButton(Modifier.fillMaxWidth()) { cb.onBrowseDriver() }
-                }
             }
         } else {
             // Opened from Settings (manager mode): a top bar with a back arrow, like Containers,
@@ -268,10 +275,6 @@ internal fun OnboardingComponentsScreen(
                     }
                     Spacer(Modifier.height(12.dp))
                     CategorySelector(category) { category = it }
-                    if (category == "AdrenoTools") {
-                        Spacer(Modifier.height(8.dp))
-                        LocalDriverButton { cb.onBrowseDriver() }
-                    }
                     if (showBundled) {
                         Spacer(Modifier.height(10.dp))
                         CoreComponentCard(
@@ -443,24 +446,6 @@ private fun LandscapeComponentsHeader(
     }
 }
 
-// Was a stock OutlinedButton (primary-tinted outline); same fill/outline as the app's buttons.
-@Composable
-private fun LocalDriverButton(modifier: Modifier = Modifier, onClick: () -> Unit) {
-    OutlinedButton(
-        onClick = onClick,
-        modifier = modifier.height(44.dp),
-        shape = WinZShapes.Medium,
-        colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = MaterialTheme.colorScheme.onSurface
-        ),
-        border = BorderStroke(1.dp, hairlineColor())
-    ) {
-        Icon(Icons.Outlined.Folder, null, Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
-        Text("Install local driver")
-    }
-}
 
 @Composable
 private fun CategorySelector(

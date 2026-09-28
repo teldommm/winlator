@@ -61,12 +61,12 @@ public class ComponentCatalogController {
 
     public interface ExtraCallbacks {
         void onBrowseLocal();
-        void onBrowseDriver();
         default void onRuntimeSelected(String runtimeIdentifier) {}
         default void onRequestPermissions() {}
     }
 
     private interface FailureCallback { void call(String error); }
+    private interface ContentInstalledCallback { void call(ContentProfile installed); }
 
     private static final class ComponentItem {
         ContentProfile profile;
@@ -177,11 +177,6 @@ public class ComponentCatalogController {
             @Override
             public void onBrowseLocal() {
                 extra.onBrowseLocal();
-            }
-
-            @Override
-            public void onBrowseDriver() {
-                extra.onBrowseDriver();
             }
 
             @Override
@@ -495,7 +490,7 @@ public class ComponentCatalogController {
             File archive = new File(host.context().getCacheDir(), "winz-component-" + System.nanoTime());
             try {
                 if (!download(item.url, archive, item.name)) throw new Exception("Download failed");
-                installContentArchive(Uri.fromFile(archive), item.name, 72, () -> {
+                installContentArchive(Uri.fromFile(archive), item.name, 72, installed -> {
                     rebuildCatalog();
                     runOnUi(() -> finishInstall(id, null));
                 }, error -> runOnUi(() -> finishInstall(id, error)));
@@ -543,7 +538,7 @@ public class ComponentCatalogController {
     }
 
     private void installContentArchive(Uri uri, String displayName, int startProgress,
-                                       Runnable success, FailureCallback failure) {
+                                       ContentInstalledCallback success, FailureCallback failure) {
         postInstallProgress("Installing " + displayName, startProgress);
         contentsManager.extraContentFile(uri, archiveProgress -> {
             int progress = archiveProgress < 0
@@ -566,7 +561,7 @@ public class ComponentCatalogController {
                     public void onFailed(ContentsManager.InstallFailedReason reason, Exception error) {
                         if (reason == ContentsManager.InstallFailedReason.ERROR_EXIST) {
                             postInstallProgress("Installed " + installedName, 100);
-                            success.run();
+                            success.call(extracted);
                         }
                         else failure.call("Installation failed: " + reason);
                     }
@@ -574,7 +569,7 @@ public class ComponentCatalogController {
                     @Override
                     public void onSucceed(ContentProfile installed) {
                         postInstallProgress("Installed " + installedName, 100);
-                        success.run();
+                        success.call(installed != null ? installed : extracted);
                     }
                 });
             }
@@ -823,33 +818,87 @@ public class ComponentCatalogController {
         }
     }
 
-    public void handleLocalComponentPicked(Uri uri) {
+    // One "Local package" entry for everything: the picked file's first bytes decide where it
+    // goes, so there's no separate "Install local driver" button. Components (.wcp) are tar
+    // archives compressed with xz or zstd; AdrenoTools drivers are plain zips with a meta.json.
+    // The name/extension isn't used — the system picker often reports names without one.
+    public void handleLocalPackagePicked(Uri uri) {
         if (installBusy) return;
         installBusy = true;
         composeController.setInstallBusy("local", true);
         String displayName = localDisplayName(uri);
         composeController.updateInstallProgress("Preparing " + displayName, 0);
-        io.execute(() -> installContentArchive(uri, displayName, 5, () -> {
-            rebuildCatalog();
-            runOnUi(() -> finishInstall("local", null));
-        }, error -> runOnUi(() -> finishInstall("local", error))));
+        io.execute(() -> {
+            switch (sniffLocalPackage(uri)) {
+                case LOCAL_PACKAGE_DRIVER:
+                    installLocalDriver(uri, displayName);
+                    break;
+                case LOCAL_PACKAGE_CONTENT:
+                    installContentArchive(uri, displayName, 5, installed -> {
+                        rebuildCatalog();
+                        runOnUi(() -> {
+                            finishInstall("local", null);
+                            revealCategory(installed != null ? displayType(installed.type) : null);
+                        });
+                    }, error -> runOnUi(() -> finishInstall("local", error)));
+                    break;
+                default:
+                    runOnUi(() -> finishInstall("local",
+                            "Unsupported package. Pick a component (.wcp) or a driver (.zip)."));
+            }
+        });
     }
 
-    public void handleLocalDriverPicked(Uri uri) {
-        if (installBusy) return;
-        installBusy = true;
-        composeController.setInstallBusy("driver-local", true);
-        composeController.updateInstallProgress("Installing " + localDisplayName(uri), -1);
-        io.execute(() -> {
-            String installed = adrenotoolsManager.installDriver(uri);
-            runOnUi(() -> {
-                installBusy = false;
-                if (composeController != null) composeController.setInstallBusy(null, false);
-                syncComposeCatalog();
-                if ((installed == null || installed.isEmpty()) && host.isAlive()) {
-                    Toast.makeText(host.context(), "Unable to install the driver.", Toast.LENGTH_LONG).show();
-                }
-            });
+    private static final int LOCAL_PACKAGE_UNKNOWN = 0;
+    private static final int LOCAL_PACKAGE_CONTENT = 1;
+    private static final int LOCAL_PACKAGE_DRIVER = 2;
+
+    // Runs on the io thread (it opens the file).
+    private int sniffLocalPackage(Uri uri) {
+        byte[] head = new byte[6];
+        int read = 0;
+        try (InputStream in = host.context().getContentResolver().openInputStream(uri)) {
+            if (in == null) return LOCAL_PACKAGE_UNKNOWN;
+            while (read < head.length) {
+                int n = in.read(head, read, head.length - read);
+                if (n < 0) break;
+                read += n;
+            }
+        } catch (Exception e) {
+            return LOCAL_PACKAGE_UNKNOWN;
+        }
+        // zip local file header: "PK\3\4"
+        if (read >= 4 && head[0] == 'P' && head[1] == 'K' && head[2] == 3 && head[3] == 4) {
+            return LOCAL_PACKAGE_DRIVER;
+        }
+        // xz: FD '7' 'z' 'X' 'Z' 00
+        if (read >= 6 && (head[0] & 0xFF) == 0xFD && head[1] == '7' && head[2] == 'z'
+                && head[3] == 'X' && head[4] == 'Z' && head[5] == 0) {
+            return LOCAL_PACKAGE_CONTENT;
+        }
+        // zstd: 28 B5 2F FD
+        if (read >= 4 && (head[0] & 0xFF) == 0x28 && (head[1] & 0xFF) == 0xB5
+                && (head[2] & 0xFF) == 0x2F && (head[3] & 0xFF) == 0xFD) {
+            return LOCAL_PACKAGE_CONTENT;
+        }
+        return LOCAL_PACKAGE_UNKNOWN;
+    }
+
+    // Runs on the io thread.
+    private void installLocalDriver(Uri uri, String displayName) {
+        postInstallProgress("Installing " + displayName, -1);
+        String installed = adrenotoolsManager.installDriver(uri);
+        boolean ok = installed != null && !installed.isEmpty();
+        runOnUi(() -> {
+            finishInstall("local", ok ? null : "Unable to install the driver. Make sure it's an AdrenoTools driver package.");
+            if (ok) revealCategory("AdrenoTools");
         });
+    }
+
+    // Switches the Components screen to the category the new package landed in.
+    private void revealCategory(String type) {
+        if (composeController != null && type != null && !type.isEmpty() && host.isAlive()) {
+            composeController.revealCategory(type);
+        }
     }
 }

@@ -41,11 +41,7 @@ fun ComponentManagerRoute(onClose: () -> Unit) {
 
     val pickComponent = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val uri = result.data?.data
-        if (result.resultCode == Activity.RESULT_OK && uri != null) catalog.handleLocalComponentPicked(uri)
-    }
-    val pickDriver = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val uri = result.data?.data
-        if (result.resultCode == Activity.RESULT_OK && uri != null) catalog.handleLocalDriverPicked(uri)
+        if (result.resultCode == Activity.RESULT_OK && uri != null) catalog.handleLocalPackagePicked(uri)
     }
 
     // Same order the fragment used: initialize → UI state → callbacks → attach; start() once
@@ -62,7 +58,6 @@ fun ComponentManagerRoute(onClose: () -> Unit) {
     val callbacks = remember {
         catalog.createCallbacks(object : ComponentCatalogController.ExtraCallbacks {
             override fun onBrowseLocal() = pickComponent.launch(openDocumentIntent())
-            override fun onBrowseDriver() = pickDriver.launch(openDocumentIntent())
         })
     }
 

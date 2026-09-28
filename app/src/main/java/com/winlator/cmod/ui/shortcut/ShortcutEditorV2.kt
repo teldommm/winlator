@@ -989,9 +989,9 @@ private fun ShortcutCategoryV2(
         else -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SettingsCard {
                 val startupEntries = listOf(
-                    "Normal (Load all services)",
-                    "Essential (Load only essential services)",
-                    "Aggressive (Stop services on startup)"
+                    "Load all services",
+                    "Load essential services",
+                    "Stop all services"
                 )
                 SettingChoice("Startup Selection", startupEntries[s.startup], startupEntries) {
                     s.startup = startupEntries.indexOf(it).coerceAtLeast(0); s.extra("startupSelection", s.startup.toString())

@@ -490,14 +490,6 @@ internal fun normalizeResolution(value: String): String =
 private fun settingDisplayLabel(value: String): String =
     if (value == "Lanczos 2 (16-tap)") "Lanczos 2" else value
 
-// What the closed field shows for the selected value. For Startup Selection the entries carry
-// their explanation in parentheses ("Normal (Load all services)") — useful while choosing in the
-// menu, noise once chosen — so the field keeps only the preset name. The menu is unchanged.
-private fun settingSelectedFieldText(label: String, value: String): String = when (label) {
-    "Startup Selection" -> value.substringBefore(" (").trim()
-    else -> settingDisplayLabel(value)
-}
-
 private fun settingFieldLabel(label: String): String = when (label) {
     "Graphics Driver" -> "OpenGL Driver"
     "Driver Version" -> "Vulkan Driver"
@@ -594,7 +586,7 @@ internal fun SettingChoice(
                     Column(Modifier.weight(1f)) {
                         Text(displayLabel, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
-                            settingSelectedFieldText(label, displaySelected),
+                            settingDisplayLabel(displaySelected),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Medium,
                             maxLines = 1,

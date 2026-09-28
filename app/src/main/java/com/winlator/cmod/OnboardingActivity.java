@@ -69,7 +69,6 @@ public class OnboardingActivity extends AppCompatActivity implements ComponentCa
     private static final int REQUEST_NOTIFICATIONS = 821;
     private static final int REQUEST_LOCAL_COMPONENT = 822;
     private static final int REQUEST_ALL_FILES = 823;
-    private static final int REQUEST_LOCAL_DRIVER = 824;
 
     private final ComponentCatalogController controller = new ComponentCatalogController(this);
 
@@ -109,14 +108,6 @@ public class OnboardingActivity extends AppCompatActivity implements ComponentCa
                         intent.addCategory(Intent.CATEGORY_OPENABLE);
                         intent.setType("*/*");
                         startActivityForResult(intent, REQUEST_LOCAL_COMPONENT);
-                    }
-
-                    @Override
-                    public void onBrowseDriver() {
-                        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-                        intent.addCategory(Intent.CATEGORY_OPENABLE);
-                        intent.setType("*/*");
-                        startActivityForResult(intent, REQUEST_LOCAL_DRIVER);
                     }
 
                     @Override
@@ -172,9 +163,7 @@ public class OnboardingActivity extends AppCompatActivity implements ComponentCa
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQUEST_LOCAL_COMPONENT && resultCode == Activity.RESULT_OK && data != null && data.getData() != null) {
-            controller.handleLocalComponentPicked(data.getData());
-        } else if (requestCode == REQUEST_LOCAL_DRIVER && resultCode == Activity.RESULT_OK && data != null && data.getData() != null) {
-            controller.handleLocalDriverPicked(data.getData());
+            controller.handleLocalPackagePicked(data.getData());
         } else if (requestCode == REQUEST_ALL_FILES) {
             continuePermissionFlow();
         }

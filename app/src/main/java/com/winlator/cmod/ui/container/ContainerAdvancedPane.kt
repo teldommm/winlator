@@ -97,9 +97,9 @@ internal fun ContainerAdvancedPane(containerId: Int) {
 
             "Startup & Input" -> SettingsCard {
                 val startupEntries = listOf(
-                    "Normal (Load all services)",
-                    "Essential (Load only essential services)",
-                    "Aggressive (Stop services on startup)"
+                    "Load all services",
+                    "Load essential services",
+                    "Stop all services"
                 )
                 SettingChoice("Startup Selection", startupEntries[startup], startupEntries) { value ->
                     startup = startupEntries.indexOf(value).coerceAtLeast(0)

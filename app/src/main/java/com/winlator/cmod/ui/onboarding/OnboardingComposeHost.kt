@@ -46,7 +46,6 @@ interface OnboardingCallbacks {
     fun onInstallBundledRuntime()
     fun onRemoveBundledRuntime()
     fun onBrowseLocal()
-    fun onBrowseDriver()
     fun onRuntimeSelected(runtimeIdentifier: String)
     fun onRequestPermissions()
     fun onRetryCore()
@@ -63,7 +62,10 @@ class OnboardingComposeController internal constructor(
     internal val installingLabel: MutableState<String?>,
     internal val installingProgress: MutableState<Int>,
     internal val initialContainerPreparing: MutableState<Boolean>,
-    internal val initialContainerReady: MutableState<Boolean>
+    internal val initialContainerReady: MutableState<Boolean>,
+    // Component type ("DXVK", "Wine", "AdrenoTools", ...) the Components screen should switch to,
+    // set after a local package installs; the screen clears it once applied.
+    internal val revealType: MutableState<String?> = mutableStateOf(null)
 ) {
     fun updateCore(ready: Boolean, progress: Int) {
         coreReady.value = ready
@@ -88,6 +90,10 @@ class OnboardingComposeController internal constructor(
             installingLabel.value = null
             installingProgress.value = -1
         }
+    }
+
+    fun revealCategory(type: String) {
+        revealType.value = type
     }
 
     fun updateInstallProgress(label: String?, progress: Int) {
@@ -243,6 +249,7 @@ private fun OnboardingFlow(
     val installing: State<String?> = state.installingId
     val installingLabel: State<String?> = state.installingLabel
     val installingProgress: State<Int> = state.installingProgress
+    val revealType: MutableState<String?> = state.revealType
     val containerPreparing: MutableState<Boolean> = state.initialContainerPreparing
     val containerReady: MutableState<Boolean> = state.initialContainerReady
 
@@ -285,6 +292,8 @@ private fun OnboardingFlow(
             installing = installing.value,
             installingLabel = installingLabel.value,
             installingProgress = installingProgress.value,
+            revealType = revealType.value,
+            onRevealHandled = { revealType.value = null },
             managerMode = managerMode,
             onBack = {
                 if (managerMode) cb.onCloseComponents()

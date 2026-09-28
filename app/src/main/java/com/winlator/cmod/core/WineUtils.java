@@ -236,22 +236,43 @@ public static void changeServicesStatus(Container container, String startupSelec
     try (WineRegistryEditor registryEditor = new WineRegistryEditor(systemRegFile)) {
         registryEditor.setCreateKeyIfNotExist(false);
 
-        String[] targetList = (selection == Container.STARTUP_SELECTION_AGGRESSIVE) ? aggressiveServices : services;
+        // Normal     - every service back to its default start value.
+        // Essential  - the base list disabled (4), except the device services games need
+        //              (controllers via winebus/winehid, PlugPlay), which stay automatic (2).
+        // Aggressive - the same over the extended list, also keeping MountMgr (drives).
+        // Essential used to fall through to the Normal values, so the two modes were identical.
+        boolean aggressive = selection == Container.STARTUP_SELECTION_AGGRESSIVE;
+        boolean essential = selection == Container.STARTUP_SELECTION_ESSENTIAL;
 
-        for (String service : targetList) {
+        // Default start value per service. Written for every service in both lists, so switching
+        // away from Aggressive also restores the ones only it disables (FontCache, MSIServer,
+        // W32Time, ...) - those used to stay disabled after going back to Normal/Essential.
+        java.util.LinkedHashMap<String, Integer> defaults = new java.util.LinkedHashMap<>();
+        java.util.HashSet<String> baseNames = new java.util.HashSet<>();
+        java.util.HashSet<String> extendedNames = new java.util.HashSet<>();
+        for (String service : aggressiveServices) {
             String name = service.substring(0, service.indexOf(":"));
-            int value = Character.getNumericValue(service.charAt(service.length() - 1));
+            defaults.put(name, Character.getNumericValue(service.charAt(service.length() - 1)));
+            extendedNames.add(name);
+        }
+        for (String service : services) {
+            String name = service.substring(0, service.indexOf(":"));
+            defaults.put(name, Character.getNumericValue(service.charAt(service.length() - 1)));
+            baseNames.add(name);
+        }
 
-            if (selection == Container.STARTUP_SELECTION_AGGRESSIVE) {
-                value = 4;
-                if (name.equalsIgnoreCase("winebus") || name.equalsIgnoreCase("winehid") ||
-                    name.equalsIgnoreCase("MountMgr") || name.equalsIgnoreCase("PlugPlay")) {
-                    value = 2;
-                }
+        for (java.util.Map.Entry<String, Integer> entry : defaults.entrySet()) {
+            String name = entry.getKey();
+            int value = entry.getValue();
+            boolean trimmedHere = (essential && baseNames.contains(name)) || (aggressive && (extendedNames.contains(name) || baseNames.contains(name)));
+            if (trimmedHere) {
+                boolean keep = name.equalsIgnoreCase("winebus") || name.equalsIgnoreCase("winehid") ||
+                    name.equalsIgnoreCase("PlugPlay") || (aggressive && name.equalsIgnoreCase("MountMgr"));
+                value = keep ? 2 : 4;
             }
             if (name.equalsIgnoreCase("NDIS")) {
                 name = "Ndis";
-                value = (selection == Container.STARTUP_SELECTION_AGGRESSIVE) ? 4 : 2;
+                value = (essential || aggressive) ? 4 : 2;
             }
 
             registryEditor.setDwordValue("System\\CurrentControlSet\\Services\\" + name, "Start", value);

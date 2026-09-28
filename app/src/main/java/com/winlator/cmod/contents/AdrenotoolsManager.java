@@ -202,42 +202,54 @@ public class AdrenotoolsManager {
     
     public String installDriver(Uri driverUri) {
         File tmpDir = new File(adrenotoolsContentDir, "tmp");
-        if (tmpDir.exists()) tmpDir.delete();
+        if (tmpDir.exists()) FileUtils.delete(tmpDir);
         tmpDir.mkdirs();
-        ZipInputStream zis;
-        InputStream is;
         String name = "";
-        
-        try {
-            is = mContext.getContentResolver().openInputStream(driverUri);
-            zis = new ZipInputStream(is);
-            ZipEntry entry = zis.getNextEntry();
-            while (entry != null) {
-                File dstFile = new File(tmpDir, entry.getName());
-                Files.copy(zis, dstFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                entry = zis.getNextEntry();
-            }
-            zis.close();
-            if (new File(tmpDir, "meta.json").exists()) {
-                name = getDriverName(tmpDir.getName());
-                File dst = new File(adrenotoolsContentDir, name);
-                if (!dst.exists() && !name.equals(""))
-                    tmpDir.renameTo(dst);
-                else {
-                    name = "";
-                    FileUtils.delete(tmpDir);
+
+        // Entries are resolved against tmpDir and rejected if they escape it ("../" names — the
+        // zip-slip case, which used to be able to write anywhere in the app's storage).
+        // Directory entries and nested paths are created instead of failing the whole install.
+        try (InputStream is = mContext.getContentResolver().openInputStream(driverUri)) {
+            if (is == null) throw new IOException("Unable to open " + driverUri);
+            try (ZipInputStream zis = new ZipInputStream(is)) {
+                String root = tmpDir.getCanonicalPath() + File.separator;
+                ZipEntry entry;
+                while ((entry = zis.getNextEntry()) != null) {
+                    File dstFile = new File(tmpDir, entry.getName());
+                    if (!dstFile.getCanonicalPath().startsWith(root)) {
+                        throw new IOException("Entry outside of the driver directory: " + entry.getName());
+                    }
+                    if (entry.isDirectory()) {
+                        dstFile.mkdirs();
+                        continue;
+                    }
+                    File parent = dstFile.getParentFile();
+                    if (parent != null) parent.mkdirs();
+                    Files.copy(zis, dstFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
                 }
             }
+        }
+        catch (Exception e) {
+            Log.d("AdrenotoolsManager", "Failed to install driver: " + e.getMessage());
+            FileUtils.delete(tmpDir);
+            return "";
+        }
+
+        if (new File(tmpDir, "meta.json").exists()) {
+            name = getDriverName(tmpDir.getName());
+            File dst = new File(adrenotoolsContentDir, name);
+            if (!dst.exists() && !name.equals(""))
+                tmpDir.renameTo(dst);
             else {
-                Log.d("AdrenotoolsManager", "Failed to install driver, a valid driver has not been selected");
-                tmpDir.delete();
+                name = "";
+                FileUtils.delete(tmpDir);
             }
         }
-        catch (IOException e) {
+        else {
             Log.d("AdrenotoolsManager", "Failed to install driver, a valid driver has not been selected");
-            tmpDir.delete();
+            FileUtils.delete(tmpDir);
         }
-        
+
         return name;
     }
     
