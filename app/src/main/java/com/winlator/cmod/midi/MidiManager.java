@@ -2,10 +2,7 @@ package com.winlator.cmod.midi;
 
 import android.content.Context;
 import android.net.Uri;
-import android.widget.ArrayAdapter;
-import android.widget.Spinner;
 
-import com.winlator.cmod.R;
 import com.winlator.cmod.core.FileUtils;
 
 import java.io.File;
@@ -105,31 +102,6 @@ public class MidiManager {
             else
                 callback.onFailed(ERROR_UNKNOWN);
         });
-    }
-
-    public static void loadSFSpinner(Spinner spinner) {
-        Context context = spinner.getContext();
-        List<String> filesName = new ArrayList<>();
-        List<File> sfFiles = getSF2Files(spinner.getContext());
-
-        filesName.add("-- " + context.getString(R.string.disabled) + " --");
-        filesName.add(DEFAULT_SF2_FILE);
-        for (File file : sfFiles)
-            filesName.add(file.getName());
-
-        spinner.setAdapter(new ArrayAdapter<>(spinner.getContext(), android.R.layout.simple_spinner_dropdown_item, filesName));
-    }
-
-    public static void loadSFSpinnerWithoutDisabled(Spinner spinner) {
-        Context context = spinner.getContext();
-        List<String> filesName = new ArrayList<>();
-        List<File> sfFiles = getSF2Files(spinner.getContext());
-
-        filesName.add(DEFAULT_SF2_FILE);
-        for (File file : sfFiles)
-            filesName.add(file.getName());
-
-        spinner.setAdapter(new ArrayAdapter<>(spinner.getContext(), android.R.layout.simple_spinner_dropdown_item, filesName));
     }
 
 }

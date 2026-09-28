@@ -16,11 +16,10 @@ private fun environmentText(
     val info = WineInfo.fromIdentifier(context, contents, shortcut.container.getWineVersion())
     var version = info.fullVersion()
     if (version.endsWith(".0")) version = version.dropLast(2)
-    val runtime = (if (info.type.equals("proton", true)) "Proton " else "Wine ") + version + " " + info.getArch()
-    "$runtime · Vulkan"
+    (if (info.type.equals("proton", true)) "Proton " else "Wine ") + version + " " + info.getArch()
 }.getOrDefault(fallback)
 
-// Runtime labels ("Proton 9.0 arm64ec · Vulkan") for Library tiles. Disk work (ContentsManager
+// Runtime labels ("Proton 9.0 arm64ec") for Library tiles. Disk work (ContentsManager
 // sync + WineInfo per container) — call off the main thread; LibraryScreenController does it on
 // its loader before publishing items. Falls back to the container name.
 object LibraryEnvironmentLabels {

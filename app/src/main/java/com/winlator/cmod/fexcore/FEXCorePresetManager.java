@@ -3,9 +3,6 @@ package com.winlator.cmod.fexcore;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.net.Uri;
-import android.widget.ArrayAdapter;
-import android.widget.Spinner;
-import android.widget.SpinnerAdapter;
 import android.widget.Toast;
 
 import androidx.preference.PreferenceManager;
@@ -24,7 +21,6 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.Locale;
 
 public class FEXCorePresetManager {
     public static EnvVars getEnvVars(Context context, String id) {
@@ -256,28 +252,4 @@ public class FEXCorePresetManager {
         preferences.edit().putString(key, customPresetStr).apply();
     }
 
-    public static void loadSpinner(Spinner spinner, String selectedId) {
-        Context context = spinner.getContext();
-        ArrayList<FEXCorePreset> presets = getPresets(context);
-
-        int selectedPosition = 0;
-        for (int i = 0; i < presets.size(); i++) {
-            if (presets.get(i).id.equals(selectedId)) {
-                selectedPosition = i;
-                break;
-            }
-        }
-
-        spinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, presets));
-        spinner.setSelection(selectedPosition);
-    }
-
-    public static String getSpinnerSelectedId(Spinner spinner) {
-        SpinnerAdapter adapter = spinner.getAdapter();
-        int selectedPosition = spinner.getSelectedItemPosition();
-        if (adapter != null && adapter.getCount() > 0 && selectedPosition >= 0) {
-            return ((FEXCorePreset)adapter.getItem(selectedPosition)).id;
-        }
-        else return FEXCorePreset.COMPATIBILITY;
-    }
 }

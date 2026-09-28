@@ -14,13 +14,10 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.Process;
-import android.os.SystemClock;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
 
-import com.winlator.cmod.XServerDisplayActivity;
-import com.winlator.cmod.container.Container;
 import com.winlator.cmod.core.CPUStatus;
 import com.winlator.cmod.core.GPUInformation;
 
@@ -1535,19 +1532,6 @@ public class WinlatorHUD extends View {
         else showMask &= ~bit;
         prefs.edit().putInt(KEY_SHOW, showMask).apply();
         requestRelayout();
-    }
-
-    public void syncCheckboxes(android.widget.CheckBox cbFps,
-            android.widget.CheckBox cbGpu,
-            android.widget.CheckBox cbCpuRam,
-            android.widget.CheckBox cbBattTemp,
-            android.widget.CheckBox cbGraph,
-            android.widget.CheckBox cbRenderer) {
-        if (cbFps != null) cbFps.setChecked((showMask & SHOW_FPS) != 0);
-        if (cbGpu != null) cbGpu.setChecked((showMask & SHOW_GPU_USAGE) != 0);
-        if (cbCpuRam != null) cbCpuRam.setChecked((showMask & SHOW_CPU_USAGE) != 0);
-        if (cbBattTemp != null) cbBattTemp.setChecked((showMask & SHOW_POWER) != 0);
-        if (cbRenderer != null) cbRenderer.setChecked((showMask & SHOW_RENDERER) != 0);
     }
 
     public void setDataSource(Object dataSource) {}

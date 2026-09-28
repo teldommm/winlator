@@ -3,10 +3,6 @@ package com.winlator.cmod.box64;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.net.Uri;
-import android.util.Log;
-import android.widget.ArrayAdapter;
-import android.widget.Spinner;
-import android.widget.SpinnerAdapter;
 import android.widget.Toast;
 
 import androidx.preference.PreferenceManager;
@@ -18,8 +14,6 @@ import com.winlator.cmod.core.FileUtils;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -291,28 +285,4 @@ public abstract class Box64PresetManager {
         preferences.edit().putString(key, customPresetStr).apply();
     }
 
-    public static void loadSpinner(String prefix, Spinner spinner, String selectedId) {
-        Context context = spinner.getContext();
-        ArrayList<Box64Preset> presets = getPresets(prefix, context);
-
-        int selectedPosition = 0;
-        for (int i = 0; i < presets.size(); i++) {
-            if (presets.get(i).id.equals(selectedId)) {
-                selectedPosition = i;
-                break;
-            }
-        }
-
-        spinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, presets));
-        spinner.setSelection(selectedPosition);
-    }
-
-    public static String getSpinnerSelectedId(Spinner spinner) {
-        SpinnerAdapter adapter = spinner.getAdapter();
-        int selectedPosition = spinner.getSelectedItemPosition();
-        if (adapter != null && adapter.getCount() > 0 && selectedPosition >= 0) {
-            return ((Box64Preset)adapter.getItem(selectedPosition)).id;
-        }
-        else return Box64Preset.COMPATIBILITY;
-    }
 }

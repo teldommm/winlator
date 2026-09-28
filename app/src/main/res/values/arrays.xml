@@ -47,9 +47,6 @@
         <item>2.3.1</item>
         <item>2.3.1-arm64ec-gplasync</item>
     </string-array>
-    <string-array name="fexcore_version_entries">
-        <item>2601</item>
-    </string-array>
     <string-array name="vkd3d_version_entries">
         <item>None</item>
         <item>2.8</item>

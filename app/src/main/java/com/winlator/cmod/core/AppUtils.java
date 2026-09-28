@@ -19,12 +19,10 @@ import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
-import android.widget.Spinner;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.PreferenceManager;
 
-import com.google.android.material.tabs.TabLayout;
 import com.winlator.cmod.R;
 
 import java.util.ArrayList;
@@ -178,66 +176,6 @@ public abstract class AppUtils {
                 }
             }
         });
-    }
-
-    public static boolean setSpinnerSelectionFromValue(Spinner spinner, String value) {
-        spinner.setSelection(0, false);
-        for (int i = 0; i < spinner.getCount(); i++) {
-            if (spinner.getItemAtPosition(i).toString().equalsIgnoreCase(value)) {
-                spinner.setSelection(i, false);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public static boolean setSpinnerSelectionFromIdentifier(Spinner spinner, String identifier) {
-        spinner.setSelection(0, false);
-        for (int i = 0; i < spinner.getCount(); i++) {
-            if (StringUtils.parseIdentifier(spinner.getItemAtPosition(i)).equals(identifier)) {
-                spinner.setSelection(i, false);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public static boolean setSpinnerSelectionFromNumber(Spinner spinner, String number) {
-        spinner.setSelection(0, false);
-        for (int i = 0; i < spinner.getCount(); i++) {
-            if (StringUtils.parseNumber(spinner.getItemAtPosition(i)).equals(number)) {
-                spinner.setSelection(i, false);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public static void setupTabLayout(final View view, int tabLayoutResId, final int... tabResIds) {
-        final Callback<Integer> tabSelectedCallback = (position) -> {
-            for (int i = 0; i < tabResIds.length; i++) {
-                View tabView = view.findViewById(tabResIds[i]);
-                tabView.setVisibility(position == i ? View.VISIBLE : View.GONE);
-            }
-        };
-
-        TabLayout tabLayout = view.findViewById(tabLayoutResId);
-
-        tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
-            @Override
-            public void onTabSelected(TabLayout.Tab tab) {
-                tabSelectedCallback.call(tab.getPosition());
-            }
-
-            @Override
-            public void onTabUnselected(TabLayout.Tab tab) {}
-
-            @Override
-            public void onTabReselected(TabLayout.Tab tab) {
-                tabSelectedCallback.call(tab.getPosition());
-            }
-        });
-        tabLayout.getTabAt(0).select();
     }
 
     public static void findViewsWithClass(ViewGroup parent, Class viewClass, ArrayList<View> outViews) {

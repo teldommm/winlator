@@ -33,10 +33,6 @@ public class StringUtils {
         return identifier.equals("pulseaudio-gn") ? "pulse-audio-gn" : identifier;
     }
 
-    public static String parseNumber(Object text) {
-        return text.toString().replaceAll("[^0-9\\.]+", "");
-    }
-
     public static String getString(Context context, String resName) {
         try {
             resName = resName.toLowerCase(Locale.ENGLISH);

@@ -47,7 +47,7 @@ fun GameDetailRoute(shortcutPath: String, onClose: () -> Unit, onLibraryChanged:
             else -> null
         }
     }
-    // Same label as the Library tile ("Proton 9.0 arm64ec · Vulkan"), which the Library has
+    // Same label as the Library tile ("Proton 9.0 arm64ec"), which the Library has
     // normally already resolved — so the subtitle is final from the first frame. Refreshed in the
     // background in case the container's runtime changed since.
     val subtitle by produceState(

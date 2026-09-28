@@ -67,7 +67,7 @@ class LibraryComposeController internal constructor(
 
     // Items arrive fully resolved (runtime label, pre-decoded icon) from LibraryScreenController's
     // loader thread. There used to be a second pass here that published the raw container name
-    // first and swapped in the "Proton … · Vulkan" label a moment later — the text jump on tiles
+    // first and swapped in the "Proton …" label a moment later — the text jump on tiles
     // every time the Library reloaded (e.g. switching back from Input Controls).
     fun setItems(value: List<LibraryItem>) {
         items.value = value.toList()
