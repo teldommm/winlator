@@ -181,27 +181,10 @@ internal fun FileManagerScreen(model: FileManagerModel, callbacks: FileManagerCa
             }
         }
 
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-            shape = WinZShapes.Medium,
-            color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, hairlineColor())
-        ) {
-            Text(
-                model.currentPath,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 13.dp, vertical = 10.dp),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.MiddleEllipsis
-            )
-        }
-
+        // The current path used to be its own card above this one; it now takes the place of
+        // the "Storage" caption over the usage bar.
         StorageMeter(
+            path = model.currentPath,
             usedText = model.storageUsedText,
             percent = model.storagePercent,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
@@ -260,7 +243,7 @@ internal fun FileManagerScreen(model: FileManagerModel, callbacks: FileManagerCa
 }
 
 @Composable
-private fun StorageMeter(usedText: String, percent: Int, modifier: Modifier = Modifier) {
+private fun StorageMeter(path: String, usedText: String, percent: Int, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = WinZShapes.Medium,
@@ -269,8 +252,17 @@ private fun StorageMeter(usedText: String, percent: Int, modifier: Modifier = Mo
     ) {
         Column(Modifier.padding(horizontal = 13.dp, vertical = 10.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("Storage", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-                Text(usedText, style = MaterialTheme.typography.bodySmall)
+                Text(
+                    path,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    // Keeps both the drive root and the current folder visible on long paths.
+                    overflow = TextOverflow.MiddleEllipsis
+                )
+                Spacer(Modifier.width(10.dp))
+                Text(usedText, style = MaterialTheme.typography.bodySmall, maxLines = 1)
             }
             Spacer(Modifier.height(8.dp))
             LinearProgressIndicator(
