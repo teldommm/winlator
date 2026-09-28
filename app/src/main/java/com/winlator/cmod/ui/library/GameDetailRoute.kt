@@ -66,7 +66,6 @@ fun GameDetailRoute(shortcutPath: String, onClose: () -> Unit, onLibraryChanged:
                 intent.putExtra("container_id", shortcut.container.id)
                 intent.putExtra("shortcut_path", shortcut.file.path)
                 intent.putExtra("shortcut_name", shortcut.name)
-                intent.putExtra("disableXinput", shortcut.getExtra("disableXinput", "0"))
                 activity.startActivity(intent)
             }
 

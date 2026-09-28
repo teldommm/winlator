@@ -99,7 +99,6 @@ data class SettingsModel(
     val shortcutPath: String,
     val cursorSpeedPercent: Int, // Cursor speed (pref "cursor_speed"): touch and captured mouse
     val cursorLock: Boolean,
-    val xInput: Boolean,
     val useDri3: Boolean,
     val highRefreshRate: Boolean,
     val fileProvider: Boolean,
@@ -234,8 +233,6 @@ internal fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) 
                     ToggleRow("Capture External Pointer", model.cursorLock) { callbacks.onBooleanChanged("cursor_lock", it) }
                     GroupDivider()
                     ToggleRow(stringResource(R.string.use_dri3_extension), model.useDri3) { callbacks.onBooleanChanged("use_dri3", it) }
-                    GroupDivider()
-                    ToggleRow("Disable Xinput (Used for Exclusive M/KB support)", model.xInput) { callbacks.onBooleanChanged("xinput_toggle", it) }
                 }
             }
 

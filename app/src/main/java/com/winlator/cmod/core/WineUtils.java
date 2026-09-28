@@ -261,32 +261,18 @@ public static void changeServicesStatus(Container container, String startupSelec
     }
 }
 
-    /**
-     * Configure Wine DirectInput joystick registry keys for all gamepads.
-     * By default, disables all joysticks in Wine's DirectInput.
-     * When DInput is enabled, sets joysticks to "override" mode to make them visible.
-     * 
-     * @param container The container to configure
-     * @param dinputEnabled Whether DInput is enabled for this container
-     * @param exclusiveXInput Whether Exclusive XInput is enabled (if false, keys are removed)
-     */
-    public static void setJoystickRegistryKeys(Container container, boolean dinputEnabled, boolean exclusiveXInput) {
+    // See GamepadMode for what each value does in Wine. Both names are written per slot: the
+    // fake devices are "Generic HID Gamepad N", and some Wine builds report them truncated.
+    public static void setJoystickRegistryKeys(Container container, int gamepadMode) {
         File userRegFile = new File(container.getRootDir(), ".wine/user.reg");
         final String joysticksKey = "Software\\Wine\\DirectInput\\Joysticks";
-        
-        // The value to set: "disabled" hides from DInput, "override" makes visible
-        final String value = dinputEnabled ? "override" : "disabled";
-        
+        final String value = com.winlator.cmod.winhandler.GamepadMode.registryValue(gamepadMode);
+
         try (WineRegistryEditor registryEditor = new WineRegistryEditor(userRegFile)) {
-            // Configure all 4 possible gamepad slots
             for (int i = 0; i < 4; i++) {
-                if (exclusiveXInput) {
-                    registryEditor.setStringValue(joysticksKey, "Generic HID Gamepad " + i, value);
-                    registryEditor.setStringValue(joysticksKey, "ric HID Gamepad " + i, value);
-                }
-                else {
-                    registryEditor.removeValue(joysticksKey, "Generic HID Gamepad " + i);
-                    registryEditor.removeValue(joysticksKey, "ric HID Gamepad " + i);
+                for (String name : new String[]{"Generic HID Gamepad " + i, "ric HID Gamepad " + i}) {
+                    if (value != null) registryEditor.setStringValue(joysticksKey, name, value);
+                    else registryEditor.removeValue(joysticksKey, name);
                 }
             }
         }

@@ -575,7 +575,6 @@ public class LibraryScreenController {
         intent.putExtra("container_id", shortcut.container.id);
         intent.putExtra("shortcut_path", shortcut.file.getPath());
         intent.putExtra("shortcut_name", shortcut.name);
-        intent.putExtra("disableXinput", shortcut.getExtra("disableXinput", "0"));
         activity.startActivity(intent);
     }
 

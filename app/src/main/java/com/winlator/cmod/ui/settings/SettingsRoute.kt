@@ -159,7 +159,6 @@ internal class SettingsScreenState(
             resolveStoredPath("shortcuts_export_path_uri", AppDefaults.DEFAULT_SHORTCUT_EXPORT_PATH),
             (preferences.getFloat("cursor_speed", 1.0f) * 100.0f).roundToInt(),
             preferences.getBoolean("cursor_lock", true),
-            preferences.getBoolean("xinput_toggle", false),
             preferences.getBoolean("use_dri3", true),
             preferences.getBoolean("high_refresh_rate_mode", false),
             preferences.getBoolean("enable_file_provider", true),

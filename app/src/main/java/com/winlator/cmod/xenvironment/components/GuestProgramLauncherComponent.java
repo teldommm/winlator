@@ -70,6 +70,11 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
     public Container getContainer() { return this.container; }
     public void setContainer(Container container) { this.container = container; }
 
+    // False for Gamepad API "none": no placeholder evdev node, so Wine sees no gamepad.
+    private boolean gamepadEnabled = true;
+
+    public void setGamepadEnabled(boolean gamepadEnabled) { this.gamepadEnabled = gamepadEnabled; }
+
     private ContentProfile resolveInstalledRuntimeProfile(ContentProfile.ContentType type, String version) {
         ContentProfile exact = contentsManager.getProfileByEntryName(type + "-" + version);
         if (exact != null && exact.remoteUrl == null) return exact;
@@ -439,7 +444,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         File devInputDir = new File(imageFs.getRootDir(), "dev/input");
         devInputDir.mkdirs();
         File event0 = new File(devInputDir, "event0");
-        if (!event0.exists()) {
+        if (gamepadEnabled && !event0.exists()) {
                 try { event0.createNewFile(); } catch (Exception e) {}
         }
 

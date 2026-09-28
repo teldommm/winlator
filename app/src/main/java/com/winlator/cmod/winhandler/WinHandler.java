@@ -61,7 +61,6 @@ public class WinHandler {
     private OnGetProcessInfoListener onGetProcessInfoListener;
     private final Map<Integer, ExternalController> controllers = new HashMap<>();
     private InetAddress localhost;
-    private byte inputType = DEFAULT_INPUT_TYPE;
     private final XServerDisplayActivity activity;
     private final List<Integer> gamepadClients = new CopyOnWriteArrayList<>();
     private SharedPreferences preferences;
@@ -81,8 +80,9 @@ public class WinHandler {
     // (on the phone vibrator the two share the same app vibration).
     private final long[] rumbleUntil = new long[MAX_CONTROLLERS];
 
-    private boolean xinputDisabled;
-    private boolean xinputDisabledInitialized = false;
+    // GamepadMode.NONE: the game gets no gamepad at all — no slot is ever assigned, so no fake
+    // evdev node is created and Wine enumerates nothing (touch-controls and physical pads alike).
+    private volatile boolean gamepadEnabled = true;
 
     private int fallbackSlot = -1;
 
@@ -491,10 +491,6 @@ public void setVibrationEnabledForSlot(int slot, boolean enabled) {
                 initReceived = true;
 
                 preferences = PreferenceManager.getDefaultSharedPreferences(activity.getBaseContext());
-
-                if (!xinputDisabledInitialized) {
-                    xinputDisabled = preferences.getBoolean("xinput_toggle", false);
-                }
                 synchronized (actions) {
                     actions.notify();
                 }
@@ -624,6 +620,7 @@ public void setVibrationEnabledForSlot(int slot, boolean enabled) {
     }
 
     private int assignSlot(int deviceId) {
+        if (!gamepadEnabled) return -1;
         Integer existing = deviceToSlot.get(deviceId);
         if (existing != null)
             return existing;
@@ -658,10 +655,10 @@ public void setVibrationEnabledForSlot(int slot, boolean enabled) {
         }
     }
 
-    public void setXInputDisabled(boolean disabled) {
-        this.xinputDisabled = disabled;
-        this.xinputDisabledInitialized = true;
-        Log.d("WinHandler", "XInput Disabled set to: " + xinputDisabled);
+    /** False for GamepadMode.NONE. Set before the guest starts. */
+    public void setGamepadEnabled(boolean enabled) {
+        gamepadEnabled = enabled;
+        Log.d("WinHandler", "Gamepad output " + (enabled ? "enabled" : "disabled (Gamepad API: none)"));
     }
 
     public void setFakeInputPath(String fakeInputPath) {
@@ -739,13 +736,6 @@ public void setVibrationEnabledForSlot(int slot, boolean enabled) {
         return handled;
     }
 
-    public byte getInputType() {
-        return inputType;
-    }
-
-    public void setInputType(byte inputType) {
-        this.inputType = inputType;
-    }
 
     public void execWithDelay(String command, int delaySeconds) {
         if (command == null || command.trim().isEmpty() || delaySeconds < 0)

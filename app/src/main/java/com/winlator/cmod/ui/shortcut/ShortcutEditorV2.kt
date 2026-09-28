@@ -226,7 +226,6 @@ private class ShortcutEditorStateV2(val shortcut: Shortcut) {
     var exclusive by mutableStateOf(shortcut.getExtra("exclusiveXInput").let { if (it.isBlank()) container.isExclusiveXInput() else it == "1" })
     var xinput by mutableStateOf((inputType and WinHandler.FLAG_INPUT_TYPE_XINPUT.toInt()) != 0)
     var dinput by mutableStateOf((inputType and WinHandler.FLAG_INPUT_TYPE_DINPUT.toInt()) != 0)
-    var disableXInput by mutableStateOf(shortcut.getExtra("disableXinput", "0") == "1")
     var relativeMouse by mutableStateOf(shortcut.getExtra("enableRelativeMouse", "0") == "1")
     var disableMouse by mutableStateOf(shortcut.getExtra("disableMouse", "0") == "1")
     // Touch Mode keeps the old "simTouchScreen" key (1 = Touchscreen) so existing shortcuts keep it.
@@ -953,8 +952,6 @@ private fun ShortcutCategoryV2(
                 SettingToggle("Enable XInput", s.xinput, s.exclusive) { s.xinput = it; if (s.exclusive && it && s.dinput) s.dinput = false; s.saveInput() }
                 SettingsDivider()
                 SettingToggle("Enable DInput", s.dinput, s.exclusive) { s.dinput = it; if (s.exclusive && it && s.xinput) s.xinput = false; s.saveInput() }
-                SettingsDivider()
-                SettingToggle("Disable XInput", s.disableXInput) { s.disableXInput = it; s.extra("disableXinput", if (it) "1" else null) }
                 SettingsDivider()
                 val touchModes = listOf("Trackpad", "Touchscreen")
                 SettingChoice("Touch Mode", touchModes[s.touchMode.coerceIn(0, 1)], touchModes) { selected ->

@@ -112,6 +112,7 @@ import com.winlator.cmod.widget.MagnifierView;
 import com.winlator.cmod.widget.TouchpadView;
 import com.winlator.cmod.widget.XServerRendererView;
 import com.winlator.cmod.widget.VulkanXServerView;
+import com.winlator.cmod.winhandler.GamepadMode;
 import com.winlator.cmod.winhandler.MouseEventFlags;
 import com.winlator.cmod.winhandler.ProcessInfo;
 import com.winlator.cmod.winhandler.TaskManagerSidebar;
@@ -244,6 +245,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
     // back. Same model as the mouse toggles: shortcut ("touchscreenTimeout" = "1") sets the
     // start value, the sidebar changes it for the session.
     private boolean isTouchscreenTimeout = false;
+    // Resolved once in onCreate; drives the Wine joystick registry keys and whether any fake
+    // gamepad node is created at all (GamepadMode.NONE).
+    private int gamepadMode = GamepadMode.BOTH;
     private boolean simulateTouchScreen = false;
 
     private SensorManager sensorManager;
@@ -340,8 +344,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         boolean isOpenWithAndroidBrowser = preferences.getBoolean("open_with_android_browser", false);
         boolean isShareAndroidClipboard = preferences.getBoolean("share_android_clipboard", false);
-
-        boolean xinputDisabledFromShortcut = false;
 
         startTime = System.currentTimeMillis();
 
@@ -489,7 +491,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
         dxwrapper = container.getDXWrapper();
         String dxwrapperConfig = container.getDXWrapperConfig();
         screenSize = container.getScreenSize();
-        winHandler.setInputType((byte) container.getInputType());
+        // Gamepad API (Exclusive Input + Enable XInput/DInput, shortcut overrides container).
+        gamepadMode = GamepadMode.resolve(container, shortcut);
+        winHandler.setGamepadEnabled(gamepadMode != GamepadMode.NONE);
         lc_all = container.getLC_ALL();
 
         Intent intent = getIntent();
@@ -507,13 +511,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
             dxwrapperConfig = shortcut.getExtra("dxwrapperConfig", container.getDXWrapperConfig());
             screenSize = shortcut.getExtra("screenSize", container.getScreenSize());
             lc_all = shortcut.getExtra("lc_all", container.getLC_ALL());
-            String inputType = shortcut.getExtra("inputType");
-            if (!inputType.isEmpty())
-                winHandler.setInputType(Byte.parseByte(inputType));
-            String xinputDisabledString = shortcut.getExtra("disableXinput", "false");
-            xinputDisabledFromShortcut = parseBoolean(xinputDisabledString);
-
-            winHandler.setXInputDisabled(xinputDisabledFromShortcut);
             String sharpnessEffect = shortcut.getExtra("sharpnessEffect", "None");
             if (!sharpnessEffect.equals("None")) {
                 double sharpnessLevel = Double.parseDouble(shortcut.getExtra("sharpnessLevel", "100"));
@@ -522,7 +519,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         + sharpnessLevel / 100 + ";" + "dlsSharpness=" + sharpnessLevel / 100 + ";" + "dlsDenoise="
                         + sharpnessDenoise / 100 + ";" + "enableOnLaunch=True";
             }
-            Log.d("XServerDisplayActivity", "XInput Disabled from Shortcut: " + xinputDisabledFromShortcut);
 
             simulateTouchScreen = shortcut.getExtra("simTouchScreen").equals("1");
             isRelativeMouseMovement = shortcut.getExtra("enableRelativeMouse").equals("1");
@@ -686,15 +682,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
         }
         return containerId;
-    }
-
-    private boolean parseBoolean(String value) {
-
-        if ("true".equalsIgnoreCase(value) || "1".equals(value) || "yes".equalsIgnoreCase(value)) {
-            return true;
-        }
-
-        return false;
     }
 
     private void handleCapturedPointer(MotionEvent event) {
@@ -1016,23 +1003,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         WineStartMenuCreator.create(this, container);
         WineUtils.createDosdevicesSymlinks(container);
 
-        int inputType = container.getInputType();
-        if (shortcut != null) {
-            String shortcutInputType = shortcut.getExtra("inputType");
-            if (!shortcutInputType.isEmpty()) {
-                inputType = Byte.parseByte(shortcutInputType);
-            }
-        }
-        boolean dinputEnabled = (inputType & WinHandler.FLAG_INPUT_TYPE_DINPUT) == WinHandler.FLAG_INPUT_TYPE_DINPUT;
-
-        boolean exclusiveXInput = container.isExclusiveXInput();
-        if (shortcut != null) {
-            String extra = shortcut.getExtra("exclusiveXInput");
-            if (!extra.isEmpty())
-                exclusiveXInput = extra.equals("1");
-        }
-
-        WineUtils.setJoystickRegistryKeys(container, dinputEnabled, exclusiveXInput);
+        WineUtils.setJoystickRegistryKeys(container, gamepadMode);
 
         if (shortcut != null)
             startupSelection = shortcut.getExtra("startupSelection", String.valueOf(container.getStartupSelection()));
@@ -1067,6 +1038,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 contentsManager,
                 contentsManager.getProfileByEntryName(container.getWineVersion()),
                 shortcut);
+        guestProgramLauncherComponent.setGamepadEnabled(gamepadMode != GamepadMode.NONE);
 
         if (container != null) {
             if (Byte.parseByte(startupSelection) == Container.STARTUP_SELECTION_AGGRESSIVE) {
