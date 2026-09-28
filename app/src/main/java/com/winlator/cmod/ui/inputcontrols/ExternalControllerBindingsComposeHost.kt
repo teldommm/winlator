@@ -1,5 +1,6 @@
 package com.winlator.cmod.ui.inputcontrols
 
+import com.winlator.cmod.ui.theme.ThemedDialogTitle
 import android.content.Context
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -242,12 +243,7 @@ private fun ExternalControllerBindingsScreen(
     if (editingItem != null) {
         val labels = bindingLabels[editingItem.type]
         ThemedDialog(onDismissRequest = { editingKey = null }) {
-            Text(
-                stringResource(R.string.binding) + ": " + editingItem.title,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(Modifier.height(12.dp))
+            ThemedDialogTitle(stringResource(R.string.binding) + ": " + editingItem.title)
             val selectionState = rememberLazyListState(
                 initialFirstVisibleItemIndex = labels.indexOf(editingItem.binding).coerceAtLeast(0)
             )

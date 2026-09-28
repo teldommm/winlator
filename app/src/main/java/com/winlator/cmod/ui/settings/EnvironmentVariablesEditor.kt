@@ -1,5 +1,6 @@
 package com.winlator.cmod.ui.settings
 
+import com.winlator.cmod.ui.theme.ThemedDialogTitle
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -214,8 +215,7 @@ private fun MultiEnvironmentChoice(options: List<String>, value: String, onChang
             }
         }
         ThemedDialog(onDismissRequest = { open = false }) {
-            Text("Select values", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(12.dp))
+            ThemedDialogTitle("Select values")
             val accent = controlAccentColor()
             LazyColumn(Modifier.heightIn(max = 420.dp)) {
                 items(options) { option ->
@@ -267,8 +267,7 @@ private fun AddEnvironmentVariableDialog(
     val selected = if (name in available) name else "Custom…"
 
     ThemedDialog(onDismissRequest = onDismiss) {
-        Text("Add environment variable", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.height(14.dp))
+        ThemedDialogTitle("Add environment variable")
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SettingChoice("Variable", selected, options) { picked ->
                 name = if (picked == "Custom…") "" else picked

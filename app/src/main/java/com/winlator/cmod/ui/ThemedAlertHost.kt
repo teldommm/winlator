@@ -1,5 +1,6 @@
 package com.winlator.cmod.ui
 
+import com.winlator.cmod.ui.theme.ThemedDialogTitle
 import android.view.ViewGroup
 import androidx.annotation.DrawableRes
 import androidx.appcompat.app.AppCompatActivity
@@ -126,8 +127,7 @@ object ThemedAlertHost {
     ) {
         showOverlay(activity) { dismiss ->
             var value by remember { mutableStateOf(initialValue) }
-            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(14.dp))
+            ThemedDialogTitle(title)
             OutlinedTextField(
                 value = value,
                 onValueChange = { value = it },
@@ -170,8 +170,7 @@ object ThemedAlertHost {
         cancelLabel: String = "Cancel"
     ) {
         showOverlay(activity) { dismiss ->
-            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(12.dp))
+            ThemedDialogTitle(title)
             Text(message, style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(16.dp))
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -218,10 +217,9 @@ object ThemedAlertHost {
     @JvmStatic
     fun actions(activity: AppCompatActivity, title: String?, items: List<ActionItem>) {
         showOverlay(activity) { dismiss ->
-            if (title != null) {
-                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(10.dp))
-            }
+            // With a title the divider sits under it (like every dialog); the rows are then
+            // not split by lines. Untitled menus keep the lines between rows.
+            if (title != null) ThemedDialogTitle(title)
             Column {
                 items.forEachIndexed { index, item ->
                     Surface(
@@ -245,7 +243,7 @@ object ThemedAlertHost {
                             Text(item.label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
                         }
                     }
-                    if (index != items.lastIndex) {
+                    if (title == null && index != items.lastIndex) {
                         HorizontalDivider(color = dividerColor())
                     }
                 }
@@ -271,8 +269,7 @@ object ThemedAlertHost {
         initiallyChecked: List<Boolean> = emptyList()
     ) {
         showOverlay(activity) { dismiss ->
-            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(12.dp))
+            ThemedDialogTitle(title)
             val checked = remember {
                 mutableStateListOf(*Array(entries.size) { i -> initiallyChecked.getOrElse(i) { false } })
             }
@@ -378,8 +375,7 @@ private fun ColumnScope.DialogBody(
     message: String,
     buttons: @Composable () -> Unit
 ) {
-    Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-    Spacer(Modifier.height(12.dp))
+    ThemedDialogTitle(title)
     Text(message, style = MaterialTheme.typography.bodyMedium)
     Spacer(Modifier.height(18.dp))
     Row(Modifier.align(Alignment.End), horizontalArrangement = Arrangement.spacedBy(10.dp)) {

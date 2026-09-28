@@ -1,5 +1,7 @@
 package com.winlator.cmod.ui.settings
 
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -860,14 +862,18 @@ internal fun SettingToggle(
     enabled: Boolean = true,
     onChanged: (Boolean) -> Unit
 ) {
+    // Whole row toggles (see ToggleRow in SettingsComposeHost); the Switch only shows state.
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 9.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onChanged)
+            .padding(horizontal = 14.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
         Switch(
             checked = checked,
-            onCheckedChange = onChanged,
+            onCheckedChange = null,
             enabled = enabled,
             colors = accentSwitchColors()
         )

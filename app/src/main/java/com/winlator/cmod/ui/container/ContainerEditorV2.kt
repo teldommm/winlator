@@ -2,6 +2,7 @@
 
 package com.winlator.cmod.ui.container
 
+import com.winlator.cmod.ui.theme.ThemedDialogTitle
 import android.content.Context
 import android.graphics.Bitmap
 import android.widget.Toast
@@ -1090,8 +1091,7 @@ private fun ContainerVulkanExtensionsV2(
     }
     if (showDialog) {
         ThemedDialog(onDismissRequest = { showDialog = false }) {
-            Text("Vulkan Extensions", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(12.dp))
+            ThemedDialogTitle("Vulkan Extensions")
             val checked = remember { mutableStateListOf(*Array(extensions.size) { i -> extensions[i] !in disabled }) }
             LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp)) {
                 items(extensions.size) { index ->

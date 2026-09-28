@@ -2,6 +2,7 @@
 
 package com.winlator.cmod.ui.shortcut
 
+import com.winlator.cmod.ui.theme.ThemedDialogTitle
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -1125,8 +1126,7 @@ private fun ShortcutVulkanExtensionsV2(context: Context, driver: String, blackli
     // window is currently hosting the composition, so it renders correctly here too.
     if (showDialog) {
         ThemedDialog(onDismissRequest = { showDialog = false }) {
-            Text("Vulkan Extensions", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(12.dp))
+            ThemedDialogTitle("Vulkan Extensions")
             val checked = remember { mutableStateListOf(*Array(extensions.size) { i -> extensions[i] !in disabled }) }
             LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp)) {
                 items(extensions.size) { index ->

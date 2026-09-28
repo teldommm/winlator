@@ -1,5 +1,10 @@
 package com.winlator.cmod.ui.theme
 
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -200,6 +205,24 @@ fun ThemedDialog(
     Dialog(onDismissRequest = onDismissRequest) {
         ThemedDialogSurface(modifier, content)
     }
+}
+
+// Title row for every dialog: the title, then the same 1dp dividerColor() line as under
+// "Version" in About, which separates the heading from the dialog's content. Emits into the
+// caller's Column (ThemedDialogSurface / ThemedDialog content), so no Spacer is needed after it.
+@Composable
+fun ThemedDialogTitle(
+    text: String,
+    leading: (@Composable () -> Unit)? = null
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        if (leading != null) {
+            leading()
+            Spacer(Modifier.width(10.dp))
+        }
+        Text(text, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+    }
+    HorizontalDivider(Modifier.padding(vertical = 12.dp), color = dividerColor())
 }
 
 // Same card look as ThemedDialog, without the Compose Dialog wrapper — for call sites

@@ -1,5 +1,7 @@
 package com.winlator.cmod.ui.container
 
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import android.content.Context
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -849,13 +851,16 @@ private fun RendererOptionsPanel(
             ) { value -> onFilterMode(filterEntries.indexOf(value).coerceAtLeast(0)) }
             ThinDivider()
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 7.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(value = swapRB, role = Role.Switch, onValueChange = onSwapRB)
+                    .padding(horizontal = 12.dp, vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("Swap red/blue channels", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                 Switch(
                     checked = swapRB,
-                    onCheckedChange = onSwapRB,
+                    onCheckedChange = null,
                     colors = accentSwitchColors()
                 )
             }
@@ -1082,13 +1087,15 @@ private fun CompactTextField(
 @Composable
 private fun ToggleSetting(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
         Switch(
             checked = checked,
-            onCheckedChange = onCheckedChange,
+            onCheckedChange = null,
             colors = accentSwitchColors()
         )
     }

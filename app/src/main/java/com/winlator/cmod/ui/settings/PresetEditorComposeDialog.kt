@@ -1,5 +1,8 @@
 package com.winlator.cmod.ui.settings
 
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
+import com.winlator.cmod.ui.theme.ThemedDialogTitle
 import android.app.Activity
 import android.content.Context
 import android.view.View
@@ -184,8 +187,10 @@ private fun ColumnScope.PresetEditorScreen(
         if (readOnly) "Bundled preset · read only" else "Edit the preset name and environment variables",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
+        modifier = Modifier.padding(top = 2.dp)
     )
+    // Same title divider as every other dialog (see ThemedDialogTitle), under the subtitle here.
+    HorizontalDivider(Modifier.padding(vertical = 12.dp), color = dividerColor())
     OutlinedTextField(
         value = name,
         onValueChange = { name = it },
@@ -250,8 +255,7 @@ private fun ColumnScope.PresetEditorScreen(
 
     helpText?.let { message ->
         ThemedDialog(onDismissRequest = { helpText = null }) {
-            Text("Help", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(12.dp))
+            ThemedDialogTitle("Help")
             Text(message, style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(18.dp))
             Row(Modifier.align(Alignment.End)) {
@@ -274,7 +278,21 @@ private fun PresetVariableRow(
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
+    val toggleOn = value == "1"
+    Column(
+        Modifier
+            .fillMaxWidth()
+            // Toggle variables flip from anywhere on the row; the Help button keeps its own tap.
+            .then(
+                if (variable.toggle) Modifier.toggleable(
+                    value = toggleOn,
+                    enabled = !readOnly,
+                    role = Role.Switch,
+                    onValueChange = { onValueChange(if (it) "1" else "0") }
+                ) else Modifier
+            )
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 variable.name,
@@ -297,9 +315,9 @@ private fun PresetVariableRow(
             if (variable.toggle) {
                 Spacer(Modifier.width(8.dp))
                 Switch(
-                    checked = value == "1",
+                    checked = toggleOn,
                     enabled = !readOnly,
-                    onCheckedChange = { onValueChange(if (it) "1" else "0") },
+                    onCheckedChange = null,
                     colors = accentSwitchColors()
                 )
             }

@@ -1,5 +1,7 @@
 package com.winlator.cmod.ui
 
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -179,7 +181,7 @@ internal fun SidebarInlineToggle(label: String, checked: Boolean, onCheckedChang
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = SidebarDimens.InlineRowHeight)
-            .clickable { onCheckedChange(!checked) },
+            .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
@@ -188,7 +190,7 @@ internal fun SidebarInlineToggle(label: String, checked: Boolean, onCheckedChang
             style = SidebarText.row(),
             color = MaterialTheme.colorScheme.onSurface
         )
-        Switch(checked = checked, onCheckedChange = onCheckedChange, colors = accentSwitchColors())
+        Switch(checked = checked, onCheckedChange = null, colors = accentSwitchColors())
     }
 }
 
@@ -206,7 +208,7 @@ internal fun SidebarToggleRow(
             .fillMaxWidth()
             .height(SidebarDimens.StandaloneRowHeight)
             .sidebarCardSurface()
-            .clickable(enabled = enabled) { onCheckedChange(!checked) }
+            .toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onCheckedChange)
             .padding(start = SidebarDimens.CardPaddingH, end = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -220,7 +222,7 @@ internal fun SidebarToggleRow(
         )
         Switch(
             checked = checked,
-            onCheckedChange = onCheckedChange,
+            onCheckedChange = null,
             enabled = enabled,
             colors = accentSwitchColors()
         )

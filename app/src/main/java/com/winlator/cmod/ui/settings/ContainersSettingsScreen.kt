@@ -1,5 +1,6 @@
 package com.winlator.cmod.ui.settings
 
+import com.winlator.cmod.ui.theme.ThemedDialogTitle
 import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
@@ -358,12 +359,7 @@ private fun ContainerPropertiesDialog(container: Container, onDismiss: () -> Uni
         .coerceIn(0, 100)
 
     ThemedDialog(onDismissRequest = onDismiss) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Outlined.Storage, null)
-            Spacer(Modifier.width(10.dp))
-            Text("Container properties", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-        }
-        Spacer(Modifier.height(14.dp))
+        ThemedDialogTitle("Container properties", leading = { Icon(Icons.Outlined.Storage, null) })
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text(
                 container.name,

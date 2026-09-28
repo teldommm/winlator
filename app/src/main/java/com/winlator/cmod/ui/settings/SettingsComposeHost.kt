@@ -1,5 +1,8 @@
 package com.winlator.cmod.ui.settings
 
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
+import com.winlator.cmod.ui.theme.ThemedDialogTitle
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -285,8 +288,7 @@ internal fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) 
 
     if (confirmReinstallImageFs) {
         ThemedDialog(onDismissRequest = { confirmReinstallImageFs = false }) {
-            Text(stringResource(R.string.reinstall_imagefs), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(12.dp))
+            ThemedDialogTitle(stringResource(R.string.reinstall_imagefs))
             Text(stringResource(R.string.do_you_want_to_reinstall_imagefs), style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(18.dp))
             Row(Modifier.align(Alignment.End), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -363,11 +365,19 @@ private fun SmallIcon(icon: ImageVector) {
 
 @Composable
 private fun ToggleRow(title: String, checked: Boolean, onChecked: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(start = 15.dp, end = 11.dp, top = 9.dp, bottom = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+    // The whole row is the toggle (it used to react only on the switch itself); the Switch is
+    // display-only so the row is one accessible "switch" and a tap isn't handled twice.
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .toggleable(value = checked, role = Role.Switch, onValueChange = onChecked)
+            .padding(start = 15.dp, end = 11.dp, top = 9.dp, bottom = 9.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Text(title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
         Switch(
             checked = checked,
-            onCheckedChange = onChecked,
+            onCheckedChange = null,
             colors = accentSwitchColors()
         )
     }
@@ -597,8 +607,7 @@ private fun WineDebugChannelsDialog(
     }
 
     ThemedDialog(onDismissRequest = onDismiss) {
-        Text("Wine debug channels", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.height(14.dp))
+        ThemedDialogTitle("Wine debug channels")
         val accent = controlAccentColor()
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinedTextField(

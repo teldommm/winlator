@@ -1,5 +1,7 @@
 package com.winlator.cmod.ui.inputcontrols
 
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import android.graphics.Bitmap
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -450,11 +452,11 @@ private fun SettingSwitchRow(label: String, checked: Boolean, onChange: (Boolean
         Modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
-            .clickable { onChange(!checked) },
+            .toggleable(value = checked, role = Role.Switch, onValueChange = onChange),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f).padding(end = 8.dp))
-        Switch(checked = checked, onCheckedChange = onChange, colors = accentSwitchColors())
+        Switch(checked = checked, onCheckedChange = null, colors = accentSwitchColors())
     }
 }
 

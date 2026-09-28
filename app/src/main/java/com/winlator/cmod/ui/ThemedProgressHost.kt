@@ -1,5 +1,6 @@
 package com.winlator.cmod.ui
 
+import com.winlator.cmod.ui.theme.ThemedDialogTitle
 import android.view.View
 import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
@@ -61,8 +62,7 @@ object ThemedProgressHost {
                     ) {
                         ThemedDialogSurface {
                             val progress = state.value
-                            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                            Spacer(Modifier.height(16.dp))
+                            ThemedDialogTitle(title)
                             Text(
                                 "${progress.percent}%",
                                 modifier = Modifier.fillMaxWidth(),
