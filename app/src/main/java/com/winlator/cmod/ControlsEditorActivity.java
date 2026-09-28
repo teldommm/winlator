@@ -895,8 +895,13 @@ public class ControlsEditorActivity extends AppCompatActivity {
 
     // Every way out (system back, the editor's own close/save) ends in finish(), so the return
     // motion is applied here: the reverse of the shared-axis enter used to open this screen.
+    // The result carries the profile the editor ended on (it can switch profiles in place), so
+    // the in-game sidebar can keep that layout active instead of dropping to Disabled.
     @Override
     public void finish() {
+        Intent result = new Intent();
+        result.putExtra("profile_id", profile != null ? profile.id : -1);
+        setResult(Activity.RESULT_OK, result);
         super.finish();
         overridePendingTransition(R.anim.shared_axis_pop_enter, R.anim.shared_axis_pop_exit);
     }

@@ -178,6 +178,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private FrameRating classicHud = null;
     private WinlatorHUD modernHud = null;
     private Runnable editInputControlsCallback;
+    // Profile id the controls editor reported on exit (-1: none, e.g. the Input Controls screen).
+    private int editorResultProfileId = -1;
     private Runnable refreshInputPanel;
     private Shortcut shortcut;
     private int activeLsfgMultiplier;
@@ -1310,6 +1312,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private ActivityResultLauncher<Intent> controlsEditorActivityResultLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             result -> {
+                Intent data = result.getData();
+                editorResultProfileId = data != null ? data.getIntExtra("profile_id", -1) : -1;
                 if (editInputControlsCallback != null) {
                     editInputControlsCallback.run();
                     editInputControlsCallback = null;
@@ -1944,15 +1948,24 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     intent.putExtra("edit_input_controls", true);
                     intent.putExtra("selected_profile_id", selectedProfileId >= 0 ? selectedProfileId : 0);
                 }
+                editorResultProfileId = -1;
                 editInputControlsCallback = () -> {
+                    // Keep a layout active after editing: the one the editor ended on (it can
+                    // switch profiles in place), else the one active before. Profiles are
+                    // reloaded first so the edits apply; if that profile was deleted,
+                    // onControlsSettingsChanged finds no match and falls back to Disabled.
+                    int profileId = editorResultProfileId >= 0 ? editorResultProfileId : selectedProfileId;
+                    editorResultProfileId = -1;
+                    // Read before hideInputControls(), which forces "show controls" back on.
+                    boolean showControls = inputControlsView.isShowTouchscreenControls();
                     hideInputControls();
                     inputControlsManager.loadProfiles(true);
-                    // Same as before: after editing, the active profile always resets to
-                    // Disabled (hideInputControls() above already cleared it), so re-apply
-                    // and persist that with the switches' current, unchanged values.
+                    // Built-in icons are cached by id; the editor can override them
+                    // (custom_icons/override_<id>.png), so drop the cache to pick that up.
+                    inputControlsView.invalidateIconCache();
                     onControlsSettingsChanged(
-                            -1,
-                            inputControlsView.isShowTouchscreenControls(),
+                            profileId,
+                            showControls,
                             preferences.getBoolean("touchscreen_haptics_enabled", false)
                     );
                     refreshInputPanel.run();
