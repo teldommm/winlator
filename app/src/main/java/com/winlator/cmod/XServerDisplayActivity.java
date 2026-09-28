@@ -210,8 +210,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
     // both at once). The active profile doesn't multiply it.
     private float globalCursorSpeed = 1.0f;
     private final com.winlator.cmod.math.MotionAccumulator capturedMouseMotion = new com.winlator.cmod.math.MotionAccumulator();
-    // Touch surface mode (sidebar "Touch Mode"); starts from the shortcut's simTouchScreen
-    // setting. Sidebar changes last for this session only — the shortcut is never rewritten
+    // Touch surface mode (sidebar "Touch Mode"); starts from the shortcut's Touch Mode
+    // (stored as simTouchScreen). Sidebar changes last for this session only — the shortcut is never rewritten
     // from in-game (its editor's Input tab stays the one place that sets the default).
     private int touchMode = TouchpadView.MODE_TRACKPAD;
     private float refreshRate = 60.0f;
@@ -238,6 +238,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private boolean isPaused = false;
     private boolean isRelativeMouseMovement = false;
     private boolean isMouseDisabled = false;
+    // Like Relative/Disable Mouse: starts from the shortcut ("tapToClick", on unless "0"),
+    // the sidebar changes it for the session only.
+    private boolean isTapToClickEnabled = true;
     private boolean simulateTouchScreen = false;
 
     private SensorManager sensorManager;
@@ -537,6 +540,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             simulateTouchScreen = shortcut.getExtra("simTouchScreen").equals("1");
             isRelativeMouseMovement = shortcut.getExtra("enableRelativeMouse").equals("1");
             isMouseDisabled = shortcut.getExtra("disableMouse").equals("1");
+            isTapToClickEnabled = !shortcut.getExtra("tapToClick").equals("0");
         }
 
         this.graphicsDriverConfig = GraphicsDriverConfig.parseGraphicsDriverConfig(graphicsDriverConfig);
@@ -1245,7 +1249,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         globalCursorSpeed = clampSpeedPercent(Math.round(preferences.getFloat("cursor_speed", 1.0f) * 100f)) / 100f;
         touchpadView = new TouchpadView(this, xServer, timeoutHandler, hideControlsRunnable);
         touchpadView.setSensitivity(globalCursorSpeed);
-        touchpadView.setTapToClickEnabled(preferences.getBoolean("touch_tap_to_click", true));
+        touchpadView.setTapToClickEnabled(isTapToClickEnabled);
         touchpadView.setMouseEnabled(!isMouseDisabled);
         touchpadView.setFourFingersTapCallback(() -> {
             if (!drawerLayout.isDrawerOpen(GravityCompat.START))
@@ -2035,8 +2039,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
             @Override
             public void onTapToClick(boolean enabled) {
+                isTapToClickEnabled = enabled;
                 if (touchpadView != null) touchpadView.setTapToClickEnabled(enabled);
-                preferences.edit().putBoolean("touch_tap_to_click", enabled).apply();
             }
 
             @Override
@@ -2074,7 +2078,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     isMouseDisabled,
                     touchMode,
                     Math.round(globalCursorSpeed * 100f),
-                    touchpadView == null || touchpadView.isTapToClickEnabled()
+                    isTapToClickEnabled
             );
             InputSidebarPanelHost.attach(ingameSidebar, R.id.LLSubInput, state, callbacks);
         };

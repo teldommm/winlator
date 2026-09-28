@@ -195,13 +195,18 @@ internal fun SidebarInlineToggle(label: String, checked: Boolean, onCheckedChang
 // Toggle that stands on its own — same 52dp footprint as SidebarActionRow so a column
 // mixing actions and toggles (Screen, Input mouse rows, Enable HUD) lines up.
 @Composable
-internal fun SidebarToggleRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+internal fun SidebarToggleRow(
+    label: String,
+    checked: Boolean,
+    enabled: Boolean = true,
+    onCheckedChange: (Boolean) -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(SidebarDimens.StandaloneRowHeight)
             .sidebarCardSurface()
-            .clickable { onCheckedChange(!checked) }
+            .clickable(enabled = enabled) { onCheckedChange(!checked) }
             .padding(start = SidebarDimens.CardPaddingH, end = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -209,11 +214,16 @@ internal fun SidebarToggleRow(label: String, checked: Boolean, onCheckedChange: 
             text = label,
             modifier = Modifier.weight(1f).padding(end = 8.dp),
             style = SidebarText.row(),
-            color = MaterialTheme.colorScheme.onSurface,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.38f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
-        Switch(checked = checked, onCheckedChange = onCheckedChange, colors = accentSwitchColors())
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            enabled = enabled,
+            colors = accentSwitchColors()
+        )
     }
 }
 

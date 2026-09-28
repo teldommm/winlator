@@ -174,14 +174,6 @@ private fun InputSidebarPanel(state: InputPanelState, callbacks: InputPanelCallb
                 onValueChangeFinished = { callbacks.onCursorSpeed(cursorSpeedDraft.roundToInt(), true) },
                 valueRange = 10f..200f
             )
-            SidebarInlineToggle(
-                label = "Tap to Click",
-                checked = tapToClick,
-                onCheckedChange = {
-                    tapToClick = it
-                    callbacks.onTapToClick(it)
-                }
-            )
         }
 
         SidebarGap()
@@ -195,6 +187,19 @@ private fun InputSidebarPanel(state: InputPanelState, callbacks: InputPanelCallb
             onCheckedChange = {
                 relativeMouse = it
                 callbacks.onRelativeMouse(it)
+            }
+        )
+        // Works in both Touch Modes (Trackpad: taps click; Touchscreen: touching presses the
+        // button), so it sits with the mouse modifiers, not in the Touch Mode card. Has no effect
+        // while the mouse is disabled, hence greyed out then.
+        SidebarGap()
+        SidebarToggleRow(
+            label = "Tap to Click",
+            checked = tapToClick,
+            enabled = !disableMouse,
+            onCheckedChange = {
+                tapToClick = it
+                callbacks.onTapToClick(it)
             }
         )
         SidebarGap()

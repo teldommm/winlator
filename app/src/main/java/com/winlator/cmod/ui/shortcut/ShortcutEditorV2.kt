@@ -229,7 +229,10 @@ private class ShortcutEditorStateV2(val shortcut: Shortcut) {
     var disableXInput by mutableStateOf(shortcut.getExtra("disableXinput", "0") == "1")
     var relativeMouse by mutableStateOf(shortcut.getExtra("enableRelativeMouse", "0") == "1")
     var disableMouse by mutableStateOf(shortcut.getExtra("disableMouse", "0") == "1")
-    var simulatedTouch by mutableStateOf(shortcut.getExtra("simTouchScreen", "0") == "1")
+    // Touch Mode keeps the old "simTouchScreen" key (1 = Touchscreen) so existing shortcuts keep it.
+    var touchMode by mutableIntStateOf(if (shortcut.getExtra("simTouchScreen", "0") == "1") 1 else 0)
+    // On by default; stored only when turned off, like the other mouse toggles.
+    var tapToClick by mutableStateOf(shortcut.getExtra("tapToClick", "1") != "0")
     var syncCpu by mutableStateOf(shortcut.getExtra("syncCpuTopology", if (container.isSyncCpuTopology()) "1" else "0") == "1")
     val cpu = mutableStateListOf<Boolean>().apply {
         val count = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)
@@ -949,11 +952,17 @@ private fun ShortcutCategoryV2(
                 SettingsDivider()
                 SettingToggle("Disable XInput", s.disableXInput) { s.disableXInput = it; s.extra("disableXinput", if (it) "1" else null) }
                 SettingsDivider()
+                val touchModes = listOf("Trackpad", "Touchscreen")
+                SettingChoice("Touch Mode", touchModes[s.touchMode.coerceIn(0, 1)], touchModes) { selected ->
+                    s.touchMode = if (selected == "Touchscreen") 1 else 0
+                    s.extra("simTouchScreen", if (s.touchMode == 1) "1" else "0")
+                }
+                SettingsDivider()
                 SettingToggle("Relative Mouse", s.relativeMouse) { s.relativeMouse = it; s.extra("enableRelativeMouse", if (it) "1" else null) }
                 SettingsDivider()
-                SettingToggle("Disable Mouse", s.disableMouse) { s.disableMouse = it; s.extra("disableMouse", if (it) "1" else null) }
+                SettingToggle("Tap to Click", s.tapToClick, !s.disableMouse) { s.tapToClick = it; s.extra("tapToClick", if (it) null else "0") }
                 SettingsDivider()
-                SettingToggle("Simulated Touchscreen", s.simulatedTouch) { s.simulatedTouch = it; s.extra("simTouchScreen", if (it) "1" else "0") }
+                SettingToggle("Disable Mouse", s.disableMouse) { s.disableMouse = it; s.extra("disableMouse", if (it) "1" else null) }
             }
         }
 
