@@ -902,10 +902,14 @@ public class ControlElement {
                         paint
                 );
 
-                drawDPadPiece(canvas, cx, cy - dist, piece, 0, states.length > 0 && states[0]);
-                drawDPadPiece(canvas, cx + dist, cy, piece, 1, states.length > 1 && states[1]);
-                drawDPadPiece(canvas, cx, cy + dist, piece, 2, states.length > 2 && states[2]);
-                drawDPadPiece(canvas, cx - dist, cy, piece, 3, states.length > 3 && states[3]);
+                // Pieces light up per pressed direction, so the element-wide `active` flag never
+                // reached them and a D-pad selected in the editor looked unselected. In the editor
+                // a selected D-pad lights all four pieces, like other elements' pressed look.
+                boolean editorSelected = selected && inputControlsView.isEditMode();
+                drawDPadPiece(canvas, cx, cy - dist, piece, 0, editorSelected || (states.length > 0 && states[0]));
+                drawDPadPiece(canvas, cx + dist, cy, piece, 1, editorSelected || (states.length > 1 && states[1]));
+                drawDPadPiece(canvas, cx, cy + dist, piece, 2, editorSelected || (states.length > 2 && states[2]));
+                drawDPadPiece(canvas, cx - dist, cy, piece, 3, editorSelected || (states.length > 3 && states[3]));
                 break;
             }
 

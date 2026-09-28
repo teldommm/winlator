@@ -87,7 +87,7 @@ private fun RowScope.PortraitNavItem(icon: ImageVector, label: String, selected:
         label = "navTint"
     )
     val pillColor by animateColorAsState(
-        if (selected) MaterialTheme.colorScheme.primary.copy(alpha = .12f) else Color.Transparent,
+        if (selected) MaterialTheme.colorScheme.primary.copy(alpha = .12f) else MaterialTheme.colorScheme.primary.copy(alpha = 0f), // not Color.Transparent: that fades through black
         animationSpec = tween(NAV_SELECTION_MS),
         label = "navPill"
     )

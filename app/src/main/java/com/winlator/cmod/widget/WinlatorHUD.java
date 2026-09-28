@@ -180,7 +180,12 @@ public class WinlatorHUD extends View {
     private float snapFps = 0;
     private volatile float frameGenPresentedRate = 0f;
 
-    private int snapGpu = -1, snapCpu = -1, snapCpuTemp = -1, snapMw = -1;
+    private int snapGpu = -1, snapCpu = -1, snapCpuTemp = -1;
+    // Signed battery power in mW (+ charging, - draining); PWR_NA when unavailable.
+    private static final int PWR_NA = Integer.MIN_VALUE;
+    private int snapMw = PWR_NA;
+    // Sign shown with PWR: 1 = "+", -1 = "−", 0 = none (direction unknown).
+    private int snapPwrSign = 0;
     private int snapTmp = -1, snapPct = -1, snapRam = -1;
     private volatile boolean snapCharging = false;
 
@@ -297,7 +302,7 @@ public class WinlatorHUD extends View {
         wVal100pct = pVal.measureText("100%");
         wValCpuTemp = pVal.measureText("150°C");
         wValFps = pVal.measureText("9999") + 2f * density;
-        wValWatt = pVal.measureText("99.9W");
+        wValWatt = Math.max(pVal.measureText("+99.9W"), pVal.measureText("\u221299.9W"));
         wValTemp = pVal.measureText("150°C");
         wChg = pChg.measureText(" CHG");
         wChgStandalone = pChg.measureText("CHG");
@@ -677,35 +682,50 @@ public class WinlatorHUD extends View {
                 }
             }
 
-            float amps = getBatteryCurrentAmps(charging);
-            float watts = (amps >= 0f && voltageMv > 0)
-                    ? (voltageMv / 1000f) * amps : -1f;
+            // Signed: + = net current into the battery (charging), - = draining.
+            float amps = getBatteryCurrentSignedAmps(plugged != 0);
+            float watts = (!Float.isNaN(amps) && voltageMv > 0)
+                    ? (voltageMv / 1000f) * amps : Float.NaN;
+            int sign = Float.isNaN(watts) ? 0 : (int) Math.signum(watts);
 
-            if (watts <= 0f) {
+            if (Float.isNaN(watts) || watts == 0f) {
                 long powerUw = readFirstSysFsLong(POWER_CHANNELS);
-                if (powerUw != 0L) watts = Math.abs(powerUw) / 1_000_000f;
+                if (powerUw != 0L) {
+                    // power_now has no reliable sign across devices: unplugged it can only be
+                    // draining; on external power the direction is unknown, so no sign.
+                    float magnitude = Math.abs(powerUw) / 1_000_000f;
+                    sign = plugged == 0 ? -1 : 0;
+                    watts = plugged == 0 ? -magnitude : magnitude;
+                }
             }
 
-            if (watts > 0f && prefs.getBoolean(KEY_DUAL_CELL, false)) {
+            if (!Float.isNaN(watts) && prefs.getBoolean(KEY_DUAL_CELL, false)) {
                 watts *= 2f;
             }
 
-            int mw = watts >= 0f ? Math.round(watts * 1000f) : -1;
+            int mw = Float.isNaN(watts) ? PWR_NA : Math.round(watts * 1000f);
+            if (mw == 0) sign = 0;
             boolean chargingChanged = charging != snapCharging;
             snapCharging = charging;
 
-            if (mw != snapMw || chargingChanged) {
+            if (mw != snapMw || sign != snapPwrSign || chargingChanged) {
                 snapMw = mw;
-                strPwr = mw >= 0
-                        ? String.format(Locale.US, "%.1fW", mw / 1000f) : "N/A";
+                snapPwrSign = sign;
+                if (mw == PWR_NA) {
+                    strPwr = "N/A";
+                } else {
+                    String prefix = sign > 0 ? "+" : sign < 0 ? "\u2212" : "";
+                    strPwr = prefix + String.format(Locale.US, "%.1fW", Math.abs(mw) / 1000f);
+                }
                 statsDirty = true;
             }
             battConsecutiveFailures = 0;
         } catch (Exception e) {
             // Used to disable battery reading for good (PWR/BAT frozen). Now: retry every
             // cycle, and show N/A after a few misses in a row.
-            if (++battConsecutiveFailures >= FAILURES_BEFORE_NA && (snapMw != -1 || snapTmp != -1)) {
-                snapMw = -1;
+            if (++battConsecutiveFailures >= FAILURES_BEFORE_NA && (snapMw != PWR_NA || snapTmp != -1)) {
+                snapMw = PWR_NA;
+                snapPwrSign = 0;
                 snapTmp = -1;
                 strPwr = "N/A";
                 strTmp = "N/A";
@@ -718,28 +738,59 @@ public class WinlatorHUD extends View {
     // devices report milliamps instead, which is what the < 20000 guess is for.
     private static volatile boolean currentIsMicroAmps = false;
 
+    // ---------- Current direction ----------
+    // Android documents CURRENT_NOW as positive = charging, negative = discharging, but many
+    // devices (and most sysfs current_now nodes) use the opposite sign. So the sign that means
+    // "draining" is learned per source the first time the device is unplugged (the only moment
+    // the direction is certain) and kept in prefs. Until then: unplugged = draining, plugged =
+    // the documented convention.
+    private static final String KEY_DRAIN_SIGN_BM = "hud_drain_sign_bm";
+    private static final String KEY_DRAIN_SIGN_SYSFS = "hud_drain_sign_sysfs";
+    // Below this the sign of an unplugged reading is noise, not direction (mA).
+    private static final float SIGN_LEARN_MIN_MA = 50f;
+
+    private int drainSign(String key) {
+        return prefs.getInt(key, 0);
+    }
+
     /**
-     * Battery current magnitude in A, -1 if unavailable. On external power a net current of 0 is
-     * a real reading (the charger covers the whole load, e.g. bypass charging / charge limit) and
-     * returns 0, so PWR shows 0.0W instead of N/A.
+     * Battery current in A: + = into the battery (charging), - = out of it (draining); NaN if
+     * unavailable. On external power a net current of 0 is a real reading (the charger covers
+     * the whole load, e.g. bypass charging / charge limit) and returns 0, so PWR shows 0.0W.
      */
-    private float getBatteryCurrentAmps(boolean onExternalPower) {
+    private float getBatteryCurrentSignedAmps(boolean onExternalPower) {
         long raw = Long.MIN_VALUE;
+        String signKey = KEY_DRAIN_SIGN_BM;
         if (batteryManager != null) {
             raw = batteryManager.getLongProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW);
         }
         if (raw == Long.MIN_VALUE || (raw == 0L && !onExternalPower)) {
             long sysfs = readFirstSysFsLong(CURRENT_CHANNELS);
-            if (sysfs != 0L) raw = sysfs;
+            if (sysfs != 0L) {
+                raw = sysfs;
+                signKey = KEY_DRAIN_SIGN_SYSFS;
+            }
         }
-        if (raw == Long.MIN_VALUE) return -1f;
-        if (raw == 0L) return onExternalPower ? 0f : -1f;
+        if (raw == Long.MIN_VALUE) return Float.NaN;
+        if (raw == 0L) return onExternalPower ? 0f : Float.NaN;
 
         long magnitude = Math.abs(raw);
         if (magnitude >= 20000L) currentIsMicroAmps = true;
         // Sticky unit: a small microamp reading near 0 A while charging (e.g. 15000 uA) used to
         // be read as 15 A and showed a huge PWR spike.
-        return currentIsMicroAmps || magnitude >= 20000L ? magnitude / 1_000_000f : magnitude / 1000f;
+        float amps = currentIsMicroAmps || magnitude >= 20000L ? magnitude / 1_000_000f : magnitude / 1000f;
+
+        int rawSign = raw > 0 ? 1 : -1;
+        int drain = drainSign(signKey);
+        if (!onExternalPower && amps * 1000f >= SIGN_LEARN_MIN_MA && drain != rawSign) {
+            drain = rawSign;
+            prefs.edit().putInt(signKey, drain).apply();
+        }
+        boolean draining;
+        if (drain != 0) draining = rawSign == drain;
+        else if (!onExternalPower) draining = true;
+        else draining = rawSign < 0; // documented convention until learned
+        return draining ? -amps : amps;
     }
 
     private long readFirstSysFsLong(String[] paths) {

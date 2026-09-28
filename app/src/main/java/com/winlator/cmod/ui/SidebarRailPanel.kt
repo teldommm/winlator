@@ -2,6 +2,7 @@ package com.winlator.cmod.ui
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -18,8 +19,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -57,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import com.winlator.cmod.R
 import com.winlator.cmod.ui.theme.controlAccentColor
 import com.winlator.cmod.ui.theme.destructiveColor
+import com.winlator.cmod.ui.theme.dividerColor
 import com.winlator.cmod.ui.theme.sidebarCardFillColor
 import kotlinx.coroutines.launch
 
@@ -95,6 +99,10 @@ class SidebarRailState(initialSelectedId: Int) {
 //   1. gaps 10 -> 4dp, 2. vertical padding 12 -> 6dp, 3. cells 48 -> 36dp (icons scale with them),
 //   4. below that everything scales down proportionally, so the last cell is always on screen.
 // Every step only takes what it needs: e.g. a small shortfall just tightens the gaps.
+//
+// Layout: sections, a divider (the same 1dp dividerColor() line as under "Version" in About),
+// then the Pause / Exit cell right below it. The divider's own vertical padding is tied to the
+// gap (14dp at a 10dp gap, as in About) so it compresses along with the gaps.
 
 @Immutable
 private data class RailMetrics(val padding: Dp, val gap: Dp, val cell: Dp)
@@ -105,18 +113,24 @@ private const val FULL_GAP = 10f
 private const val MIN_GAP = 4f
 private const val FULL_CELL = 48f
 private const val MIN_CELL = 36f
+private const val DIVIDER_PAD_PER_GAP = 1.4f
+private const val DIVIDER_THICKNESS = 1f
+
+private fun dividerPadding(gap: Dp) = gap * DIVIDER_PAD_PER_GAP
 
 private fun railMetrics(available: Dp, cells: Int, bounded: Boolean): RailMetrics {
     val full = RailMetrics(FULL_PAD.dp, FULL_GAP.dp, FULL_CELL.dp)
     if (!bounded || cells <= 0) return full
-    val h = available.value
-    val gaps = (cells - 1).coerceAtLeast(0)
+    val h = available.value - DIVIDER_THICKNESS
+    // Gap units: the plain gaps between sections plus the divider's padding above and below
+    // (which replaces the gap between the last section and the Pause / Exit cell).
+    val gaps = if (cells >= 2) (cells - 2) + 2 * DIVIDER_PAD_PER_GAP else 0f
     fun need(pad: Float, gap: Float, cell: Float) = 2 * pad + cells * cell + gaps * gap
 
     if (need(FULL_PAD, FULL_GAP, FULL_CELL) <= h) return full
 
     // 1. Gaps.
-    if (gaps > 0) {
+    if (gaps > 0f) {
         val gap = (h - 2 * FULL_PAD - cells * FULL_CELL) / gaps
         if (gap >= MIN_GAP) return RailMetrics(FULL_PAD.dp, gap.coerceAtMost(FULL_GAP).dp, FULL_CELL.dp)
     }
@@ -164,10 +178,17 @@ internal fun SidebarRail(
                     onClick = { callbacks.onSelect(item.id) }
                 )
             }
-            Spacer(Modifier.height(metrics.gap))
-            // Takes whatever is left, so the session cell sits at the bottom; 0 when tight.
-            Spacer(Modifier.weight(1f))
+            // Session control sits right under the sections, set apart by a divider.
+            HorizontalDivider(
+                modifier = Modifier
+                    .padding(vertical = dividerPadding(metrics.gap))
+                    .width(metrics.cell),
+                thickness = DIVIDER_THICKNESS.dp,
+                color = dividerColor()
+            )
             RailSessionButton(state = state, callbacks = callbacks, cell = metrics.cell)
+            // Whatever height is left stays empty below.
+            Spacer(Modifier.weight(1f))
         }
     }
 }
@@ -185,15 +206,20 @@ private fun RailCell(
     onClick: () -> Unit,
     content: @Composable () -> Unit
 ) {
-    val background by animateColorAsState(
-        if (selected) sidebarCardFillColor() else Color.Transparent,
-        label = "railCellBackground"
+    // Fade the highlight by alpha only. It used to animate the colour to Color.Transparent,
+    // which is transparent *black*: the colour interpolation passed through dark grey, so the
+    // cell you left flashed a black square for a moment.
+    val fillColor = sidebarCardFillColor()
+    val highlight by animateFloatAsState(
+        targetValue = if (selected) 1f else 0f,
+        animationSpec = tween(150),
+        label = "railCellHighlight"
     )
     Box(
         modifier = Modifier
             .size(cell)
             .clip(cellShape(cell))
-            .background(background)
+            .background(fillColor.copy(alpha = fillColor.alpha * highlight))
             .clickable(onClick = onClick)
             .semantics { if (description != null) contentDescription = description },
         contentAlignment = Alignment.Center
@@ -261,8 +287,9 @@ private fun RailSessionButton(state: SidebarRailState, callbacks: SidebarRailCal
         if (exitMode) destructive.copy(alpha = 0.22f) else baseFill,
         label = "sessionFill"
     )
+    // Same trap as the rail highlight: fade the accent itself, not towards transparent black.
     val borderColor by animateColorAsState(
-        if (paused && !exitMode) accent else Color.Transparent,
+        if (paused && !exitMode) accent else accent.copy(alpha = 0f),
         label = "sessionBorder"
     )
     val pauseTint by animateColorAsState(

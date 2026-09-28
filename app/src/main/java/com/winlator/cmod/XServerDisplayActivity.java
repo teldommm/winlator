@@ -1367,7 +1367,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 @Override
                 public void onExit() {
                     drawerLayout.closeDrawers();
-                    exit();
+                    // Same themed confirm as Task Manager's End Process, red confirm button.
+                    ThemedAlertHost.confirm(XServerDisplayActivity.this, getString(R.string.exit_game),
+                            getString(R.string.do_you_want_to_exit_game), getString(R.string.exit),
+                            () -> exit(), true);
                 }
             });
             sidebarRailState = ingameSidebar.getRailState();
