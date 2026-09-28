@@ -159,7 +159,6 @@ import com.winlator.cmod.core.AppDefaults;
 
 public class XServerDisplayActivity extends AppCompatActivity {
 
-    private static final boolean DISABLE_TOUCHSCREEN_AUTO_HIDE = true;
     private static final HashMap<String, Boolean> WINE_XRANDR_SUPPORT_CACHE = new HashMap<>();
     private final AtomicBoolean exiting = new AtomicBoolean(false);
 
@@ -241,6 +240,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
     // Like Relative/Disable Mouse: starts from the shortcut ("tapToClick", on unless "0"),
     // the sidebar changes it for the session only.
     private boolean isTapToClickEnabled = true;
+    // Touchscreen Timeout: controls fade out after 5 s idle, the next touch only brings them
+    // back. Same model as the mouse toggles: shortcut ("touchscreenTimeout" = "1") sets the
+    // start value, the sidebar changes it for the session.
+    private boolean isTouchscreenTimeout = false;
     private boolean simulateTouchScreen = false;
 
     private SensorManager sensorManager;
@@ -251,9 +254,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private Handler handler;
     private Runnable savePlaytimeRunnable;
     private static final long SAVE_INTERVAL_MS = 1000;
-
-    private Handler timeoutHandler = new Handler(Looper.getMainLooper());
-    private Runnable hideControlsRunnable;
 
     private boolean isDarkMode;
 
@@ -354,19 +354,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
         };
         handler.postDelayed(savePlaytimeRunnable, SAVE_INTERVAL_MS);
-
-        hideControlsRunnable = () -> {
-            if (DISABLE_TOUCHSCREEN_AUTO_HIDE) {
-                return;
-            }
-
-            if (preferences.getBoolean("touchscreen_timeout_enabled", false)
-                    && inputControlsView != null
-                    && inputControlsView.getProfile() != null) {
-                inputControlsView.setVisibility(View.GONE);
-                Log.d("XServerDisplayActivity", "Touchscreen controls hidden after timeout.");
-            }
-        };
 
         contentsManager = new ContentsManager(this);
         contentsManager.syncContents();
@@ -541,6 +528,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             isRelativeMouseMovement = shortcut.getExtra("enableRelativeMouse").equals("1");
             isMouseDisabled = shortcut.getExtra("disableMouse").equals("1");
             isTapToClickEnabled = !shortcut.getExtra("tapToClick").equals("0");
+            isTouchscreenTimeout = shortcut.getExtra("touchscreenTimeout").equals("1");
         }
 
         this.graphicsDriverConfig = GraphicsDriverConfig.parseGraphicsDriverConfig(graphicsDriverConfig);
@@ -1247,7 +1235,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         rootView.addView(xServerView);
 
         globalCursorSpeed = clampSpeedPercent(Math.round(preferences.getFloat("cursor_speed", 1.0f) * 100f)) / 100f;
-        touchpadView = new TouchpadView(this, xServer, timeoutHandler, hideControlsRunnable);
+        touchpadView = new TouchpadView(this, xServer);
         touchpadView.setSensitivity(globalCursorSpeed);
         touchpadView.setTapToClickEnabled(isTapToClickEnabled);
         touchpadView.setMouseEnabled(!isMouseDisabled);
@@ -1267,18 +1255,14 @@ public class XServerDisplayActivity extends AppCompatActivity {
         touchpadView.setFocusableInTouchMode(true);
         rootView.addView(touchpadView);
 
-        inputControlsView = new InputControlsView(this, timeoutHandler, hideControlsRunnable);
+        inputControlsView = new InputControlsView(this);
         inputControlsView
                 .setOverlayOpacity(preferences.getFloat("overlay_opacity", InputControlsView.DEFAULT_OVERLAY_OPACITY));
         inputControlsView.setTouchpadView(touchpadView);
         inputControlsView.setXServer(xServer);
         inputControlsView.setVisibility(View.GONE);
+        inputControlsView.setAutoHideEnabled(isTouchscreenTimeout);
         rootView.addView(inputControlsView);
-
-        boolean isTimeoutEnabled = preferences.getBoolean("touchscreen_timeout_enabled", false);
-        if (isTimeoutEnabled) {
-            startTouchscreenTimeout();
-        }
 
         if (container != null) {
             String hudModeExtra = container.getExtra("hudMode");
@@ -1933,13 +1917,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         InputPanelCallbacks callbacks = new InputPanelCallbacks() {
             // Mirrors the old applySidebarInputControls(): always re-reads/re-persists the
-            // full snapshot of profile + switches, whichever one just changed. The touchscreen
-            // timeout switch is gone from the panel (auto-hide is compiled out, see
-            // DISABLE_TOUCHSCREEN_AUTO_HIDE), so its stored value is simply carried along.
+            // full snapshot of profile + switches, whichever one just changed.
             @Override
             public void onControlsSettingsChanged(int profileId, boolean showTouchscreenControls,
                                                    boolean touchscreenHaptics) {
-                boolean touchscreenTimeout = preferences.getBoolean("touchscreen_timeout_enabled", false);
                 inputControlsView.setShowTouchscreenControls(showTouchscreenControls);
 
                 ArrayList<ControlsProfile> profiles = inputControlsManager.getProfiles();
@@ -1962,12 +1943,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 } else {
                     hideInputControls();
                 }
+            }
 
-                if (touchscreenTimeout && inputControlsView.getVisibility() == View.VISIBLE) {
-                    startTouchscreenTimeout();
-                } else if (touchpadView != null) {
-                    touchpadView.setOnTouchListener(null);
-                }
+            @Override
+            public void onTouchscreenTimeout(boolean enabled) {
+                isTouchscreenTimeout = enabled;
+                inputControlsView.setAutoHideEnabled(enabled);
             }
 
             @Override
@@ -2072,6 +2053,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     profileOptions,
                     selectedProfileId,
                     inputControlsView.isShowTouchscreenControls(),
+                    isTouchscreenTimeout,
                     preferences.getBoolean("touchscreen_haptics_enabled", false),
                     Math.round(preferences.getFloat("overlay_opacity", InputControlsView.DEFAULT_OVERLAY_OPACITY) * 100f),
                     isRelativeMouseMovement,
@@ -2096,11 +2078,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         inputControlsView.setShowTouchscreenControls(isShowTouchscreenControls);
 
-        boolean isTimeoutEnabled = preferences.getBoolean("touchscreen_timeout_enabled", false);
         boolean isHapticsEnabled = preferences.getBoolean("touchscreen_haptics_enabled", false);
 
         SharedPreferences.Editor editor = preferences.edit();
-        editor.putBoolean("touchscreen_timeout_enabled", isTimeoutEnabled);
         editor.putBoolean("touchscreen_haptics_enabled", isHapticsEnabled);
         editor.apply();
 
@@ -2115,94 +2095,27 @@ public class XServerDisplayActivity extends AppCompatActivity {
             hideInputControls();
         }
 
-        if (isTimeoutEnabled && inputControlsView.getVisibility() == View.VISIBLE) {
-            startTouchscreenTimeout();
-        } else {
-            touchpadView.setOnTouchListener(null);
-        }
-
         Log.d("XServerDisplayActivity", "Input controls simulated confirmation executed.");
     }
 
-    private void startTouchscreenTimeout() {
-        if (timeoutHandler != null && hideControlsRunnable != null) {
-            timeoutHandler.removeCallbacks(hideControlsRunnable);
-        }
-
-        if (DISABLE_TOUCHSCREEN_AUTO_HIDE) {
-            Log.d("XServerDisplayActivity", "Touchscreen auto-hide disabled; controls remain visible.");
-            if (touchpadView != null) {
-                touchpadView.setOnTouchListener(null);
-            }
-            if (inputControlsView != null && inputControlsView.getProfile() != null) {
-                inputControlsView.setVisibility(View.VISIBLE);
-            }
-            return;
-        }
-
-        boolean isTimeoutEnabled = preferences.getBoolean("touchscreen_timeout_enabled", false);
-
-        if (isTimeoutEnabled) {
-            if (inputControlsView != null && inputControlsView.getProfile() != null) {
-                inputControlsView.setVisibility(View.VISIBLE);
-            }
-            Log.d("XServerDisplayActivity", "Timeout is enabled, setting up timeout logic.");
-
-            touchpadView.setOnTouchListener((v, event) -> {
-                int action = event.getActionMasked();
-                if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_MOVE) {
-                    if (inputControlsView != null && inputControlsView.getProfile() != null) {
-                        inputControlsView.setVisibility(View.VISIBLE);
-                    }
-
-                    timeoutHandler.removeCallbacks(hideControlsRunnable);
-                    timeoutHandler.postDelayed(hideControlsRunnable, 5000);
-                }
-
-                return false;
-            });
-
-            timeoutHandler.postDelayed(hideControlsRunnable, 5000);
-        } else {
-            Log.d("XServerDisplayActivity", "Timeout is disabled, controls will stay visible.");
-
-            if (inputControlsView != null && inputControlsView.getProfile() != null) {
-                inputControlsView.setVisibility(View.VISIBLE);
-            }
-            timeoutHandler.removeCallbacks(hideControlsRunnable);
-            touchpadView.setOnTouchListener(null);
-        }
-    }
-
     private void showInputControls(ControlsProfile profile) {
-        if (timeoutHandler != null && hideControlsRunnable != null) {
-            timeoutHandler.removeCallbacks(hideControlsRunnable);
-        }
-
         inputControlsView.setProfile(profile);
         inputControlsView.setVisibility(View.VISIBLE);
         inputControlsView.requestFocus();
 
         // Cursor Speed only: the profile's own speed now drives just its stick/button mouse moves.
         touchpadView.setSensitivity(globalCursorSpeed);
-        touchpadView.setPointerButtonRightEnabled(false);
 
         inputControlsView.invalidate();
         winHandler.sendGamepadState();
     }
 
     private void hideInputControls() {
-        if (timeoutHandler != null && hideControlsRunnable != null) {
-            timeoutHandler.removeCallbacks(hideControlsRunnable);
-        }
-
         inputControlsView.setShowTouchscreenControls(true);
         inputControlsView.setVisibility(View.GONE);
         inputControlsView.setProfile(null);
 
         touchpadView.setSensitivity(globalCursorSpeed);
-        touchpadView.setPointerButtonLeftEnabled(true);
-        touchpadView.setPointerButtonRightEnabled(true);
         // No controls any more: no pointer may stay on the touchpad's ignore list.
         touchpadView.setPointerIdsToIgnore(java.util.Collections.emptySet());
 

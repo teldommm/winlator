@@ -168,7 +168,7 @@
     <string name="cannot_remove_default_sound_font">Cannot remove default soundfont</string>
     <string name="lc_all" translatable="false">LC_ALL</string>
 
-    <string name="enable_touchscreen_timeout">Touchscreen Timeout (Requires Restart)</string>
+    <string name="enable_touchscreen_timeout">Touchscreen Timeout</string>
     <string name="enable_touchscreen_haptics">Enable Touchscreen Haptic Feedback</string>
 
 

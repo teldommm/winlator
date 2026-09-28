@@ -22,10 +22,12 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.os.Build;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.util.Log;
 import android.view.HapticFeedbackConstants;
+import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.PointerIcon;
@@ -63,7 +65,6 @@ import java.util.TimerTask;
 public class InputControlsView extends View {
     public static final float DEFAULT_OVERLAY_OPACITY = 0.85f;
     private static final byte MOUSE_WHEEL_DELTA = 120;
-    private static final boolean AUTO_HIDE_CONTROLS = false;
     private boolean editMode = false;
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG | Paint.FILTER_BITMAP_FLAG);
     private final Path path = new Path();
@@ -140,10 +141,20 @@ public class InputControlsView extends View {
     // Full deflection at 100% Stick Mouse Speed = 10 px per 60 Hz tick (600 px/s), as before.
     private static final float STICK_MOUSE_PIXELS_PER_TICK = 10f;
     private boolean showTouchscreenControls = true;
-    private int activeTouchPointerCount = 0;
 
-    private Handler timeoutHandler; // Reference to the activity's timeout handler
-    private Runnable hideControlsRunnable; // Runnable to hide the controls
+    // ---------- Touchscreen Timeout (auto-hide) ----------
+    // After AUTO_HIDE_DELAY_MS with every finger up, the controls fade out. The view stays
+    // VISIBLE (only its alpha drops), so physical controllers and focus are unaffected. While
+    // concealed, the next touch only brings the controls back: that whole gesture (until every
+    // finger is up) is swallowed and reaches neither the elements nor the touchpad.
+    private static final long AUTO_HIDE_DELAY_MS = 5000;
+    private static final long AUTO_HIDE_FADE_OUT_MS = 250;
+    private static final long AUTO_HIDE_FADE_IN_MS = 120;
+    private final Handler autoHideHandler = new Handler(Looper.getMainLooper());
+    private final Runnable concealRunnable = this::conceal;
+    private boolean autoHideEnabled = false;
+    private boolean concealed = false;
+    private boolean swallowingWakeGesture = false;
 
     private SharedPreferences preferences;
 
@@ -165,21 +176,6 @@ public class InputControlsView extends View {
     @SuppressLint("ResourceType")
     public InputControlsView(Context context) {
         super(context);
-        setClickable(true);
-        setFocusable(true);
-        setFocusableInTouchMode(true);
-        requestFocus(); // Add this line to request focus
-        setBackgroundColor(0x00000000);
-        setPointerIcon(PointerIcon.load(getResources(), R.drawable.hidden_pointer_arrow));
-        setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        preferences = PreferenceManager.getDefaultSharedPreferences(this.getContext());
-    }
-
-    @SuppressLint("ResourceType")
-    public InputControlsView(Context context, Handler timeoutHandler, Runnable hideControlsRunnable) {
-        super(context);
-        this.timeoutHandler = timeoutHandler; // Store the reference to timeout handler
-        this.hideControlsRunnable = hideControlsRunnable; // Store the reference to the hide controls runnable
         setClickable(true);
         setFocusable(true);
         setFocusableInTouchMode(true);
@@ -566,6 +562,7 @@ public class InputControlsView extends View {
             invalidate();
             if (previousSelection != null && editorListener != null) editorListener.onSelectionChanged(null);
         }
+        else runOnUi(this::resetAutoHide);
     }
 
     public boolean isShowTouchscreenControls() {
@@ -574,6 +571,7 @@ public class InputControlsView extends View {
 
     public void setShowTouchscreenControls(boolean showTouchscreenControls) {
         this.showTouchscreenControls = showTouchscreenControls;
+        runOnUi(this::resetAutoHide);
     }
 
     public int getPrimaryColor() {
@@ -632,6 +630,7 @@ public class InputControlsView extends View {
     protected void onDetachedFromWindow() {
         if (mouseMoveTimer != null)
             mouseMoveTimer.cancel();
+        autoHideHandler.removeCallbacks(concealRunnable);
         super.onDetachedFromWindow();
     }
 
@@ -792,9 +791,7 @@ public class InputControlsView extends View {
         boolean hapticsEnabled = preferences.getBoolean("touchscreen_haptics_enabled", false);
         touchHapticsEnabled = hapticsEnabled && !editMode;
 
-        // Do not let the auto-hide runnable hide controls while a finger is still down.
-        // This fixes controls disappearing under load or while holding a stick/button.
-        updateTouchscreenTimeout(event);
+        if (handleAutoHideTouch(event)) return true;
 
         if (editMode && readyToDraw) {
             handleEditTouch(event);
@@ -819,7 +816,6 @@ public class InputControlsView extends View {
                     float x = event.getX(actionIndex);
                     float y = event.getY(actionIndex);
 
-                    touchpadView.setPointerButtonLeftEnabled(true);
                     boolean hapticPlayed = false;
                     for (ControlElement element : profile.getElements()) {
                         if (element.handleTouchDown(pointerId, x, y)) {
@@ -833,9 +829,6 @@ public class InputControlsView extends View {
                                     hapticPlayed = true;
                                 }
                             }
-                        }
-                        if (element.getBindingAt(0) == Binding.MOUSE_LEFT_BUTTON) {
-                            touchpadView.setPointerButtonLeftEnabled(false);
                         }
                     }
                     // Second pass: only a touch nobody took by their own bounds may spawn a
@@ -891,50 +884,95 @@ public class InputControlsView extends View {
 
 
 
-    private void updateTouchscreenTimeout(MotionEvent event) {
-        if (timeoutHandler == null || hideControlsRunnable == null) return;
-
-        switch (event.getActionMasked()) {
-            case MotionEvent.ACTION_DOWN:
-                activeTouchPointerCount = 1;
-                timeoutHandler.removeCallbacks(hideControlsRunnable);
-                break;
-            case MotionEvent.ACTION_POINTER_DOWN:
-                activeTouchPointerCount = event.getPointerCount();
-                timeoutHandler.removeCallbacks(hideControlsRunnable);
-                break;
-            case MotionEvent.ACTION_MOVE:
-                if (activeTouchPointerCount > 0) {
-                    timeoutHandler.removeCallbacks(hideControlsRunnable);
-                }
-                break;
-            case MotionEvent.ACTION_POINTER_UP:
-                activeTouchPointerCount = Math.max(0, event.getPointerCount() - 1);
-                if (activeTouchPointerCount > 0) {
-                    timeoutHandler.removeCallbacks(hideControlsRunnable);
-                }
-                else {
-                    scheduleTouchscreenTimeout();
-                }
-                break;
-            case MotionEvent.ACTION_UP:
-            case MotionEvent.ACTION_CANCEL:
-                activeTouchPointerCount = 0;
-                scheduleTouchscreenTimeout();
-                break;
-        }
+    /** Touchscreen Timeout on/off (shortcut setting, sidebar can change it for the session). */
+    public void setAutoHideEnabled(boolean enabled) {
+        autoHideEnabled = enabled;
+        runOnUi(this::resetAutoHide);
     }
 
-    private void scheduleTouchscreenTimeout() {
-        if (!AUTO_HIDE_CONTROLS) {
-            if (timeoutHandler != null && hideControlsRunnable != null) {
-                timeoutHandler.removeCallbacks(hideControlsRunnable);
-            }
-            return;
+    public boolean isAutoHideEnabled() {
+        return autoHideEnabled;
+    }
+
+    private boolean isAutoHideActive() {
+        return autoHideEnabled && !editMode && profile != null && showTouchscreenControls
+                && getVisibility() == VISIBLE;
+    }
+
+    // Returns true when the event belongs to the gesture that wakes concealed controls.
+    private boolean handleAutoHideTouch(MotionEvent event) {
+        if (event.isFromSource(InputDevice.SOURCE_MOUSE)) return false;
+        int action = event.getActionMasked();
+        boolean gestureEnds = action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL;
+
+        if (!isAutoHideActive()) {
+            if (gestureEnds) swallowingWakeGesture = false;
+            return swallowingWakeGesture;
         }
-        if (timeoutHandler == null || hideControlsRunnable == null) return;
-        timeoutHandler.removeCallbacks(hideControlsRunnable);
-        timeoutHandler.postDelayed(hideControlsRunnable, 5000);
+
+        if (action == MotionEvent.ACTION_DOWN) {
+            swallowingWakeGesture = concealed;
+            if (concealed) reveal();
+        }
+
+        // Fingers down: never hide. Last finger up: start counting again.
+        if (gestureEnds) scheduleConceal();
+        else autoHideHandler.removeCallbacks(concealRunnable);
+
+        if (swallowingWakeGesture) {
+            if (gestureEnds) swallowingWakeGesture = false;
+            return true;
+        }
+        return false;
+    }
+
+    private void scheduleConceal() {
+        autoHideHandler.removeCallbacks(concealRunnable);
+        if (isAutoHideActive()) autoHideHandler.postDelayed(concealRunnable, AUTO_HIDE_DELAY_MS);
+    }
+
+    private void conceal() {
+        if (!isAutoHideActive() || concealed || isAnyElementHeld()) return;
+        concealed = true;
+        animate().cancel();
+        animate().alpha(0f).setDuration(AUTO_HIDE_FADE_OUT_MS).start();
+    }
+
+    private void reveal() {
+        concealed = false;
+        animate().cancel();
+        animate().alpha(1f).setDuration(AUTO_HIDE_FADE_IN_MS).start();
+    }
+
+    // Back to fully shown, then restart the countdown if auto-hide applies. Called whenever
+    // something that decides isAutoHideActive() changes.
+    private void resetAutoHide() {
+        autoHideHandler.removeCallbacks(concealRunnable);
+        swallowingWakeGesture = false;
+        concealed = false;
+        animate().cancel();
+        setAlpha(1f);
+        scheduleConceal();
+    }
+
+    private boolean isAnyElementHeld() {
+        if (profile == null) return false;
+        for (ControlElement element : profile.getElements()) {
+            if (element.getCurrentPointerId() != -1) return true;
+        }
+        return false;
+    }
+
+    private void runOnUi(Runnable action) {
+        if (Looper.myLooper() == Looper.getMainLooper()) action.run();
+        else post(action);
+    }
+
+    @Override
+    public void setVisibility(int visibility) {
+        super.setVisibility(visibility);
+        // Guard: a super constructor may set visibility before our fields exist.
+        if (autoHideHandler != null) runOnUi(this::resetAutoHide);
     }
 
     public boolean onKeyEvent(KeyEvent event) {

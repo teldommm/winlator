@@ -233,6 +233,8 @@ private class ShortcutEditorStateV2(val shortcut: Shortcut) {
     var touchMode by mutableIntStateOf(if (shortcut.getExtra("simTouchScreen", "0") == "1") 1 else 0)
     // On by default; stored only when turned off, like the other mouse toggles.
     var tapToClick by mutableStateOf(shortcut.getExtra("tapToClick", "1") != "0")
+    // Off by default; stored only when on.
+    var touchscreenTimeout by mutableStateOf(shortcut.getExtra("touchscreenTimeout", "0") == "1")
     var syncCpu by mutableStateOf(shortcut.getExtra("syncCpuTopology", if (container.isSyncCpuTopology()) "1" else "0") == "1")
     val cpu = mutableStateListOf<Boolean>().apply {
         val count = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)
@@ -939,6 +941,8 @@ private fun ShortcutCategoryV2(
         "Input" -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SettingsCard {
                 SettingMappedChoice("Controls Profile", s.controlsProfile, profiles) { s.controlsProfile = it; s.extra("controlsProfile", it.takeUnless { id -> id == "0" }) }
+                SettingsDivider()
+                SettingToggle("Touchscreen Timeout", s.touchscreenTimeout, s.controlsProfile != "0") { s.touchscreenTimeout = it; s.extra("touchscreenTimeout", if (it) "1" else null) }
                 SettingsDivider()
                 SettingToggle("Exclusive Input", s.exclusive) {
                     s.exclusive = it

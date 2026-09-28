@@ -42,8 +42,6 @@ public class TouchpadView extends View {
     private final Finger[] fingers = new Finger[MAX_FINGERS];
     private byte numFingers = 0;
     private float sensitivity = 1.0f;
-    private boolean pointerButtonLeftEnabled = true;
-    private boolean pointerButtonRightEnabled = true;
     private Finger fingerPointerButtonLeft;
     private Finger fingerPointerButtonRight;
     private float scrollAccumY = 0;
@@ -101,21 +99,15 @@ public class TouchpadView extends View {
     private float lastTapRawX, lastTapRawY;
     private int lastTapX, lastTapY;
 
-    private Handler timeoutHandler; // Reference to the activity's timeout handler
-    private Runnable hideControlsRunnable; // Runnable to hide the controls
-
     private SharedPreferences preferences;
 
 
     // Flag to control touchpad vs touchscreen mode
 
     @SuppressLint("ResourceType")
-    public TouchpadView(Context context, XServer xServer, Handler timeoutHandler, Runnable hideControlsRunnable) {
+    public TouchpadView(Context context, XServer xServer) {
         super(context);
         this.xServer = xServer;
-
-        this.timeoutHandler = timeoutHandler; // Store the reference to timeout handler
-        this.hideControlsRunnable = hideControlsRunnable; // Store the reference to the hide controls runnable
 
         setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         setBackground(createTransparentBg());
@@ -126,9 +118,6 @@ public class TouchpadView extends View {
         updateXform(AppUtils.getScreenWidth(), AppUtils.getScreenHeight(), xServer.screenInfo.width, xServer.screenInfo.height);
         // Initialize SharedPreferences here
         this.preferences = PreferenceManager.getDefaultSharedPreferences(context);
-
-        this.timeoutHandler = timeoutHandler; // Store the reference to timeout handler
-        this.hideControlsRunnable = hideControlsRunnable; // Store the reference to the hide controls runnable
 
         // Set up the generic motion listener for hover events
         setOnGenericMotionListener(new OnGenericMotionListener() {
@@ -221,9 +210,6 @@ public class TouchpadView extends View {
         // If mouse is disabled, ignore all input
         if (!mouseEnabled) return true;
 
-        // Reset the timeout timer to keep controls visible
-        resetTouchscreenTimeout();
-
         if (event.getToolType(0) == MotionEvent.TOOL_TYPE_STYLUS) return handleStylusEvent(event);
 
         int action = event.getActionMasked();
@@ -235,15 +221,6 @@ public class TouchpadView extends View {
         return result;
     }
 
-    private void resetTouchscreenTimeout() {
-        //Log.d("TouchpadView", "Touch detected, resetting timeout.");
-        if (timeoutHandler != null && hideControlsRunnable != null) {
-            // Cancel any pending hide requests
-            timeoutHandler.removeCallbacks(hideControlsRunnable);
-            // Post a new request to hide the controls after 5 seconds
-            timeoutHandler.postDelayed(hideControlsRunnable, 5000); // Adjust timeout as necessary
-        }
-    }
     private boolean handleStylusHoverEvent(MotionEvent event) {
         int action = event.getActionMasked();
 
@@ -529,8 +506,7 @@ public class TouchpadView extends View {
         lastTapY = y;
 
         xServer.injectPointerMove(x, y);
-        // Only Tap to Click gates this: the trackpad's pointerButtonLeft/RightEnabled (turned off
-        // while a controls profile maps mouse buttons) are about trackpad taps, not direct touch.
+        // Tap to Click is the only switch for touch clicks, in both modes.
         if (tapToClickEnabled && !xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT)) {
             xServer.injectPointerButtonPress(Pointer.Button.BUTTON_LEFT);
         }
@@ -549,7 +525,7 @@ public class TouchpadView extends View {
 
     // Trackpad long press: one finger held still for LONG_PRESS_RIGHT_CLICK_MS = right click.
     private void onLongPress() {
-        if (!tapToClickEnabled || !pointerButtonRightEnabled || numFingers != 1) return;
+        if (!tapToClickEnabled || numFingers != 1) return;
         Finger finger = null;
         for (byte i = 0; i < MAX_FINGERS; i++) if (fingers[i] != null) { finger = fingers[i]; break; }
         if (finger == null || finger.travelDistance() >= MAX_TAP_TRAVEL_DISTANCE) return;
@@ -647,21 +623,21 @@ public class TouchpadView extends View {
     }
 
     private void pressPointerButtonLeft(Finger finger) {
-        if (pointerButtonLeftEnabled && !xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT)) {
+        if (!xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT)) {
             xServer.injectPointerButtonPress(Pointer.Button.BUTTON_LEFT);
             fingerPointerButtonLeft = finger;
         }
     }
 
     private void pressPointerButtonRight(Finger finger) {
-        if (pointerButtonRightEnabled && !xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_RIGHT)) {
+        if (!xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_RIGHT)) {
             xServer.injectPointerButtonPress(Pointer.Button.BUTTON_RIGHT);
             fingerPointerButtonRight = finger;
         }
     }
 
     private void releasePointerButtonLeft(final Finger finger) {
-        if (pointerButtonLeftEnabled && finger == fingerPointerButtonLeft && xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT)) {
+        if (finger == fingerPointerButtonLeft && xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT)) {
             postDelayed(() -> {
                 xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_LEFT);
                 fingerPointerButtonLeft = null;
@@ -670,7 +646,7 @@ public class TouchpadView extends View {
     }
 
     private void releasePointerButtonRight(final Finger finger) {
-        if (pointerButtonRightEnabled && finger == fingerPointerButtonRight && xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_RIGHT)) {
+        if (finger == fingerPointerButtonRight && xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_RIGHT)) {
             postDelayed(() -> {
                 xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_RIGHT);
                 fingerPointerButtonRight = null;
@@ -730,22 +706,6 @@ public class TouchpadView extends View {
             default:
                 break;
         }
-    }
-
-    public boolean isPointerButtonLeftEnabled() {
-        return pointerButtonLeftEnabled;
-    }
-
-    public void setPointerButtonLeftEnabled(boolean pointerButtonLeftEnabled) {
-        this.pointerButtonLeftEnabled = pointerButtonLeftEnabled;
-    }
-
-    public boolean isPointerButtonRightEnabled() {
-        return pointerButtonRightEnabled;
-    }
-
-    public void setPointerButtonRightEnabled(boolean pointerButtonRightEnabled) {
-        this.pointerButtonRightEnabled = pointerButtonRightEnabled;
     }
 
     public void setFourFingersTapCallback(Runnable fourFingersTapCallback) {

@@ -35,6 +35,7 @@ data class InputPanelState(
     val profiles: List<InputProfileOption>,
     val selectedProfileId: Int, // -1 = disabled
     val showTouchscreenControls: Boolean,
+    val touchscreenTimeout: Boolean,
     val touchscreenHaptics: Boolean,
     val controlsOpacityPercent: Int,
     val relativeMouse: Boolean,
@@ -53,6 +54,9 @@ interface InputPanelCallbacks {
         showTouchscreenControls: Boolean,
         touchscreenHaptics: Boolean
     )
+
+    /** Session-only, like the mouse toggles (the shortcut sets the start value). */
+    fun onTouchscreenTimeout(enabled: Boolean)
 
     fun onEditProfiles(selectedProfileId: Int)
     /** commit = false while dragging (live preview only), true once on release (persist). */
@@ -82,6 +86,7 @@ private fun InputSidebarPanel(state: InputPanelState, callbacks: InputPanelCallb
     var profileId by remember { mutableStateOf(state.selectedProfileId) }
     var showControls by remember { mutableStateOf(state.showTouchscreenControls) }
     var haptics by remember { mutableStateOf(state.touchscreenHaptics) }
+    var timeout by remember { mutableStateOf(state.touchscreenTimeout) }
     var relativeMouse by remember { mutableStateOf(state.relativeMouse) }
     var disableMouse by remember { mutableStateOf(state.disableMouse) }
     var touchMode by remember { mutableStateOf(state.touchMode) }
@@ -115,6 +120,15 @@ private fun InputSidebarPanel(state: InputPanelState, callbacks: InputPanelCallb
                 onCheckedChange = {
                     showControls = it
                     pushControlsSettings()
+                }
+            )
+            // Fades the controls out after 5 s idle; the next touch only brings them back.
+            SidebarInlineToggle(
+                label = stringResource(R.string.enable_touchscreen_timeout),
+                checked = timeout,
+                onCheckedChange = {
+                    timeout = it
+                    callbacks.onTouchscreenTimeout(it)
                 }
             )
             SidebarInlineToggle(
