@@ -1,5 +1,12 @@
 package com.winlator.cmod.ui.settings
 
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
 import com.winlator.cmod.ui.theme.ThemedDialogTitle
@@ -693,7 +700,8 @@ private fun SoundFontCard(choices: List<SettingChoice>, onInstall: () -> Unit, o
 }
 
 // The key and the four addresses artwork is fetched with, all visible at once and showing the
-// default until changed. One Restore defaults for the lot; nothing is stored until Save.
+// default until changed. There is no Save: a value is stored when its field loses focus (Next, Done,
+// a tap elsewhere) and when the screen is left. Restoring the defaults is turning the switch off.
 @Composable
 private fun ArtworkSourcesEditor(model: SettingsModel, callbacks: SettingsCallbacks) {
     var apiKey by remember(model.steamGridApiKey) { mutableStateOf(model.steamGridApiKey) }
@@ -702,38 +710,69 @@ private fun ArtworkSourcesEditor(model: SettingsModel, callbacks: SettingsCallba
     var gamesCdn by remember(model.gamesDbCdnUrl) { mutableStateOf(model.gamesDbCdnUrl) }
     val searchInvalid = !gamesSearch.contains(RemoteSources.QUERY_PLACEHOLDER)
 
+    fun commit() {
+        // An emptied field means "the default": show it as such, and store nothing for it.
+        if (apiKey.isBlank()) apiKey = RemoteSources.DEFAULT_STEAMGRID_API_KEY
+        if (steamGridUrl.isBlank()) steamGridUrl = RemoteSources.DEFAULT_STEAMGRID
+        if (gamesSearch.isBlank()) gamesSearch = RemoteSources.DEFAULT_GAMESDB_SEARCH
+        if (gamesCdn.isBlank()) gamesCdn = RemoteSources.DEFAULT_GAMESDB_CDN
+        // A search address without the placeholder is not stored; the field keeps showing the error.
+        val search = if (gamesSearch.contains(RemoteSources.QUERY_PLACEHOLDER)) gamesSearch else model.gamesDbSearchUrl
+        if (apiKey.trim() == model.steamGridApiKey && steamGridUrl.trim() == model.steamGridUrl &&
+            search.trim() == model.gamesDbSearchUrl && gamesCdn.trim() == model.gamesDbCdnUrl) return
+        callbacks.onArtworkSourcesSaved(apiKey, steamGridUrl, search, gamesCdn)
+    }
+    val commitLatest = rememberUpdatedState { commit() }
+    // Leaving the screen with a field still focused (back, another tab) must not drop the edit.
+    DisposableEffect(Unit) { onDispose { commitLatest.value() } }
+
     Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedTextField(value = apiKey, onValueChange = { apiKey = it }, label = { Text("SteamGridDB API key") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-        OutlinedTextField(value = steamGridUrl, onValueChange = { steamGridUrl = it }, label = { Text("SteamGridDB API URL") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-        OutlinedTextField(
-            value = gamesSearch,
-            onValueChange = { gamesSearch = it },
-            label = { Text("TheGamesDB search URL") },
-            isError = searchInvalid,
-            supportingText = if (searchInvalid) ({ Text("Must contain ${RemoteSources.QUERY_PLACEHOLDER}") }) else null,
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+        ArtworkField("SteamGridDB API key", apiKey, { apiKey = it }, ImeAction.Next, ::commit)
+        ArtworkField("SteamGridDB API URL", steamGridUrl, { steamGridUrl = it }, ImeAction.Next, ::commit)
+        ArtworkField(
+            "TheGamesDB search URL", gamesSearch, { gamesSearch = it }, ImeAction.Next, ::commit,
+            error = if (searchInvalid) "Must contain ${RemoteSources.QUERY_PLACEHOLDER}" else null
         )
-        OutlinedTextField(value = gamesCdn, onValueChange = { gamesCdn = it }, label = { Text("TheGamesDB images URL") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-        Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedButton(
-                onClick = {
-                    apiKey = RemoteSources.DEFAULT_STEAMGRID_API_KEY
-                    steamGridUrl = RemoteSources.DEFAULT_STEAMGRID
-                    gamesSearch = RemoteSources.DEFAULT_GAMESDB_SEARCH
-                    gamesCdn = RemoteSources.DEFAULT_GAMESDB_CDN
-                },
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
-                border = BorderStroke(1.dp, hairlineColor())
-            ) { Text("Restore defaults") }
-            Button(
-                onClick = { callbacks.onArtworkSourcesSaved(apiKey, steamGridUrl, gamesSearch, gamesCdn) },
-                enabled = !searchInvalid,
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = androidx.compose.ui.graphics.Color.White)
-            ) { Text("Save") }
-        }
+        ArtworkField("TheGamesDB images URL", gamesCdn, { gamesCdn = it }, ImeAction.Done, ::commit)
+        Text(
+            "Turn the switch off to go back to the defaults",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
+// One address / key field: [onCommit] runs when it loses focus after having had it (so not on the
+// first composition). Done clears the focus, which is what commits.
+@Composable
+private fun ArtworkField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    imeAction: ImeAction,
+    onCommit: () -> Unit,
+    error: String? = null
+) {
+    var hadFocus by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = true,
+        isError = error != null,
+        label = { Text(label) },
+        supportingText = if (error != null) ({ Text(error) }) else null,
+        keyboardOptions = KeyboardOptions(imeAction = imeAction),
+        keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+        modifier = Modifier
+            .fillMaxWidth()
+            .onFocusChanged { state ->
+                if (state.isFocused) {
+                    hadFocus = true
+                } else if (hadFocus) {
+                    hadFocus = false
+                    onCommit()
+                }
+            }
+    )
+}

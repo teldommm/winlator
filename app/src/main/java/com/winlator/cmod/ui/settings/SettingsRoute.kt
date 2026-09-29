@@ -335,13 +335,15 @@ internal class SettingsScreenState(
     }
 
     override fun onArtworkSourcesSaved(steamGridApiKey: String, steamGridUrl: String, gamesDbSearchUrl: String, gamesDbCdnUrl: String) {
+        // The editor also saves as it leaves the screen; if the switch was just turned off (which put
+        // the defaults back) that must not write the old edits over them.
+        if (!preferences.getBoolean("enable_custom_api_key", false) && !RemoteSources.hasArtworkOverrides(activity)) return
         RemoteSources.set(activity, RemoteSources.KEY_STEAMGRID_API_KEY, steamGridApiKey, RemoteSources.DEFAULT_STEAMGRID_API_KEY)
         RemoteSources.set(activity, RemoteSources.KEY_STEAMGRID, steamGridUrl, RemoteSources.DEFAULT_STEAMGRID)
         RemoteSources.set(activity, RemoteSources.KEY_GAMESDB_SEARCH, gamesDbSearchUrl, RemoteSources.DEFAULT_GAMESDB_SEARCH)
         RemoteSources.set(activity, RemoteSources.KEY_GAMESDB_CDN, gamesDbCdnUrl, RemoteSources.DEFAULT_GAMESDB_CDN)
         // A key that was rejected (or a rate-limit pause) may be fixed now: try again right away.
         ArtworkRepository.clearBlock()
-        Toast.makeText(activity, "Artwork sources saved", Toast.LENGTH_SHORT).show()
         rebuild()
     }
 
