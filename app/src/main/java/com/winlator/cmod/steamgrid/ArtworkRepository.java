@@ -12,8 +12,10 @@ import androidx.preference.PreferenceManager;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonParseException;
 import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.container.Shortcut;
+import com.winlator.cmod.core.ExeIconExtractor;
 import com.winlator.cmod.core.FileUtils;
 
 import java.io.ByteArrayOutputStream;
@@ -98,6 +100,14 @@ public final class ArtworkRepository {
         return thread;
     });
 
+    // Local, CPU/disk-only work (icon extraction, placeholder covers): its own thread so it never
+    // waits behind, or delays, a network job.
+    private static final ExecutorService LOCAL_EXECUTOR = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "artwork-local");
+        thread.setDaemon(true);
+        return thread;
+    });
+
     private static volatile SteamGridDBApi api;
     private static volatile OkHttpClient http;
 
@@ -170,9 +180,17 @@ public final class ArtworkRepository {
     public static File autoIconFile(String baseName) { return new File(dir(KIND_ICON), baseName + ".png"); }
     public static File userIconFile(String baseName) { return new File(dir(KIND_ICON), baseName + ".user.png"); }
 
+    /**
+     * Offline placeholder cover built from the game's own icon. Deliberately a separate file from
+     * coverFile(): a real cover has to stay "missing" for the downloader, and a generated one must
+     * never be mistaken for it. Tiles show the real cover when there is one, else this.
+     */
+    public static File generatedCoverFile(String baseName) { return new File(dir(KIND_COVER), baseName + ".gen.png"); }
+
     /** Deletes cover, banner and icons of a game and forgets what was remembered about it. */
     public static void deleteArtwork(Context context, String baseName) {
         coverFile(baseName).delete();
+        generatedCoverFile(baseName).delete();
         bannerFile(baseName).delete();
         autoIconFile(baseName).delete();
         userIconFile(baseName).delete();
@@ -202,6 +220,50 @@ public final class ArtworkRepository {
                 Log.w(TAG, "Artwork cleanup failed: " + error.getMessage());
             }
         });
+    }
+
+    // ------------------------------------------------------------------ offline placeholder cover
+
+    public static void runLocal(Runnable task) {
+        LOCAL_EXECUTOR.execute(() -> {
+            try {
+                task.run();
+            } catch (Throwable error) {
+                Log.w(TAG, "Local artwork task failed", error);
+            }
+        });
+    }
+
+    /**
+     * Writes covers/NAME.gen.png from the first usable icon among iconCandidates. Returns true only
+     * when a new file was created. With no real icon nothing is generated (a solid colour square
+     * would look worse than the plain icon tile). Call on a worker thread.
+     */
+    public static boolean generateCover(String baseName, File... iconCandidates) {
+        File dest = generatedCoverFile(baseName);
+        if (dest.isFile() && dest.length() > 0) return false;
+        for (File candidate : iconCandidates) {
+            if (candidate == null || !candidate.isFile() || candidate.length() == 0) continue;
+            Bitmap icon = decodeScaled(candidate, 512);
+            if (icon == null) continue;
+            try {
+                if (ExeIconExtractor.saveCoverFromIcon(icon, dest)) return true;
+            } finally {
+                icon.recycle();
+            }
+        }
+        return false;
+    }
+
+    /** Decodes an image so its long side is at most about maxSide (a user-picked icon can be huge). */
+    static Bitmap decodeScaled(File file, int maxSide) {
+        BitmapFactory.Options bounds = new BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        BitmapFactory.decodeFile(file.getPath(), bounds);
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null;
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inSampleSize = Math.max(1, Math.max(bounds.outWidth, bounds.outHeight) / maxSide);
+        return BitmapFactory.decodeFile(file.getPath(), options);
     }
 
     // ------------------------------------------------------------------ settings and state
@@ -398,10 +460,12 @@ public final class ArtworkRepository {
             markTransient(job);
             result.message = "Network error - check your connection";
         } catch (RuntimeException e) {
-            // e.g. a malformed / unexpected JSON body: cool down instead of retrying on every scroll.
-            Log.w(TAG, "Unexpected response: " + e.getMessage());
+            // Cool down instead of retrying on every scroll; keep the stack trace for the log.
+            Log.w(TAG, "Artwork lookup failed", e);
             markTransient(job);
-            result.message = "Unexpected response from SteamGridDB";
+            result.message = e instanceof JsonParseException
+                    ? "Unexpected response from SteamGridDB"
+                    : "Artwork lookup failed (" + e.getClass().getSimpleName() + ")";
         }
         return result;
     }
@@ -439,7 +503,14 @@ public final class ArtworkRepository {
                 t.sgdbId = cached;
                 return t;
             }
-            queries = buildQueries(job.name, job.windowsPath);
+            List<String> built;
+            try {
+                built = buildQueries(job.name, job.windowsPath);
+            } catch (RuntimeException error) {
+                Log.w(TAG, "buildQueries failed, using the plain name", error);
+                built = Collections.singletonList(job.name == null ? "" : job.name.trim());
+            }
+            queries = built;
             minScore = AUTO_MATCH_THRESHOLD;
             automatic = true;
         }
@@ -716,15 +787,19 @@ public final class ArtworkRepository {
         return key.isEmpty() || GENERIC_NAMES.contains(key);
     }
 
-    /** Unicode-safe clean-up: keeps every letter/digit (Cyrillic, accents, ...), drops release tags. */
+    /**
+     * Unicode-safe clean-up: keeps every letter/digit (Cyrillic, accents, ...), drops release tags.
+     * Android's regex engine is ICU, not java.util.regex: JVM-only inline flags such as (?U) make
+     * Pattern.compile throw there (it did: every automatic lookup failed), so only (?i) is used.
+     */
     static String cleanQuery(String raw) {
         if (raw == null) return "";
         String n = raw;
         n = n.replaceAll("\\[[^\\]]*\\]|\\([^)]*\\)", " ");
-        n = n.replaceAll("(?iU)\\bv?\\d+(?:\\.\\d+)+\\b", " ");
-        n = n.replaceAll("(?iU)\\bv\\d+\\b", " ");
+        n = n.replaceAll("(?i)\\bv?\\d+(?:\\.\\d+)+\\b", " ");
+        n = n.replaceAll("(?i)\\bv\\d+\\b", " ");
         n = n.replace('_', ' ').replace('-', ' ').replace('.', ' ');
-        n = n.replaceAll("(?iU)\\b(repack|setup|installer|portable|goty|gog|fitgirl|dodi|codex|skidrow|win64|win32|x64|x86|shipping)\\b", " ");
+        n = n.replaceAll("(?i)\\b(repack|setup|installer|portable|goty|gog|fitgirl|dodi|codex|skidrow|win64|win32|x64|x86|shipping)\\b", " ");
         n = n.replaceAll("[^\\p{L}\\p{N}' ]+", " ");
         return n.replaceAll("\\s+", " ").trim();
     }

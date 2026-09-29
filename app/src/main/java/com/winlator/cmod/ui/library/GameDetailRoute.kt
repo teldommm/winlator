@@ -44,8 +44,11 @@ fun GameDetailRoute(shortcutPath: String, onClose: () -> Unit, onLibraryChanged:
     val bannerPath = remember(shortcut) {
         File(Environment.getExternalStorageDirectory(), "Winlator/banners/$baseName.png").takeIf { it.exists() }?.path
     }
+    // The downloaded cover, else the offline placeholder built from the icon (covers/NAME.gen.png).
     val coverPath = remember(shortcut) {
-        File(Environment.getExternalStorageDirectory(), "Winlator/covers/$baseName.png").takeIf { it.exists() }?.path
+        val covers = File(Environment.getExternalStorageDirectory(), "Winlator/covers")
+        File(covers, "$baseName.png").takeIf { it.exists() }?.path
+            ?: File(covers, "$baseName.gen.png").takeIf { it.isFile && it.length() > 0 }?.path
     }
     // Same label as the Library tile ("Proton 9.0 arm64ec"), which the Library has
     // normally already resolved — so the subtitle is final from the first frame. Refreshed in the

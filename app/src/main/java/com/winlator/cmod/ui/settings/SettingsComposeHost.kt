@@ -230,6 +230,11 @@ internal fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) 
             if (model.customApiKeyEnabled) {
                 item("api-key") { EditableValueCard("SteamGridDB API Key", model.customApiKey, callbacks::onCustomApiKeyChanged) }
             }
+            item("auto-download-artwork") {
+                GroupCard {
+                    ToggleRow("Auto-download artwork from the internet", model.autoDownloadArtwork) { callbacks.onBooleanChanged("auto_download_artwork", it) }
+                }
+            }
 
             item("xserver-title") { SectionTitle(stringResource(R.string.xserver)) }
             item("xserver") {
@@ -271,8 +276,6 @@ internal fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) 
                     ToggleRow(stringResource(R.string.pause_resume_wine), model.pauseWine) { callbacks.onBooleanChanged("pause_resume_wine", it) }
                     GroupDivider()
                     ToggleRow(stringResource(R.string.high_refresh_rate), model.highRefreshRate) { callbacks.onBooleanChanged("high_refresh_rate_mode", it) }
-                    GroupDivider()
-                    ToggleRow("Auto-download artwork from the internet", model.autoDownloadArtwork) { callbacks.onBooleanChanged("auto_download_artwork", it) }
                     GroupDivider()
                     ToggleRow(stringResource(R.string.remove_loading_bar_when_booting_games), model.removeLoadingBar) { callbacks.onBooleanChanged("remove_loading_bar_when_booting_games", it) }
                 }

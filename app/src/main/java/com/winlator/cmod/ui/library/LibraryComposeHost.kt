@@ -24,6 +24,9 @@ data class LibraryItem(
     val name: String,
     val containerName: String,
     val coverPath: String?,
+    // Offline placeholder built from the game's icon (see ArtworkRepository.generatedCoverFile);
+    // used only where coverPath is null, so the downloader still treats the cover as missing.
+    val generatedCoverPath: String?,
     val bannerPath: String?,
     val iconPath: String?,
     val fallbackIcon: Bitmap?,

@@ -90,8 +90,9 @@ public class LibraryScreenController {
     private final HashMap<String, String> environmentLabels = new HashMap<>();
     private final Set<String> artworkRequests = Collections.synchronizedSet(new HashSet<>());
 
-    // Shortcuts whose exe icon was already tried this session (no retry on every scroll).
-    private final Set<String> iconRequests = Collections.synchronizedSet(new HashSet<>());
+    // Shortcuts whose exe icon / placeholder cover was already tried this session (no retry on
+    // every scroll).
+    private final Set<String> offlineArtTried = Collections.synchronizedSet(new HashSet<>());
 
     private Shortcut shortcutForIconUpdate;
     private int pendingPickTarget = PICK_ICON;
@@ -274,6 +275,9 @@ public class LibraryScreenController {
             File userIcon = new File(getImagesDir(false), baseName + ".user.png");
             File autoIcon = new File(getImagesDir(false), baseName + ".png");
             File cover = new File(getImagesDir(true), baseName + ".png");
+            File generated = ArtworkRepository.generatedCoverFile(baseName);
+            // A real cover replaced the placeholder: drop it.
+            if (cover.exists() && generated.exists()) generated.delete();
             File banner = new File(getBannerDir(), baseName + ".png");
             String iconPath = userIcon.exists() ? userIcon.getPath() :
                     (autoIcon.exists() ? autoIcon.getPath() : null);
@@ -289,6 +293,7 @@ public class LibraryScreenController {
                     shortcut.name,
                     containerLabel,
                     cover.exists() ? cover.getPath() : null,
+                    !cover.exists() && generated.isFile() && generated.length() > 0 ? generated.getPath() : null,
                     banner.exists() ? banner.getPath() : null,
                     iconPath,
                     icon != null ? icon : shortcut.icon,
@@ -333,7 +338,6 @@ public class LibraryScreenController {
     // it did not just fail/miss (ArtworkRepository remembers that, so scrolling does not retry).
     private void requestArtwork(Shortcut shortcut, String kind) {
         String baseName = FileUtils.getBasename(shortcut.file.getPath());
-        File autoIcon = ArtworkRepository.autoIconFile(baseName);
         File cover = ArtworkRepository.coverFile(baseName);
         File banner = ArtworkRepository.bannerFile(baseName);
         final boolean coverMissing = !cover.exists();
@@ -349,7 +353,7 @@ public class LibraryScreenController {
                 && !ArtworkRepository.shouldSkip(activity, baseName, ArtworkRepository.KIND_BANNER) ? banner : null;
 
         if (!allowed || (coverTarget == null && bannerTarget == null)) {
-            if (coverMissing) ensureExeIcon(shortcut, autoIcon);
+            if (coverMissing) ensureOfflineArt(shortcut);
             return;
         }
 
@@ -360,7 +364,7 @@ public class LibraryScreenController {
         ArtworkRepository.enqueue(job, result -> postToUi(() -> {
             artworkRequests.remove(requestKey);
             if (result.anySaved()) publishLibraryItems();
-            if (coverMissing && !result.coverSaved) ensureExeIcon(shortcut, autoIcon);
+            if (coverMissing && !result.coverSaved) ensureOfflineArt(shortcut);
             if (result.authProblem) warnApiKeyOnce();
         }));
     }
@@ -371,15 +375,32 @@ public class LibraryScreenController {
         Toast.makeText(activity, "SteamGridDB rejected the API key - check it in Settings", Toast.LENGTH_LONG).show();
     }
 
-    // Fallback tile image: the icon inside the exe, extracted once per session and game.
-    private void ensureExeIcon(Shortcut shortcut, File autoIcon) {
-        if (autoIcon.exists() || !iconRequests.add(shortcut.file.getPath())) return;
-        File exeFile = resolveExeFile(shortcut);
-        if (exeFile != null) {
-            ExeIconExtractor.extractAsync(exeFile, autoIcon, false, () -> {
-                if (activity != null) activity.runOnUiThread(this::publishLibraryItems);
-            });
-        }
+    // What a tile shows when there is no downloaded cover, and needs no internet: the icon inside
+    // the exe (extracted once) and a placeholder cover built from that icon. Tried once per
+    // session and game; the placeholder never counts as "the cover", so a real one still downloads.
+    private void ensureOfflineArt(Shortcut shortcut) {
+        if (!offlineArtTried.add(shortcut.file.getPath())) return;
+        final String baseName = FileUtils.getBasename(shortcut.file.getPath());
+        final File autoIcon = ArtworkRepository.autoIconFile(baseName);
+        final File userIcon = ArtworkRepository.userIconFile(baseName);
+        final File containerIcon = shortcut.iconFile;
+        ArtworkRepository.runLocal(() -> {
+            boolean changed = false;
+            if (!userIcon.exists() && !autoIcon.exists()) {
+                File exeFile = resolveExeFile(shortcut);
+                if (exeFile != null) changed = ExeIconExtractor.extractIcon(exeFile, autoIcon);
+            }
+            boolean generated = ArtworkRepository.generateCover(baseName, userIcon, autoIcon, containerIcon);
+            if (changed || generated) postToUi(this::publishLibraryItems);
+        });
+    }
+
+    // The placeholder is drawn from the icon, so a new/reset icon needs a new placeholder.
+    private void regenerateOfflineCover(Shortcut shortcut) {
+        String baseName = FileUtils.getBasename(shortcut.file.getPath());
+        ArtworkRepository.generatedCoverFile(baseName).delete();
+        offlineArtTried.remove(shortcut.file.getPath());
+        if (!ArtworkRepository.coverFile(baseName).exists()) ensureOfflineArt(shortcut);
     }
 
     // "Artwork" in the game menu: one window with everything that can be done to a game's images.
@@ -507,6 +528,7 @@ public class LibraryScreenController {
         String baseName = FileUtils.getBasename(shortcut.file.getPath());
         ArtworkRepository.userIconFile(baseName).delete();
         loadShortcutsList();
+        regenerateOfflineCover(shortcut);
         toast("Icon reset");
     }
 
@@ -545,6 +567,7 @@ public class LibraryScreenController {
 
             Toast.makeText(activity, "Icon updated!", Toast.LENGTH_SHORT).show();
             loadShortcutsList();
+            regenerateOfflineCover(shortcut);
 
         } catch (Exception e) {
             Toast.makeText(activity, "Error saving icon", Toast.LENGTH_SHORT).show();

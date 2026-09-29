@@ -459,13 +459,11 @@ internal fun CompactArtworkCard(item: LibraryItem, cb: LibraryCallbacks) {
         border = BorderStroke(1.dp, hairlineColor())
     ) {
         Box {
-            // Backdrop only from real artwork; an icon stretched over the whole row is just noise.
-            if (item.bannerPath != null || item.coverPath != null) {
-                ArtworkCompat(
-                    item.bannerPath ?: item.coverPath,
-                    null,
-                    Modifier.fillMaxSize().alpha(.52f)
-                )
+            // Backdrop only from real artwork (or the placeholder cover); an icon stretched over
+            // the whole row is just noise.
+            val backdrop = item.bannerPath ?: item.coverPath ?: item.generatedCoverPath
+            if (backdrop != null) {
+                ArtworkCompat(backdrop, null, Modifier.fillMaxSize().alpha(.52f))
             }
             Box(
                 Modifier.fillMaxSize().background(
@@ -510,8 +508,10 @@ internal fun CoverArtworkCard(item: LibraryItem, cb: LibraryCallbacks) {
         border = BorderStroke(1.dp, hairlineColor())
     ) {
         Box(Modifier.aspectRatio(.72f)) {
-            // No cover: the icon at its own size on a plain tile (a stretched icon/banner looked broken).
-            if (item.coverPath != null) ArtworkCompat(item.coverPath, null, Modifier.fillMaxSize())
+            // No downloaded cover: the placeholder built from the icon (works offline); with no
+            // usable icon either, the plain icon tile. Never a stretched icon/banner.
+            val cover = item.coverPath ?: item.generatedCoverPath
+            if (cover != null) ArtworkCompat(cover, null, Modifier.fillMaxSize())
             else IconTile(item.iconPath, item.fallbackIcon, Modifier.fillMaxSize())
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent, Color.Black.copy(.92f)))))
             Column(Modifier.align(Alignment.BottomStart).padding(start = 14.dp, end = 50.dp, bottom = 13.dp)) {

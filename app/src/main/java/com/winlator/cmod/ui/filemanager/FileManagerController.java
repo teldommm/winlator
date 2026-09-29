@@ -724,6 +724,8 @@ public class FileManagerController {
             // game of the same name, and no remembered "not found" from before.
             File staleBanner = new File(new File(Environment.getExternalStorageDirectory(), "Winlator/banners"), displayName + ".png");
             if (staleBanner.exists()) staleBanner.delete();
+            File staleGenerated = new File(coversDir, displayName + ".gen.png");
+            if (staleGenerated.exists()) staleGenerated.delete();
             com.winlator.cmod.steamgrid.ArtworkRepository.forget(activity, displayName);
         } catch (Exception e) {
             e.printStackTrace();

@@ -43,6 +43,34 @@ public class ExeIconExtractor {
         });
     }
 
+    /**
+     * Builds the 600x900 placeholder cover (blurred colour wash of the icon, vignette, icon with a
+     * shadow in the middle) from an icon the caller already has, and writes it atomically so a
+     * half-written file is never picked up by a tile. The icon is not recycled here.
+     */
+    public static boolean saveCoverFromIcon(Bitmap icon, File destinationFile) {
+        if (icon == null || icon.isRecycled() || icon.getWidth() <= 0 || icon.getHeight() <= 0) return false;
+        File parent = destinationFile.getParentFile();
+        if (parent != null && !parent.exists() && !parent.mkdirs()) return false;
+        File temp = new File(destinationFile.getPath() + ".tmp");
+        Bitmap cover = null;
+        try {
+            cover = buildCover(icon);
+            try (FileOutputStream out = new FileOutputStream(temp)) {
+                if (!cover.compress(Bitmap.CompressFormat.PNG, 100, out)) return false;
+            }
+            if (temp.renameTo(destinationFile)) return true;
+            destinationFile.delete();
+            return temp.renameTo(destinationFile);
+        } catch (Exception e) {
+            Log.e(TAG, "[saveCoverFromIcon] " + e.getMessage(), e);
+            return false;
+        } finally {
+            if (cover != null && !cover.isRecycled()) cover.recycle();
+            if (temp.exists()) temp.delete();
+        }
+    }
+
     public static Bitmap extractBitmap(File exeFile) {
         try {
             return PeIconExtractor.extract(exeFile);
@@ -172,7 +200,9 @@ public class ExeIconExtractor {
                 : idealDraw;
 
         int left = (COVER_WIDTH  - iconDraw) / 2;
-        int top  = (COVER_HEIGHT - iconDraw) / 2;
+        // A little above centre: library tiles darken the bottom third for the title and put the
+        // menu button in the top-right corner, so the icon sits clear of both.
+        int top  = (COVER_HEIGHT - iconDraw) / 2 - (int) (COVER_HEIGHT * 0.04f);
 
         Bitmap drawIcon = icon;
         if (srcSize < iconDraw) {

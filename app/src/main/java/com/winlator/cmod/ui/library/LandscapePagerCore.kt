@@ -97,7 +97,7 @@ internal fun LandscapePagerCore(
     }
 
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        ArtBackdrop(item.bannerPath, item.coverPath, Modifier.fillMaxSize())
+        ArtBackdrop(item.bannerPath, item.coverPath ?: item.generatedCoverPath, Modifier.fillMaxSize())
         Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Color.Black.copy(.84f), Color.Black.copy(.48f), Color.Black.copy(.20f)))))
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(.18f), Color.Transparent, Color.Black.copy(.72f)))))
         // No top padding: the header is a fixed 54dp band at the very top, aligned with
@@ -146,7 +146,8 @@ internal fun LandscapePagerCore(
                                 color = Color.Black.copy(.30f),
                                 border = BorderStroke(if (selected) 2.dp else 1.dp, Color.White.copy(if (selected) .88f else .20f))
                             ) {
-                                if (candidate.coverPath != null) PagerImage(candidate.coverPath, null, Modifier.fillMaxSize())
+                                val pageCover = candidate.coverPath ?: candidate.generatedCoverPath
+                                if (pageCover != null) PagerImage(pageCover, null, Modifier.fillMaxSize())
                                 else IconTile(candidate.iconPath, candidate.fallbackIcon, Modifier.fillMaxSize())
                             }
                         }
