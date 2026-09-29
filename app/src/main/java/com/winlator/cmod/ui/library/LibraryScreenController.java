@@ -45,6 +45,7 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -59,16 +60,13 @@ import com.winlator.cmod.core.AppDefaults;
 // Fragment-specific parts were replaced:
 //  - activity/activity/activity are the activity passed in;
 //  - the icon picker launcher is provided by the route (rememberLauncherForActivityResult)
-//    and its result comes back through onIconPicked();
+//    and its result comes back through onImagePicked();
 //  - detail screens are opened through MainActivity (MainShell's detail stack);
 //  - onResume/onViewCreated reloads are the route's LifecycleResumeEffect, plus MainShell's
 //    re-show / refresh signal.
 // The never-called content-archive picker (pickContentArchive) was dropped.
 public class LibraryScreenController {
     private static final String TAG = "LibraryScreen";
-    private static final int PICK_ICON = 0;
-    private static final int PICK_COVER = 1;
-    private static final int PICK_BACKGROUND = 2;
     private static boolean apiKeyWarningShown;
 
     private final AppCompatActivity activity;
@@ -95,9 +93,8 @@ public class LibraryScreenController {
     // every scroll).
     private final Set<String> offlineArtTried = Collections.synchronizedSet(new HashSet<>());
 
-    private Shortcut shortcutForIconUpdate;
-    private int pendingPickTarget = PICK_ICON;
-    private Runnable iconPickerLauncher;
+    private Shortcut shortcutForImagePick;
+    private Runnable imagePickerLauncher;
     private final LibraryCallbacks callbacks;
 
     public static final int IMPORT_SHORTCUT = 1005;
@@ -171,17 +168,23 @@ public class LibraryScreenController {
     }
 
     // Set by LibraryRoute: launches the image picker (GetContent "image/*").
-    public void setIconPickerLauncher(Runnable launcher) {
-        iconPickerLauncher = launcher;
+    public void setImagePickerLauncher(Runnable launcher) {
+        imagePickerLauncher = launcher;
     }
 
-    // The same image picker serves "Choose icon", "Choose cover" and "Choose background" (see
-    // showArtworkMenu).
-    public void onIconPicked(Uri uri) {
-        if (uri == null || shortcutForIconUpdate == null) return;
-        if (pendingPickTarget == PICK_COVER) updateShortcutCover(uri, shortcutForIconUpdate);
-        else if (pendingPickTarget == PICK_BACKGROUND) updateShortcutBackground(uri, shortcutForIconUpdate);
-        else updateShortcutIcon(uri, shortcutForIconUpdate);
+    // "Choose image from gallery" (Artwork menu): the picked image comes back here, then the user
+    // says what it is for (showUseAsDialog).
+    public void onImagePicked(Uri uri) {
+        final Shortcut shortcut = shortcutForImagePick;
+        if (uri == null || shortcut == null) return;
+        // Header-only read, off the main thread; it decides the pre-selection in the dialog.
+        ArtworkRepository.runLocal(() -> {
+            float aspect = ArtworkRepository.imageAspect(activity, uri);
+            postToUi(() -> {
+                if (aspect <= 0f) toast("Could not read that image");
+                else showUseAsDialog(shortcut, uri, aspect);
+            });
+        });
     }
 
     private void setGridView(boolean gridView) {
@@ -416,34 +419,28 @@ public class LibraryScreenController {
     // "Artwork" in the game menu: one window with everything that can be done to a game's images.
     private void showArtworkMenu(Shortcut shortcut) {
         String baseName = FileUtils.getBasename(shortcut.file.getPath());
-        boolean hasArtwork = ArtworkRepository.coverFile(baseName).exists()
+        boolean hasDownloaded = ArtworkRepository.coverFile(baseName).exists()
                 || ArtworkRepository.bannerFile(baseName).exists();
-        boolean hasUserIcon = ArtworkRepository.userIconFile(baseName).exists();
-        boolean hasUserImages = ArtworkRepository.isUsable(ArtworkRepository.userCoverFile(baseName))
+        boolean hasMyImages = ArtworkRepository.isUsable(ArtworkRepository.userIconFile(baseName))
+                || ArtworkRepository.isUsable(ArtworkRepository.userCoverFile(baseName))
                 || ArtworkRepository.isUsable(ArtworkRepository.userBannerFile(baseName));
 
         List<ThemedAlertHost.ActionItem> items = new ArrayList<>();
         items.add(new ThemedAlertHost.ActionItem("Search SteamGridDB...", () -> promptArtworkSource(shortcut)));
         items.add(new ThemedAlertHost.ActionItem("Re-download automatically", () -> redownloadArtwork(shortcut)));
-        items.add(new ThemedAlertHost.ActionItem("Choose cover from gallery", () -> pickImage(shortcut, PICK_COVER)));
-        items.add(new ThemedAlertHost.ActionItem("Choose background from gallery", () -> pickImage(shortcut, PICK_BACKGROUND)));
-        items.add(new ThemedAlertHost.ActionItem("Choose icon from gallery", () -> pickImage(shortcut, PICK_ICON)));
-        if (hasUserIcon) {
-            items.add(new ThemedAlertHost.ActionItem("Reset icon", () -> resetIcon(shortcut)));
+        items.add(new ThemedAlertHost.ActionItem("Choose image from gallery...", () -> pickImage(shortcut)));
+        if (hasMyImages) {
+            items.add(new ThemedAlertHost.ActionItem("Reset my images", () -> resetMyImages(shortcut)));
         }
-        if (hasUserImages) {
-            items.add(new ThemedAlertHost.ActionItem("Reset my cover & background", () -> resetCustomImages(shortcut)));
-        }
-        if (hasArtwork) {
+        if (hasDownloaded) {
             items.add(new ThemedAlertHost.ActionItem("Remove cover & banner", () -> confirmRemoveArtwork(shortcut), 0, true));
         }
         ThemedAlertHost.actions(activity, "Artwork", items);
     }
 
-    private void pickImage(Shortcut shortcut, int target) {
-        shortcutForIconUpdate = shortcut;
-        pendingPickTarget = target;
-        if (iconPickerLauncher != null) iconPickerLauncher.run();
+    private void pickImage(Shortcut shortcut) {
+        shortcutForImagePick = shortcut;
+        if (imagePickerLauncher != null) imagePickerLauncher.run();
     }
 
     private void promptArtworkSource(Shortcut shortcut) {
@@ -547,80 +544,75 @@ public class LibraryScreenController {
         toast("Artwork removed");
     }
 
-    private void resetIcon(Shortcut shortcut) {
+    // Icon, cover and background the user chose themselves (NAME.user.png in icons/, covers/, banners/).
+    private void resetMyImages(Shortcut shortcut) {
         String baseName = FileUtils.getBasename(shortcut.file.getPath());
         ArtworkRepository.userIconFile(baseName).delete();
-        loadShortcutsList();
-        regenerateOfflineCover(shortcut);
-        toast("Icon reset");
-    }
-
-    // The user's own cover (NAME.user.png): wins over the downloaded one and is left alone by the
-    // downloader; shown as picked, not reduced to a blurred backdrop.
-    private void updateShortcutCover(Uri sourceUri, Shortcut shortcut) {
-        String baseName = FileUtils.getBasename(shortcut.file.getPath());
-        File cover = ArtworkRepository.userCoverFile(baseName);
-        ArtworkRepository.enqueueFromUri(activity, sourceUri, cover, ArtworkRepository.coverMaxLongSide(),
-                result -> postToUi(() -> {
-                    if (result.coverSaved) {
-                        publishLibraryItems();
-                        toast("Cover updated");
-                    } else {
-                        toast(result.message);
-                    }
-                }));
-    }
-
-    // The user's own background (NAME.user.png in banners/): the wide picture behind the game's
-    // page and the Library pager, shown sharp and full-bleed like a banner.
-    private void updateShortcutBackground(Uri sourceUri, Shortcut shortcut) {
-        String baseName = FileUtils.getBasename(shortcut.file.getPath());
-        File background = ArtworkRepository.userBannerFile(baseName);
-        ArtworkRepository.enqueueFromUri(activity, sourceUri, background, ArtworkRepository.bannerMaxLongSide(),
-                result -> postToUi(() -> {
-                    if (result.coverSaved) {
-                        publishLibraryItems();
-                        toast("Background updated");
-                    } else {
-                        toast(result.message);
-                    }
-                }));
-    }
-
-    private void resetCustomImages(Shortcut shortcut) {
-        String baseName = FileUtils.getBasename(shortcut.file.getPath());
         ArtworkRepository.userCoverFile(baseName).delete();
         ArtworkRepository.userBannerFile(baseName).delete();
         loadShortcutsList();
         regenerateOfflineCover(shortcut);
-        toast("Your cover & background reset");
+        toast("Your images reset");
+    }
+
+    // What the picked image is for. One picture can serve several roles (a wide one as both cover and
+    // background), so it is a checklist; the pre-selection follows the picture's shape: wide =
+    // background, portrait = cover, roughly square = icon.
+    private void showUseAsDialog(Shortcut shortcut, Uri uri, float aspect) {
+        boolean wide = aspect >= 1.3f;
+        boolean portrait = aspect < 0.9f;
+        ThemedAlertHost.multiChoice(
+                activity,
+                "Use this image as",
+                Arrays.asList(
+                        "Cover (tiles and posters)",
+                        "Background (wide, behind the game's page)",
+                        "Icon (small avatar, home-screen shortcut)"),
+                "Apply",
+                positions -> {
+                    if (positions.isEmpty()) return;
+                    importPickedImage(shortcut, uri, positions.contains(0), positions.contains(1), positions.contains(2));
+                },
+                Arrays.asList(portrait, wide, !wide && !portrait)
+        );
+    }
+
+    // Stored as the user's own files (NAME.user.png): they win over downloaded and generated images,
+    // the downloader leaves them alone, and a cover / background of theirs is shown as picked (never
+    // reduced to a blurred backdrop). The same Uri is read once per role.
+    private void importPickedImage(Shortcut shortcut, Uri uri, boolean asCover, boolean asBackground, boolean asIcon) {
+        final String baseName = FileUtils.getBasename(shortcut.file.getPath());
+        ArtworkRepository.runLocal(() -> {
+            boolean cover = asCover && ArtworkRepository.importFromUri(activity, uri,
+                    ArtworkRepository.userCoverFile(baseName), ArtworkRepository.coverMaxLongSide());
+            boolean background = asBackground && ArtworkRepository.importFromUri(activity, uri,
+                    ArtworkRepository.userBannerFile(baseName), ArtworkRepository.bannerMaxLongSide());
+            boolean icon = asIcon && ArtworkRepository.importFromUri(activity, uri,
+                    ArtworkRepository.userIconFile(baseName), ArtworkRepository.iconMaxLongSide());
+            postToUi(() -> {
+                if (!cover && !background && !icon) {
+                    toast("Could not save that image");
+                    return;
+                }
+                if (icon) {
+                    // The placeholder cover is drawn from the icon, so it is rebuilt too.
+                    loadShortcutsList();
+                    regenerateOfflineCover(shortcut);
+                } else {
+                    publishLibraryItems();
+                }
+                List<String> done = new ArrayList<>();
+                if (cover) done.add("Cover");
+                if (background) done.add("Background");
+                if (icon) done.add("Icon");
+                toast(String.join(" + ", done) + " updated");
+            });
+        });
     }
 
     private void openGameDetails(Shortcut shortcut) {
         if (activity instanceof MainActivity) {
             ((MainActivity) activity).openGameDetail(shortcut.file.getPath());
-        }
-    }
-
-    private void updateShortcutIcon(Uri sourceUri, Shortcut shortcut) {
-        try {
-            File targetDir = getImagesDir(false);
-            String baseName = FileUtils.getBasename(shortcut.file.getPath());
-            File destFile = new File(targetDir, baseName + ".user.png");
-
-            try (InputStream is = activity.getContentResolver().openInputStream(sourceUri);
-                 OutputStream os = new FileOutputStream(destFile)) {
-                byte[] buffer = new byte[1024];
-                int length;
-                while ((length = is.read(buffer)) > 0) os.write(buffer, 0, length);
-            }
-
-            Toast.makeText(activity, "Icon updated!", Toast.LENGTH_SHORT).show();
-            loadShortcutsList();
-            regenerateOfflineCover(shortcut);
-
-        } catch (Exception e) {
-            Toast.makeText(activity, "Error saving icon", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -814,10 +806,22 @@ public class LibraryScreenController {
     private void addShortcutToScreen(Shortcut shortcut) {
         ShortcutManager shortcutManager = getSystemService(activity, ShortcutManager.class);
         if (shortcutManager != null && shortcutManager.isRequestPinShortcutSupported()) {
-            File iconDir = getImagesDir(false);
-            File imgFile = new File(iconDir, FileUtils.getBasename(shortcut.file.getPath()) + ".png");
-            Bitmap bmp = imgFile.exists() ? BitmapFactory.decodeFile(imgFile.getPath()) : shortcut.icon;
+            String baseName = FileUtils.getBasename(shortcut.file.getPath());
+            // The icon the user chose (NAME.user.png) first, then the one extracted from the exe.
+            File userIcon = ArtworkRepository.userIconFile(baseName);
+            Bitmap bmp = ArtworkRepository.isUsable(userIcon) ? BitmapFactory.decodeFile(userIcon.getPath()) : null;
+            if (bmp == null) {
+                File imgFile = new File(getImagesDir(false), baseName + ".png");
+                bmp = imgFile.exists() ? BitmapFactory.decodeFile(imgFile.getPath()) : shortcut.icon;
+            }
             if (bmp == null) bmp = BitmapFactory.decodeResource(activity.getResources(), R.drawable.icon_wine);
+            int maxSide = Math.max(shortcutManager.getIconMaxWidth(), shortcutManager.getIconMaxHeight());
+            int longSide = Math.max(bmp.getWidth(), bmp.getHeight());
+            if (maxSide > 0 && longSide > maxSide) {
+                float scale = (float) maxSide / longSide;
+                bmp = Bitmap.createScaledBitmap(bmp, Math.max(1, Math.round(bmp.getWidth() * scale)),
+                        Math.max(1, Math.round(bmp.getHeight() * scale)), true);
+            }
             
             shortcutManager.requestPinShortcut(buildScreenShortCut(shortcut.name, shortcut.name, shortcut.container.id,
                     shortcut.file.getPath(), Icon.createWithBitmap(bmp), shortcut.getExtra("uuid")), null);

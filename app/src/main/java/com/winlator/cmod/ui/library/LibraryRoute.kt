@@ -25,10 +25,10 @@ fun LibraryRoute(shownSerial: Int, active: Boolean, detailOpen: Boolean = false)
     val activity = LocalContext.current.findActivity() as AppCompatActivity
     val controller = remember { LibraryScreenController(activity) }
 
-    val pickIcon = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        controller.onIconPicked(uri)
+    val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        controller.onImagePicked(uri)
     }
-    SideEffect { controller.setIconPickerLauncher { pickIcon.launch("image/*") } }
+    SideEffect { controller.setImagePickerLauncher { pickImage.launch("image/*") } }
 
     DisposableEffect(controller) {
         onDispose { controller.dispose() }

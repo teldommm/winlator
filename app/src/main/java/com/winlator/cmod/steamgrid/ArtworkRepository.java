@@ -84,6 +84,7 @@ public final class ArtworkRepository {
     private static final List<String> COVER_RANK = java.util.Arrays.asList("660x930", "600x900", "342x482");
     private static final List<String> BANNER_RANK = java.util.Arrays.asList("920x430", "460x215");
 
+    private static final int ICON_MAX_LONG_SIDE = 512;
     private static final int COVER_MAX_LONG_SIDE = 1400;
     private static final int BANNER_MAX_LONG_SIDE = 2000;
     private static final int MAX_DOWNLOAD_BYTES = 12 * 1024 * 1024;
@@ -391,22 +392,43 @@ public final class ArtworkRepository {
 
     /** Imports an image the user picked, scaled down to a sane size. */
     public static void enqueueFromUri(Context context, Uri uri, File dest, int maxLongSide, Listener listener) {
-        final Context app = context.getApplicationContext();
         EXECUTOR.execute(() -> {
             Result result = new Result();
-            try (InputStream in = app.getContentResolver().openInputStream(uri)) {
-                byte[] data = in != null ? readLimited(in, 32 * 1024 * 1024) : null;
-                boolean saved = data != null && saveBytes(data, dest, maxLongSide);
-                result.coverSaved = saved;
-                if (!saved) result.message = "Could not read that image";
-            } catch (Throwable error) {
-                Log.w(TAG, "Import from gallery failed: " + error.getMessage());
-                result.message = "Could not read that image";
-            }
+            result.coverSaved = importFromUri(context, uri, dest, maxLongSide);
+            if (!result.coverSaved) result.message = "Could not read that image";
             if (listener != null) listener.onFinished(result);
         });
     }
 
+    /**
+     * Synchronous version for a worker thread: reads the picked image and stores it (images within
+     * maxLongSide as they are, larger ones scaled down). The same Uri can be imported several times,
+     * e.g. as cover and as background.
+     */
+    public static boolean importFromUri(Context context, Uri uri, File dest, int maxLongSide) {
+        try (InputStream in = context.getApplicationContext().getContentResolver().openInputStream(uri)) {
+            byte[] data = in != null ? readLimited(in, 32 * 1024 * 1024) : null;
+            return data != null && saveBytes(data, dest, maxLongSide);
+        } catch (Throwable error) {
+            Log.w(TAG, "Import from gallery failed: " + error.getMessage());
+            return false;
+        }
+    }
+
+    /** Width / height of a picked image from its header only (no decode); 0 when unreadable. */
+    public static float imageAspect(Context context, Uri uri) {
+        try (InputStream in = context.getApplicationContext().getContentResolver().openInputStream(uri)) {
+            if (in == null) return 0f;
+            BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            BitmapFactory.decodeStream(in, null, bounds);
+            return bounds.outWidth > 0 && bounds.outHeight > 0 ? (float) bounds.outWidth / bounds.outHeight : 0f;
+        } catch (Throwable error) {
+            return 0f;
+        }
+    }
+
+    public static int iconMaxLongSide() { return ICON_MAX_LONG_SIDE; }
     public static int coverMaxLongSide() { return COVER_MAX_LONG_SIDE; }
     public static int bannerMaxLongSide() { return BANNER_MAX_LONG_SIDE; }
 

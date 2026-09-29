@@ -120,7 +120,7 @@ internal fun LibraryRootWithoutEmptyDescription(
 private fun EmptyFilterChip(label: String, selected: Boolean) {
     Surface(
         shape = WinZShapes.Small,
-        color = if (selected) filterChipSelectedFill() else androidx.compose.ui.graphics.Color.Transparent,
+        color = if (selected) translucentControlFill() else androidx.compose.ui.graphics.Color.Transparent,
         contentColor = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
         border = BorderStroke(1.dp, hairlineColor())
     ) {

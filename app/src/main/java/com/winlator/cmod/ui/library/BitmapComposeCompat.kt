@@ -434,12 +434,13 @@ private fun LibraryTopIcon(icon: ImageVector, selected: Boolean, click: () -> Un
     ) { Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) { Icon(icon, null, modifier = Modifier.size(23.dp)) } }
 }
 
-// Fill of the selected All / Favorites / Recent chip. It used to be the opaque surfaceVariant, a dark
-// slab (near-black on AMOLED) that hid whatever is behind the chip, e.g. the artwork under the
-// landscape header. Now a translucent tint of the text colour - light on the dark themes, dark on
-// White - so the backdrop shows through. Raise the alphas for a stronger highlight.
+// Fill of small controls that sit over the content: the selected All / Favorites / Recent chip and
+// the back arrow of the game page. It used to be the opaque surfaceVariant, a dark slab (near-black on
+// AMOLED) that hid whatever is behind it, e.g. the artwork. Now a translucent tint of the text colour
+// - light on the dark themes, dark on White - so the backdrop shows through. Raise the alphas for a
+// stronger highlight; both controls follow.
 @Composable
-internal fun filterChipSelectedFill(): Color {
+internal fun translucentControlFill(): Color {
     val light = MaterialTheme.colorScheme.background.luminance() > .65f
     return MaterialTheme.colorScheme.onSurface.copy(alpha = if (light) 0.06f else 0.10f)
 }
@@ -449,7 +450,7 @@ private fun LibraryFilterChip(label: String, selected: Boolean, click: () -> Uni
     Surface(
         onClick = click,
         shape = WinZShapes.Small,
-        color = if (selected) filterChipSelectedFill() else Color.Transparent,
+        color = if (selected) translucentControlFill() else Color.Transparent,
         contentColor = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
         border = BorderStroke(1.dp, hairlineColor())
     ) { Text(label, Modifier.padding(horizontal = 15.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge) }

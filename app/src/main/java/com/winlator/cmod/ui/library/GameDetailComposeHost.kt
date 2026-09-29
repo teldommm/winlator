@@ -113,8 +113,8 @@ private fun LandscapeDetail(title: String, subtitle: String, artwork: Bitmap?, c
             onClick = callbacks::onBack,
             modifier = Modifier.align(Alignment.TopStart).padding(start = 18.dp, top = 16.dp).size(44.dp),
             shape = WinZShapes.Medium,
-            // Theme gray (was a black square) — same fill/outline family as the app's buttons.
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(.92f),
+            // Same translucent fill as the selected All / Favorites / Recent chip.
+            color = translucentControlFill(),
             contentColor = MaterialTheme.colorScheme.onSurface,
             border = BorderStroke(1.dp, hairlineColor())
         ) {
@@ -248,8 +248,8 @@ private fun PortraitDetail(title: String, subtitle: String, artwork: Bitmap?, co
                 onClick = callbacks::onBack,
                 modifier = Modifier.align(Alignment.TopStart).padding(start = 14.dp, top = 14.dp).size(44.dp),
                 shape = WinZShapes.Medium,
-                // Theme gray (was a black square) — same fill/outline family as the app's buttons.
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(.92f),
+                // Same translucent fill as the selected All / Favorites / Recent chip.
+                color = translucentControlFill(),
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 border = BorderStroke(1.dp, hairlineColor())
             ) {
