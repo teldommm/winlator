@@ -1,6 +1,7 @@
 package com.winlator.cmod.ui.library
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -50,17 +51,47 @@ internal fun IconTile(iconPath: String?, fallback: Bitmap?, modifier: Modifier =
     }
 }
 
-// Full-bleed background. With a banner: the banner, slowly breathing. With only a portrait cover:
-// a soft colour wash made from it (see SoftArt), drifting a little more, so a stretched cover never
-// shows as a pixelated slice. Draws nothing when the game has no artwork at all.
+// A picture the user chose that is wide enough to be a background on its own.
+private const val WIDE_ASPECT = 1.3f
+private val wideCache = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
+
+// Header-only read (no decode); cached per file version. Call off the main thread.
+internal fun isWideImage(path: String?): Boolean {
+    val key = LibraryImageCache.keyFor(path) ?: return false
+    wideCache[key]?.let { return it }
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(path, bounds)
+    val wide = bounds.outWidth > 0 && bounds.outHeight > 0 && bounds.outWidth >= bounds.outHeight * WIDE_ASPECT
+    wideCache[key] = wide
+    return wide
+}
+
+// Full-bleed background, by where the picture came from:
+//  - a banner (downloaded, or the user's own background): sharp, slowly breathing;
+//  - the user's own cover: shown as picked. A wide one is the background itself (sharp); a portrait
+//    one is not blown up into a strip, the backdrop falls back to the soft wash (the sharp cover is
+//    shown by the card / detail page in front of it);
+//  - a downloaded portrait cover or the offline placeholder: the soft colour wash made from it
+//    (see SoftArt), drifting a little more.
+// Draws nothing when the game has no artwork at all.
 @Composable
-internal fun ArtBackdrop(bannerPath: String?, coverPath: String?, modifier: Modifier = Modifier) {
-    if (bannerPath != null) {
-        val key = remember(bannerPath) { LibraryImageCache.keyFor(bannerPath) }
-        val banner by produceState<Bitmap?>(LibraryImageCache.peek(key), key) {
-            value = withContext(Dispatchers.IO) { LibraryImageCache.load(bannerPath) }
+internal fun ArtBackdrop(bannerPath: String?, coverPath: String?, coverIsUser: Boolean, modifier: Modifier = Modifier) {
+    val wideKey = remember(coverPath) { LibraryImageCache.keyFor(coverPath) }
+    val wide by produceState(
+        coverIsUser && wideKey != null && wideCache[wideKey] == true,
+        coverPath,
+        coverIsUser
+    ) {
+        value = coverIsUser && withContext(Dispatchers.IO) { isWideImage(coverPath) }
+    }
+    val sharpPath = bannerPath ?: if (wide) coverPath else null
+
+    if (sharpPath != null) {
+        val key = remember(sharpPath) { LibraryImageCache.keyFor(sharpPath) }
+        val sharp by produceState<Bitmap?>(LibraryImageCache.peek(key), key) {
+            value = withContext(Dispatchers.IO) { LibraryImageCache.load(sharpPath) }
         }
-        val art = banner
+        val art = sharp
         if (art != null) {
             Box(modifier.clipToBounds()) {
                 Image(art.asImageBitmap(), null, Modifier.fillMaxSize().kenBurns(), contentScale = ContentScale.Crop)

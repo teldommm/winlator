@@ -68,6 +68,7 @@ public class LibraryScreenController {
     private static final String TAG = "LibraryScreen";
     private static final int PICK_ICON = 0;
     private static final int PICK_COVER = 1;
+    private static final int PICK_BACKGROUND = 2;
     private static boolean apiKeyWarningShown;
 
     private final AppCompatActivity activity;
@@ -174,10 +175,12 @@ public class LibraryScreenController {
         iconPickerLauncher = launcher;
     }
 
-    // The same image picker serves "Choose icon" and "Choose cover" (see showArtworkMenu).
+    // The same image picker serves "Choose icon", "Choose cover" and "Choose background" (see
+    // showArtworkMenu).
     public void onIconPicked(Uri uri) {
         if (uri == null || shortcutForIconUpdate == null) return;
         if (pendingPickTarget == PICK_COVER) updateShortcutCover(uri, shortcutForIconUpdate);
+        else if (pendingPickTarget == PICK_BACKGROUND) updateShortcutBackground(uri, shortcutForIconUpdate);
         else updateShortcutIcon(uri, shortcutForIconUpdate);
     }
 
@@ -274,11 +277,15 @@ public class LibraryScreenController {
             String baseName = FileUtils.getBasename(shortcut.file.getPath());
             File userIcon = new File(getImagesDir(false), baseName + ".user.png");
             File autoIcon = new File(getImagesDir(false), baseName + ".png");
-            File cover = new File(getImagesDir(true), baseName + ".png");
+            // The user's own cover / background win over downloaded ones (NAME.user.png).
+            File userCover = ArtworkRepository.userCoverFile(baseName);
+            boolean hasUserCover = ArtworkRepository.isUsable(userCover);
+            File cover = hasUserCover ? userCover : new File(getImagesDir(true), baseName + ".png");
             File generated = ArtworkRepository.generatedCoverFile(baseName);
             // A real cover replaced the placeholder: drop it.
             if (cover.exists() && generated.exists()) generated.delete();
-            File banner = new File(getBannerDir(), baseName + ".png");
+            File userBanner = ArtworkRepository.userBannerFile(baseName);
+            File banner = ArtworkRepository.isUsable(userBanner) ? userBanner : new File(getBannerDir(), baseName + ".png");
             String iconPath = userIcon.exists() ? userIcon.getPath() :
                     (autoIcon.exists() ? autoIcon.getPath() : null);
             // Decode the (small) game icon here, off the main thread, so the tile's first frame
@@ -293,6 +300,7 @@ public class LibraryScreenController {
                     shortcut.name,
                     containerLabel,
                     cover.exists() ? cover.getPath() : null,
+                    hasUserCover,
                     !cover.exists() && generated.isFile() && generated.length() > 0 ? generated.getPath() : null,
                     banner.exists() ? banner.getPath() : null,
                     iconPath,
@@ -340,8 +348,10 @@ public class LibraryScreenController {
         String baseName = FileUtils.getBasename(shortcut.file.getPath());
         File cover = ArtworkRepository.coverFile(baseName);
         File banner = ArtworkRepository.bannerFile(baseName);
-        final boolean coverMissing = !cover.exists();
-        boolean bannerMissing = !banner.exists();
+        // cover / banner above are the downloader's own slots (its write targets); whether an
+        // image is missing also counts the user's own one.
+        final boolean coverMissing = ArtworkRepository.effectiveCover(baseName) == null;
+        boolean bannerMissing = ArtworkRepository.effectiveBanner(baseName) == null;
         if (!coverMissing && !bannerMissing) return;
 
         String source = shortcut.getExtra(ArtworkRepository.EXTRA_SOURCE, "");
@@ -400,7 +410,7 @@ public class LibraryScreenController {
         String baseName = FileUtils.getBasename(shortcut.file.getPath());
         ArtworkRepository.generatedCoverFile(baseName).delete();
         offlineArtTried.remove(shortcut.file.getPath());
-        if (!ArtworkRepository.coverFile(baseName).exists()) ensureOfflineArt(shortcut);
+        if (ArtworkRepository.effectiveCover(baseName) == null) ensureOfflineArt(shortcut);
     }
 
     // "Artwork" in the game menu: one window with everything that can be done to a game's images.
@@ -409,14 +419,20 @@ public class LibraryScreenController {
         boolean hasArtwork = ArtworkRepository.coverFile(baseName).exists()
                 || ArtworkRepository.bannerFile(baseName).exists();
         boolean hasUserIcon = ArtworkRepository.userIconFile(baseName).exists();
+        boolean hasUserImages = ArtworkRepository.isUsable(ArtworkRepository.userCoverFile(baseName))
+                || ArtworkRepository.isUsable(ArtworkRepository.userBannerFile(baseName));
 
         List<ThemedAlertHost.ActionItem> items = new ArrayList<>();
         items.add(new ThemedAlertHost.ActionItem("Search SteamGridDB...", () -> promptArtworkSource(shortcut)));
         items.add(new ThemedAlertHost.ActionItem("Re-download automatically", () -> redownloadArtwork(shortcut)));
         items.add(new ThemedAlertHost.ActionItem("Choose cover from gallery", () -> pickImage(shortcut, PICK_COVER)));
+        items.add(new ThemedAlertHost.ActionItem("Choose background from gallery", () -> pickImage(shortcut, PICK_BACKGROUND)));
         items.add(new ThemedAlertHost.ActionItem("Choose icon from gallery", () -> pickImage(shortcut, PICK_ICON)));
         if (hasUserIcon) {
             items.add(new ThemedAlertHost.ActionItem("Reset icon", () -> resetIcon(shortcut)));
+        }
+        if (hasUserImages) {
+            items.add(new ThemedAlertHost.ActionItem("Reset my cover & background", () -> resetCustomImages(shortcut)));
         }
         if (hasArtwork) {
             items.add(new ThemedAlertHost.ActionItem("Remove cover & banner", () -> confirmRemoveArtwork(shortcut), 0, true));
@@ -435,7 +451,7 @@ public class LibraryScreenController {
         ThemedAlertHost.prompt(
                 activity,
                 "SteamGridDB source",
-                "Game name, steamgriddb.com game link or ID, steam:APPID, or a direct image URL (cover only).",
+                "Game name, steamgriddb.com game link or ID, steam:APPID, or a direct image URL (used as your cover).",
                 ArtworkRepository.sourceToInput(current, shortcut.name),
                 "Search",
                 value -> applyArtworkSource(shortcut, value)
@@ -454,7 +470,9 @@ public class LibraryScreenController {
 
         if (parsed.startsWith("url:")) {
             toast("Downloading cover...");
-            ArtworkRepository.enqueueDirect(parsed.substring(4), cover, ArtworkRepository.coverMaxLongSide(),
+            // A link the user typed is their own choice: stored like a picked image.
+            ArtworkRepository.enqueueDirect(parsed.substring(4), ArtworkRepository.userCoverFile(baseName),
+                    ArtworkRepository.coverMaxLongSide(),
                     result -> postToUi(() -> {
                         if (result.coverSaved) {
                             publishLibraryItems();
@@ -470,6 +488,9 @@ public class LibraryScreenController {
         ArtworkRepository.Job job = newArtworkJob(shortcut, parsed, true, true, cover, banner);
         ArtworkRepository.enqueue(job, result -> postToUi(() -> {
             if (result.anySaved()) {
+                // An explicit search replaces the user's own image of each kind it just found.
+                if (result.coverSaved) ArtworkRepository.userCoverFile(baseName).delete();
+                if (result.bannerSaved) ArtworkRepository.userBannerFile(baseName).delete();
                 // Remember the source only once it produced something, so a typo does not stick.
                 shortcut.putExtra(ArtworkRepository.EXTRA_SOURCE, parsed);
                 shortcut.saveData();
@@ -493,6 +514,8 @@ public class LibraryScreenController {
             shortcut.putExtra(ArtworkRepository.EXTRA_SOURCE, null);
             shortcut.saveData();
             if (result.anySaved()) {
+                if (result.coverSaved) ArtworkRepository.userCoverFile(baseName).delete();
+                if (result.bannerSaved) ArtworkRepository.userBannerFile(baseName).delete();
                 loadShortcutsList();
                 toast("Artwork updated");
             } else {
@@ -506,8 +529,8 @@ public class LibraryScreenController {
         ThemedAlertHost.confirm(
                 activity,
                 "Remove artwork?",
-                "The cover and banner will be deleted and won't be downloaded again for this game. "
-                        + "\"Re-download automatically\" brings them back.",
+                "The downloaded cover and banner will be deleted and won't be downloaded again for this game. "
+                        + "Images you chose yourself stay. \"Re-download automatically\" brings the downloaded ones back.",
                 "Remove",
                 () -> removeArtwork(shortcut),
                 true
@@ -532,9 +555,11 @@ public class LibraryScreenController {
         toast("Icon reset");
     }
 
+    // The user's own cover (NAME.user.png): wins over the downloaded one and is left alone by the
+    // downloader; shown as picked, not reduced to a blurred backdrop.
     private void updateShortcutCover(Uri sourceUri, Shortcut shortcut) {
         String baseName = FileUtils.getBasename(shortcut.file.getPath());
-        File cover = ArtworkRepository.coverFile(baseName);
+        File cover = ArtworkRepository.userCoverFile(baseName);
         ArtworkRepository.enqueueFromUri(activity, sourceUri, cover, ArtworkRepository.coverMaxLongSide(),
                 result -> postToUi(() -> {
                     if (result.coverSaved) {
@@ -544,6 +569,31 @@ public class LibraryScreenController {
                         toast(result.message);
                     }
                 }));
+    }
+
+    // The user's own background (NAME.user.png in banners/): the wide picture behind the game's
+    // page and the Library pager, shown sharp and full-bleed like a banner.
+    private void updateShortcutBackground(Uri sourceUri, Shortcut shortcut) {
+        String baseName = FileUtils.getBasename(shortcut.file.getPath());
+        File background = ArtworkRepository.userBannerFile(baseName);
+        ArtworkRepository.enqueueFromUri(activity, sourceUri, background, ArtworkRepository.bannerMaxLongSide(),
+                result -> postToUi(() -> {
+                    if (result.coverSaved) {
+                        publishLibraryItems();
+                        toast("Background updated");
+                    } else {
+                        toast(result.message);
+                    }
+                }));
+    }
+
+    private void resetCustomImages(Shortcut shortcut) {
+        String baseName = FileUtils.getBasename(shortcut.file.getPath());
+        ArtworkRepository.userCoverFile(baseName).delete();
+        ArtworkRepository.userBannerFile(baseName).delete();
+        loadShortcutsList();
+        regenerateOfflineCover(shortcut);
+        toast("Your cover & background reset");
     }
 
     private void openGameDetails(Shortcut shortcut) {

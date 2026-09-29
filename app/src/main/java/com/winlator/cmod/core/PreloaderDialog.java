@@ -157,9 +157,13 @@ public class PreloaderDialog {
         launchStatus.setText(textResId);
 
         releaseArtwork();
+        // Order: the user's own background, the banner, the user's own cover, the downloaded cover.
+        File userBanner = getLaunchUserBannerFile();
         File banner = getLaunchBannerFile();
-        boolean hasBanner = isUsableImageFile(banner);
-        File artwork = hasBanner ? banner : getLaunchCoverFile();
+        boolean hasUserBanner = isUsableImageFile(userBanner);
+        boolean hasBanner = hasUserBanner || isUsableImageFile(banner);
+        File artwork = hasUserBanner ? userBanner
+                : (isUsableImageFile(banner) ? banner : getLaunchCoverFile());
         if (isUsableImageFile(artwork)) artworkBitmap = decodeArtwork(artwork);
 
         boolean hasArtwork = artworkBitmap != null;
@@ -262,9 +266,17 @@ public class PreloaderDialog {
         return new File(dir, baseName + ".png");
     }
 
+    private File getLaunchUserBannerFile() {
+        String baseName = resolveLaunchBaseName();
+        if (TextUtils.isEmpty(baseName)) return null;
+        return ArtworkRepository.userBannerFile(baseName);
+    }
+
     private File getLaunchCoverFile() {
         String baseName = resolveLaunchBaseName();
         if (TextUtils.isEmpty(baseName)) return null;
+        File userCover = ArtworkRepository.userCoverFile(baseName);
+        if (isUsableImageFile(userCover)) return userCover;
         return new File(new File(Environment.getExternalStorageDirectory(), "Winlator/covers"), baseName + ".png");
     }
 

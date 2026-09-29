@@ -75,7 +75,7 @@ interface GameDetailCallbacks {
 // The game detail screen. Opened by MainShell as a detail entry through GameDetailRoute
 // (GameDetailRoute.kt); onBack pops it.
 @Composable
-internal fun GameDetailScreen(title: String, subtitle: String, bannerPath: String?, coverPath: String?, fallback: Bitmap?, initialFavorite: Boolean, callbacks: GameDetailCallbacks) {
+internal fun GameDetailScreen(title: String, subtitle: String, bannerPath: String?, coverPath: String?, coverIsUser: Boolean, fallback: Bitmap?, initialFavorite: Boolean, callbacks: GameDetailCallbacks) {
     val landscape = LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
     val activity = LocalContext.current as? MainActivity
 
@@ -98,14 +98,14 @@ internal fun GameDetailScreen(title: String, subtitle: String, bannerPath: Strin
         favorite = !favorite
         callbacks.onFavorite(favorite)
     }
-    if (landscape) LandscapeDetail(title, subtitle, artwork, coverOnly, favorite, callbacks, toggle)
-    else PortraitDetail(title, subtitle, artwork, coverOnly, fallback, favorite, callbacks, toggle)
+    if (landscape) LandscapeDetail(title, subtitle, artwork, coverOnly, coverIsUser, favorite, callbacks, toggle)
+    else PortraitDetail(title, subtitle, artwork, coverOnly, coverIsUser, fallback, favorite, callbacks, toggle)
 }
 
 @Composable
-private fun LandscapeDetail(title: String, subtitle: String, artwork: Bitmap?, coverOnly: Boolean, favorite: Boolean, callbacks: GameDetailCallbacks, toggleFavorite: () -> Unit) {
+private fun LandscapeDetail(title: String, subtitle: String, artwork: Bitmap?, coverOnly: Boolean, coverIsUser: Boolean, favorite: Boolean, callbacks: GameDetailCallbacks, toggleFavorite: () -> Unit) {
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        DetailArtwork(artwork, coverOnly, showCover = false)
+        DetailArtwork(artwork, coverOnly, coverIsUser, landscape = true)
         Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Color.Black.copy(.93f), Color.Black.copy(.70f), Color.Black.copy(.28f)))))
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(.18f), Color.Transparent, Color.Black.copy(.55f)))))
 
@@ -175,16 +175,23 @@ private fun LandscapeDetail(title: String, subtitle: String, artwork: Bitmap?, c
     }
 }
 
-// Banner: full-bleed crop, slowly breathing. Cover only: a soft colour wash of it drifting behind
-// (SoftArt) plus, in the portrait header, the cover itself at its own proportions with a gentle
-// zoom of its own, out of step with the backdrop. Motion is off unless the screen allowed it
-// (LocalArtworkMotion, the "Animated artwork" setting).
+// What the header shows, by where the picture came from (all of it moves only when the screen
+// allowed motion: LocalArtworkMotion, the "Animated artwork" setting):
+//  - banner or the user's own background: sharp, full-bleed, slowly breathing;
+//  - the user's own cover, wide enough (>= 1.3): the same, it is the background itself;
+//  - any other cover (downloaded portrait cover, the offline placeholder): a soft colour wash of it
+//    drifting behind, plus the cover itself in front (portrait header: at the top; landscape:
+//    only for the user's own cover, as a poster in the free area on the right, clear of the card);
+//  - the user's own cover keeps its own proportions instead of being cropped to 2:3.
 @Composable
-private fun DetailArtwork(artwork: Bitmap?, coverOnly: Boolean, showCover: Boolean) {
+private fun DetailArtwork(artwork: Bitmap?, coverOnly: Boolean, coverIsUser: Boolean, landscape: Boolean) {
     if (artwork == null) return
     val image = artwork.asImageBitmap()
+    val ratio = artwork.width.toFloat() / artwork.height.toFloat()
+    val asBackground = !coverOnly || (coverIsUser && ratio >= 1.3f)
+    val frameRatio = if (coverIsUser) ratio.coerceIn(0.5f, 1.29f) else 2f / 3f
     Box(Modifier.fillMaxSize().clipToBounds()) {
-        if (!coverOnly) {
+        if (asBackground) {
             Image(image, null, Modifier.fillMaxSize().kenBurns(), contentScale = ContentScale.Crop)
         } else {
             val soft = remember(artwork) { SoftArt.from(artwork) }
@@ -194,7 +201,7 @@ private fun DetailArtwork(artwork: Bitmap?, coverOnly: Boolean, showCover: Boole
                 Modifier.fillMaxSize().kenBurns(amplitude = 0.12f, periodMs = 26_000, pan = 0.9f),
                 contentScale = ContentScale.Crop
             )
-            if (showCover) {
+            if (!landscape) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
                     Image(
                         image,
@@ -202,7 +209,21 @@ private fun DetailArtwork(artwork: Bitmap?, coverOnly: Boolean, showCover: Boole
                         Modifier
                             .padding(top = 16.dp, bottom = 112.dp)
                             .fillMaxHeight()
-                            .aspectRatio(2f / 3f)
+                            .aspectRatio(frameRatio)
+                            .kenBurns(amplitude = 0.04f, periodMs = 18_000, pan = 0f, phase = 0.5f)
+                            .clip(WinZShapes.Small),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+            } else if (coverIsUser) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterEnd) {
+                    Image(
+                        image,
+                        null,
+                        Modifier
+                            .padding(end = 40.dp, top = 24.dp, bottom = 24.dp)
+                            .fillMaxHeight()
+                            .aspectRatio(frameRatio)
                             .kenBurns(amplitude = 0.04f, periodMs = 18_000, pan = 0f, phase = 0.5f)
                             .clip(WinZShapes.Small),
                         contentScale = ContentScale.Crop
@@ -214,10 +235,10 @@ private fun DetailArtwork(artwork: Bitmap?, coverOnly: Boolean, showCover: Boole
 }
 
 @Composable
-private fun PortraitDetail(title: String, subtitle: String, artwork: Bitmap?, coverOnly: Boolean, fallback: Bitmap?, favorite: Boolean, callbacks: GameDetailCallbacks, toggleFavorite: () -> Unit) {
+private fun PortraitDetail(title: String, subtitle: String, artwork: Bitmap?, coverOnly: Boolean, coverIsUser: Boolean, fallback: Bitmap?, favorite: Boolean, callbacks: GameDetailCallbacks, toggleFavorite: () -> Unit) {
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Box(Modifier.fillMaxWidth().aspectRatio(1.28f).background(MaterialTheme.colorScheme.surface)) {
-            if (artwork != null) DetailArtwork(artwork, coverOnly, showCover = true)
+            if (artwork != null) DetailArtwork(artwork, coverOnly, coverIsUser, landscape = false)
             else if (fallback != null) IconTile(null, fallback, Modifier.fillMaxSize())
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(.18f), Color.Transparent, Color.Black.copy(.88f)))))
             IconButton(onClick = toggleFavorite, modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).size(48.dp)) {

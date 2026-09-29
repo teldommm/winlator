@@ -42,13 +42,22 @@ fun GameDetailRoute(shortcutPath: String, onClose: () -> Unit, onLibraryChanged:
     val baseName = remember(shortcut) { FileUtils.getBasename(shortcut.file.path) }
     // Both are passed on: the screen picks the banner, or blurs/frames the cover when that is all
     // there is (a portrait cover stretched over the header looked wrong).
+    // The user's own background (banners/NAME.user.png) wins over the downloaded banner.
     val bannerPath = remember(shortcut) {
-        File(Environment.getExternalStorageDirectory(), "Winlator/banners/$baseName.png").takeIf { it.exists() }?.path
+        val banners = File(Environment.getExternalStorageDirectory(), "Winlator/banners")
+        File(banners, "$baseName.user.png").takeIf { it.isFile && it.length() > 0 }?.path
+            ?: File(banners, "$baseName.png").takeIf { it.exists() }?.path
     }
-    // The downloaded cover, else the offline placeholder built from the icon (covers/NAME.gen.png).
+    // The user's own cover (covers/NAME.user.png), else the downloaded one, else the offline
+    // placeholder built from the icon (covers/NAME.gen.png).
+    val userCoverPath = remember(shortcut) {
+        File(File(Environment.getExternalStorageDirectory(), "Winlator/covers"), "$baseName.user.png")
+            .takeIf { it.isFile && it.length() > 0 }?.path
+    }
     val coverPath = remember(shortcut) {
         val covers = File(Environment.getExternalStorageDirectory(), "Winlator/covers")
-        File(covers, "$baseName.png").takeIf { it.exists() }?.path
+        userCoverPath
+            ?: File(covers, "$baseName.png").takeIf { it.exists() }?.path
             ?: File(covers, "$baseName.gen.png").takeIf { it.isFile && it.length() > 0 }?.path
     }
     // Same label as the Library tile ("Proton 9.0 arm64ec"), which the Library has
@@ -120,6 +129,7 @@ fun GameDetailRoute(shortcutPath: String, onClose: () -> Unit, onLibraryChanged:
             subtitle,
             bannerPath,
             coverPath,
+            userCoverPath != null,
             shortcut.icon,
             "1" == shortcut.getExtra("favorite", "0"),
             callbacks

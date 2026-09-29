@@ -99,7 +99,12 @@ internal fun LandscapePagerCore(
     }
 
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        ArtBackdrop(item.bannerPath, item.coverPath ?: item.generatedCoverPath, Modifier.fillMaxSize())
+        ArtBackdrop(
+            item.bannerPath,
+            item.coverPath ?: item.generatedCoverPath,
+            item.coverPath != null && item.coverIsUser,
+            Modifier.fillMaxSize()
+        )
         Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Color.Black.copy(.84f), Color.Black.copy(.48f), Color.Black.copy(.20f)))))
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(.18f), Color.Transparent, Color.Black.copy(.72f)))))
         // No top padding: the header is a fixed 54dp band at the very top, aligned with

@@ -184,6 +184,32 @@ public final class ArtworkRepository {
     public static File userIconFile(String baseName) { return new File(dir(KIND_ICON), baseName + ".user.png"); }
 
     /**
+     * Images the user picked themselves follow the icon convention (NAME.user.png): they win over
+     * downloaded and generated ones, the downloader never writes or removes them, and they have
+     * their own reset. Only an explicit Search / Re-download (or a reset) replaces them.
+     */
+    public static File userCoverFile(String baseName) { return new File(dir(KIND_COVER), baseName + ".user.png"); }
+    public static File userBannerFile(String baseName) { return new File(dir(KIND_BANNER), baseName + ".user.png"); }
+
+    public static boolean isUsable(File file) { return file != null && file.isFile() && file.length() > 0; }
+
+    /** The user's own cover if there is one, else the downloaded cover; null when neither exists. */
+    public static File effectiveCover(String baseName) {
+        File user = userCoverFile(baseName);
+        if (isUsable(user)) return user;
+        File cover = coverFile(baseName);
+        return cover.exists() ? cover : null;
+    }
+
+    /** The user's own background if there is one, else the downloaded banner; null when neither exists. */
+    public static File effectiveBanner(String baseName) {
+        File user = userBannerFile(baseName);
+        if (isUsable(user)) return user;
+        File banner = bannerFile(baseName);
+        return banner.exists() ? banner : null;
+    }
+
+    /**
      * Offline placeholder cover built from the game's own icon. Deliberately a separate file from
      * coverFile(): a real cover has to stay "missing" for the downloader, and a generated one must
      * never be mistaken for it. Tiles show the real cover when there is one, else this.
@@ -193,8 +219,10 @@ public final class ArtworkRepository {
     /** Deletes cover, banner and icons of a game and forgets what was remembered about it. */
     public static void deleteArtwork(Context context, String baseName) {
         coverFile(baseName).delete();
+        userCoverFile(baseName).delete();
         generatedCoverFile(baseName).delete();
         bannerFile(baseName).delete();
+        userBannerFile(baseName).delete();
         autoIconFile(baseName).delete();
         userIconFile(baseName).delete();
         forget(context, baseName);
@@ -380,6 +408,7 @@ public final class ArtworkRepository {
     }
 
     public static int coverMaxLongSide() { return COVER_MAX_LONG_SIDE; }
+    public static int bannerMaxLongSide() { return BANNER_MAX_LONG_SIDE; }
 
     // ------------------------------------------------------------------ user input
 

@@ -24,6 +24,9 @@ data class LibraryItem(
     val name: String,
     val containerName: String,
     val coverPath: String?,
+    // coverPath is a picture the user chose themselves (NAME.user.png): shown as it is, never
+    // reduced to a blurred backdrop.
+    val coverIsUser: Boolean,
     // Offline placeholder built from the game's icon (see ArtworkRepository.generatedCoverFile);
     // used only where coverPath is null, so the downloader still treats the cover as missing.
     val generatedCoverPath: String?,
