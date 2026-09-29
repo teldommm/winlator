@@ -165,6 +165,7 @@ internal class SettingsScreenState(
             preferences.getBoolean("open_with_android_browser", false),
             preferences.getBoolean("share_android_clipboard", false),
             preferences.getBoolean("pause_resume_wine", true),
+            preferences.getBoolean("auto_download_artwork", true),
             preferences.getBoolean("remove_loading_bar_when_booting_games", false),
             preferences.getBoolean("enable_wine_debug", false),
             preferences.getString("wine_debug_channels", AppDefaults.DEFAULT_WINE_DEBUG_CHANNELS)

@@ -720,6 +720,11 @@ public class FileManagerController {
             if (!coversDir.exists()) coversDir.mkdirs();
             File autoCover = new File(coversDir, displayName + ".png");
             if (autoCover.exists()) autoCover.delete();
+            // A new library entry starts with clean artwork state: no stale banner from an earlier
+            // game of the same name, and no remembered "not found" from before.
+            File staleBanner = new File(new File(Environment.getExternalStorageDirectory(), "Winlator/banners"), displayName + ".png");
+            if (staleBanner.exists()) staleBanner.delete();
+            com.winlator.cmod.steamgrid.ArtworkRepository.forget(activity, displayName);
         } catch (Exception e) {
             e.printStackTrace();
         }

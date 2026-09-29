@@ -25,10 +25,7 @@ import androidx.preference.PreferenceManager;
 import com.winlator.cmod.MainActivity;
 import com.winlator.cmod.R;
 import com.winlator.cmod.XServerDisplayActivity;
-import com.winlator.cmod.steamgrid.SteamGridDBApi;
-import com.winlator.cmod.steamgrid.SteamGridGridsResponse;
-import com.winlator.cmod.steamgrid.SteamGridGridsResponseDeserializer;
-import com.winlator.cmod.steamgrid.SteamGridSearchResponse;
+import com.winlator.cmod.steamgrid.ArtworkRepository;
 import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.container.Shortcut;
@@ -36,15 +33,6 @@ import com.winlator.cmod.ui.ThemedAlertHost;
 import com.winlator.cmod.ui.shortcut.ShortcutSettingsComposeDialog;
 import com.winlator.cmod.core.ExeIconExtractor;
 import com.winlator.cmod.core.FileUtils;
-
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import okhttp3.OkHttpClient;
-import retrofit2.Call;
-import retrofit2.Callback;
-import retrofit2.Response;
-import retrofit2.Retrofit;
-import retrofit2.converter.gson.GsonConverterFactory;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -78,8 +66,9 @@ import com.winlator.cmod.core.AppDefaults;
 // The never-called content-archive picker (pickContentArchive) was dropped.
 public class LibraryScreenController {
     private static final String TAG = "LibraryScreen";
-    private static final String STEAMGRID_BASE_URL = "https://www.steamgriddb.com/api/v2/";
-    private static String STEAMGRID_API_KEY = "0324c52513634547a7b32d6d323635d0";
+    private static final int PICK_ICON = 0;
+    private static final int PICK_COVER = 1;
+    private static boolean apiKeyWarningShown;
 
     private final AppCompatActivity activity;
     private ContainerManager manager;
@@ -101,7 +90,11 @@ public class LibraryScreenController {
     private final HashMap<String, String> environmentLabels = new HashMap<>();
     private final Set<String> artworkRequests = Collections.synchronizedSet(new HashSet<>());
 
+    // Shortcuts whose exe icon was already tried this session (no retry on every scroll).
+    private final Set<String> iconRequests = Collections.synchronizedSet(new HashSet<>());
+
     private Shortcut shortcutForIconUpdate;
+    private int pendingPickTarget = PICK_ICON;
     private Runnable iconPickerLauncher;
     private final LibraryCallbacks callbacks;
 
@@ -180,10 +173,11 @@ public class LibraryScreenController {
         iconPickerLauncher = launcher;
     }
 
+    // The same image picker serves "Choose icon" and "Choose cover" (see showArtworkMenu).
     public void onIconPicked(Uri uri) {
-        if (uri != null && shortcutForIconUpdate != null) {
-            updateShortcutIcon(uri, shortcutForIconUpdate);
-        }
+        if (uri == null || shortcutForIconUpdate == null) return;
+        if (pendingPickTarget == PICK_COVER) updateShortcutCover(uri, shortcutForIconUpdate);
+        else updateShortcutIcon(uri, shortcutForIconUpdate);
     }
 
     private void setGridView(boolean gridView) {
@@ -192,139 +186,12 @@ public class LibraryScreenController {
         if (libraryController != null) libraryController.setGridView(isGridView);
     }
 
-    private void fetchCoverFromSteamGrid(Shortcut shortcut, File destFile,
-                                          Runnable onSuccess, Runnable onFail) {
-        fetchArtworkFromSteamGrid(shortcut, destFile, "600x900", onSuccess, onFail);
-    }
-
-    private void fetchBannerFromSteamGrid(Shortcut shortcut, File destFile,
-                                           Runnable onSuccess, Runnable onFail) {
-        fetchArtworkFromSteamGrid(shortcut, destFile, "460x215", onSuccess, onFail);
-    }
-
-    private void fetchArtworkFromSteamGrid(Shortcut shortcut, File destFile, String dimensions,
-                                            Runnable onSuccess, Runnable onFail) {
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(activity);
-        if (prefs.getBoolean("enable_custom_api_key", false)) {
-            String custom = prefs.getString("custom_api_key", "");
-            if (custom != null && !custom.isEmpty()) STEAMGRID_API_KEY = custom;
-        }
-        if (STEAMGRID_API_KEY.isEmpty()) {
-            if (onFail != null) onFail.run();
-            return;
-        }
-
-        Retrofit retrofit = new Retrofit.Builder()
-                .baseUrl(STEAMGRID_BASE_URL)
-                .client(new OkHttpClient())
-                .addConverterFactory(GsonConverterFactory.create())
-                .build();
-
-        SteamGridDBApi api = retrofit.create(SteamGridDBApi.class);
-        api.searchGame("Bearer " + STEAMGRID_API_KEY, shortcut.name)
-                .enqueue(new Callback<SteamGridSearchResponse>() {
-                    @Override
-                    public void onResponse(Call<SteamGridSearchResponse> call,
-                                           Response<SteamGridSearchResponse> response) {
-                        if (response.isSuccessful() && response.body() != null
-                                && response.body().data != null
-                                && !response.body().data.isEmpty()) {
-                            fetchSteamGridArtwork(response.body().data.get(0).id, destFile,
-                                    dimensions, onSuccess, onFail);
-                        } else if (onFail != null) {
-                            onFail.run();
-                        }
-                    }
-
-                    @Override
-                    public void onFailure(Call<SteamGridSearchResponse> call, Throwable error) {
-                        Log.e(TAG, "SteamGridDB search failed: " + error.getMessage());
-                        if (onFail != null) onFail.run();
-                    }
-                });
-    }
-
-    private void fetchSteamGridArtwork(int gameId, File destFile, String dimensions,
-                                        Runnable onSuccess, Runnable onFail) {
-        Gson gson = new GsonBuilder()
-                .registerTypeAdapter(SteamGridGridsResponse.class,
-                        new SteamGridGridsResponseDeserializer())
-                .create();
-
-        Retrofit retrofit = new Retrofit.Builder()
-                .baseUrl(STEAMGRID_BASE_URL)
-                .client(new OkHttpClient())
-                .addConverterFactory(GsonConverterFactory.create(gson))
-                .build();
-
-        SteamGridDBApi api = retrofit.create(SteamGridDBApi.class);
-        api.getGridsByGameId("Bearer " + STEAMGRID_API_KEY, gameId,
-                "alternate", dimensions, "static")
-                .enqueue(new Callback<SteamGridGridsResponse>() {
-                    @Override
-                    public void onResponse(Call<SteamGridGridsResponse> call,
-                                           Response<SteamGridGridsResponse> response) {
-                        if (response.isSuccessful() && response.body() != null
-                                && response.body().data != null
-                                && !response.body().data.isEmpty()) {
-                            downloadAndSaveCover(response.body().data.get(0).url,
-                                    destFile, onSuccess, onFail);
-                        } else if (onFail != null) {
-                            onFail.run();
-                        }
-                    }
-
-                    @Override
-                    public void onFailure(Call<SteamGridGridsResponse> call, Throwable error) {
-                        Log.e(TAG, "SteamGridDB artwork failed: " + error.getMessage());
-                        if (onFail != null) onFail.run();
-                    }
-                });
-    }
-
-    private void downloadAndSaveCover(String url, File destFile,
-                                       Runnable onSuccess, Runnable onFail) {
-        Executors.newSingleThreadExecutor().execute(() -> {
-            try {
-                HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
-                conn.connect();
-                Bitmap bmp = BitmapFactory.decodeStream(conn.getInputStream());
-                if (bmp == null) { if (onFail != null) onFail.run(); return; }
-
-                if (destFile.getParentFile() != null) destFile.getParentFile().mkdirs();
-
-                try (FileOutputStream fos = new FileOutputStream(destFile)) {
-                    bmp.compress(Bitmap.CompressFormat.PNG, 100, fos);
-                }
-                bmp.recycle();
-                Log.d(TAG, "SteamGridDB cover salvo: " + destFile.getAbsolutePath());
-                if (onSuccess != null) onSuccess.run();
-            } catch (Exception e) {
-                Log.e(TAG, "Falha ao baixar cover do SteamGridDB: " + e.getMessage());
-                if (onFail != null) onFail.run();
-            }
-        });
-    }
-
     private File getImagesDir(boolean isCover) {
-        File targetDir = new File(Environment.getExternalStorageDirectory(), isCover ? "Winlator/covers" : "Winlator/icons");
-        if (!targetDir.exists()) targetDir.mkdirs();
-        
-        File nomedia = new File(targetDir, ".nomedia");
-        if (!nomedia.exists()) {
-            try { nomedia.createNewFile(); } catch (IOException e) {}
-        }
-        return targetDir;
+        return ArtworkRepository.dir(isCover ? ArtworkRepository.KIND_COVER : ArtworkRepository.KIND_ICON);
     }
 
     private File getBannerDir() {
-        File targetDir = new File(Environment.getExternalStorageDirectory(), "Winlator/banners");
-        if (!targetDir.exists()) targetDir.mkdirs();
-        File nomedia = new File(targetDir, ".nomedia");
-        if (!nomedia.exists()) {
-            try { nomedia.createNewFile(); } catch (IOException ignored) {}
-        }
-        return targetDir;
+        return ArtworkRepository.dir(ArtworkRepository.KIND_BANNER);
     }
 
     // Reloads containers and shortcuts off the main thread. A fresh ContainerManager is built
@@ -440,45 +307,221 @@ public class LibraryScreenController {
         }
     }
 
-    private void requestArtwork(Shortcut shortcut, String kind) {
-        String baseName = FileUtils.getBasename(shortcut.file.getPath());
-        File autoIcon = new File(getImagesDir(false), baseName + ".png");
-        File cover = new File(getImagesDir(true), baseName + ".png");
-        File banner = new File(getBannerDir(), baseName + ".png");
+    // ---- Artwork ---------------------------------------------------------------------------
 
-        if ("cover".equals(kind)) {
-            requestCover(shortcut, cover, autoIcon);
-        } else if ("banner".equals(kind)) {
-            requestBanner(shortcut, banner);
-        }
+    private ArtworkRepository.Job newArtworkJob(Shortcut shortcut, String source, boolean force,
+                                                boolean replaceStale, File cover, File banner) {
+        ArtworkRepository.Job job = new ArtworkRepository.Job();
+        job.context = activity;
+        job.name = shortcut.name;
+        job.windowsPath = shortcut.path;
+        job.baseName = FileUtils.getBasename(shortcut.file.getPath());
+        job.source = source;
+        job.coverFile = cover;
+        job.bannerFile = banner;
+        job.force = force;
+        job.replaceStale = replaceStale;
+        return job;
     }
 
-    private void requestCover(Shortcut shortcut, File cover, File autoIcon) {
-        final String coverKey = "cover:" + shortcut.file.getPath();
-        if (!cover.exists() && artworkRequests.add(coverKey)) {
-            fetchCoverFromSteamGrid(shortcut, cover, () -> {
-                artworkRequests.remove(coverKey);
+    private void toast(String message) {
+        if (activity != null) Toast.makeText(activity, message, Toast.LENGTH_SHORT).show();
+    }
+
+    // Called by every tile that has no cover/banner yet. One job fetches whatever is missing, and
+    // only when it makes sense: automatic download is on, the game was not set to "no artwork", and
+    // it did not just fail/miss (ArtworkRepository remembers that, so scrolling does not retry).
+    private void requestArtwork(Shortcut shortcut, String kind) {
+        String baseName = FileUtils.getBasename(shortcut.file.getPath());
+        File autoIcon = ArtworkRepository.autoIconFile(baseName);
+        File cover = ArtworkRepository.coverFile(baseName);
+        File banner = ArtworkRepository.bannerFile(baseName);
+        final boolean coverMissing = !cover.exists();
+        boolean bannerMissing = !banner.exists();
+        if (!coverMissing && !bannerMissing) return;
+
+        String source = shortcut.getExtra(ArtworkRepository.EXTRA_SOURCE, "");
+        boolean allowed = ArtworkRepository.isAutoDownloadEnabled(activity)
+                && !ArtworkRepository.SOURCE_NONE.equals(source);
+        File coverTarget = coverMissing
+                && !ArtworkRepository.shouldSkip(activity, baseName, ArtworkRepository.KIND_COVER) ? cover : null;
+        File bannerTarget = bannerMissing
+                && !ArtworkRepository.shouldSkip(activity, baseName, ArtworkRepository.KIND_BANNER) ? banner : null;
+
+        if (!allowed || (coverTarget == null && bannerTarget == null)) {
+            if (coverMissing) ensureExeIcon(shortcut, autoIcon);
+            return;
+        }
+
+        final String requestKey = "artwork:" + shortcut.file.getPath();
+        if (!artworkRequests.add(requestKey)) return;
+        ArtworkRepository.Job job = newArtworkJob(shortcut, source.isEmpty() ? null : source,
+                false, false, coverTarget, bannerTarget);
+        ArtworkRepository.enqueue(job, result -> postToUi(() -> {
+            artworkRequests.remove(requestKey);
+            if (result.anySaved()) publishLibraryItems();
+            if (coverMissing && !result.coverSaved) ensureExeIcon(shortcut, autoIcon);
+            if (result.authProblem) warnApiKeyOnce();
+        }));
+    }
+
+    private void warnApiKeyOnce() {
+        if (apiKeyWarningShown) return;
+        apiKeyWarningShown = true;
+        Toast.makeText(activity, "SteamGridDB rejected the API key - check it in Settings", Toast.LENGTH_LONG).show();
+    }
+
+    // Fallback tile image: the icon inside the exe, extracted once per session and game.
+    private void ensureExeIcon(Shortcut shortcut, File autoIcon) {
+        if (autoIcon.exists() || !iconRequests.add(shortcut.file.getPath())) return;
+        File exeFile = resolveExeFile(shortcut);
+        if (exeFile != null) {
+            ExeIconExtractor.extractAsync(exeFile, autoIcon, false, () -> {
                 if (activity != null) activity.runOnUiThread(this::publishLibraryItems);
-            }, () -> {
-                artworkRequests.remove(coverKey);
-                File exeFile = resolveExeFile(shortcut);
-                if (exeFile != null && !autoIcon.exists()) {
-                    ExeIconExtractor.extractAsync(exeFile, autoIcon, false, () -> {
-                        if (activity != null) activity.runOnUiThread(this::publishLibraryItems);
-                    });
-                }
             });
         }
     }
 
-    private void requestBanner(Shortcut shortcut, File banner) {
-        final String bannerKey = "banner:" + shortcut.file.getPath();
-        if (!banner.exists() && artworkRequests.add(bannerKey)) {
-            fetchBannerFromSteamGrid(shortcut, banner, () -> {
-                artworkRequests.remove(bannerKey);
-                if (activity != null) activity.runOnUiThread(this::publishLibraryItems);
-            }, () -> artworkRequests.remove(bannerKey));
+    // "Artwork" in the game menu: one window with everything that can be done to a game's images.
+    private void showArtworkMenu(Shortcut shortcut) {
+        String baseName = FileUtils.getBasename(shortcut.file.getPath());
+        boolean hasArtwork = ArtworkRepository.coverFile(baseName).exists()
+                || ArtworkRepository.bannerFile(baseName).exists();
+        boolean hasUserIcon = ArtworkRepository.userIconFile(baseName).exists();
+
+        List<ThemedAlertHost.ActionItem> items = new ArrayList<>();
+        items.add(new ThemedAlertHost.ActionItem("Search SteamGridDB...", () -> promptArtworkSource(shortcut)));
+        items.add(new ThemedAlertHost.ActionItem("Re-download automatically", () -> redownloadArtwork(shortcut)));
+        items.add(new ThemedAlertHost.ActionItem("Choose cover from gallery", () -> pickImage(shortcut, PICK_COVER)));
+        items.add(new ThemedAlertHost.ActionItem("Choose icon from gallery", () -> pickImage(shortcut, PICK_ICON)));
+        if (hasUserIcon) {
+            items.add(new ThemedAlertHost.ActionItem("Reset icon", () -> resetIcon(shortcut)));
         }
+        if (hasArtwork) {
+            items.add(new ThemedAlertHost.ActionItem("Remove cover & banner", () -> confirmRemoveArtwork(shortcut), 0, true));
+        }
+        ThemedAlertHost.actions(activity, "Artwork", items);
+    }
+
+    private void pickImage(Shortcut shortcut, int target) {
+        shortcutForIconUpdate = shortcut;
+        pendingPickTarget = target;
+        if (iconPickerLauncher != null) iconPickerLauncher.run();
+    }
+
+    private void promptArtworkSource(Shortcut shortcut) {
+        String current = shortcut.getExtra(ArtworkRepository.EXTRA_SOURCE, "");
+        ThemedAlertHost.prompt(
+                activity,
+                "SteamGridDB source",
+                "Game name, steamgriddb.com game link or ID, steam:APPID, or a direct image URL (cover only).",
+                ArtworkRepository.sourceToInput(current, shortcut.name),
+                "Search",
+                value -> applyArtworkSource(shortcut, value)
+        );
+    }
+
+    private void applyArtworkSource(Shortcut shortcut, String raw) {
+        String parsed = ArtworkRepository.parseUserInput(raw);
+        if (parsed == null) {
+            redownloadArtwork(shortcut);
+            return;
+        }
+        String baseName = FileUtils.getBasename(shortcut.file.getPath());
+        File cover = ArtworkRepository.coverFile(baseName);
+        File banner = ArtworkRepository.bannerFile(baseName);
+
+        if (parsed.startsWith("url:")) {
+            toast("Downloading cover...");
+            ArtworkRepository.enqueueDirect(parsed.substring(4), cover, ArtworkRepository.coverMaxLongSide(),
+                    result -> postToUi(() -> {
+                        if (result.coverSaved) {
+                            publishLibraryItems();
+                            toast("Cover updated");
+                        } else {
+                            toast(result.message);
+                        }
+                    }));
+            return;
+        }
+
+        toast("Searching SteamGridDB...");
+        ArtworkRepository.Job job = newArtworkJob(shortcut, parsed, true, true, cover, banner);
+        ArtworkRepository.enqueue(job, result -> postToUi(() -> {
+            if (result.anySaved()) {
+                // Remember the source only once it produced something, so a typo does not stick.
+                shortcut.putExtra(ArtworkRepository.EXTRA_SOURCE, parsed);
+                shortcut.saveData();
+                loadShortcutsList();
+                toast("Artwork updated");
+            } else {
+                if (result.authProblem) warnApiKeyOnce();
+                toast(result.message);
+            }
+        }));
+    }
+
+    private void redownloadArtwork(Shortcut shortcut) {
+        String baseName = FileUtils.getBasename(shortcut.file.getPath());
+        toast("Downloading artwork...");
+        ArtworkRepository.forget(activity, baseName);
+        ArtworkRepository.Job job = newArtworkJob(shortcut, null, true, true,
+                ArtworkRepository.coverFile(baseName), ArtworkRepository.bannerFile(baseName));
+        ArtworkRepository.enqueue(job, result -> postToUi(() -> {
+            // Back to automatic mode, whatever the previous source or "no artwork" choice was.
+            shortcut.putExtra(ArtworkRepository.EXTRA_SOURCE, null);
+            shortcut.saveData();
+            if (result.anySaved()) {
+                loadShortcutsList();
+                toast("Artwork updated");
+            } else {
+                if (result.authProblem) warnApiKeyOnce();
+                toast(result.message);
+            }
+        }));
+    }
+
+    private void confirmRemoveArtwork(Shortcut shortcut) {
+        ThemedAlertHost.confirm(
+                activity,
+                "Remove artwork?",
+                "The cover and banner will be deleted and won't be downloaded again for this game. "
+                        + "\"Re-download automatically\" brings them back.",
+                "Remove",
+                () -> removeArtwork(shortcut),
+                true
+        );
+    }
+
+    private void removeArtwork(Shortcut shortcut) {
+        String baseName = FileUtils.getBasename(shortcut.file.getPath());
+        ArtworkRepository.coverFile(baseName).delete();
+        ArtworkRepository.bannerFile(baseName).delete();
+        shortcut.putExtra(ArtworkRepository.EXTRA_SOURCE, ArtworkRepository.SOURCE_NONE);
+        shortcut.saveData();
+        loadShortcutsList();
+        toast("Artwork removed");
+    }
+
+    private void resetIcon(Shortcut shortcut) {
+        String baseName = FileUtils.getBasename(shortcut.file.getPath());
+        ArtworkRepository.userIconFile(baseName).delete();
+        loadShortcutsList();
+        toast("Icon reset");
+    }
+
+    private void updateShortcutCover(Uri sourceUri, Shortcut shortcut) {
+        String baseName = FileUtils.getBasename(shortcut.file.getPath());
+        File cover = ArtworkRepository.coverFile(baseName);
+        ArtworkRepository.enqueueFromUri(activity, sourceUri, cover, ArtworkRepository.coverMaxLongSide(),
+                result -> postToUi(() -> {
+                    if (result.coverSaved) {
+                        publishLibraryItems();
+                        toast("Cover updated");
+                    } else {
+                        toast(result.message);
+                    }
+                }));
     }
 
     private void openGameDetails(Shortcut shortcut) {
@@ -592,8 +635,7 @@ public class LibraryScreenController {
             ShortcutSettingsComposeDialog.show(activity, shortcut, this::loadShortcutsList);
         }
         else if (LibraryComposeHost.ACTION_ICON.equals(action)) {
-            shortcutForIconUpdate = shortcut;
-            if (iconPickerLauncher != null) iconPickerLauncher.run();
+            showArtworkMenu(shortcut);
         }
         else if (LibraryComposeHost.ACTION_REMOVE.equals(action)) {
             ThemedAlertHost.confirm(
@@ -610,6 +652,7 @@ public class LibraryScreenController {
                         } catch (Exception ignored) {}
 
                         if (fileDeleted) {
+                            ArtworkRepository.deleteArtworkIfUnused(activity, shortcut.file);
                             disableShortcutOnScreen(activity, shortcut);
                             loadShortcutsList();
                             Toast.makeText(context, "Shortcut removed.", Toast.LENGTH_SHORT).show();

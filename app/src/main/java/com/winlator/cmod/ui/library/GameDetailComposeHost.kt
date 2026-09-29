@@ -41,6 +41,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -73,7 +75,7 @@ interface GameDetailCallbacks {
 // The game detail screen. Opened by MainShell as a detail entry through GameDetailRoute
 // (GameDetailRoute.kt); onBack pops it.
 @Composable
-internal fun GameDetailScreen(title: String, subtitle: String, artworkPath: String?, fallback: Bitmap?, initialFavorite: Boolean, callbacks: GameDetailCallbacks) {
+internal fun GameDetailScreen(title: String, subtitle: String, bannerPath: String?, coverPath: String?, fallback: Bitmap?, initialFavorite: Boolean, callbacks: GameDetailCallbacks) {
     val landscape = LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
     val activity = LocalContext.current as? MainActivity
 
@@ -83,23 +85,27 @@ internal fun GameDetailScreen(title: String, subtitle: String, artworkPath: Stri
 
     // The Library pager/tiles have usually decoded this banner/cover already (LibraryImageCache),
     // so start from it instead of flashing the exe icon first.
+    // Banner when there is one, else the (portrait) cover. There is no icon fallback here on
+    // purpose: an exe icon cropped over the whole header looked broken (see ArtworkViews.kt).
+    val artworkPath = bannerPath ?: coverPath
+    val coverOnly = bannerPath == null && coverPath != null
     val artworkKey = remember(artworkPath) { LibraryImageCache.keyFor(artworkPath) }
-    val artwork by produceState(LibraryImageCache.peek(artworkKey) ?: fallback, artworkKey) {
-        value = withContext(Dispatchers.IO) { LibraryImageCache.load(artworkPath) } ?: fallback
+    val artwork by produceState<Bitmap?>(LibraryImageCache.peek(artworkKey), artworkKey) {
+        value = withContext(Dispatchers.IO) { LibraryImageCache.load(artworkPath) }
     }
     var favorite by remember(initialFavorite) { mutableStateOf(initialFavorite) }
     val toggle = {
         favorite = !favorite
         callbacks.onFavorite(favorite)
     }
-    if (landscape) LandscapeDetail(title, subtitle, artwork, favorite, callbacks, toggle)
-    else PortraitDetail(title, subtitle, artwork, favorite, callbacks, toggle)
+    if (landscape) LandscapeDetail(title, subtitle, artwork, coverOnly, favorite, callbacks, toggle)
+    else PortraitDetail(title, subtitle, artwork, coverOnly, fallback, favorite, callbacks, toggle)
 }
 
 @Composable
-private fun LandscapeDetail(title: String, subtitle: String, artwork: Bitmap?, favorite: Boolean, callbacks: GameDetailCallbacks, toggleFavorite: () -> Unit) {
+private fun LandscapeDetail(title: String, subtitle: String, artwork: Bitmap?, coverOnly: Boolean, favorite: Boolean, callbacks: GameDetailCallbacks, toggleFavorite: () -> Unit) {
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        if (artwork != null) Image(artwork.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        DetailArtwork(artwork, coverOnly, showCover = false)
         Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Color.Black.copy(.93f), Color.Black.copy(.70f), Color.Black.copy(.28f)))))
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(.18f), Color.Transparent, Color.Black.copy(.55f)))))
 
@@ -169,11 +175,42 @@ private fun LandscapeDetail(title: String, subtitle: String, artwork: Bitmap?, f
     }
 }
 
+// Banner: full-bleed crop. Cover only: blurred backdrop, plus (portrait header) the cover itself
+// at its own proportions above the title instead of a 2x zoom into its middle.
 @Composable
-private fun PortraitDetail(title: String, subtitle: String, artwork: Bitmap?, favorite: Boolean, callbacks: GameDetailCallbacks, toggleFavorite: () -> Unit) {
+private fun DetailArtwork(artwork: Bitmap?, coverOnly: Boolean, showCover: Boolean) {
+    if (artwork == null) return
+    val image = artwork.asImageBitmap()
+    Box(Modifier.fillMaxSize().clipToBounds()) {
+        if (!coverOnly) {
+            Image(image, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        } else {
+            Image(
+                image,
+                null,
+                Modifier.fillMaxSize().softenBackdrop(),
+                contentScale = ContentScale.Crop
+            )
+            if (showCover) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                    Image(
+                        image,
+                        null,
+                        Modifier.padding(top = 16.dp, bottom = 112.dp).fillMaxHeight().aspectRatio(2f / 3f).clip(WinZShapes.Small),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PortraitDetail(title: String, subtitle: String, artwork: Bitmap?, coverOnly: Boolean, fallback: Bitmap?, favorite: Boolean, callbacks: GameDetailCallbacks, toggleFavorite: () -> Unit) {
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Box(Modifier.fillMaxWidth().aspectRatio(1.28f).background(MaterialTheme.colorScheme.surface)) {
-            if (artwork != null) Image(artwork.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            if (artwork != null) DetailArtwork(artwork, coverOnly, showCover = true)
+            else if (fallback != null) IconTile(null, fallback, Modifier.fillMaxSize())
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(.18f), Color.Transparent, Color.Black.copy(.88f)))))
             IconButton(onClick = toggleFavorite, modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).size(48.dp)) {
                 Icon(if (favorite) Icons.Outlined.Star else Icons.Outlined.StarBorder, "Favorite", tint = Color.White)

@@ -11,7 +11,7 @@ public class SteamGridSearchResponse {
     @SerializedName("data")
     public List<GameData> data;
 
-    public class GameData {
+    public static class GameData {
         @SerializedName("id")
         public int id;
 

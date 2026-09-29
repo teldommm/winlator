@@ -21,6 +21,7 @@ import com.winlator.cmod.ui.theme.findActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import com.winlator.cmod.steamgrid.ArtworkRepository
 
 // Game detail as a MainShell detail entry (replaces GameDetailFragment). Same actions; the
 // runtime subtitle (which syncs ContentsManager — disk work) is now resolved off the main thread
@@ -38,14 +39,13 @@ fun GameDetailRoute(shortcutPath: String, onClose: () -> Unit, onLibraryChanged:
     }
 
     val baseName = remember(shortcut) { FileUtils.getBasename(shortcut.file.path) }
-    val artworkPath = remember(shortcut) {
-        val banner = File(Environment.getExternalStorageDirectory(), "Winlator/banners/$baseName.png")
-        val cover = File(Environment.getExternalStorageDirectory(), "Winlator/covers/$baseName.png")
-        when {
-            banner.exists() -> banner.path
-            cover.exists() -> cover.path
-            else -> null
-        }
+    // Both are passed on: the screen picks the banner, or blurs/frames the cover when that is all
+    // there is (a portrait cover stretched over the header looked wrong).
+    val bannerPath = remember(shortcut) {
+        File(Environment.getExternalStorageDirectory(), "Winlator/banners/$baseName.png").takeIf { it.exists() }?.path
+    }
+    val coverPath = remember(shortcut) {
+        File(Environment.getExternalStorageDirectory(), "Winlator/covers/$baseName.png").takeIf { it.exists() }?.path
     }
     // Same label as the Library tile ("Proton 9.0 arm64ec"), which the Library has
     // normally already resolved — so the subtitle is final from the first frame. Refreshed in the
@@ -98,6 +98,7 @@ fun GameDetailRoute(shortcutPath: String, onClose: () -> Unit, onLibraryChanged:
                     "Remove",
                     {
                         if (shortcut.file.delete()) {
+                            ArtworkRepository.deleteArtworkIfUnused(activity, shortcut.file)
                             onLibraryChanged()
                             onClose()
                         }
@@ -111,7 +112,8 @@ fun GameDetailRoute(shortcutPath: String, onClose: () -> Unit, onLibraryChanged:
     GameDetailScreen(
         shortcut.name,
         subtitle,
-        artworkPath,
+        bannerPath,
+        coverPath,
         shortcut.icon,
         "1" == shortcut.getExtra("favorite", "0"),
         callbacks

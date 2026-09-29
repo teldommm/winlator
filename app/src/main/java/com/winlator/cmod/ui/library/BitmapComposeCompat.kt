@@ -459,11 +459,14 @@ internal fun CompactArtworkCard(item: LibraryItem, cb: LibraryCallbacks) {
         border = BorderStroke(1.dp, hairlineColor())
     ) {
         Box {
-            ArtworkCompat(
-                item.bannerPath ?: item.coverPath ?: item.iconPath,
-                item.fallbackIcon,
-                Modifier.fillMaxSize().alpha(.52f)
-            )
+            // Backdrop only from real artwork; an icon stretched over the whole row is just noise.
+            if (item.bannerPath != null || item.coverPath != null) {
+                ArtworkCompat(
+                    item.bannerPath ?: item.coverPath,
+                    null,
+                    Modifier.fillMaxSize().alpha(.52f)
+                )
+            }
             Box(
                 Modifier.fillMaxSize().background(
                     Brush.horizontalGradient(
@@ -507,7 +510,9 @@ internal fun CoverArtworkCard(item: LibraryItem, cb: LibraryCallbacks) {
         border = BorderStroke(1.dp, hairlineColor())
     ) {
         Box(Modifier.aspectRatio(.72f)) {
-            ArtworkCompat(item.coverPath ?: item.bannerPath ?: item.iconPath, item.fallbackIcon, Modifier.fillMaxSize())
+            // No cover: the icon at its own size on a plain tile (a stretched icon/banner looked broken).
+            if (item.coverPath != null) ArtworkCompat(item.coverPath, null, Modifier.fillMaxSize())
+            else IconTile(item.iconPath, item.fallbackIcon, Modifier.fillMaxSize())
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent, Color.Black.copy(.92f)))))
             Column(Modifier.align(Alignment.BottomStart).padding(start = 14.dp, end = 50.dp, bottom = 13.dp)) {
                 Text(item.name, color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)

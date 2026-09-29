@@ -14,6 +14,8 @@ public interface SteamGridDBApi {
             @Path("term") String searchTerm
     );
 
+    // styles / dimensions / types are optional: Retrofit leaves out a null query parameter.
+    // dimensions and styles accept comma separated lists ("660x930,600x900,342x482").
     @GET("grids/game/{gameId}")
     Call<SteamGridGridsResponse> getGridsByGameId(
             @Header("Authorization") String authToken,
@@ -23,7 +25,13 @@ public interface SteamGridDBApi {
             @Query("types") String types              // Example: "static"
     );
 
-
-
-
+    // Same as above, addressed by Steam App ID instead of the SteamGridDB game id.
+    @GET("grids/steam/{appId}")
+    Call<SteamGridGridsResponse> getGridsBySteamAppId(
+            @Header("Authorization") String authToken,
+            @Path("appId") long appId,
+            @Query("styles") String styles,
+            @Query("dimensions") String dimensions,
+            @Query("types") String types
+    );
 }

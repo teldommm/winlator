@@ -2,6 +2,7 @@ package com.winlator.cmod.ui.theme
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -106,17 +107,23 @@ private fun ThemePreview(colors: ThemePreviewColors) {
         border = BorderStroke(1.dp, colors.outline)
     ) {
         Box(Modifier.padding(8.dp)) {
+            // Inner "surface" swatch. The real colorScheme.surface is ~90% translucent and almost
+            // equal to the background in every theme (AMOLED: #050505 on #000), so it used to
+            // vanish into the tile. It now uses an opaque, clearly lighter/darker tone plus its
+            // own outline so it stays readable in White, Dark and AMOLED.
             Box(
                 Modifier
                     .align(Alignment.TopStart)
-                    .size(18.dp)
+                    .size(17.dp)
                     .background(colors.surface, WinZShapes.ExtraSmall)
+                    .border(1.dp, colors.outline, WinZShapes.ExtraSmall)
             )
             Box(
                 Modifier
                     .align(Alignment.BottomEnd)
-                    .size(15.dp)
+                    .size(14.dp)
                     .background(colors.accent, CircleShape)
+                    .border(1.dp, colors.outline, CircleShape)
             )
         }
     }
@@ -202,7 +209,9 @@ internal fun winlatorThemePreview(theme: WinlatorThemeType): ThemePreviewColors 
     val scheme = winlatorColorScheme(theme)
     return ThemePreviewColors(
         background = scheme.background,
-        surface = scheme.surface,
+        // Opaque token with real contrast against `background` (surfaceContainerHighest:
+        // White #E1E3E8, Dark #313130, AMOLED #191919) instead of the translucent `surface`.
+        surface = scheme.surfaceContainerHighest,
         accent = scheme.primary,
         outline = scheme.outline
     )

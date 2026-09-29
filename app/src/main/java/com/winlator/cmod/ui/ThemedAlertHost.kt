@@ -149,6 +149,42 @@ object ThemedAlertHost {
         }
     }
 
+    // prompt() with a short explanatory line under the title (what the field accepts).
+    @JvmStatic
+    fun prompt(
+        activity: AppCompatActivity,
+        title: String,
+        message: String,
+        initialValue: String,
+        confirmLabel: String,
+        onConfirm: Consumer<String>
+    ) {
+        showOverlay(activity) { dismiss ->
+            var value by remember { mutableStateOf(initialValue) }
+            ThemedDialogTitle(title)
+            Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                value = value,
+                onValueChange = { value = it },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(18.dp))
+            Row(Modifier.align(Alignment.End), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(
+                    onClick = dismiss,
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
+                    border = BorderStroke(1.dp, hairlineColor())
+                ) { Text("Cancel") }
+                Button(
+                    onClick = { dismiss(); onConfirm.accept(value) },
+                    colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
+                ) { Text(confirmLabel) }
+            }
+        }
+    }
+
     // One option among several, e.g. Replace/Rename for a paste conflict. destructive tints the
     // row's label with the theme's error color (e.g. an overwrite that can't be undone).
     // destructive is last (default) so @JvmOverloads can offer a 2-arg overload from Java.

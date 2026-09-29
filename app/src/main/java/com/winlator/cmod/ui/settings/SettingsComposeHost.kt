@@ -110,6 +110,7 @@ data class SettingsModel(
     val openInBrowser: Boolean,
     val shareClipboard: Boolean,
     val pauseWine: Boolean,
+    val autoDownloadArtwork: Boolean,
     val removeLoadingBar: Boolean,
     val wineDebug: Boolean,
     val wineDebugChannels: String,
@@ -270,6 +271,8 @@ internal fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) 
                     ToggleRow(stringResource(R.string.pause_resume_wine), model.pauseWine) { callbacks.onBooleanChanged("pause_resume_wine", it) }
                     GroupDivider()
                     ToggleRow(stringResource(R.string.high_refresh_rate), model.highRefreshRate) { callbacks.onBooleanChanged("high_refresh_rate_mode", it) }
+                    GroupDivider()
+                    ToggleRow("Auto-download artwork from the internet", model.autoDownloadArtwork) { callbacks.onBooleanChanged("auto_download_artwork", it) }
                     GroupDivider()
                     ToggleRow(stringResource(R.string.remove_loading_bar_when_booting_games), model.removeLoadingBar) { callbacks.onBooleanChanged("remove_loading_bar_when_booting_games", it) }
                 }

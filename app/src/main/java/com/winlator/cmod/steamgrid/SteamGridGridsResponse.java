@@ -21,7 +21,7 @@ public class SteamGridGridsResponse {
     @SerializedName("data")
     public List<Grid> data;  // The data field is a list of Grid objects
 
-    public class Grid {
+    public static class Grid {
         @SerializedName("id")
         public int id;
 
@@ -34,6 +34,12 @@ public class SteamGridGridsResponse {
         @SerializedName("url")
         public String url;
 
+        @SerializedName("width")
+        public int width;
+
+        @SerializedName("height")
+        public int height;
+
         @SerializedName("thumb")
         public String thumb;
 
@@ -44,7 +50,7 @@ public class SteamGridGridsResponse {
         public Author author;
     }
 
-    public class Author {
+    public static class Author {
         @SerializedName("name")
         public String name;
 

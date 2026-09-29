@@ -37,6 +37,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import com.winlator.cmod.steamgrid.ArtworkRepository;
 
 public class PreloaderDialog {
     private static final String TAG = "PreloaderDialog";
@@ -159,7 +160,8 @@ public class PreloaderDialog {
         launchScrim.setVisibility(hasArtwork ? View.VISIBLE : View.GONE);
         applyLaunchTextColors(hasArtwork);
 
-        if (!hasBanner && banner != null) {
+        // Honors Settings > Experimental > "Auto-download artwork" and a per-game "Remove artwork".
+        if (!hasBanner && banner != null && ArtworkRepository.isAutoAllowed(activity, resolveLaunchShortcutFile())) {
             requestTheGamesDbBanner(launchTitleText, banner);
         }
     }
@@ -230,6 +232,12 @@ public class PreloaderDialog {
         if (TextUtils.isEmpty(shortcutPath)) return null;
         String baseName = FileUtils.getBasename(shortcutPath);
         return TextUtils.isEmpty(baseName) ? null : baseName;
+    }
+
+    private File resolveLaunchShortcutFile() {
+        Intent intent = activity.getIntent();
+        String shortcutPath = intent != null ? intent.getStringExtra("shortcut_path") : null;
+        return TextUtils.isEmpty(shortcutPath) ? null : new File(shortcutPath);
     }
 
     private File getLaunchBannerFile() {
