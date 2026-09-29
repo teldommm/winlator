@@ -224,20 +224,16 @@ internal fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) 
 
             item("cover-art-title") { SectionTitle("COVER ART") }
             item("cover-art") {
+                // One card, like LOGS: the key toggle (with its field while on), then the two switches.
                 GroupCard {
                     ToggleRow("Set SteamGrid API Key? (Cover Art)", model.customApiKeyEnabled) { callbacks.onBooleanChanged("enable_custom_api_key", it) }
-                }
-            }
-            if (model.customApiKeyEnabled) {
-                item("api-key") { EditableValueCard("SteamGridDB API Key", model.customApiKey, callbacks::onCustomApiKeyChanged) }
-            }
-            item("auto-download-artwork") {
-                GroupCard {
+                    if (model.customApiKeyEnabled) {
+                        GroupDivider()
+                        EditableInlineValue("SteamGridDB API Key", model.customApiKey, callbacks::onCustomApiKeyChanged)
+                    }
+                    GroupDivider()
                     ToggleRow("Auto-download artwork from the internet", model.autoDownloadArtwork) { callbacks.onBooleanChanged("auto_download_artwork", it) }
-                }
-            }
-            item("animated-artwork") {
-                GroupCard {
+                    GroupDivider()
                     ToggleRow("Animated artwork", model.animatedArtwork) { callbacks.onBooleanChanged("animated_artwork", it) }
                 }
             }

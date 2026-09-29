@@ -6,6 +6,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -62,6 +63,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.coerceIn
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.MainActivity
 import com.winlator.cmod.ui.KeepLandscapeChromeHidden
@@ -134,7 +136,10 @@ private fun LandscapeDetail(title: String, subtitle: String, artwork: Bitmap?, c
         )
 
         // Everything interactive stays clear of a display cutout on the left / right edge.
-        Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal))) {
+        BoxWithConstraints(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal))) {
+            // ~42% of the width: 300dp on a small landscape phone, up to 380dp on a wide one.
+            val panelWidth = (maxWidth * 0.42f).coerceIn(300.dp, 380.dp)
+            val compactCaptions = panelWidth < 340.dp
             if (artwork != null && coverIsUser && !usesAsBackground(artwork, coverOnly, coverIsUser)) {
                 DetailPoster(artwork, Modifier.align(Alignment.BottomStart))
             }
@@ -149,7 +154,7 @@ private fun LandscapeDetail(title: String, subtitle: String, artwork: Bitmap?, c
                 Text(
                     title,
                     color = Color.White,
-                    style = MaterialTheme.typography.headlineSmall.copy(
+                    style = MaterialTheme.typography.headlineLarge.copy(
                         shadow = Shadow(Color.Black.copy(.6f), Offset(0f, 2f), 6f)
                     ),
                     fontWeight = FontWeight.Bold,
@@ -159,7 +164,7 @@ private fun LandscapeDetail(title: String, subtitle: String, artwork: Bitmap?, c
                 Text(
                     subtitle,
                     color = Color.White.copy(.78f),
-                    style = MaterialTheme.typography.bodyMedium.copy(
+                    style = MaterialTheme.typography.bodyLarge.copy(
                         shadow = Shadow(Color.Black.copy(.6f), Offset(0f, 1f), 4f)
                     )
                 )
@@ -168,27 +173,27 @@ private fun LandscapeDetail(title: String, subtitle: String, artwork: Bitmap?, c
             FavoriteButton(favorite, toggleFavorite, Modifier.align(Alignment.TopEnd).padding(end = 18.dp, top = 16.dp))
 
             Surface(
-                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 34.dp, bottom = 24.dp).width(304.dp),
+                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 34.dp, bottom = 24.dp).width(panelWidth),
                 shape = WinZShapes.Large,
                 color = Color.Black.copy(.42f),
                 border = BorderStroke(1.dp, Color.White.copy(.16f))
             ) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Button(
                         onClick = callbacks::onPlay,
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        modifier = Modifier.fillMaxWidth().height(58.dp),
                         shape = WinZShapes.Medium,
                         colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
                     ) {
-                        Icon(Icons.Outlined.PlayArrow, null)
+                        Icon(Icons.Outlined.PlayArrow, null, modifier = Modifier.size(30.dp))
                         Spacer(Modifier.size(8.dp))
-                        Text("Play", fontWeight = FontWeight.Bold)
+                        Text("Play", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        DetailIconAction(Icons.Outlined.Settings, "Configure", Modifier.weight(1f), callbacks::onConfigure)
-                        DetailIconAction(Icons.Outlined.Dns, "Container", Modifier.weight(1f), callbacks::onArguments)
-                        DetailIconAction(Icons.Outlined.Folder, "Folder", Modifier.weight(1f), callbacks::onGameFolder)
-                        DetailIconAction(Icons.Outlined.DeleteOutline, "Remove", Modifier.weight(1f), callbacks::onRemove, destructive = true)
+                        DetailIconAction(Icons.Outlined.Settings, "Configure", Modifier.weight(1f), compactCaptions, callbacks::onConfigure)
+                        DetailIconAction(Icons.Outlined.Dns, "Container", Modifier.weight(1f), compactCaptions, callbacks::onArguments)
+                        DetailIconAction(Icons.Outlined.Folder, "Folder", Modifier.weight(1f), compactCaptions, callbacks::onGameFolder)
+                        DetailIconAction(Icons.Outlined.DeleteOutline, "Remove", Modifier.weight(1f), compactCaptions, callbacks::onRemove, destructive = true)
                     }
                 }
             }
@@ -224,12 +229,12 @@ private fun FavoriteButton(favorite: Boolean, onToggle: () -> Unit, modifier: Mo
     }
 }
 
-// Compact square button for the landscape panel: icon over a short caption, light on the dark panel.
+// Square button for the landscape panel: icon over a short caption, light on the dark panel.
 @Composable
-private fun DetailIconAction(icon: ImageVector, label: String, modifier: Modifier, onClick: () -> Unit, destructive: Boolean = false) {
+private fun DetailIconAction(icon: ImageVector, label: String, modifier: Modifier, compactCaption: Boolean, onClick: () -> Unit, destructive: Boolean = false) {
     Surface(
         onClick = onClick,
-        modifier = modifier.height(56.dp),
+        modifier = modifier.height(70.dp),
         shape = WinZShapes.Medium,
         color = Color.White.copy(alpha = 0.10f),
         contentColor = if (destructive) destructiveColor() else Color.White,
@@ -240,9 +245,15 @@ private fun DetailIconAction(icon: ImageVector, label: String, modifier: Modifie
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Icon(icon, contentDescription = label, modifier = Modifier.size(22.dp))
-            Spacer(Modifier.height(2.dp))
-            Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+            Icon(icon, contentDescription = label, modifier = Modifier.size(28.dp))
+            Spacer(Modifier.height(4.dp))
+            // A narrow panel (small landscape phone) falls back to the smaller caption so "Configure" fits.
+            Text(
+                label,
+                style = if (compactCaption) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
+                maxLines = 1,
+                softWrap = false
+            )
         }
     }
 }
@@ -256,7 +267,7 @@ private fun DetailPoster(artwork: Bitmap, modifier: Modifier) {
         artwork.asImageBitmap(),
         null,
         modifier
-            .padding(start = 34.dp, top = 104.dp, bottom = 24.dp)
+            .padding(start = 34.dp, top = 132.dp, bottom = 24.dp)
             .fillMaxHeight()
             .aspectRatio(ratio)
             .kenBurns(amplitude = 0.04f, periodMs = 18_000, pan = 0f, phase = 0.5f)
