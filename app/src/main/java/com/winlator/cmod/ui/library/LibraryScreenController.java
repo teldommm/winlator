@@ -589,12 +589,18 @@ public class LibraryScreenController {
                     ArtworkRepository.userBannerFile(baseName), ArtworkRepository.bannerMaxLongSide());
             boolean icon = asIcon && ArtworkRepository.importFromUri(activity, uri,
                     ArtworkRepository.userIconFile(baseName), ArtworkRepository.iconMaxLongSide());
+            final Bitmap pickedIcon = icon
+                    ? BitmapFactory.decodeFile(ArtworkRepository.userIconFile(baseName).getPath()) : null;
             postToUi(() -> {
                 if (!cover && !background && !icon) {
                     toast("Could not save that image");
                     return;
                 }
                 if (icon) {
+                    if (pickedIcon != null) {
+                        shortcut.icon = pickedIcon;
+                        refreshPinnedShortcutIcon(shortcut, pickedIcon);
+                    }
                     // The placeholder cover is drawn from the icon, so it is rebuilt too.
                     loadShortcutsList();
                     regenerateOfflineCover(shortcut);
@@ -815,17 +821,33 @@ public class LibraryScreenController {
                 bmp = imgFile.exists() ? BitmapFactory.decodeFile(imgFile.getPath()) : shortcut.icon;
             }
             if (bmp == null) bmp = BitmapFactory.decodeResource(activity.getResources(), R.drawable.icon_wine);
-            int maxSide = Math.max(shortcutManager.getIconMaxWidth(), shortcutManager.getIconMaxHeight());
-            int longSide = Math.max(bmp.getWidth(), bmp.getHeight());
-            if (maxSide > 0 && longSide > maxSide) {
-                float scale = (float) maxSide / longSide;
-                bmp = Bitmap.createScaledBitmap(bmp, Math.max(1, Math.round(bmp.getWidth() * scale)),
-                        Math.max(1, Math.round(bmp.getHeight() * scale)), true);
-            }
+            bmp = fitShortcutIcon(shortcutManager, bmp);
             
             shortcutManager.requestPinShortcut(buildScreenShortCut(shortcut.name, shortcut.name, shortcut.container.id,
                     shortcut.file.getPath(), Icon.createWithBitmap(bmp), shortcut.getExtra("uuid")), null);
         }
+    }
+
+    private static Bitmap fitShortcutIcon(ShortcutManager shortcutManager, Bitmap bmp) {
+        int maxSide = Math.max(shortcutManager.getIconMaxWidth(), shortcutManager.getIconMaxHeight());
+        int longSide = Math.max(bmp.getWidth(), bmp.getHeight());
+        if (maxSide > 0 && longSide > maxSide) {
+            float scale = (float) maxSide / longSide;
+            return Bitmap.createScaledBitmap(bmp, Math.max(1, Math.round(bmp.getWidth() * scale)),
+                    Math.max(1, Math.round(bmp.getHeight() * scale)), true);
+        }
+        return bmp;
+    }
+
+    // A shortcut already pinned to the home screen keeps the icon it was created with, so it is
+    // refreshed when the user picks a new icon (nothing happens if it was never pinned).
+    private void refreshPinnedShortcutIcon(Shortcut shortcut, Bitmap bmp) {
+        String uuid = shortcut.getExtra("uuid");
+        if (uuid.isEmpty()) return;
+        ShortcutManager shortcutManager = getSystemService(activity, ShortcutManager.class);
+        if (shortcutManager == null) return;
+        updateShortcutOnScreen(shortcut.name, shortcut.name, shortcut.container.id,
+                shortcut.file.getPath(), Icon.createWithBitmap(fitShortcutIcon(shortcutManager, bmp)), uuid);
     }
 
     public static void disableShortcutOnScreen(Context context, Shortcut shortcut) {

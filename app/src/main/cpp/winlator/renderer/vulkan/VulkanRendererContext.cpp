@@ -1679,7 +1679,7 @@ void VulkanRendererContext::collectWindowNodes(int64_t id, int absX, int absY,
     auto it = windowTree.find(id);
     if (it == windowTree.end()) return;
     WinNode& node = it->second;
-    if (!node.mapped) return;
+    if (!node.mapped || node.width <= 1 || node.height <= 1) return;
 
     int myAbsX = absX, myAbsY = absY;
     if (id != rootWindowId) {

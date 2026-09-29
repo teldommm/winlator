@@ -116,6 +116,11 @@ public abstract class DrawRequests {
             throw new IllegalStateException("dstDrawable has null data!");
         }
 
+        if (srcDrawable.isOffscreen() && client.xServer.getXServerView() != null
+                && client.xServer.getXServerView().nativeCompositeRedirect(srcDrawableId, dstDrawableId, dstX, dstY)) {
+            return;
+        }
+
 
         GraphicsContext graphicsContext =  client.xServer.graphicsContextManager.getGraphicsContext(gcId);
         if (graphicsContext == null) throw new BadGraphicsContext(gcId);

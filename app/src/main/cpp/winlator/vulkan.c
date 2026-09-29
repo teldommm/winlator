@@ -153,6 +153,32 @@ static int fill_library_name(JNIEnv *env, jobject context, const char *driver_na
 
 // ---------- Loader ----------
 
+// Some vendor Vulkan ICDs (seen on HyperOS 3) depend on libjpeg/libcrypto that the app's linker
+// namespace doesn't resolve on its own. Preloading them RTLD_GLOBAL first lets the custom
+// driver load. Best effort: the first candidate that opens wins, failures are ignored.
+static void preload_first_existing(const char **candidates) {
+    for (int i = 0; candidates[i]; i++) {
+        if (dlopen(candidates[i], RTLD_GLOBAL | RTLD_NOW))
+            return;
+    }
+}
+
+static void preload_vendor_icd_deps(void) {
+    const char *jpeg_candidates[] = {
+        "/system/lib64/libjpeg.so",
+        "/system_ext/lib64/libjpeg.so",
+        "libjpeg.so",
+        NULL,
+    };
+    preload_first_existing(jpeg_candidates);
+
+    const char *crypto_candidates[] = {
+        "libcrypto.so",
+        NULL,
+    };
+    preload_first_existing(crypto_candidates);
+}
+
 // "System" / no driver → the platform loader. A custom driver is used only if everything it
 // needs resolves; otherwise the query fails (the caller reports "Unknown") rather than silently
 // answering for a different driver.
@@ -164,6 +190,7 @@ static void *open_vulkan(JNIEnv *env, jobject context, const char *driver_name) 
         LOGE("custom driver '%s' requested without a context", driver_name);
         return NULL;
     }
+    preload_vendor_icd_deps();
     if (!fill_driver_path(env, context, driver_name) || access(s_driver_path, F_OK) != 0) {
         LOGE("driver '%s' is not installed", driver_name);
         return NULL;

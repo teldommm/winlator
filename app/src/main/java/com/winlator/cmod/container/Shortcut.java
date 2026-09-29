@@ -96,6 +96,14 @@ public class Shortcut {
                     iconFile = customIcon;
                 }
             }
+
+            // The icon the user picked themselves (NAME.user.png) is the one shown; iconFile keeps
+            // pointing at the extracted icon, which is what gets copied along with the shortcut.
+            File userIcon = new File(customIconsDir, baseName + ".user.png");
+            if (userIcon.isFile() && userIcon.length() > 0) {
+                Bitmap userBitmap = BitmapFactory.decodeFile(userIcon.getAbsolutePath());
+                if (userBitmap != null) icon = userBitmap;
+            }
         } catch (Exception e) {}
 
         this.name = FileUtils.getBasename(file.getPath());

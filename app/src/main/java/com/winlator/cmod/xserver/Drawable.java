@@ -25,6 +25,7 @@ public class Drawable extends XResource {
     private boolean directScanout;
     private Runnable onDrawListener;
     private Callback<Drawable> onDestroyListener;
+    private boolean offscreen = false;
     public final Object renderLock = new Object();
 
     static {
@@ -202,6 +203,14 @@ public class Drawable extends XResource {
     
     public void updateDirect() {
         if (onDrawListener != null) onDrawListener.run();
+    }
+
+    public void setOffscreen(boolean offscreen) {
+        this.offscreen = offscreen;
+    }
+
+    public boolean isOffscreen() {
+        return this.offscreen;
     }
     
 

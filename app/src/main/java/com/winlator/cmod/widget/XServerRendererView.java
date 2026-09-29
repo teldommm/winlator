@@ -34,6 +34,9 @@ public abstract class XServerRendererView extends SurfaceView {
 
     public abstract void addDirectContent(int windowId, Drawable drawable, GPUImage gpuImage);
     public abstract void nativeRemoveDirectContent(int windowId, int pixmapId);
+    public abstract void nativeSetCompositeRedirected(int windowId, boolean redirected);
+    // Returns true if the copy was handled by moving windows; false means the caller must do a real pixel copy.
+    public abstract boolean nativeCompositeRedirect(int srcDrawableId, int dstDrawableId, short dstX, short dstY);
 
     public abstract void onUpdateWindowContentDirect(Window window, Drawable drawable);
     public abstract void onUpdateWindowContentDirect(Window window, Drawable drawable, short xOff, short yOff);

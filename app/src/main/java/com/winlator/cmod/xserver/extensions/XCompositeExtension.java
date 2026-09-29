@@ -119,6 +119,7 @@ public class XCompositeExtension implements Extension, XResourceManager.OnResour
         }
 
         redirects.add(new Redirect(client, window, updateType));
+        setRedirectState(window, true);
     }
 
     private void unredirectWindow(XClient client, XInputStream inputStream)
@@ -139,6 +140,7 @@ public class XCompositeExtension implements Extension, XResourceManager.OnResour
                         && redirect.window == window
                         && redirect.updateType == updateType);
         if (!removed) throw new BadValue(windowId);
+        if (!hasRedirect(window)) setRedirectState(window, false);
     }
 
     @Override
@@ -160,8 +162,33 @@ public class XCompositeExtension implements Extension, XResourceManager.OnResour
         }
     }
 
+    private boolean hasRedirect(Window window) {
+        for (Redirect redirect : redirects) {
+            if (redirect.window == window) return true;
+        }
+        return false;
+    }
+
+    private void setRedirectState(Window window, boolean redirected) {
+        window.setCompositeRedirected(redirected);
+        if (window.getContent() != null) window.getContent().setOffscreen(redirected);
+        if (xServer.getXServerView() != null) {
+            xServer.getXServerView().nativeSetCompositeRedirected(window.id, redirected);
+        }
+    }
+
     public void freeClientResources(XClient client) {
+        List<Window> affectedWindows = new java.util.ArrayList<>();
+        for (Redirect redirect : redirects) {
+            if (redirect.client == client && !affectedWindows.contains(redirect.window)) {
+                affectedWindows.add(redirect.window);
+            }
+        }
+
         redirects.removeIf(redirect -> redirect.client == client);
+        for (Window window : affectedWindows) {
+            if (!hasRedirect(window)) setRedirectState(window, false);
+        }
     }
 
     @Override

@@ -30,6 +30,8 @@ import com.winlator.cmod.xserver.XServer;
 
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -43,6 +45,7 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
     private long nativeHandle = 0;
     private final Object lock = new Object();
     private final ExecutorService eventExecutor = Executors.newSingleThreadExecutor();
+    private final Set<Integer> compositeRedirectedWindows = ConcurrentHashMap.newKeySet();
 
     private boolean fullscreen = false;
     private float magnifierZoom = 1.0f;
@@ -277,6 +280,7 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
             catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
             initExecutor = null;
         }
+        compositeRedirectedWindows.clear();
         synchronized (lock) {
             if (nativeHandle != 0) {
                 nativeDestroy(nativeHandle);
@@ -389,6 +393,7 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
     @Override
     public void onDestroyWindow(Window window) {
         final long id = window.id;
+        compositeRedirectedWindows.remove(window.id);
         queueEvent(() -> {
             synchronized (lock) {
                 if (nativeHandle != 0) nativeDestroyWindow(nativeHandle, id);
@@ -418,12 +423,17 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
     }
 
     @Override
-    public void onReparentWindow(Window window, Window newParent) {
+    public void onReparentWindow(Window window, Window newParent, short x, short y) {
         final long id = window.id;
         final long newParentId = newParent != null ? newParent.id : 0;
+        final long contentId = did(window.getContent());
+        final int w = window.getWidth(), h = window.getHeight();
         queueEvent(() -> {
             synchronized (lock) {
-                if (nativeHandle != 0) nativeReparentWindow(nativeHandle, id, newParentId);
+                if (nativeHandle != 0) {
+                    nativeReparentWindow(nativeHandle, id, newParentId);
+                    nativeUpdateWindowGeometry(nativeHandle, id, contentId, x, y, w, h);
+                }
             }
         });
     }
@@ -514,6 +524,68 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
                 if (nativeHandle != 0) nativeRemoveWindow(nativeHandle, contentId);
             }
         });
+    }
+
+    @Override
+    public void nativeSetCompositeRedirected(int windowId, boolean redirected) {
+        if (xServer.windowManager.getWindow(windowId) == null) return;
+        if (redirected) compositeRedirectedWindows.add(windowId);
+        else compositeRedirectedWindows.remove(windowId);
+    }
+
+    private static boolean hasAncestor(Window window, Window ancestor) {
+        Window current = window;
+        while (current != null) {
+            if (current == ancestor) return true;
+            current = current.getParent();
+        }
+        return false;
+    }
+
+    private static Window getWindowSibling(Window window, Window other) {
+        Window current = window;
+        while (current != null) {
+            if (current.getParent() == other.getParent()) return current;
+            current = current.getParent();
+        }
+        return null;
+    }
+
+    @Override
+    public boolean nativeCompositeRedirect(int srcDrawableId, int dstDrawableId, short dstX, short dstY) {
+        Window srcWindow = xServer.windowManager.getWindow(srcDrawableId);
+        Window dstWindow = xServer.windowManager.getWindow(dstDrawableId);
+        // Pixmap destination or copy within the same window: needs a real pixel copy.
+        if (srcWindow == null || dstWindow == null || srcWindow == dstWindow) return false;
+        if (!hasAncestor(srcWindow, dstWindow)) {
+            Window sibling = getWindowSibling(srcWindow, dstWindow);
+            if (sibling == null) return false;
+
+            Window parent = sibling.getParent();
+            if (parent == null || parent != dstWindow.getParent()) return false;
+
+            int posX = dstWindow.getX() + dstX;
+            int posY = dstWindow.getY() + dstY;
+            boolean positionChanged = sibling.getX() != posX || sibling.getY() != posY;
+
+            if (positionChanged) {
+                sibling.setX((short)posX);
+                sibling.setY((short)posY);
+                onUpdateWindowGeometry(sibling, false);
+            }
+
+            List<Window> children = parent.getChildren();
+            int siblingIndex = children.indexOf(sibling);
+            int dstIndex = children.indexOf(dstWindow);
+            if (siblingIndex < 0 || dstIndex < 0) return false;
+
+            if (siblingIndex <= dstIndex) {
+                parent.moveChildAbove(sibling, dstWindow);
+                onChangeWindowZOrder(Window.StackMode.ABOVE, sibling, dstWindow);
+            }
+        }
+
+        return true;
     }
 
     @Override
