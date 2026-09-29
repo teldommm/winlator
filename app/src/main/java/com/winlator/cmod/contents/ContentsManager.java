@@ -44,6 +44,12 @@ public class ContentsManager {
 
     private SharedPreferences preferences;
 
+    // The catalog (contents.json) and the package's own profile.json are written independently, so
+    // the name / code the catalog lists a package under is often not what the installed package
+    // calls itself (catalog "DXVK 1.7.2, code 1" vs profile.json "1.7.2, code 0"). This remembers
+    // which installed package a catalog entry turned into, so the two stay one row in the list.
+    private static final String REMOTE_INSTALL_PREFIX = "remote_install|";
+
     public enum InstallFailedReason {
         ERROR_NOSPACE,
         ERROR_BADTAR,
@@ -82,6 +88,32 @@ public class ContentsManager {
     public ContentsManager(Context context) {
         this.context = context;
         this.preferences = context.getSharedPreferences("contents_manager_prefs", Context.MODE_PRIVATE);
+    }
+
+    private static String remoteInstallKey(ContentProfile remote) {
+        return REMOTE_INSTALL_PREFIX + remote.type + "|" + remote.verName + "|" + remote.verCode;
+    }
+
+    /** Records that the catalog entry {@code remote} was installed as {@code installed}. */
+    public void rememberRemoteInstall(ContentProfile remote, ContentProfile installed) {
+        if (remote == null || installed == null || remote.type == null || installed.type == null) return;
+        preferences.edit().putString(remoteInstallKey(remote), getEntryName(installed)).apply();
+    }
+
+    /** Entry name (see {@link #getEntryName}) the catalog entry was installed as, or null. */
+    public String getRememberedInstall(ContentProfile remote) {
+        if (remote == null || remote.type == null) return null;
+        return preferences.getString(remoteInstallKey(remote), null);
+    }
+
+    private void forgetRemoteInstalls(String entryName) {
+        SharedPreferences.Editor editor = null;
+        for (Map.Entry<String, ?> stored : preferences.getAll().entrySet()) {
+            if (!stored.getKey().startsWith(REMOTE_INSTALL_PREFIX) || !entryName.equals(stored.getValue())) continue;
+            if (editor == null) editor = preferences.edit();
+            editor.remove(stored.getKey());
+        }
+        if (editor != null) editor.apply();
     }
 
     public void setGraphicsDriverInstalled(String driverVersion, boolean installed) {
@@ -407,6 +439,7 @@ public class ContentsManager {
 
     public void removeContent(ContentProfile profile) {
         if (profilesMap.get(profile.type).contains(profile)) {
+            forgetRemoteInstalls(getEntryName(profile));
             FileUtils.delete(getInstallDir(context, profile));
             profilesMap.get(profile.type).remove(profile);
             syncContents();

@@ -26,6 +26,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -51,6 +53,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,6 +61,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.contentdialog.DriverRepo
@@ -69,10 +73,14 @@ import com.winlator.cmod.ui.theme.controlAccentColor
 import com.winlator.cmod.ui.theme.dividerColor
 import com.winlator.cmod.ui.theme.hairlineColor
 
-// "Winlator servers" (the button in the component manager): one window for every remote address the app uses (component catalog,
-// driver repositories, input-controls profiles, artwork). Same hosting technique
-// as PresetEditorComposeDialog: a ComposeView added onto the activity's content root, so it shares
+// "Winlator servers" (the button in the component manager): one window for the remote addresses of
+// components, drivers and input controls (component catalog, driver repositories, input-controls
+// profiles). The artwork ones live in Settings, COVER ART, next to the key they are used with.
+// Same hosting technique as PresetEditorComposeDialog: a ComposeView added onto the activity's content root, so it shares
 // the themed dialog shell and scrim of every other dialog in the app.
+//
+// Adding a driver repository is a second, small window (AddRepoOverlay) opened from the list, so the
+// main window only ever shows the repositories that are there, not an input form.
 //
 // Edits are a draft until Save; the values are stored through RemoteSources (blank / default means
 // "no override"), so the rest of the app reads them from there and needs no other plumbing.
@@ -103,6 +111,8 @@ object WinlatorServicesDialog {
                         }
                     }
                     val dismiss: () -> Unit = { visibleState.targetState = false }
+                    val repos = remember { mutableStateListOf<DriverRepo>().apply { addAll(RemoteSources.driverRepos(activity)) } }
+                    var addRepoOpen by remember { mutableStateOf(false) }
                     AnimatedVisibility(
                         visibleState = visibleState,
                         enter = fadeIn(tween(180)),
@@ -126,11 +136,30 @@ object WinlatorServicesDialog {
                                         .heightIn(max = 620.dp)
                                         .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { }
                                 ) {
-                                    ServicesScreen(context = activity, onCancel = dismiss, onSaved = {
-                                        onSaved?.run()
-                                        dismiss()
-                                    })
+                                    ServicesScreen(
+                                        context = activity,
+                                        repos = repos,
+                                        onAddRepo = { addRepoOpen = true },
+                                        onCancel = dismiss,
+                                        onSaved = {
+                                            onSaved?.run()
+                                            dismiss()
+                                        }
+                                    )
                                 }
+                            }
+                            if (addRepoOpen) {
+                                AddRepoOverlay(
+                                    existing = repos,
+                                    onDismiss = { addRepoOpen = false },
+                                    onAdd = { name, input ->
+                                        val api = RemoteSources.normalizeDriverRepoUrl(input)
+                                        if (api.isNotEmpty() && repos.none { it.apiUrl == api }) {
+                                            repos.add(DriverRepo(name.trim().ifEmpty { RemoteSources.suggestRepoName(api) }, api))
+                                        }
+                                        addRepoOpen = false
+                                    }
+                                )
                             }
                         }
                     }
@@ -142,32 +171,19 @@ object WinlatorServicesDialog {
 }
 
 @Composable
-private fun ColumnScope.ServicesScreen(context: Context, onCancel: () -> Unit, onSaved: () -> Unit) {
+private fun ColumnScope.ServicesScreen(
+    context: Context,
+    repos: SnapshotStateList<DriverRepo>,
+    onAddRepo: () -> Unit,
+    onCancel: () -> Unit,
+    onSaved: () -> Unit
+) {
     var contentsUrl by remember { mutableStateOf(RemoteSources.contentsUrl(context)) }
     var inputControls by remember { mutableStateOf(RemoteSources.get(context, RemoteSources.KEY_INPUT_CONTROLS, RemoteSources.DEFAULT_INPUT_CONTROLS)) }
-    var steamGrid by remember { mutableStateOf(RemoteSources.get(context, RemoteSources.KEY_STEAMGRID, RemoteSources.DEFAULT_STEAMGRID)) }
-    var gamesSearch by remember { mutableStateOf(RemoteSources.get(context, RemoteSources.KEY_GAMESDB_SEARCH, RemoteSources.DEFAULT_GAMESDB_SEARCH)) }
-    var gamesCdn by remember { mutableStateOf(RemoteSources.get(context, RemoteSources.KEY_GAMESDB_CDN, RemoteSources.DEFAULT_GAMESDB_CDN)) }
-    val repos = remember { mutableStateListOf<DriverRepo>().apply { addAll(RemoteSources.driverRepos(context)) } }
-    var newRepoName by remember { mutableStateOf("") }
-    var newRepoUrl by remember { mutableStateOf("") }
-
-    val gamesSearchInvalid = !gamesSearch.contains(RemoteSources.QUERY_PLACEHOLDER)
-
-    fun addPendingRepo() {
-        val api = RemoteSources.normalizeDriverRepoUrl(newRepoUrl)
-        if (api.isEmpty()) return
-        if (repos.none { it.apiUrl == api }) {
-            val name = newRepoName.trim().ifEmpty { RemoteSources.suggestRepoName(api) }
-            repos.add(DriverRepo(name, api))
-        }
-        newRepoName = ""
-        newRepoUrl = ""
-    }
 
     Text("Winlator servers", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
     Text(
-        "Choose where the app downloads components, drivers, controls and artwork from",
+        "Choose where the app downloads components, drivers and controls from",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(top = 2.dp)
@@ -192,7 +208,8 @@ private fun ColumnScope.ServicesScreen(context: Context, onCancel: () -> Unit, o
                     "Driver repositories",
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 TextButton(onClick = {
                     repos.clear()
@@ -213,23 +230,8 @@ private fun ColumnScope.ServicesScreen(context: Context, onCancel: () -> Unit, o
             repos.toList().forEachIndexed { index, repo ->
                 RepoRow(repo) { repos.removeAt(index) }
             }
-            OutlinedTextField(
-                value = newRepoName,
-                onValueChange = { newRepoName = it },
-                singleLine = true,
-                label = { Text("Name (optional)") },
-                modifier = Modifier.fillMaxWidth()
-            )
-            OutlinedTextField(
-                value = newRepoUrl,
-                onValueChange = { newRepoUrl = it },
-                singleLine = true,
-                label = { Text("owner/repo or GitHub releases API URL") },
-                modifier = Modifier.fillMaxWidth()
-            )
             OutlinedButton(
-                onClick = { addPendingRepo() },
-                enabled = newRepoUrl.isNotBlank(),
+                onClick = onAddRepo,
                 modifier = Modifier.align(Alignment.End),
                 colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
                 border = BorderStroke(1.dp, hairlineColor())
@@ -242,40 +244,11 @@ private fun ColumnScope.ServicesScreen(context: Context, onCancel: () -> Unit, o
             HorizontalDivider(color = dividerColor())
             GroupLabel("Input controls")
             ServiceField("Profiles folder URL", inputControls, RemoteSources.DEFAULT_INPUT_CONTROLS) { inputControls = it }
-
-            HorizontalDivider(color = dividerColor())
-            GroupLabel("Artwork")
-            ServiceField("SteamGridDB API URL", steamGrid, RemoteSources.DEFAULT_STEAMGRID) { steamGrid = it }
-            ServiceField(
-                label = "TheGamesDB search URL",
-                value = gamesSearch,
-                default = RemoteSources.DEFAULT_GAMESDB_SEARCH,
-                error = if (gamesSearchInvalid) "Must contain ${RemoteSources.QUERY_PLACEHOLDER}" else null
-            ) { gamesSearch = it }
-            ServiceField("TheGamesDB images URL", gamesCdn, RemoteSources.DEFAULT_GAMESDB_CDN) { gamesCdn = it }
         }
     }
 
-    TextButton(
-        onClick = {
-            contentsUrl = RemoteSources.DEFAULT_CONTENTS_URL
-            inputControls = RemoteSources.DEFAULT_INPUT_CONTROLS
-            steamGrid = RemoteSources.DEFAULT_STEAMGRID
-            gamesSearch = RemoteSources.DEFAULT_GAMESDB_SEARCH
-            gamesCdn = RemoteSources.DEFAULT_GAMESDB_CDN
-            repos.clear()
-            repos.addAll(RemoteSources.defaultDriverRepos())
-            newRepoName = ""
-            newRepoUrl = ""
-        },
-        modifier = Modifier.align(Alignment.End).padding(top = 6.dp)
-    ) {
-        Icon(Icons.Outlined.Refresh, null, modifier = Modifier.size(16.dp))
-        Spacer(Modifier.width(6.dp))
-        Text("Restore defaults")
-    }
     Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         OutlinedButton(
@@ -286,20 +259,94 @@ private fun ColumnScope.ServicesScreen(context: Context, onCancel: () -> Unit, o
         ) { Text("Cancel") }
         Button(
             onClick = {
-                if (newRepoUrl.isNotBlank()) addPendingRepo()
                 RemoteSources.set(context, RemoteSources.KEY_CONTENTS_URL, contentsUrl, RemoteSources.DEFAULT_CONTENTS_URL)
                 RemoteSources.set(context, RemoteSources.KEY_INPUT_CONTROLS, inputControls, RemoteSources.DEFAULT_INPUT_CONTROLS)
-                RemoteSources.set(context, RemoteSources.KEY_STEAMGRID, steamGrid, RemoteSources.DEFAULT_STEAMGRID)
-                RemoteSources.set(context, RemoteSources.KEY_GAMESDB_SEARCH, gamesSearch, RemoteSources.DEFAULT_GAMESDB_SEARCH)
-                RemoteSources.set(context, RemoteSources.KEY_GAMESDB_CDN, gamesCdn, RemoteSources.DEFAULT_GAMESDB_CDN)
                 RemoteSources.saveDriverRepos(context, repos.toList())
                 RemoteSources.dropLegacyKeys(context)
                 onSaved()
             },
-            enabled = !gamesSearchInvalid,
             modifier = Modifier.weight(1f),
             colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
         ) { Text("Save") }
+    }
+}
+
+// The "add a driver repository" window: name (optional) and address. Drawn over the servers window
+// with its own scrim; tapping outside or Cancel closes it without adding anything.
+@Composable
+private fun AddRepoOverlay(
+    existing: List<DriverRepo>,
+    onDismiss: () -> Unit,
+    onAdd: (name: String, input: String) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var input by remember { mutableStateOf("") }
+    val api = RemoteSources.normalizeDriverRepoUrl(input)
+    val duplicate = api.isNotEmpty() && existing.any { it.apiUrl == api }
+    val canAdd = api.isNotEmpty() && !duplicate
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.5f))
+            .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { onDismiss() },
+        contentAlignment = Alignment.Center
+    ) {
+        ThemedDialogSurface(
+            modifier = Modifier
+                .heightIn(max = 620.dp)
+                .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { }
+        ) {
+            Text("Add repository", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Text(
+                "A GitHub repository that publishes AdrenoTools drivers in its releases",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+            Column(
+                modifier = Modifier.padding(top = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedTextField(
+                    value = input,
+                    onValueChange = { input = it },
+                    singleLine = true,
+                    isError = duplicate,
+                    label = { Text("owner/repo or GitHub releases API URL") },
+                    supportingText = if (duplicate) ({ Text("Already in the list") }) else null,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    singleLine = true,
+                    label = { Text("Name (optional)") },
+                    placeholder = if (api.isNotEmpty()) ({ Text(RemoteSources.suggestRepoName(api)) }) else null,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { if (canAdd) onAdd(name, input) }),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
+                    border = BorderStroke(1.dp, hairlineColor())
+                ) { Text("Cancel") }
+                Button(
+                    onClick = { onAdd(name, input) },
+                    enabled = canAdd,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
+                ) { Text("Add") }
+            }
+        }
     }
 }
 

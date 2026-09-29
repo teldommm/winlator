@@ -31,9 +31,11 @@ import com.winlator.cmod.core.AppDefaults
 import com.winlator.cmod.core.FileUtils
 import com.winlator.cmod.core.LosslessDll
 import com.winlator.cmod.core.PreloaderDialog
+import com.winlator.cmod.core.RemoteSources
 import com.winlator.cmod.fexcore.FEXCoreEditPresetDialog
 import com.winlator.cmod.fexcore.FEXCorePreset
 import com.winlator.cmod.fexcore.FEXCorePresetManager
+import com.winlator.cmod.steamgrid.ArtworkRepository
 import com.winlator.cmod.midi.MidiManager
 import com.winlator.cmod.ui.ThemedAlertHost
 import com.winlator.cmod.ui.theme.findActivity
@@ -171,8 +173,13 @@ internal class SettingsScreenState(
             preferences.getString("wine_debug_channels", AppDefaults.DEFAULT_WINE_DEBUG_CHANNELS)
                 ?: AppDefaults.DEFAULT_WINE_DEBUG_CHANNELS,
             preferences.getBoolean("enable_box64_logs", false),
-            preferences.getBoolean("enable_custom_api_key", false),
-            preferences.getString("custom_api_key", "") ?: "",
+            // On when the person turned it on, or when an override is already stored (an address set
+            // before these settings moved here must not sit hidden behind an "off" switch).
+            preferences.getBoolean("enable_custom_api_key", false) || RemoteSources.hasArtworkOverrides(activity),
+            RemoteSources.steamGridApiKey(activity),
+            RemoteSources.get(activity, RemoteSources.KEY_STEAMGRID, RemoteSources.DEFAULT_STEAMGRID),
+            RemoteSources.get(activity, RemoteSources.KEY_GAMESDB_SEARCH, RemoteSources.DEFAULT_GAMESDB_SEARCH),
+            RemoteSources.get(activity, RemoteSources.KEY_GAMESDB_CDN, RemoteSources.DEFAULT_GAMESDB_CDN),
             wineDebugOptions
         )
     }
@@ -309,8 +316,12 @@ internal class SettingsScreenState(
 
     override fun onBooleanChanged(key: String, value: Boolean) {
         val editor = preferences.edit().putBoolean(key, value)
-        if ("enable_custom_api_key" == key && !value) editor.remove("custom_api_key")
         editor.apply()
+        if ("enable_custom_api_key" == key && !value) {
+            // Off means the defaults: the key and every artwork address go back to them.
+            RemoteSources.resetArtwork(activity)
+            ArtworkRepository.clearBlock()
+        }
         if ("enable_file_provider" == key) {
             Toast.makeText(activity, "This option will take effect at the next startup.", Toast.LENGTH_SHORT).show()
         }
@@ -323,8 +334,14 @@ internal class SettingsScreenState(
         rebuild()
     }
 
-    override fun onCustomApiKeyChanged(value: String) {
-        preferences.edit().putString("custom_api_key", value.trim()).apply()
+    override fun onArtworkSourcesSaved(steamGridApiKey: String, steamGridUrl: String, gamesDbSearchUrl: String, gamesDbCdnUrl: String) {
+        RemoteSources.set(activity, RemoteSources.KEY_STEAMGRID_API_KEY, steamGridApiKey, RemoteSources.DEFAULT_STEAMGRID_API_KEY)
+        RemoteSources.set(activity, RemoteSources.KEY_STEAMGRID, steamGridUrl, RemoteSources.DEFAULT_STEAMGRID)
+        RemoteSources.set(activity, RemoteSources.KEY_GAMESDB_SEARCH, gamesDbSearchUrl, RemoteSources.DEFAULT_GAMESDB_SEARCH)
+        RemoteSources.set(activity, RemoteSources.KEY_GAMESDB_CDN, gamesDbCdnUrl, RemoteSources.DEFAULT_GAMESDB_CDN)
+        // A key that was rejected (or a rate-limit pause) may be fixed now: try again right away.
+        ArtworkRepository.clearBlock()
+        Toast.makeText(activity, "Artwork sources saved", Toast.LENGTH_SHORT).show()
         rebuild()
     }
 

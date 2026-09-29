@@ -74,8 +74,6 @@ public final class ArtworkRepository {
     /** Settings > COVER ART: slow zoom/drift on big artwork (default on). */
     public static final String PREF_ANIMATED_ARTWORK = "animated_artwork";
 
-    private static final String DEFAULT_API_KEY = "0324c52513634547a7b32d6d323635d0";
-
     // Vertical (portrait) sizes SteamGridDB knows, best first: 660x930 is 0.71, the closest
     // to the library tile (0.72). Horizontal: the larger one first so the backdrop stays sharp.
     private static final String COVER_DIMENSIONS = "660x930,600x900,342x482";
@@ -112,7 +110,7 @@ public final class ArtworkRepository {
     });
 
     private static volatile SteamGridDBApi api;
-    // Base URL the cached Retrofit instance was built for; rebuilt when Winlator servers changes it.
+    // Base URL the cached Retrofit instance was built for; rebuilt when the address in Settings changes.
     private static volatile String apiBase;
     private static volatile OkHttpClient http;
 
@@ -349,14 +347,18 @@ public final class ArtworkRepository {
         return context.getApplicationContext().getSharedPreferences(CACHE_PREFS, Context.MODE_PRIVATE);
     }
 
-    /** Read on every request (never cached in a static), so toggling the custom key takes effect at once. */
+    /** Read on every request (never cached in a static), so changing the key takes effect at once. */
     private static String apiKey(Context context) {
-        SharedPreferences p = prefs(context);
-        if (p.getBoolean("enable_custom_api_key", false)) {
-            String custom = p.getString("custom_api_key", "");
-            if (custom != null && !custom.trim().isEmpty()) return custom.trim();
-        }
-        return DEFAULT_API_KEY;
+        return RemoteSources.steamGridApiKey(context);
+    }
+
+    /**
+     * Forgets a "key rejected" / "rate limit" pause. Called when the person changes the key or an
+     * address in Settings: the reason for the pause may be gone, so waiting it out makes no sense.
+     */
+    public static void clearBlock() {
+        blockedUntil = 0L;
+        blockedReason = "";
     }
 
     // ------------------------------------------------------------------ async entry points
@@ -686,7 +688,7 @@ public final class ArtworkRepository {
                     try {
                         local = buildApi(base, gson);
                     } catch (IllegalArgumentException invalidBase) {
-                        // A malformed address typed in Winlator servers must not crash artwork loading:
+                        // A malformed address typed in Settings must not crash artwork loading:
                         // use the default for it. apiBase still remembers the address that was asked
                         // for, so the fallback is not rebuilt on every call.
                         local = buildApi(RemoteSources.DEFAULT_STEAMGRID, gson);

@@ -87,6 +87,7 @@ import com.winlator.cmod.ui.theme.WinlatorThemePreferenceCard
 import kotlin.math.roundToInt
 import com.winlator.cmod.ui.theme.WinZShapes
 import com.winlator.cmod.ui.theme.hairlineColor
+import com.winlator.cmod.core.RemoteSources
 import com.winlator.cmod.ui.theme.dividerColor
 
 @Immutable
@@ -116,8 +117,11 @@ data class SettingsModel(
     val wineDebug: Boolean,
     val wineDebugChannels: String,
     val box64Logs: Boolean,
-    val customApiKeyEnabled: Boolean,
-    val customApiKey: String,
+    val customArtworkSources: Boolean,
+    val steamGridApiKey: String,
+    val steamGridUrl: String,
+    val gamesDbSearchUrl: String,
+    val gamesDbCdnUrl: String,
     val wineDebugOptions: List<String>
 )
 
@@ -134,7 +138,7 @@ interface SettingsCallbacks {
     fun onChooseShortcutPath()
     fun onBooleanChanged(key: String, value: Boolean)
     fun onCursorSpeedChanged(percent: Int)
-    fun onCustomApiKeyChanged(value: String)
+    fun onArtworkSourcesSaved(steamGridApiKey: String, steamGridUrl: String, gamesDbSearchUrl: String, gamesDbCdnUrl: String)
     fun onWineDebugChannelsChanged(value: String)
     fun onReinstallImageFs()
     fun onPresetAction(kind: String, id: String, action: String)
@@ -224,10 +228,10 @@ internal fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) 
             item("cover-art") {
                 // One card, like LOGS: the key toggle (with its field while on), then the two switches.
                 GroupCard {
-                    ToggleRow("Set SteamGrid API Key? (Cover Art)", model.customApiKeyEnabled) { callbacks.onBooleanChanged("enable_custom_api_key", it) }
-                    if (model.customApiKeyEnabled) {
+                    ToggleRow("Custom artwork sources", model.customArtworkSources) { callbacks.onBooleanChanged("enable_custom_api_key", it) }
+                    if (model.customArtworkSources) {
                         GroupDivider()
-                        EditableInlineValue("SteamGridDB API Key", model.customApiKey, callbacks::onCustomApiKeyChanged)
+                        ArtworkSourcesEditor(model, callbacks)
                     }
                     GroupDivider()
                     ToggleRow("Auto-download artwork from the internet", model.autoDownloadArtwork) { callbacks.onBooleanChanged("auto_download_artwork", it) }
@@ -688,16 +692,48 @@ private fun SoundFontCard(choices: List<SettingChoice>, onInstall: () -> Unit, o
     }
 }
 
+// The key and the four addresses artwork is fetched with, all visible at once and showing the
+// default until changed. One Restore defaults for the lot; nothing is stored until Save.
 @Composable
-private fun EditableInlineValue(label: String, initial: String, onSave: (String) -> Unit) {
-    var value by remember(initial) { mutableStateOf(initial) }
+private fun ArtworkSourcesEditor(model: SettingsModel, callbacks: SettingsCallbacks) {
+    var apiKey by remember(model.steamGridApiKey) { mutableStateOf(model.steamGridApiKey) }
+    var steamGridUrl by remember(model.steamGridUrl) { mutableStateOf(model.steamGridUrl) }
+    var gamesSearch by remember(model.gamesDbSearchUrl) { mutableStateOf(model.gamesDbSearchUrl) }
+    var gamesCdn by remember(model.gamesDbCdnUrl) { mutableStateOf(model.gamesDbCdnUrl) }
+    val searchInvalid = !gamesSearch.contains(RemoteSources.QUERY_PLACEHOLDER)
+
     Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedTextField(value = value, onValueChange = { value = it }, label = { Text(label) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-        Button(
-            onClick = { onSave(value) },
-            modifier = Modifier.align(Alignment.End),
-            colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = androidx.compose.ui.graphics.Color.White)
-        ) { Text("Save") }
+        OutlinedTextField(value = apiKey, onValueChange = { apiKey = it }, label = { Text("SteamGridDB API key") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+        OutlinedTextField(value = steamGridUrl, onValueChange = { steamGridUrl = it }, label = { Text("SteamGridDB API URL") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+        OutlinedTextField(
+            value = gamesSearch,
+            onValueChange = { gamesSearch = it },
+            label = { Text("TheGamesDB search URL") },
+            isError = searchInvalid,
+            supportingText = if (searchInvalid) ({ Text("Must contain ${RemoteSources.QUERY_PLACEHOLDER}") }) else null,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+        OutlinedTextField(value = gamesCdn, onValueChange = { gamesCdn = it }, label = { Text("TheGamesDB images URL") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+        Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedButton(
+                onClick = {
+                    apiKey = RemoteSources.DEFAULT_STEAMGRID_API_KEY
+                    steamGridUrl = RemoteSources.DEFAULT_STEAMGRID
+                    gamesSearch = RemoteSources.DEFAULT_GAMESDB_SEARCH
+                    gamesCdn = RemoteSources.DEFAULT_GAMESDB_CDN
+                },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
+                border = BorderStroke(1.dp, hairlineColor())
+            ) { Text("Restore defaults") }
+            Button(
+                onClick = { callbacks.onArtworkSourcesSaved(apiKey, steamGridUrl, gamesSearch, gamesCdn) },
+                enabled = !searchInvalid,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = androidx.compose.ui.graphics.Color.White)
+            ) { Text("Save") }
+        }
     }
 }
 

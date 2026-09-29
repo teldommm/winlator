@@ -14,6 +14,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -48,6 +49,23 @@ public final class ContentsSource implements ComponentSource {
         ArrayList<ComponentEntry> out = new ArrayList<>();
         Set<String> seen = new HashSet<>();
         Map<String, ContentEntry> newest = new HashMap<>();
+        // A catalog row and the package it installed as are the same thing to the user, whatever
+        // name / code each of them carries: installedFor maps a catalog profile to its package on
+        // disk, claimed holds the entry names of the packages that are already shown that way.
+        Map<ContentProfile, ContentProfile> installedFor = new IdentityHashMap<>();
+        Set<String> claimed = new HashSet<>();
+
+        for (ContentProfile.ContentType type : ContentProfile.ContentType.values()) {
+            List<ContentProfile> profiles = manager.getProfiles(type);
+            if (profiles == null) continue;
+            for (ContentProfile profile : profiles) {
+                if (profile.remoteUrl == null) continue;
+                ContentProfile installed = findInstalledFor(profile);
+                if (installed != null && claimed.add(ContentsManager.getEntryName(installed))) {
+                    installedFor.put(profile, installed);
+                }
+            }
+        }
 
         for (ContentProfile.ContentType type : ContentProfile.ContentType.values()) {
             List<ContentProfile> profiles = manager.getProfiles(type);
@@ -55,9 +73,14 @@ public final class ContentsSource implements ComponentSource {
             for (ContentProfile profile : profiles) {
                 String typeName = displayType(type);
                 if (typeName.isEmpty() || profile.verName == null || profile.verName.isEmpty()) continue;
-                ContentEntry entry = new ContentEntry(typeName, profile);
-                entry.installed = isInstalled(profile);
-                entry.installedName = entry.installed ? installedEntryName(type, profile) : "";
+                ContentProfile installed;
+                if (profile.remoteUrl == null) {
+                    if (claimed.contains(ContentsManager.getEntryName(profile))) continue;
+                    installed = profile;
+                } else {
+                    installed = installedFor.get(profile);
+                }
+                ContentEntry entry = new ContentEntry(typeName, profile, installed);
                 if (!seen.add(entry.id)) continue;
                 out.add(entry);
                 ContentEntry current = newest.get(typeName);
@@ -69,10 +92,9 @@ public final class ContentsSource implements ComponentSource {
             for (ContentProfile profile : manager.getInstalledProfiles(type)) {
                 String typeName = displayType(type);
                 if (typeName.isEmpty()) continue;
-                ContentEntry entry = new ContentEntry(typeName, profile);
+                if (claimed.contains(ContentsManager.getEntryName(profile))) continue;
+                ContentEntry entry = new ContentEntry(typeName, profile, profile);
                 if (!seen.add(entry.id)) continue;
-                entry.installed = true;
-                entry.installedName = ContentsManager.getEntryName(profile);
                 out.add(entry);
             }
         }
@@ -94,20 +116,37 @@ public final class ContentsSource implements ComponentSource {
         return "";
     }
 
-    private boolean isInstalled(ContentProfile candidate) {
-        return findInstalled(candidate.type, candidate.verCode, candidate.verName) != null;
-    }
-
-    private String installedEntryName(ContentProfile.ContentType type, ContentProfile candidate) {
-        ContentProfile installed = findInstalled(type, candidate.verCode, candidate.verName);
-        return installed != null ? ContentsManager.getEntryName(installed) : "";
-    }
-
     private ContentProfile findInstalled(ContentProfile.ContentType type, int verCode, String verName) {
         for (ContentProfile installed : manager.getInstalledProfiles(type)) {
             if (installed.verCode == verCode && installed.verName.equals(verName)) return installed;
         }
         return null;
+    }
+
+    /**
+     * The package on disk that {@code candidate} stands for, or null. A local profile is only ever
+     * itself. A catalog profile matches, in this order: a package with the same name and code; the
+     * package this entry was installed as (remembered at install time, which is the only thing
+     * that works when the package names itself differently from the catalog); a package with the
+     * same name (covers what was installed before that was remembered, or from a file).
+     */
+    private ContentProfile findInstalledFor(ContentProfile candidate) {
+        ContentProfile exact = findInstalled(candidate.type, candidate.verCode, candidate.verName);
+        if (exact != null || candidate.remoteUrl == null) return exact;
+
+        String remembered = manager.getRememberedInstall(candidate);
+        if (remembered != null) {
+            for (ContentProfile installed : manager.getInstalledProfiles(candidate.type)) {
+                if (remembered.equals(ContentsManager.getEntryName(installed))) return installed;
+            }
+        }
+
+        ContentProfile sameName = null;
+        for (ContentProfile installed : manager.getInstalledProfiles(candidate.type)) {
+            if (!installed.verName.equals(candidate.verName)) continue;
+            if (sameName == null || installed.verCode > sameName.verCode) sameName = installed;
+        }
+        return sameName;
     }
 
     /** The catalog entry of {@code type} named {@code verName} that can be downloaded, or null. */
@@ -138,7 +177,9 @@ public final class ContentsSource implements ComponentSource {
             } catch (Downloader.DownloadException e) {
                 throw new ComponentException("Unable to install " + name + ": " + e.userMessage(), e);
             }
-            return installArchive(Uri.fromFile(archive), name, 72, sink);
+            ContentProfile installed = installArchive(Uri.fromFile(archive), name, 72, sink);
+            manager.rememberRemoteInstall(profile, installed);
+            return installed;
         } finally {
             archive.delete();
         }
@@ -199,12 +240,18 @@ public final class ContentsSource implements ComponentSource {
     }
 
     private final class ContentEntry extends ComponentEntry {
+        /** What the row is listed as: a catalog entry, or a package that is only on the device. */
         final ContentProfile profile;
-        String installedName = "";
+        /** The package on disk behind this row, or null while it is only in the catalog. */
+        final ContentProfile installedProfile;
+        String installedName;
 
-        ContentEntry(String typeName, ContentProfile profile) {
+        ContentEntry(String typeName, ContentProfile profile, ContentProfile installedProfile) {
             super(typeName + ":" + profile.verCode + ":" + profile.verName, typeName, profile.verName, profile.verCode);
             this.profile = profile;
+            this.installedProfile = installedProfile;
+            this.installed = installedProfile != null;
+            this.installedName = installedProfile != null ? ContentsManager.getEntryName(installedProfile) : "";
         }
 
         @Override
@@ -214,7 +261,9 @@ public final class ContentsSource implements ComponentSource {
 
         @Override
         public String runtimeId() {
-            return type.equals("Wine") || type.equals("Proton") ? ContentsManager.getEntryName(profile) : null;
+            if (!type.equals("Wine") && !type.equals("Proton")) return null;
+            // What a container stores is the installed package's name, not the catalog's.
+            return ContentsManager.getEntryName(installedProfile != null ? installedProfile : profile);
         }
 
         @Override
@@ -237,8 +286,9 @@ public final class ContentsSource implements ComponentSource {
             installRemote(context, profile, sink);
         }
 
+        // Looked up again instead of using the field: it has to be what is on disk right now.
         private ContentProfile installedProfile() {
-            return findInstalled(profile.type, versionCode, name);
+            return findInstalledFor(profile);
         }
 
         @Override

@@ -16,8 +16,10 @@ import java.util.regex.Pattern;
 
 /**
  * Single place for every remote address the app talks to. Defaults live here; the installed app
- * can override each one through "Winlator servers" (Components screen). A blank stored value means
- * "use the default", so resetting a field is just removing its preference.
+ * can override the component / driver / controls addresses through "Winlator servers" (Components
+ * screen) and the artwork ones (SteamGridDB key and address, TheGamesDB addresses) in Settings,
+ * COVER ART. A blank stored value means "use the default", so resetting a field is just removing
+ * its preference.
  *
  * Existing preference keys ({@link #KEY_CONTENTS_URL}, {@link #KEY_DRIVER_REPOS}) are kept as they
  * were, so values users already saved keep working.
@@ -31,12 +33,16 @@ public final class RemoteSources {
     public static final String KEY_STEAMGRID = "svc_steamgriddb_url";
     public static final String KEY_GAMESDB_SEARCH = "svc_thegamesdb_search_url";
     public static final String KEY_GAMESDB_CDN = "svc_thegamesdb_cdn_url";
+    /** Kept from when this was the only artwork setting, so keys people already saved still work. */
+    public static final String KEY_STEAMGRID_API_KEY = "custom_api_key";
 
     public static final String DEFAULT_CONTENTS_URL = "https://raw.githubusercontent.com/StevenMXZ/Winlator-Contents/main/contents.json";
     public static final String DEFAULT_INPUT_CONTROLS = "https://raw.githubusercontent.com/brunodev85/winlator/main/input_controls/";
     public static final String DEFAULT_STEAMGRID = "https://www.steamgriddb.com/api/v2/";
     public static final String DEFAULT_GAMESDB_SEARCH = "https://thegamesdb.net/search.php?name={query}&platform_id%5B%5D=1";
     public static final String DEFAULT_GAMESDB_CDN = "https://cdn.thegamesdb.net/images/original/";
+    /** The key every install shares until the person enters their own. */
+    public static final String DEFAULT_STEAMGRID_API_KEY = "0324c52513634547a7b32d6d323635d0";
 
     public static final String QUERY_PLACEHOLDER = "{query}";
 
@@ -97,6 +103,31 @@ public final class RemoteSources {
 
     public static String gamesDbCdn(Context context) {
         return withTrailingSlash(get(context, KEY_GAMESDB_CDN, DEFAULT_GAMESDB_CDN));
+    }
+
+    /** The SteamGridDB API key in use: the person's own, or the shared default. */
+    public static String steamGridApiKey(Context context) {
+        return get(context, KEY_STEAMGRID_API_KEY, DEFAULT_STEAMGRID_API_KEY);
+    }
+
+    private static final String[] ARTWORK_KEYS = {
+            KEY_STEAMGRID_API_KEY, KEY_STEAMGRID, KEY_GAMESDB_SEARCH, KEY_GAMESDB_CDN};
+
+    /** True when any artwork key or address differs from its default. */
+    public static boolean hasArtworkOverrides(Context context) {
+        SharedPreferences preferences = prefs(context);
+        for (String key : ARTWORK_KEYS) {
+            String stored = preferences.getString(key, null);
+            if (stored != null && !stored.trim().isEmpty()) return true;
+        }
+        return false;
+    }
+
+    /** Puts the SteamGridDB key and the artwork addresses back to their defaults. */
+    public static void resetArtwork(Context context) {
+        SharedPreferences.Editor editor = prefs(context).edit();
+        for (String key : ARTWORK_KEYS) editor.remove(key);
+        editor.apply();
     }
 
     // ------------------------------------------------------------------ driver repositories
@@ -198,6 +229,7 @@ public final class RemoteSources {
                 .remove(KEY_STEAMGRID)
                 .remove(KEY_GAMESDB_SEARCH)
                 .remove(KEY_GAMESDB_CDN)
+                .remove(KEY_STEAMGRID_API_KEY)
                 .apply();
         dropLegacyKeys(context);
     }
