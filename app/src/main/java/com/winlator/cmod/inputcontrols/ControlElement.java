@@ -716,6 +716,7 @@ public class ControlElement {
     private void invalidateSelf() {
         Rect rect = getBoundingBox();
         int pad = Math.max(4, inputControlsView.getSnappingSize() * 2);
+        if (type == Type.STICK) pad = Math.max(pad, rect.width() / 4);
         
         inputControlsView.invalidateElement(expandedBounds(rect, pad));
     }
@@ -1150,6 +1151,7 @@ public class ControlElement {
                     trackpadVelX = trackpadVelY = 0;
                     trackpadLastMoveMs = 0;
                 }
+                invalidateSelf();
                 return handleTouchMove(pointerId, x, y);
             }
         }
@@ -1232,6 +1234,16 @@ public class ControlElement {
         inputControlsView.setStickMouse(this, Mathf.clamp(outX, -1, 1), Mathf.clamp(outY, -1, 1));
     }
 
+    // A D-pad bound to the four gamepad D-pad directions reports through one call (one packet
+    // per change) instead of four separate binding events.
+    private boolean usesNativeGamepadDPad() {
+        return type == Type.D_PAD &&
+               getBindingAt(0) == Binding.GAMEPAD_DPAD_UP &&
+               getBindingAt(1) == Binding.GAMEPAD_DPAD_RIGHT &&
+               getBindingAt(2) == Binding.GAMEPAD_DPAD_DOWN &&
+               getBindingAt(3) == Binding.GAMEPAD_DPAD_LEFT;
+    }
+
     public boolean handleTouchMove(int pointerId, float x, float y) {
         if (pointerId == currentPointerId && type == Type.BUTTON && mouseMoveMode) {
             inputControlsView.getTouchpadView().mouseMove(x, y, MotionEvent.ACTION_MOVE);
@@ -1270,10 +1282,11 @@ public class ControlElement {
                     offsetY = y - cy;
                 }
 
-                if (Mathf.lengthSq(offsetX, offsetY) > radius * radius) {
-                    float angle = (float)Math.atan2(offsetY, offsetX);
-                    offsetX = (float)(Math.cos(angle) * radius);
-                    offsetY = (float)(Math.sin(angle) * radius);
+                float distanceSquared = offsetX * offsetX + offsetY * offsetY;
+                if (distanceSquared > radius * radius) {
+                    float clampScale = radius / (float)Math.sqrt(distanceSquared);
+                    offsetX *= clampScale;
+                    offsetY *= clampScale;
                 }
 
                 deltaX = Mathf.clamp(offsetX / radius, -1, 1);
@@ -1285,11 +1298,11 @@ public class ControlElement {
                 float offsetX = localX - radius;
                 float offsetY = localY - radius;
 
-                float distance = Mathf.lengthSq(radius - localX, radius - localY);
-                if (distance > radius * radius) {
-                    float angle = (float)Math.atan2(offsetY, offsetX);
-                    offsetX = (float)(Math.cos(angle) * radius);
-                    offsetY = (float)(Math.sin(angle) * radius);
+                float distanceSquared = offsetX * offsetX + offsetY * offsetY;
+                if (distanceSquared > radius * radius) {
+                    float clampScale = radius / (float)Math.sqrt(distanceSquared);
+                    offsetX *= clampScale;
+                    offsetY *= clampScale;
                 }
 
                 deltaX = Mathf.clamp(offsetX / radius, -1, 1);
@@ -1297,9 +1310,15 @@ public class ControlElement {
             }
 
             if (type == Type.STICK) {
+                float visualX = stickCenterX(boundingBox) + deltaX * radius;
+                float visualY = stickCenterY(boundingBox) + deltaY * radius;
+                boolean redraw = currentPosition == null ||
+                                 Math.abs(currentPosition.x - visualX) >= 0.5f ||
+                                 Math.abs(currentPosition.y - visualY) >= 0.5f;
+                // A dynamic stick also moves its base (the anchor), which the thumb alone doesn't show.
+                if (isDynamicStick() && !inputControlsView.isEditMode()) redraw = true;
                 if (currentPosition == null) currentPosition = new PointF();
-                currentPosition.x = stickCenterX(boundingBox) + deltaX * radius;
-                currentPosition.y = stickCenterY(boundingBox) + deltaY * radius;
+                if (redraw) currentPosition.set(visualX, visualY);
                 float adjDeltaX = (Math.abs(deltaX) < Math.abs(deltaY) * STICK_CROSS_ZONE) ? 0 : deltaX;
                 float adjDeltaY = (Math.abs(deltaY) < Math.abs(deltaX) * STICK_CROSS_ZONE) ? 0 : deltaY;
                 
@@ -1335,11 +1354,18 @@ public class ControlElement {
                         Binding binding = getBindingAt(i);
                         if (binding.isMouseMove()) continue;
                         float value = i == 1 || i == 3 ? adjDeltaX : adjDeltaY;
-                        inputControlsView.handleInputEvent(binding, states[i], value);
-                        this.states[i] = states[i];
+                        boolean state = states[i];
+                        // Keys go out on a change only (a held direction isn't pressed again on
+                        // every move); gamepad bindings keep coming, their analog value follows
+                        // the finger (the view drops the ones that changed nothing).
+                        if (state != this.states[i] || (state && binding.isGamepad())) {
+                            inputControlsView.handleInputEvent(binding, state, value);
+                        }
+                        this.states[i] = state;
                     }
                 }
-                invalidateSelf();
+                if (redraw) invalidateSelf();
+                return true;
             }
             else if (type == Type.TRACKPAD) {
                 
@@ -1407,6 +1433,34 @@ public class ControlElement {
             else {
                 final boolean[] states = {deltaY <= -DPAD_DEAD_ZONE, deltaX >= DPAD_DEAD_ZONE, deltaY >= DPAD_DEAD_ZONE, deltaX <= -DPAD_DEAD_ZONE};
 
+                if (usesNativeGamepadDPad()) {
+                    // A direction is kept until the finger is slightly inside its threshold, so
+                    // it doesn't flicker between released and pressed right on the edge.
+                    final float releaseZone = DPAD_DEAD_ZONE - 0.05f;
+                    final boolean up = deltaY <= -(this.states[0] ? releaseZone : DPAD_DEAD_ZONE);
+                    final boolean right = deltaX >= (this.states[1] ? releaseZone : DPAD_DEAD_ZONE);
+                    final boolean down = deltaY >= (this.states[2] ? releaseZone : DPAD_DEAD_ZONE);
+                    final boolean left = deltaX <= -(this.states[3] ? releaseZone : DPAD_DEAD_ZONE);
+                    if (this.states[0] == up && this.states[1] == right &&
+                        this.states[2] == down && this.states[3] == left) return true;
+
+                    boolean hadDirection = this.states[0] || this.states[1] || this.states[2] || this.states[3];
+                    boolean newDirection = (up && !this.states[0]) || (right && !this.states[1]) ||
+                                           (down && !this.states[2]) || (left && !this.states[3]);
+                    inputControlsView.handleDPadInput(up, right, down, left);
+                    this.states[0] = up;
+                    this.states[1] = right;
+                    this.states[2] = down;
+                    this.states[3] = left;
+                    if (newDirection) {
+                        inputControlsView.playTouchHaptic(hadDirection ? TouchHaptics.TICK : TouchHaptics.PRESS);
+                    }
+                    invalidateSelf();
+                    return true;
+                }
+
+                boolean stateChanged = false;
+
                 // Haptics on rising edges only: a direction that wasn't held before. From rest
                 // that's a press; rolling to another direction without lifting is a lighter
                 // tick. Releasing a direction or returning to centre is silent.
@@ -1418,6 +1472,7 @@ public class ControlElement {
                 applyMouseMoveBindings(states[1] || states[3] ? deltaX : 0f, states[0] || states[2] ? deltaY : 0f);
                 for (byte i = 0; i < 4; i++) {
                     Binding binding = getBindingAt(i);
+                    if (this.states[i] != states[i]) stateChanged = true;
                     if (binding.isMouseMove()) {
                         if (states[i] && !this.states[i]) newDirection = true;
                         this.states[i] = states[i];
@@ -1433,9 +1488,12 @@ public class ControlElement {
                 if (type == Type.D_PAD && newDirection) {
                     inputControlsView.playTouchHaptic(hadDirection ? TouchHaptics.TICK : TouchHaptics.PRESS);
                 }
+                if (stateChanged) invalidateSelf();
+                return true;
             }
 
-            invalidateSelf();
+            // Trackpad: only its pressed look is drawn (set on touch down and up), so moving the
+            // finger changes the input but not the picture.
             return true;
         }
         else if (pointerId == currentPointerId && type == Type.RANGE_BUTTON) {
@@ -1483,6 +1541,10 @@ public class ControlElement {
                 }
                 if ((type == Type.STICK || type == Type.TRACKPAD) && getBindingAt(0).isGamepad()) {
                     inputControlsView.handleStickInput(getBindingAt(0), 0f, 0f);
+                    for (byte i = 0; i < states.length; i++) states[i] = false;
+                }
+                else if (usesNativeGamepadDPad()) {
+                    inputControlsView.handleDPadInput(false, false, false, false);
                     for (byte i = 0; i < states.length; i++) states[i] = false;
                 }
                 else {

@@ -2,7 +2,6 @@ package com.winlator.cmod.ui.library
 
 import android.content.Intent
 import android.os.Environment
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -93,8 +92,8 @@ fun GameDetailRoute(shortcutPath: String, onClose: () -> Unit, onLibraryChanged:
                 )
             }
 
-            override fun onGameFolder() {
-                Toast.makeText(activity, shortcut.container.desktopDir.path, Toast.LENGTH_LONG).show()
+            override fun onSaves() {
+                GameSavesComposeDialog.show(activity, shortcut)
             }
 
             override fun onFavorite(favorite: Boolean) {

@@ -175,7 +175,8 @@ static_assert(offsetof(WindowPushConstantsPostFX, cosR) == 48, "cosR offset must
 class VulkanRendererContext {
 public:
     VulkanRendererContext(ANativeWindow* window, int cWidth, int cHeight,
-                          void* adrenotoolsHandle = nullptr);
+                          void* adrenotoolsHandle = nullptr,
+                          bool validationEnabled = false);
     ~VulkanRendererContext();
 
     void onSurfaceResized(int width, int height);
@@ -245,6 +246,13 @@ private:
         bool                 needsTransition = false;
         AHardwareBuffer*     ahb            = nullptr;
     };
+    // A texture whose window is gone. It is destroyed once the frame that last drew it has
+    // finished on the GPU (serial <= completedSerial), so nothing waits for the device to go idle.
+    struct RetiredTex {
+        WinTex wt;
+        uint64_t serial = 0;
+        AHardwareBuffer* ahb = nullptr;
+    };
 
     struct RenderEntry { int64_t id; int x, y; };
     struct DrawEntry {
@@ -293,6 +301,8 @@ public:
     ANativeWindow* window;
     int surfaceWidth, surfaceHeight, containerWidth, containerHeight;
     void* adrenotoolsHandle = nullptr;
+    bool validationRequested = false;
+    VkDebugUtilsMessengerEXT validationMessenger = VK_NULL_HANDLE;
     int filterMode  = 0;
     int stretchMode = 0;
     int postFXMode  = 0;
@@ -311,7 +321,12 @@ public:
     std::unordered_map<AHardwareBuffer*, WinTex>              ahbImportCache;
     std::unordered_map<int64_t, std::vector<AHardwareBuffer*>> windowAhbs;
 
-    std::vector<WinTex>    deleteQueue;
+    std::vector<RetiredTex> deleteQueue;
+    std::atomic<bool> retirePending{false};
+    uint64_t submittedSerial = 0;
+    uint64_t completedSerial = 0;
+    uint64_t pendingFrameSerial = 0;
+    uint64_t slotSerial[MAX_FRAMES_IN_FLIGHT] = {};
     std::vector<RenderEntry> renderList;
 
     std::vector<DrawEntry>             frameDraws;
@@ -324,6 +339,7 @@ public:
 
     std::atomic<bool> cursorVisible{false};
     short  cursorHotX=0, cursorHotY=0, cursorTexW=0, cursorTexH=0;
+    short  cursorPendingW=0, cursorPendingH=0;
     std::vector<uint32_t>  cursorPixels;
     std::atomic<bool> isCursorImageDirty{false};
     std::atomic<bool> cursorMoved{false};
@@ -332,11 +348,12 @@ public:
     VkDeviceMemory  cursorMem   = VK_NULL_HANDLE;
     VkImageView     cursorView  = VK_NULL_HANDLE;
     VkDescriptorSet  cursorDS   = VK_NULL_HANDLE;
-    VkBuffer         cursorStg  = VK_NULL_HANDLE;
-    VkDeviceMemory   cursorStgM = VK_NULL_HANDLE;
-    void*            cursorStgP = nullptr;
-    VkDeviceSize     cursorStgC = 0;
-    VkDeviceSize     cursorUploadSize = 0;
+    // One staging buffer per frame slot: the GPU may still be reading the previous slot's copy of
+    // the cursor while the CPU fills the next one.
+    VkBuffer         cursorStg[MAX_FRAMES_IN_FLIGHT]  = {};
+    VkDeviceMemory   cursorStgM[MAX_FRAMES_IN_FLIGHT] = {};
+    void*            cursorStgP[MAX_FRAMES_IN_FLIGHT] = {};
+    VkDeviceSize     cursorStgC[MAX_FRAMES_IN_FLIGHT] = {};
 
     VkInstance       instance;
     VkSurfaceKHR     surface;
@@ -537,6 +554,7 @@ public:
     std::thread       renderThread;
     std::atomic<bool> isRunning{false};
     std::atomic<bool> fbResized{false};
+    std::atomic<bool> swapchainRetryPending{false};
     std::mutex        renderMutex;
     std::mutex        dirtyMutex;
     std::condition_variable dirtyCV;
@@ -600,10 +618,11 @@ public:
     bool  importAHBToWinTex(WinTex& wt, AHardwareBuffer* ahb);
     void  cleanupAllAHBCache();
     void  flushDeleteQueue();
+    void  destroyTexNow(RetiredTex& retired);
     void  destroyWinTex(WinTex& wt);
     void  ensureCursorTex(short w, short h);
     void  cleanupCursorTex();
-    void  ensureCursorStaging(VkDeviceSize sz);
+    void  ensureCursorStaging(VkDeviceSize sz, uint32_t slot);
 
     void recordCmdBuf(VkCommandBuffer cb, uint32_t imgIdx,
         const std::vector<DrawEntry>& draws,

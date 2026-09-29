@@ -6,6 +6,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <algorithm>
+#include <string>
+#include <android/log.h>
 #include "../../../adrenotools/include/adrenotools/driver.h"
 #include "VulkanRendererContext.h"
 
@@ -100,10 +102,26 @@ extern "C" JNIEXPORT jlong JNICALL
 Java_com_winlator_cmod_widget_VulkanXServerView_nativeInit(
     JNIEnv* env, jobject ,
     jobject surface, jint w, jint h,
-    jstring jDriverPath, jstring jLibraryName, jstring jNativeLibDir)
+    jstring jDriverPath, jstring jLibraryName, jstring jNativeLibDir,
+    jboolean validationEnabled)
 {
     ANativeWindow* win = ANativeWindow_fromSurface(env, surface);
     if (!win) return 0;
+
+    // The layer is only looked for when it was asked for; this just reports in logcat whether the
+    // .so is actually there (the renderer then enables it if the loader exposes it).
+    if (validationEnabled == JNI_TRUE) {
+        const char* nativeLibDir = jNativeLibDir
+            ? env->GetStringUTFChars(jNativeLibDir, nullptr) : nullptr;
+        if (nativeLibDir) {
+            std::string layerPath = std::string(nativeLibDir) + "/libVkLayer_khronos_validation.so";
+            const bool layerPresent = access(layerPath.c_str(), R_OK) == 0;
+            __android_log_print(layerPresent ? ANDROID_LOG_INFO : ANDROID_LOG_ERROR,
+                "Winlator_VulkanValidation", "requested layer=%s present=%d",
+                layerPath.c_str(), layerPresent ? 1 : 0);
+            env->ReleaseStringUTFChars(jNativeLibDir, nativeLibDir);
+        }
+    }
 
     void* adrenotoolsHandle = nullptr;
     if (jDriverPath && jLibraryName && jNativeLibDir) {
@@ -118,7 +136,8 @@ Java_com_winlator_cmod_widget_VulkanXServerView_nativeInit(
 
     try {
         return reinterpret_cast<jlong>(
-            new VulkanRendererContext(win, w, h, adrenotoolsHandle));
+            new VulkanRendererContext(win, w, h, adrenotoolsHandle,
+                                      validationEnabled == JNI_TRUE));
     } catch (...) {
         ANativeWindow_release(win);
         if (adrenotoolsHandle) dlclose(adrenotoolsHandle);

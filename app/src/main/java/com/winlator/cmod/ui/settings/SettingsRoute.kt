@@ -169,9 +169,11 @@ internal class SettingsScreenState(
             preferences.getBoolean("auto_download_artwork", true),
             preferences.getBoolean("animated_artwork", true),
             preferences.getBoolean("remove_loading_bar_when_booting_games", false),
+            preferences.getBoolean("game_saves_all_shortcuts", false),
             preferences.getBoolean("enable_wine_debug", false),
             preferences.getString("wine_debug_channels", AppDefaults.DEFAULT_WINE_DEBUG_CHANNELS)
                 ?: AppDefaults.DEFAULT_WINE_DEBUG_CHANNELS,
+            preferences.getBoolean("enable_winlator_logs", false),
             preferences.getBoolean("enable_box64_logs", false),
             // On when the person turned it on, or when an override is already stored (an address set
             // before these settings moved here must not sit hidden behind an "off" switch).

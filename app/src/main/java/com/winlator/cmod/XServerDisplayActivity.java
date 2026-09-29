@@ -61,6 +61,7 @@ import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.GPUInformation;
+import com.winlator.cmod.core.GameSaveManager;
 import com.winlator.cmod.core.KeyValueSet;
 import com.winlator.cmod.core.LosslessDll;
 import com.winlator.cmod.core.OnExtractFileListener;
@@ -74,6 +75,7 @@ import com.winlator.cmod.core.WineRequestHandler;
 import com.winlator.cmod.core.WineStartMenuCreator;
 import com.winlator.cmod.core.WineThemeManager;
 import com.winlator.cmod.core.WineUtils;
+import com.winlator.cmod.core.WinlatorLogcatLogger;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.ExternalController;
 import com.winlator.cmod.inputcontrols.InputControlsManager;
@@ -217,6 +219,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private float refreshRate = 60.0f;
     private MagnifierView magnifierView;
     private DebugDialog debugDialog;
+    private WinlatorLogcatLogger winlatorLogcatLogger;
     private String rendererLogPath;
     private short taskAffinityMask = 0;
     private short taskAffinityMaskWoW64 = 0;
@@ -478,9 +481,15 @@ public class XServerDisplayActivity extends AppCompatActivity {
         imageFs.setWinePath(wineInfo.path);
 
         ProcessHelper.removeAllDebugCallbacks();
+        boolean enableWinlatorLogs = preferences.getBoolean("enable_winlator_logs", false);
+        if (enableLogs || enableWinlatorLogs) DebugLogFile.setFilename(getExecutable());
         if (enableLogs) {
-            DebugLogFile.setFilename(getExecutable());
             ProcessHelper.addDebugCallback(debugDialog = new DebugDialog(this));
+        }
+        if (enableWinlatorLogs) {
+            winlatorLogcatLogger = new WinlatorLogcatLogger(DebugLogFile.getWinlatorLogFile(this));
+            winlatorLogcatLogger.start();
+            ProcessHelper.addDebugCallback(winlatorLogcatLogger);
         }
 
         graphicsDriver = container.getGraphicsDriver();
@@ -886,6 +895,16 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     break;
                 }
             }
+            // Wine is stopped by now, so the save files are no longer being written.
+            if (shortcut != null && GameSaveManager.shouldAutoBackup(this, shortcut)) {
+                GameSaveManager.BackupResult saveResult = GameSaveManager.backup(shortcut, true);
+                if (saveResult.ok) {
+                    Log.i("GameSaveManager", "Auto backup completed: " + saveResult.fileCount + " files");
+                } else {
+                    Log.w("GameSaveManager", "Auto backup skipped/failed: " + saveResult.error);
+                }
+            }
+
             runOnUiThread(() -> ThemedLoadingOverlayHost.dismiss(shutdownOverlay));
             runOnUiThread(() -> AppUtils.restartApplication(getApplicationContext()));
         });
@@ -893,6 +912,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        if (winlatorLogcatLogger != null) {
+            ProcessHelper.removeDebugCallback(winlatorLogcatLogger);
+            winlatorLogcatLogger.stop();
+            winlatorLogcatLogger = null;
+        }
         if (taskManagerSidebar != null) taskManagerSidebar.stop();
         super.onDestroy();
     }
@@ -1146,6 +1170,17 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         {
             VulkanXServerView vkRenderer = (VulkanXServerView) renderer;
+
+            // Opt-in Vulkan validation layer: WINLATOR_VULKAN_VALIDATION=1 in the container or
+            // shortcut environment variables (needs libVkLayer_khronos_validation.so in the app).
+            EnvVars vulkanStartupVars = new EnvVars();
+            if (container != null) vulkanStartupVars.putAll(container.getEnvVars());
+            if (shortcut != null) vulkanStartupVars.putAll(shortcut.getExtra("envVars"));
+            String validationValue = vulkanStartupVars.get("WINLATOR_VULKAN_VALIDATION");
+            boolean validationEnabled = "1".equals(validationValue)
+                    || "true".equalsIgnoreCase(validationValue)
+                    || "yes".equalsIgnoreCase(validationValue);
+            vkRenderer.setValidationEnabled(validationEnabled, AppUtils.getNativeLibDir(this));
 
             String rendererDriverId = shortcut != null ? shortcut.getRendererDriverId()
                     : (container != null ? container.getRendererDriverId() : "");

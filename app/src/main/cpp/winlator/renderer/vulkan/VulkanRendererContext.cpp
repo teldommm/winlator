@@ -7,6 +7,8 @@
 #include <cstring>
 #include <cmath>
 #include <algorithm>
+#include <utility>
+#include <chrono>
 #include <inttypes.h>
 #include <dlfcn.h>
 #include "window_vert.h"
@@ -16,11 +18,25 @@
 #include "window_stretch_frag.h"
 #include "window_postfx_frag.h"
 
+namespace {
+VKAPI_ATTR VkBool32 VKAPI_CALL logValidationMessage(
+    VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+    VkDebugUtilsMessageTypeFlagsEXT,
+    const VkDebugUtilsMessengerCallbackDataEXT* data,
+    void*) {
+    const int priority = (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
+        ? ANDROID_LOG_ERROR : ANDROID_LOG_WARN;
+    __android_log_print(priority, "Winlator_VulkanValidation", "%s",
+                        data && data->pMessage ? data->pMessage : "(no message)");
+    return VK_FALSE;
+}
+}
+
 VulkanRendererContext::VulkanRendererContext(ANativeWindow* win, int cW, int cH,
-                                             void* aHandle)
+                                             void* aHandle, bool enableValidation)
     : window(win), surfaceWidth(cW), surfaceHeight(cH),
       containerWidth(cW), containerHeight(cH),
-      adrenotoolsHandle(aHandle)
+      adrenotoolsHandle(aHandle), validationRequested(enableValidation)
 {
     createInstance(); createSurface(); pickPhysicalDevice(); createLogicalDevice();
     createSwapchain(); createRenderPass(); createDSLayout();
@@ -39,13 +55,7 @@ VulkanRendererContext::~VulkanRendererContext() {
     for (auto& [id, wt] : texMap) destroyWinTex(wt);
     texMap.clear();
 
-    for (auto& wt : deleteQueue) {
-        if (wt.ds   != VK_NULL_HANDLE) vk_.FreeDescriptorSets(device, winTexPool, 1, &wt.ds);
-        if (wt.view != VK_NULL_HANDLE) vk_.DestroyImageView(device, wt.view, nullptr);
-        if (wt.img  != VK_NULL_HANDLE) vk_.DestroyImage(device, wt.img, nullptr);
-        if (wt.mem  != VK_NULL_HANDLE) vk_.FreeMemory(device, wt.mem, nullptr);
-        if (wt.stg  != VK_NULL_HANDLE) { vk_.DestroyBuffer(device, wt.stg, nullptr); vk_.FreeMemory(device, wt.stgMem, nullptr); }
-    }
+    for (auto& retired : deleteQueue) destroyTexNow(retired);
     deleteQueue.clear();
     cleanupSwapchain(); cleanupCursorTex();
 
@@ -67,6 +77,11 @@ VulkanRendererContext::~VulkanRendererContext() {
     vk_.DestroyRenderPass(device, renderPass, nullptr);
     vk_.DestroyDevice(device, nullptr);
     vk_.DestroySurfaceKHR(instance, surface, nullptr);
+    if (validationMessenger != VK_NULL_HANDLE) {
+        auto destroyMessenger = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
+            gipa(instance, "vkDestroyDebugUtilsMessengerEXT"));
+        if (destroyMessenger) destroyMessenger(instance, validationMessenger, nullptr);
+    }
     vk_.DestroyInstance(instance, nullptr);
     if (adrenotoolsHandle) { dlclose(adrenotoolsHandle); adrenotoolsHandle = nullptr; }
 }
@@ -192,15 +207,90 @@ void VulkanRendererContext::createInstance() {
             gipa = (PFN_vkGetInstanceProcAddr)dlsym(loaderLib, "vkGetInstanceProcAddr");
     }
 
+    if (!gipa) throw std::runtime_error("Vulkan loader unavailable");
     vk_.CreateInstance = (PFN_vkCreateInstance)gipa(nullptr, "vkCreateInstance");
+    if (!vk_.CreateInstance) throw std::runtime_error("vkCreateInstance unavailable");
     VkApplicationInfo ai{}; ai.sType=VK_STRUCTURE_TYPE_APPLICATION_INFO;
     ai.pApplicationName="Winlator"; ai.apiVersion=VK_API_VERSION_1_3;
-    const char* ext[]={"VK_KHR_surface","VK_KHR_android_surface"};
+    const char* ext[]={"VK_KHR_surface","VK_KHR_android_surface",
+                       VK_EXT_DEBUG_UTILS_EXTENSION_NAME};
     VkInstanceCreateInfo ci{}; ci.sType=VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     ci.pApplicationInfo=&ai; ci.enabledExtensionCount=2; ci.ppEnabledExtensionNames=ext;
-    if (vk_.CreateInstance(&ci,nullptr,&instance)!=VK_SUCCESS) throw std::runtime_error("instance");
+
+    const char* validationLayer = "VK_LAYER_KHRONOS_validation";
+    bool enableValidation = false;
+    VkDebugUtilsMessengerCreateInfoEXT debugInfo{};
+    if (validationRequested) {
+        auto enumerateLayers = reinterpret_cast<PFN_vkEnumerateInstanceLayerProperties>(
+            gipa(nullptr, "vkEnumerateInstanceLayerProperties"));
+        uint32_t count = 0;
+        if (enumerateLayers && enumerateLayers(&count, nullptr) == VK_SUCCESS) {
+            std::vector<VkLayerProperties> layers(count);
+            if (enumerateLayers(&count, layers.data()) == VK_SUCCESS) {
+                enableValidation = std::any_of(layers.begin(), layers.end(),
+                    [&](const VkLayerProperties& layer) {
+                        return strcmp(layer.layerName, validationLayer) == 0;
+                    });
+            }
+        }
+        if (enableValidation) {
+            ci.enabledLayerCount = 1;
+            ci.ppEnabledLayerNames = &validationLayer;
+
+            auto enumerateExtensions = reinterpret_cast<PFN_vkEnumerateInstanceExtensionProperties>(
+                gipa(nullptr, "vkEnumerateInstanceExtensionProperties"));
+            auto hasDebugUtils = [&](const char* layerName) {
+                uint32_t extensionCount = 0;
+                if (!enumerateExtensions ||
+                    enumerateExtensions(layerName, &extensionCount, nullptr) != VK_SUCCESS)
+                    return false;
+                std::vector<VkExtensionProperties> extensions(extensionCount);
+                return enumerateExtensions(layerName, &extensionCount, extensions.data()) == VK_SUCCESS &&
+                    std::any_of(extensions.begin(), extensions.end(), [](const VkExtensionProperties& e) {
+                        return strcmp(e.extensionName, VK_EXT_DEBUG_UTILS_EXTENSION_NAME) == 0;
+                    });
+            };
+            if (hasDebugUtils(nullptr) || hasDebugUtils(validationLayer)) {
+                ci.enabledExtensionCount = 3;
+                debugInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+                debugInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                    VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+                debugInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                    VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                    VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+                debugInfo.pfnUserCallback = logValidationMessage;
+                ci.pNext = &debugInfo;
+            }
+        } else {
+            RLOG_E("WINLATOR_VULKAN_VALIDATION requested, but VK_LAYER_KHRONOS_validation is unavailable");
+        }
+    }
+
+    VkResult result = vk_.CreateInstance(&ci, nullptr, &instance);
+    if (result != VK_SUCCESS && enableValidation) {
+        RLOG_E("validation instance creation failed (%d), retrying without the layer", result);
+        enableValidation = false;
+        ci.enabledLayerCount = 0;
+        ci.ppEnabledLayerNames = nullptr;
+        ci.enabledExtensionCount = 2;
+        ci.pNext = nullptr;
+        result = vk_.CreateInstance(&ci, nullptr, &instance);
+    }
+    if (result != VK_SUCCESS) throw std::runtime_error("instance");
 
     loadInstanceDispatch();
+    if (enableValidation) {
+        RLOG_E("VK_LAYER_KHRONOS_validation enabled for Vulkan renderer (debug_utils=%d)",
+               ci.pNext ? 1 : 0);
+        if (ci.pNext) {
+            auto createMessenger = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
+                gipa(instance, "vkCreateDebugUtilsMessengerEXT"));
+            if (!createMessenger ||
+                createMessenger(instance, &debugInfo, nullptr, &validationMessenger) != VK_SUCCESS) {
+                RLOG_E("VK_EXT_debug_utils messenger unavailable; check Android VALIDATION logs");
+            }
+        }
+    }
 }
 
 void VulkanRendererContext::createSurface() {
@@ -240,14 +330,35 @@ void VulkanRendererContext::createLogicalDevice() {
 
     PFN_vkEnumerateDeviceExtensionProperties enumDevExts =
         (PFN_vkEnumerateDeviceExtensionProperties)gipa(instance, "vkEnumerateDeviceExtensionProperties");
-    { uint32_t n=0; if(enumDevExts) enumDevExts(physicalDevice,nullptr,&n,nullptr);
-      std::vector<VkExtensionProperties> av(n);
-      if(enumDevExts) enumDevExts(physicalDevice,nullptr,&n,av.data());
-      for (auto& e:av) { (void)e; } }
+    bool hasForeignQueue = false;
+    if (enumDevExts) {
+        uint32_t extCount = 0;
+        if (enumDevExts(physicalDevice, nullptr, &extCount, nullptr) == VK_SUCCESS && extCount > 0) {
+            std::vector<VkExtensionProperties> availableExts(extCount);
+            if (enumDevExts(physicalDevice, nullptr, &extCount, availableExts.data()) == VK_SUCCESS) {
+                for (const auto& ext : availableExts) {
+                    RLOG("Available Vulkan device extension: %s (specVersion=%u)",
+                         ext.extensionName, ext.specVersion);
+                    if (strcmp(ext.extensionName, VK_EXT_QUEUE_FAMILY_FOREIGN_EXTENSION_NAME) == 0)
+                        hasForeignQueue = true;
+                }
+            }
+        }
+    }
     std::vector<const char*> extList = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME
     };
+    // The AHB extension depends on VK_EXT_queue_family_foreign, so it has to be enabled with it
+    // whenever the device offers it. Unlike upstream (which refuses to start without it), a device
+    // that doesn't advertise it keeps working exactly as before.
+    if (hasForeignQueue) {
+        extList.push_back(VK_EXT_QUEUE_FAMILY_FOREIGN_EXTENSION_NAME);
+    } else {
+        RLOG_E("AHB imports want VK_EXT_queue_family_foreign, but the Vulkan device does not advertise it; continuing without it");
+    }
+    for (const char* ext : extList)
+        RLOG("Enabled Vulkan device extension: %s", ext);
     VkDeviceCreateInfo ci{}; ci.sType=VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     ci.pQueueCreateInfos=&qi; ci.queueCreateInfoCount=1;
     ci.enabledExtensionCount=(uint32_t)extList.size(); ci.ppEnabledExtensionNames=extList.data();
@@ -394,7 +505,9 @@ void VulkanRendererContext::createSwapchain() {
     ci.imageSharingMode=VK_SHARING_MODE_EXCLUSIVE; ci.preTransform=pre;
     ci.compositeAlpha=compositeAlpha; ci.presentMode=presentMode; ci.clipped=VK_TRUE;
     ci.oldSwapchain=oldSwapchain;
-    if (vk_.CreateSwapchainKHR(device,&ci,nullptr,&swapchain)!=VK_SUCCESS) throw std::runtime_error("swapchain");
+    VkSwapchainKHR newSwapchain=VK_NULL_HANDLE;
+    if (vk_.CreateSwapchainKHR(device,&ci,nullptr,&newSwapchain)!=VK_SUCCESS) throw std::runtime_error("swapchain");
+    swapchain=newSwapchain;
     RLOG("swapchain created: %dx%d format=%d presentMode=%d compositeAlpha=%d imgCount=%u",
         swapchainExt.width,swapchainExt.height,(int)swapchainFmt,(int)presentMode,(int)compositeAlpha,imgCount);
     if (oldSwapchain!=VK_NULL_HANDLE) vk_.DestroySwapchainKHR(device,oldSwapchain,nullptr);
@@ -872,7 +985,8 @@ void VulkanRendererContext::destroyWinTex(WinTex& wt) {
     if (wt.img!=VK_NULL_HANDLE || wt.stg!=VK_NULL_HANDLE) {
         WinTex deferred = wt;
         deferred.isAHB = false;
-        deleteQueue.push_back(deferred);
+        deleteQueue.push_back({deferred, pendingFrameSerial ? pendingFrameSerial : submittedSerial, nullptr});
+        retirePending.store(true, std::memory_order_release);
     }
     wt={};
 }
@@ -900,15 +1014,25 @@ void VulkanRendererContext::cleanupCursorTex() {
     if (cursorView!=VK_NULL_HANDLE){vk_.DestroyImageView(device,cursorView,nullptr);cursorView=VK_NULL_HANDLE;}
     if (cursorImg!=VK_NULL_HANDLE){vk_.DestroyImage(device,cursorImg,nullptr);cursorImg=VK_NULL_HANDLE;}
     if (cursorMem!=VK_NULL_HANDLE){vk_.FreeMemory(device,cursorMem,nullptr);cursorMem=VK_NULL_HANDLE;}
-    if (cursorStg!=VK_NULL_HANDLE){vk_.DestroyBuffer(device,cursorStg,nullptr);vk_.FreeMemory(device,cursorStgM,nullptr);cursorStg=VK_NULL_HANDLE;cursorStgP=nullptr;cursorStgC=0;}
+    for (uint32_t slot=0; slot<MAX_FRAMES_IN_FLIGHT; ++slot) {
+        if (cursorStg[slot]!=VK_NULL_HANDLE) {
+            vk_.DestroyBuffer(device,cursorStg[slot],nullptr);
+            vk_.FreeMemory(device,cursorStgM[slot],nullptr);
+            cursorStg[slot]=VK_NULL_HANDLE; cursorStgM[slot]=VK_NULL_HANDLE;
+            cursorStgP[slot]=nullptr; cursorStgC[slot]=0;
+        }
+    }
     cursorTexW=0; cursorTexH=0;
 }
 
-void VulkanRendererContext::ensureCursorStaging(VkDeviceSize sz) {
-    if (cursorStgC>=sz) return;
-    if (cursorStg!=VK_NULL_HANDLE){vk_.DestroyBuffer(device,cursorStg,nullptr);vk_.FreeMemory(device,cursorStgM,nullptr);}
-    createBuffer(sz,VK_BUFFER_USAGE_TRANSFER_SRC_BIT,VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,cursorStg,cursorStgM);
-    vk_.MapMemory(device,cursorStgM,0,sz,0,&cursorStgP); cursorStgC=sz;
+void VulkanRendererContext::ensureCursorStaging(VkDeviceSize sz, uint32_t slot) {
+    if (cursorStgC[slot]>=sz) return;
+    if (cursorStg[slot]!=VK_NULL_HANDLE) {
+        vk_.DestroyBuffer(device,cursorStg[slot],nullptr);
+        vk_.FreeMemory(device,cursorStgM[slot],nullptr);
+    }
+    createBuffer(sz,VK_BUFFER_USAGE_TRANSFER_SRC_BIT,VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,cursorStg[slot],cursorStgM[slot]);
+    vk_.MapMemory(device,cursorStgM[slot],0,sz,0,&cursorStgP[slot]); cursorStgC[slot]=sz;
 }
 
 void VulkanRendererContext::recordCmdBuf(VkCommandBuffer cb, uint32_t imgIdx,
@@ -968,7 +1092,8 @@ void VulkanRendererContext::recordCmdBuf(VkCommandBuffer cb, uint32_t imgIdx,
     bool hasCursorCopy = hasCursorUpload && cursorImg!=VK_NULL_HANDLE && cursorUpload!=VK_NULL_HANDLE;
     if (hasCursorCopy) {
         VkImageMemoryBarrier b{}; b.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        b.oldLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; b.newLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        // Every cursor upload overwrites the complete image, including its first use.
+        b.oldLayout=VK_IMAGE_LAYOUT_UNDEFINED; b.newLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
         b.srcQueueFamilyIndex=b.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED;
         b.image=cursorImg; b.subresourceRange={VK_IMAGE_ASPECT_COLOR_BIT,0,1,0,1};
         b.srcAccessMask=VK_ACCESS_SHADER_READ_BIT; b.dstAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -1100,12 +1225,26 @@ void VulkanRendererContext::renderLoop() {
     while (isRunning) {
         { std::unique_lock<std::mutex> lk(dirtyMutex);
           dirtyCV.wait(lk,[this]{
-              return !isRunning||(!surfaceDetached.load()&&(needsRender.load()||fbResized.load()))||cursorMoved.load(); }); }
+              return !isRunning||(!surfaceDetached.load()&&
+                  (needsRender.load()||fbResized.load()||cursorMoved.load())); }); }
         if (!isRunning) break;
-        if (swapchain == VK_NULL_HANDLE || cmdBufs.empty()) continue;
-        try { renderFrame(); } catch (const std::exception& error) {
-            RLOG_E("renderFrame: %s", error.what());
+        try { renderFrame(); }
+        catch (const std::exception& error) {
+            if (!swapchainRetryPending.exchange(true)) RLOG_E("renderFrame failed: %s", error.what());
+            { std::lock_guard<std::mutex> lk(renderMutex); pendingFrameSerial=0; }
             fbResized.store(true);
+        }
+        catch (...) {
+            if (!swapchainRetryPending.exchange(true)) RLOG_E("renderFrame failed: unknown exception");
+            { std::lock_guard<std::mutex> lk(renderMutex); pendingFrameSerial=0; }
+            fbResized.store(true);
+        }
+        // A failed frame or swapchain retries at a calm pace instead of spinning the core: the
+        // wait is cut short as soon as the surface goes away or the renderer stops.
+        if (swapchainRetryPending.load()) {
+            std::unique_lock<std::mutex> lk(dirtyMutex);
+            dirtyCV.wait_for(lk,std::chrono::milliseconds(50),[this]{
+                return !isRunning||surfaceDetached.load(); });
         }
     }
 }
@@ -1114,14 +1253,19 @@ void VulkanRendererContext::flushDeleteQueue() {
     std::lock_guard<std::mutex> lk(renderMutex);
     if (deleteQueue.empty()) return;
     vk_.DeviceWaitIdle(device);
-    for (auto& wt:deleteQueue) {
-        if (wt.ds  !=VK_NULL_HANDLE) vk_.FreeDescriptorSets(device,winTexPool,1,&wt.ds);
-        if (wt.view!=VK_NULL_HANDLE) vk_.DestroyImageView(device,wt.view,nullptr);
-        if (wt.img !=VK_NULL_HANDLE) vk_.DestroyImage(device,wt.img,nullptr);
-        if (wt.mem !=VK_NULL_HANDLE) vk_.FreeMemory(device,wt.mem,nullptr);
-        if (wt.stg !=VK_NULL_HANDLE){vk_.DestroyBuffer(device,wt.stg,nullptr);vk_.FreeMemory(device,wt.stgMem,nullptr);}
-    }
+    for (auto& retired:deleteQueue) destroyTexNow(retired);
     deleteQueue.clear();
+    retirePending.store(false, std::memory_order_release);
+}
+
+void VulkanRendererContext::destroyTexNow(RetiredTex& retired) {
+    WinTex& wt=retired.wt;
+    if (wt.ds  !=VK_NULL_HANDLE) vk_.FreeDescriptorSets(device,winTexPool,1,&wt.ds);
+    if (wt.view!=VK_NULL_HANDLE) vk_.DestroyImageView(device,wt.view,nullptr);
+    if (wt.img !=VK_NULL_HANDLE) vk_.DestroyImage(device,wt.img,nullptr);
+    if (wt.mem !=VK_NULL_HANDLE) vk_.FreeMemory(device,wt.mem,nullptr);
+    if (wt.stg !=VK_NULL_HANDLE){vk_.DestroyBuffer(device,wt.stg,nullptr);vk_.FreeMemory(device,wt.stgMem,nullptr);}
+    if (retired.ahb) AHardwareBuffer_release(retired.ahb);
 }
 
 void VulkanRendererContext::renderFrame() {
@@ -1131,22 +1275,60 @@ void VulkanRendererContext::renderFrame() {
     cursorMoved.store(false,std::memory_order_relaxed);
 
     if (surfaceDetached.load(std::memory_order_acquire)) return;
-    if (surfaceWidth==0||surfaceHeight==0) return;
+    if (surfaceWidth==0||surfaceHeight==0) { swapchainRetryPending.store(true); return; }
 
     if (fbResized.load()) {
         for (auto& f:inFlightFences) vk_.WaitForFences(device,1,&f,VK_TRUE,UINT64_MAX);
         cleanupSwapchain();
         bool ok=false;
-        try{createSwapchain();createFramebuffers();createCmdBufs();recreateSyncObjects();imgInFlight.assign(swapchainImages.size(),VK_NULL_HANDLE);ok=true;}catch(...){}
-        if (ok) fbResized.store(false);
+        try{createSwapchain();createFramebuffers();createCmdBufs();recreateSyncObjects();imgInFlight.assign(swapchainImages.size(),VK_NULL_HANDLE);ok=true;}
+        catch(const std::exception& e){
+            if (!swapchainRetryPending.exchange(true)) RLOG_E("swapchain recreate failed: %s",e.what());
+        }
+        catch(...){
+            if (!swapchainRetryPending.exchange(true)) RLOG_E("swapchain recreate failed: unknown exception");
+        }
+        if (ok) {
+            fbResized.store(false);
+            swapchainRetryPending.store(false);
+            needsRender.store(true);
+            dirtyCV.notify_one();
+        }
         return;
     }
 
-    if (cmdSlot(0) >= cmdBufs.size() || cmdBufs[cmdSlot(0)] == VK_NULL_HANDLE) return;
+    // Nothing to draw into (a recreate is still failing or pending): ask for another attempt.
+    if (swapchain==VK_NULL_HANDLE || cmdBufs.empty()) {
+        fbResized.store(true);
+        swapchainRetryPending.store(true);
+        return;
+    }
+    if (cmdSlot(0) >= cmdBufs.size() || cmdBufs[cmdSlot(0)] == VK_NULL_HANDLE) {
+        fbResized.store(true);
+        swapchainRetryPending.store(true);
+        return;
+    }
     bool currentFenceWaited = false;
-    if (!vk_.GetFenceStatus || vk_.GetFenceStatus(device, inFlightFences[currentFrame]) == VK_NOT_READY) {
-        vk_.WaitForFences(device,1,&inFlightFences[currentFrame],VK_TRUE,UINT64_MAX);
+    VkResult fenceState=vk_.GetFenceStatus ? vk_.GetFenceStatus(device,inFlightFences[currentFrame]) : VK_NOT_READY;
+    if (fenceState==VK_NOT_READY) {
+        if (vk_.WaitForFences(device,1,&inFlightFences[currentFrame],VK_TRUE,UINT64_MAX)!=VK_SUCCESS)
+            throw std::runtime_error("frame fence wait");
         currentFenceWaited = true;
+    } else if (fenceState!=VK_SUCCESS) throw std::runtime_error("frame fence status");
+
+    // This slot's frame is finished, so every texture it drew can now be destroyed.
+    completedSerial=std::max(completedSerial,slotSerial[currentFrame]);
+    if (retirePending.load(std::memory_order_acquire)) {
+        std::lock_guard<std::mutex> lk(renderMutex);
+        if (!deleteQueue.empty()) {
+            size_t keep=0;
+            for (auto& retired:deleteQueue) {
+                if (retired.serial<=completedSerial) destroyTexNow(retired);
+                else deleteQueue[keep++]=std::move(retired);
+            }
+            deleteQueue.resize(keep);
+        }
+        retirePending.store(!deleteQueue.empty(),std::memory_order_release);
     }
 
     // This slot's previous frame is complete, so its chain timestamps are final.
@@ -1259,25 +1441,23 @@ void VulkanRendererContext::renderFrame() {
     short ptrX,ptrY,curHotX,curHotY,curW,curH; bool curVis;
     VkBuffer curUpload=VK_NULL_HANDLE; bool hasCurUpload=false;
     VkRect2D effectiveScissor{{0,0},swapchainExt};
+    // First-use transitions are only marked done once the submit that carries them succeeded.
+    struct PendingAHBTransition { AHardwareBuffer* ahb; VkImage image; };
+    struct PendingTexTransition { int64_t id; VkImage image; };
+    std::vector<PendingAHBTransition> pendingAHB;
+    std::vector<PendingTexTransition> pendingTex;
 
     {
         std::lock_guard<std::mutex> lk(renderMutex);
 
-        if (!deleteQueue.empty()) {
-            for (auto& wt:deleteQueue) {
-                if (wt.ds  !=VK_NULL_HANDLE) vk_.FreeDescriptorSets(device,winTexPool,1,&wt.ds);
-                if (wt.view!=VK_NULL_HANDLE) vk_.DestroyImageView(device,wt.view,nullptr);
-                if (wt.img !=VK_NULL_HANDLE) vk_.DestroyImage(device,wt.img,nullptr);
-                if (wt.mem !=VK_NULL_HANDLE) vk_.FreeMemory(device,wt.mem,nullptr);
-                if (wt.stg !=VK_NULL_HANDLE){vk_.DestroyBuffer(device,wt.stg,nullptr);vk_.FreeMemory(device,wt.stgMem,nullptr);}
-            }
-            deleteQueue.clear();
-        }
+        // Pin the draw list before releasing renderMutex: removeWindow may run while the
+        // commands are recorded but before their submit reaches the GPU.
+        pendingFrameSerial=++submittedSerial;
 
         ox=sceneOffsetX; oy=sceneOffsetY; sx=sceneScaleX; sy=sceneScaleY;
         cw=(float)containerWidth; ch=(float)containerHeight;
         ptrX=(short)pointerX.load(); ptrY=(short)pointerY.load();
-        curHotX=cursorHotX; curHotY=cursorHotY; curW=cursorTexW; curH=cursorTexH;
+        curHotX=cursorHotX; curHotY=cursorHotY;
         curVis=cursorVisible.load();
 
         if (hasCustomScissor) effectiveScissor = rotateRectLogicalToIdentity(customScissor);
@@ -1292,22 +1472,44 @@ void VulkanRendererContext::renderFrame() {
             if (wt.ds==VK_NULL_HANDLE) continue;
             DrawEntry de{wt.img,wt.ds,VK_NULL_HANDLE,re.x,re.y,wt.w,wt.h};
             de.isAHB=wt.isAHB;
-            if (wt.needsTransition) { de.needsTransition=true; wt.needsTransition=false; }
+            if (wt.isAHB) {
+                auto cit=ahbImportCache.find(wt.ahb);
+                if (cit!=ahbImportCache.end() && cit->second.img==wt.img &&
+                    cit->second.needsTransition &&
+                    std::none_of(pendingAHB.begin(),pendingAHB.end(),
+                        [&](const PendingAHBTransition& p){return p.image==wt.img;})) {
+                    de.needsTransition=true;
+                    pendingAHB.push_back({wt.ahb,wt.img});
+                }
+            } else if (wt.needsTransition &&
+                std::none_of(pendingTex.begin(),pendingTex.end(),
+                    [&](const PendingTexTransition& p){return p.image==wt.img;})) {
+                de.needsTransition=true;
+                pendingTex.push_back({re.id,wt.img});
+            }
             if (wt.dirty && !wt.isAHB && wt.stg!=VK_NULL_HANDLE) { de.upload=wt.stg; wt.dirty=false; }
             else if (wt.isAHB) { wt.dirty=false; }
             frameDraws.push_back(de);
         }
 
-        if (isCursorImageDirty.load() && cursorImg!=VK_NULL_HANDLE && !cursorPixels.empty()) {
+        if (isCursorImageDirty.load() && !cursorPixels.empty()) {
+            if (cursorImg==VK_NULL_HANDLE || cursorTexW!=cursorPendingW || cursorTexH!=cursorPendingH) {
+                // The shared cursor descriptor and the old image view can still be referenced by
+                // either frame slot. Resizes are rare; wait only here, never on pointer motion or
+                // same-size cursor updates.
+                if (cursorImg!=VK_NULL_HANDLE)
+                    for (auto& fence:inFlightFences)
+                        if (vk_.WaitForFences(device,1,&fence,VK_TRUE,UINT64_MAX)!=VK_SUCCESS)
+                            throw std::runtime_error("cursor resize fence wait");
+                ensureCursorTex(cursorPendingW,cursorPendingH);
+            }
             VkDeviceSize csz=(VkDeviceSize)cursorTexW*cursorTexH*4;
-            ensureCursorStaging(csz);
-            isCursorImageDirty.store(false); hasCurUpload=true; curUpload=cursorStg;
-            cursorUploadSize = csz;
+            ensureCursorStaging(csz,currentFrame);
+            memcpy(cursorStgP[currentFrame],cursorPixels.data(),(size_t)csz);
+            isCursorImageDirty.store(false); hasCurUpload=true; curUpload=cursorStg[currentFrame];
         }
+        curW=cursorTexW; curH=cursorTexH;
     }
-
-    if (hasCurUpload && cursorStgP && !cursorPixels.empty())
-        memcpy(cursorStgP, cursorPixels.data(), cursorUploadSize);
 
     recordCmdBuf(cmdBufs[cmdSlot(0)],imgIdx,frameDraws,
         frameAhbTransitions,framePreUpload,framePostUpload,
@@ -1362,12 +1564,35 @@ void VulkanRendererContext::renderFrame() {
             // The fence was reset above and may now never signal; replace it
             // with a signalled one so the next use of this slot does not wait
             // on it forever.
+            // An earlier submit of this frame already went out and is not covered by that fence
+            // (it rides on the last one), so let it finish before its textures can be retired.
+            if (k > 0) vk_.DeviceWaitIdle(device);
+            {
+                std::lock_guard<std::mutex> lk(renderMutex);
+                if (k > 0) slotSerial[currentFrame] = pendingFrameSerial;
+                pendingFrameSerial = 0;
+                if (k == 0 && hasCurUpload) isCursorImageDirty.store(true);
+            }
             vk_.DestroyFence(device,inFlightFences[currentFrame],nullptr);
             VkFenceCreateInfo fi{}; fi.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO; fi.flags=VK_FENCE_CREATE_SIGNALED_BIT;
             vk_.CreateFence(device,&fi,nullptr,&inFlightFences[currentFrame]);
             imgInFlight.assign(swapchainImages.size(), VK_NULL_HANDLE);
             fbResized.store(true);
+            swapchainRetryPending.store(true);
             return;
+        }
+        if (k == 0 && (!pendingAHB.empty() || !pendingTex.empty())) {
+            std::lock_guard<std::mutex> lk(renderMutex);
+            for (const auto& p:pendingAHB) {
+                auto it=ahbImportCache.find(p.ahb);
+                if (it!=ahbImportCache.end() && it->second.img==p.image)
+                    it->second.needsTransition=false;
+            }
+            for (const auto& p:pendingTex) {
+                auto it=texMap.find(p.id);
+                if (it!=texMap.end() && it->second.img==p.image)
+                    it->second.needsTransition=false;
+            }
         }
         fenceSubmitted = last;
         VkPresentInfoKHR pi{}; pi.sType=VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -1389,6 +1614,12 @@ void VulkanRendererContext::renderFrame() {
         // still means "this frame's work is done".
         VkSubmitInfo si{}; si.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO;
         vk_.QueueSubmit(graphicsQueue,1,&si,inFlightFences[currentFrame]);
+    }
+    {
+        // Everything of this frame is submitted and the slot's fence covers it.
+        std::lock_guard<std::mutex> lk(renderMutex);
+        slotSerial[currentFrame]=pendingFrameSerial;
+        pendingFrameSerial=0;
     }
     trackPresentedRate(presented);
     currentFrame=(currentFrame+1)%MAX_FRAMES_IN_FLIGHT;
@@ -1430,6 +1661,7 @@ bool VulkanRendererContext::reattachSurface(ANativeWindow* newWindow) {
             createSwapchain();
             createFramebuffers();
             createCmdBufs();
+            recreateSyncObjects();
             imgInFlight.assign(swapchainImages.size(), VK_NULL_HANDLE);
         } catch (...) {
             __android_log_print(ANDROID_LOG_ERROR, "Winlator_Renderer", "reattachSurface: swapchain recreate failed");
@@ -1438,8 +1670,9 @@ bool VulkanRendererContext::reattachSurface(ANativeWindow* newWindow) {
 
         surfaceWidth  = ANativeWindow_getWidth(window);
         surfaceHeight = ANativeWindow_getHeight(window);
-        for (auto& [id, wt] : texMap) wt.needsTransition = true;
-        for (auto& [ahb, wt] : ahbImportCache) wt.needsTransition = true;
+        // Texture layouts survive a surface change; forcing a transition from UNDEFINED here
+        // would throw their contents away.
+        swapchainRetryPending.store(false);
         surfaceDetached.store(false, std::memory_order_release);
     }
     needsRender.store(true, std::memory_order_release);
@@ -1465,13 +1698,13 @@ void VulkanRendererContext::setCursorVisible(bool v) {
 void VulkanRendererContext::updateCursorImage(void* px, short w, short h, short stride, short hotX, short hotY) {
     if (!px||w<=0||h<=0) return;
     std::lock_guard<std::mutex> lk(renderMutex);
-    ensureCursorTex(w,h);
     cursorPixels.resize((size_t)w*h);
     const size_t srcStrideBytes=(size_t)std::max((int)stride,(int)w)*4;
     const size_t rowBytes=(size_t)w*4;
     const uint8_t* src=static_cast<const uint8_t*>(px);
     uint8_t* dst=reinterpret_cast<uint8_t*>(cursorPixels.data());
     for (int y=0;y<h;y++) memcpy(dst+(size_t)y*rowBytes,src+(size_t)y*srcStrideBytes,rowBytes);
+    cursorPendingW=w; cursorPendingH=h;
     cursorHotX=hotX; cursorHotY=hotY;
     isCursorImageDirty.store(true); needsRender.store(true); dirtyCV.notify_one();
 }
@@ -1482,6 +1715,7 @@ void VulkanRendererContext::updateWindowContent(int64_t id, void* px, short w, s
     {
         std::lock_guard<std::mutex> lk(renderMutex);
         WinTex& wt=texMap[id];
+        if (wt.isAHB) wt={}; // The cached AHB owns the borrowed image.
         if (wt.img==VK_NULL_HANDLE || wt.w!=w || wt.h!=h) {
             if (wt.img!=VK_NULL_HANDLE) destroyWinTex(wt);
             if (!createWinTexResources(wt,w,h)) { texMap.erase(id); return; }
@@ -1517,14 +1751,15 @@ void VulkanRendererContext::updateWindowContentAHB(int64_t id, AHardwareBuffer* 
         ahbImportCache[ahb] = tmp;
         windowAhbs[id].push_back(ahb);
         cit = ahbImportCache.find(ahb);
-        RLOG("updateWindowContentAHB: imported new AHB %p for id=%" PRId64 " (%dx%d)",
-            (void*)ahb, id, tmp.w, tmp.h);
+        RLOG("updateWindowContentAHB: imported new AHB %p img=%p for id=%" PRId64 " (%dx%d)",
+            (void*)ahb, (void*)tmp.img, id, tmp.w, tmp.h);
     }
     WinTex& src = cit->second;
     WinTex& wt  = texMap[id];
+    if (!wt.isAHB && wt.img!=VK_NULL_HANDLE) destroyWinTex(wt);
     wt.img  = src.img; wt.mem  = src.mem; wt.view = src.view; wt.ds   = src.ds;
     wt.isAHB = true; wt.ahb  = ahb; wt.w = src.w; wt.h = src.h;
-    if (src.needsTransition) { wt.needsTransition = true; src.needsTransition = false; }
+    wt.needsTransition = false; // The first-use layout belongs to the cached VkImage.
     needsRender.store(true); dirtyCV.notify_one();
 }
 
@@ -1549,8 +1784,8 @@ void VulkanRendererContext::removeWindow(int64_t id) {
             auto cit = ahbImportCache.find(ahb);
             if (cit != ahbImportCache.end()) {
                 WinTex deferred = cit->second; deferred.isAHB = false;
-                deleteQueue.push_back(deferred);
-                AHardwareBuffer_release(ahb);
+                deleteQueue.push_back({deferred, pendingFrameSerial ? pendingFrameSerial : submittedSerial, ahb});
+                retirePending.store(true, std::memory_order_release);
                 ahbImportCache.erase(cit);
             }
         }
@@ -1679,13 +1914,15 @@ void VulkanRendererContext::collectWindowNodes(int64_t id, int absX, int absY,
     auto it = windowTree.find(id);
     if (it == windowTree.end()) return;
     WinNode& node = it->second;
-    if (!node.mapped || node.width <= 1 || node.height <= 1) return;
+    if (!node.mapped) return;
 
     int myAbsX = absX, myAbsY = absY;
     if (id != rootWindowId) {
         myAbsX = absX + node.x;
         myAbsY = absY + node.y;
-        if (node.viewable) {
+        // 1x1 helper windows are skipped, but their children still get collected below.
+        bool renderable = node.width > 1 && node.height > 1;
+        if (node.viewable && renderable) {
             out.push_back({node.contentId, myAbsX, myAbsY});
             outSizes.push_back({node.width, node.height});
         }

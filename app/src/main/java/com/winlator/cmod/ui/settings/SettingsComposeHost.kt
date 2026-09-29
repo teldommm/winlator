@@ -121,8 +121,10 @@ data class SettingsModel(
     val autoDownloadArtwork: Boolean,
     val animatedArtwork: Boolean,
     val removeLoadingBar: Boolean,
+    val gameSavesAllShortcuts: Boolean,
     val wineDebug: Boolean,
     val wineDebugChannels: String,
+    val winlatorLogs: Boolean,
     val box64Logs: Boolean,
     val customArtworkSources: Boolean,
     val steamGridApiKey: String,
@@ -247,6 +249,17 @@ internal fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) 
                 }
             }
 
+            item("game-saves-title") { SectionTitle("GAME SAVES") }
+            item("game-saves") {
+                GroupCard {
+                    ToggleRow(
+                        "Back up saves of all games",
+                        model.gameSavesAllShortcuts,
+                        "Find each game's save files and back them up when it exits"
+                    ) { callbacks.onBooleanChanged("game_saves_all_shortcuts", it) }
+                }
+            }
+
             item("xserver-title") { SectionTitle(stringResource(R.string.xserver)) }
             item("xserver") {
                 GroupCard {
@@ -270,6 +283,12 @@ internal fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) 
                             onSave = callbacks::onWineDebugChannelsChanged
                         )
                     }
+                    GroupDivider()
+                    ToggleRow(
+                        "Enable Winlator logs",
+                        model.winlatorLogs,
+                        "Save the app's own logcat beside the game log"
+                    ) { callbacks.onBooleanChanged("enable_winlator_logs", it) }
                     GroupDivider()
                     ToggleRow(stringResource(R.string.enable_box64_logs), model.box64Logs) { callbacks.onBooleanChanged("enable_box64_logs", it) }
                 }
@@ -380,7 +399,7 @@ private fun SmallIcon(icon: ImageVector) {
 }
 
 @Composable
-private fun ToggleRow(title: String, checked: Boolean, onChecked: (Boolean) -> Unit) {
+private fun ToggleRow(title: String, checked: Boolean, subtitle: String? = null, onChecked: (Boolean) -> Unit) {
     // The whole row is the toggle (it used to react only on the switch itself); the Switch is
     // display-only so the row is one accessible "switch" and a tap isn't handled twice.
     Row(
@@ -390,7 +409,16 @@ private fun ToggleRow(title: String, checked: Boolean, onChecked: (Boolean) -> U
             .padding(start = 15.dp, end = 11.dp, top = 9.dp, bottom = 9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            if (!subtitle.isNullOrBlank()) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
         Switch(
             checked = checked,
             onCheckedChange = null,

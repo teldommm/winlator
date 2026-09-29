@@ -80,7 +80,7 @@ interface GameDetailCallbacks {
     fun onPlay()
     fun onConfigure()
     fun onArguments()
-    fun onGameFolder()
+    fun onSaves()
     fun onFavorite(favorite: Boolean)
     fun onRemove()
 }
@@ -192,7 +192,7 @@ private fun LandscapeDetail(title: String, subtitle: String, artwork: Bitmap?, c
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         DetailIconAction(Icons.Outlined.Settings, "Configure", Modifier.weight(1f), compactCaptions, callbacks::onConfigure)
                         DetailIconAction(Icons.Outlined.Dns, "Container", Modifier.weight(1f), compactCaptions, callbacks::onArguments)
-                        DetailIconAction(Icons.Outlined.Folder, "Folder", Modifier.weight(1f), compactCaptions, callbacks::onGameFolder)
+                        DetailIconAction(Icons.Outlined.Folder, "Saves", Modifier.weight(1f), compactCaptions, callbacks::onSaves)
                         DetailIconAction(Icons.Outlined.DeleteOutline, "Remove", Modifier.weight(1f), compactCaptions, callbacks::onRemove, destructive = true)
                     }
                 }
@@ -352,7 +352,7 @@ private fun PortraitDetail(title: String, subtitle: String, artwork: Bitmap?, co
             ) { Icon(Icons.Outlined.PlayArrow, null); Spacer(Modifier.size(8.dp)); Text("Play", fontWeight = FontWeight.Bold) }
             DetailAction(Icons.Outlined.Settings, "Configure", Modifier.fillMaxWidth(), callbacks::onConfigure)
             DetailAction(Icons.Outlined.PlayArrow, "Enter container", Modifier.fillMaxWidth(), callbacks::onArguments)
-            DetailAction(Icons.Outlined.Folder, "Game folder", Modifier.fillMaxWidth(), callbacks::onGameFolder)
+            DetailAction(Icons.Outlined.Folder, "Saves", Modifier.fillMaxWidth(), callbacks::onSaves)
             DetailAction(Icons.Outlined.DeleteOutline, "Remove", Modifier.fillMaxWidth(), callbacks::onRemove, true)
             Spacer(Modifier.height(12.dp))
         }

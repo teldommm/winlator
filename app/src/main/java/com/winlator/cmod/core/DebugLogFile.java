@@ -23,20 +23,34 @@ public class DebugLogFile {
     }
 
     public static File getLogFile(Context context) {
+        return buildLogFile(context, "");
+    }
+
+    // Winlator's own logcat (WinlatorLogcatLogger) goes beside the game log: same name plus "_winlator".
+    public static File getWinlatorLogFile(Context context) {
+        return buildLogFile(context, "_winlator");
+    }
+
+    private static File buildLogFile(Context context, String suffix) {
         SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(context);
         String winlatorPath = sp.getString("winlator_path_uri", null);
         File logsDir;
 
         if (winlatorPath != null) {
             Uri winlatorUri = Uri.parse(winlatorPath);
-            logsDir = new File(FileUtils.getFilePathFromUri(context, winlatorUri), "logs");
+            String resolvedPath = FileUtils.getFilePathFromUri(context, winlatorUri);
+            logsDir = resolvedPath != null
+                    ? new File(resolvedPath, "logs")
+                    : new File(AppDefaults.DEFAULT_WINLATOR_PATH, "logs");
         } else {
             logsDir = new File(AppDefaults.DEFAULT_WINLATOR_PATH, "logs");
         }
 
         if (!logsDir.exists()) logsDir.mkdirs();
 
-        String logFile = fileName.replaceAll("\\s", "_").toLowerCase() + "_" + DateFormat.format("yyyy-MM-dd_HH-mm-ss", new Date()) + ".txt";
+        String baseName = fileName != null && !fileName.isEmpty() ? fileName : "winlator";
+        String logFile = baseName.replaceAll("\\s", "_").toLowerCase()
+                + suffix + "_" + DateFormat.format("yyyy-MM-dd_HH-mm-ss", new Date()) + ".txt";
         return new File(logsDir, logFile);
     }
 }

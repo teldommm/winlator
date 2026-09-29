@@ -1215,8 +1215,8 @@ public class InputControlsView extends View {
      * Use this for analog sticks to avoid per-direction axis conflicts.
      */
     public void handleStickInput(Binding firstBinding, float deltaX, float deltaY) {
-        if (!firstBinding.isGamepad()) return;
-        
+        if (!firstBinding.isGamepad() || profile == null) return;
+
         GamepadState state = profile.getGamepadState();
         WinHandler winHandler = xServer != null ? xServer.getWinHandler() : null;
         
@@ -1226,14 +1226,41 @@ public class InputControlsView extends View {
                              firstBinding == Binding.GAMEPAD_LEFT_THUMB_LEFT ||
                              firstBinding == Binding.GAMEPAD_LEFT_THUMB_RIGHT;
         
+        boolean changed;
         if (isLeftStick) {
+            changed = Float.compare(state.thumbLX, deltaX) != 0 ||
+                      Float.compare(state.thumbLY, deltaY) != 0;
             state.thumbLX = deltaX;
             state.thumbLY = deltaY;
         } else {
+            changed = Float.compare(state.thumbRX, deltaX) != 0 ||
+                      Float.compare(state.thumbRY, deltaY) != 0;
             state.thumbRX = deltaX;
             state.thumbRY = deltaY;
         }
-        
+
+        if (changed && winHandler != null) {
+            winHandler.sendGamepadState();
+        }
+    }
+
+    /** All four D-pad directions in one update (one packet, and none if nothing changed). */
+    public void handleDPadInput(boolean up, boolean right, boolean down, boolean left) {
+        if (profile == null) return;
+
+        GamepadState state = profile.getGamepadState();
+        boolean changed = state.dpad[0] != up ||
+                          state.dpad[1] != right ||
+                          state.dpad[2] != down ||
+                          state.dpad[3] != left;
+        if (!changed) return;
+
+        state.dpad[0] = up;
+        state.dpad[1] = right;
+        state.dpad[2] = down;
+        state.dpad[3] = left;
+
+        WinHandler winHandler = xServer != null ? xServer.getWinHandler() : null;
         if (winHandler != null) {
             winHandler.sendGamepadState();
         }
@@ -1250,39 +1277,60 @@ public class InputControlsView extends View {
     public void handleInputEvent(ExternalController controller, Binding binding, boolean isActionDown, float offset, boolean sendUpdate) {
         WinHandler winHandler = xServer != null ? xServer.getWinHandler() : null;
         if (binding.isGamepad()) {
+            if (profile == null && controller == null) return;
+
             GamepadState state = (controller != null) ? controller.remappedState : profile.getGamepadState();
+            boolean stateChanged = false;
 
             int buttonIdx = binding.ordinal() - Binding.GAMEPAD_BUTTON_A.ordinal();
             if (buttonIdx <= ExternalController.IDX_BUTTON_R2) {
-                if (buttonIdx == ExternalController.IDX_BUTTON_L2)
-                    state.triggerL = isActionDown ? (offset != 0 ? offset : 1.0f) : 0f;
-                else if (buttonIdx == ExternalController.IDX_BUTTON_R2)
-                    state.triggerR = isActionDown ? (offset != 0 ? offset : 1.0f) : 0f;
-                else
-                    state.setPressed(buttonIdx, isActionDown);
+                if (buttonIdx == ExternalController.IDX_BUTTON_L2) {
+                    float value = isActionDown ? (offset != 0 ? offset : 1.0f) : 0f;
+                    stateChanged = Float.compare(state.triggerL, value) != 0;
+                    state.triggerL = value;
+                }
+                else if (buttonIdx == ExternalController.IDX_BUTTON_R2) {
+                    float value = isActionDown ? (offset != 0 ? offset : 1.0f) : 0f;
+                    stateChanged = Float.compare(state.triggerR, value) != 0;
+                    state.triggerR = value;
+                }
+                else {
+                    stateChanged = state.isPressed(buttonIdx) != isActionDown;
+                    if (stateChanged) state.setPressed(buttonIdx, isActionDown);
+                }
             }
             else if (binding == Binding.GAMEPAD_LEFT_THUMB_UP || binding == Binding.GAMEPAD_LEFT_THUMB_DOWN) {
                 float val = (isActionDown && offset == 0) ? 1.0f : Math.abs(offset);
-                state.thumbLY = isActionDown ? (binding == Binding.GAMEPAD_LEFT_THUMB_UP ? -val : val) : 0;
+                float value = isActionDown ? (binding == Binding.GAMEPAD_LEFT_THUMB_UP ? -val : val) : 0;
+                stateChanged = Float.compare(state.thumbLY, value) != 0;
+                state.thumbLY = value;
             }
             else if (binding == Binding.GAMEPAD_LEFT_THUMB_LEFT || binding == Binding.GAMEPAD_LEFT_THUMB_RIGHT) {
                 float val = (isActionDown && offset == 0) ? 1.0f : Math.abs(offset);
-                state.thumbLX = isActionDown ? (binding == Binding.GAMEPAD_LEFT_THUMB_LEFT ? -val : val) : 0;
+                float value = isActionDown ? (binding == Binding.GAMEPAD_LEFT_THUMB_LEFT ? -val : val) : 0;
+                stateChanged = Float.compare(state.thumbLX, value) != 0;
+                state.thumbLX = value;
             }
             else if (binding == Binding.GAMEPAD_RIGHT_THUMB_UP || binding == Binding.GAMEPAD_RIGHT_THUMB_DOWN) {
                 float val = (isActionDown && offset == 0) ? 1.0f : Math.abs(offset);
-                state.thumbRY = isActionDown ? (binding == Binding.GAMEPAD_RIGHT_THUMB_UP ? -val : val) : 0;
+                float value = isActionDown ? (binding == Binding.GAMEPAD_RIGHT_THUMB_UP ? -val : val) : 0;
+                stateChanged = Float.compare(state.thumbRY, value) != 0;
+                state.thumbRY = value;
             }
             else if (binding == Binding.GAMEPAD_RIGHT_THUMB_LEFT || binding == Binding.GAMEPAD_RIGHT_THUMB_RIGHT) {
                 float val = (isActionDown && offset == 0) ? 1.0f : Math.abs(offset);
-                state.thumbRX = isActionDown ? (binding == Binding.GAMEPAD_RIGHT_THUMB_LEFT ? -val : val) : 0;
+                float value = isActionDown ? (binding == Binding.GAMEPAD_RIGHT_THUMB_LEFT ? -val : val) : 0;
+                stateChanged = Float.compare(state.thumbRX, value) != 0;
+                state.thumbRX = value;
             }
             else if (binding == Binding.GAMEPAD_DPAD_UP || binding == Binding.GAMEPAD_DPAD_RIGHT ||
                      binding == Binding.GAMEPAD_DPAD_DOWN || binding == Binding.GAMEPAD_DPAD_LEFT) {
-                state.dpad[binding.ordinal() - Binding.GAMEPAD_DPAD_UP.ordinal()] = isActionDown;
+                int dpadIndex = binding.ordinal() - Binding.GAMEPAD_DPAD_UP.ordinal();
+                stateChanged = state.dpad[dpadIndex] != isActionDown;
+                state.dpad[dpadIndex] = isActionDown;
             }
 
-            if (winHandler != null && sendUpdate) {
+            if (winHandler != null && sendUpdate && stateChanged) {
                 if (controller != null)
                     winHandler.sendGamepadState(controller);
                 else
