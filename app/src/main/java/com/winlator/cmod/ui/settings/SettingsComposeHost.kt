@@ -249,17 +249,6 @@ internal fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) 
                 }
             }
 
-            item("game-saves-title") { SectionTitle("GAME SAVES") }
-            item("game-saves") {
-                GroupCard {
-                    ToggleRow(
-                        "Back up saves of all games",
-                        model.gameSavesAllShortcuts,
-                        "Find each game's save files and back them up when it exits"
-                    ) { callbacks.onBooleanChanged("game_saves_all_shortcuts", it) }
-                }
-            }
-
             item("xserver-title") { SectionTitle(stringResource(R.string.xserver)) }
             item("xserver") {
                 GroupCard {
@@ -284,11 +273,7 @@ internal fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) 
                         )
                     }
                     GroupDivider()
-                    ToggleRow(
-                        "Enable Winlator logs",
-                        model.winlatorLogs,
-                        "Save the app's own logcat beside the game log"
-                    ) { callbacks.onBooleanChanged("enable_winlator_logs", it) }
+                    ToggleRow("Enable Winlator logs", model.winlatorLogs) { callbacks.onBooleanChanged("enable_winlator_logs", it) }
                     GroupDivider()
                     ToggleRow(stringResource(R.string.enable_box64_logs), model.box64Logs) { callbacks.onBooleanChanged("enable_box64_logs", it) }
                 }
@@ -308,6 +293,12 @@ internal fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) 
                     ToggleRow(stringResource(R.string.high_refresh_rate), model.highRefreshRate) { callbacks.onBooleanChanged("high_refresh_rate_mode", it) }
                     GroupDivider()
                     ToggleRow(stringResource(R.string.remove_loading_bar_when_booting_games), model.removeLoadingBar) { callbacks.onBooleanChanged("remove_loading_bar_when_booting_games", it) }
+                    GroupDivider()
+                    ToggleRow(
+                        "Back up saves of all games",
+                        model.gameSavesAllShortcuts,
+                        "Find each game's save files and back them up when it exits"
+                    ) { callbacks.onBooleanChanged("game_saves_all_shortcuts", it) }
                 }
             }
 

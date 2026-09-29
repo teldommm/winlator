@@ -26,12 +26,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -47,6 +53,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.text.font.FontWeight
@@ -268,8 +276,19 @@ private fun ColumnScope.GameSavesPanel(
             )
 
             HorizontalDivider(color = dividerColor())
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
+            val autoChecked = globalAutoBackup || autoBackup
+            val autoEnabled = !busy && !globalAutoBackup
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .toggleable(value = autoChecked, enabled = autoEnabled, role = Role.Switch) {
+                        autoBackup = it
+                        GameSaveManager.setAutoBackupEnabled(shortcut, it)
+                    },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f).padding(end = 8.dp)) {
                     Text("Automatic backup", style = MaterialTheme.typography.bodyLarge)
                     Text(
                         if (globalAutoBackup) "Enabled for all games in Settings"
@@ -279,12 +298,9 @@ private fun ColumnScope.GameSavesPanel(
                     )
                 }
                 Switch(
-                    checked = globalAutoBackup || autoBackup,
-                    onCheckedChange = {
-                        autoBackup = it
-                        GameSaveManager.setAutoBackupEnabled(shortcut, it)
-                    },
-                    enabled = !busy && !globalAutoBackup,
+                    checked = autoChecked,
+                    onCheckedChange = null,
+                    enabled = autoEnabled,
                     colors = accentSwitchColors()
                 )
             }
@@ -309,7 +325,7 @@ private fun ColumnScope.GameSavesPanel(
                     Text("• $it", style = MaterialTheme.typography.bodySmall)
                 }
             }
-            SavesOutlinedButton("Rescan save locations", Modifier.fillMaxWidth(), enabled = !busy && !loading) { rescan() }
+            SavesOutlinedButton("Rescan save locations", Modifier.fillMaxWidth(), enabled = !busy && !loading, icon = Icons.Outlined.Refresh) { rescan() }
 
             message?.let {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -346,21 +362,32 @@ private fun ColumnScope.GameSavesPanel(
 private fun SavesLabel(text: String) {
     Text(
         text,
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.Medium,
+        style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
 }
 
 @Composable
-private fun SavesOutlinedButton(text: String, modifier: Modifier, enabled: Boolean = true, onClick: () -> Unit) {
+private fun SavesOutlinedButton(
+    text: String,
+    modifier: Modifier,
+    enabled: Boolean = true,
+    icon: ImageVector? = null,
+    onClick: () -> Unit
+) {
     OutlinedButton(
         onClick = onClick,
         modifier = modifier,
         enabled = enabled,
         colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface),
         border = BorderStroke(1.dp, hairlineColor())
-    ) { Text(text) }
+    ) {
+        if (icon != null) {
+            Icon(icon, null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+        }
+        Text(text)
+    }
 }
 
 private fun backupLabel(file: File): String {
