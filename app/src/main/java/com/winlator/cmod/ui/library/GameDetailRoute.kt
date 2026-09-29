@@ -5,6 +5,7 @@ import android.os.Environment
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
@@ -112,13 +113,16 @@ fun GameDetailRoute(shortcutPath: String, onClose: () -> Unit, onLibraryChanged:
         }
     }
 
-    GameDetailScreen(
-        shortcut.name,
-        subtitle,
-        bannerPath,
-        coverPath,
-        shortcut.icon,
-        "1" == shortcut.getExtra("favorite", "0"),
-        callbacks
-    )
+    val motionEnabled = rememberArtworkMotionEnabled()
+    CompositionLocalProvider(LocalArtworkMotion provides motionEnabled) {
+        GameDetailScreen(
+            shortcut.name,
+            subtitle,
+            bannerPath,
+            coverPath,
+            shortcut.icon,
+            "1" == shortcut.getExtra("favorite", "0"),
+            callbacks
+        )
+    }
 }

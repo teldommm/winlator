@@ -1,5 +1,6 @@
 package com.winlator.cmod.core;
 
+import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.app.Dialog;
 import android.content.Intent;
@@ -8,11 +9,13 @@ import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Environment;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
+import android.view.animation.LinearInterpolator;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -49,6 +52,16 @@ public class PreloaderDialog {
     private final Activity activity;
     private Dialog dialog;
     private Bitmap artworkBitmap;
+    private ValueAnimator artworkMotion;
+    private ImageView artworkMotionView;
+    private View.OnAttachStateChangeListener artworkMotionDetach;
+
+    // Slow zoom/drift of the launch artwork ("Animated artwork" setting). Same maths as the
+    // Compose kenBurns modifier: one looping clock into sinusoids, drift limited to the margin the
+    // zoom leaves so the picture's edge never shows.
+    private static final long ARTWORK_MOTION_PERIOD_MS = 26_000L;
+    private static final float ARTWORK_MOTION_AMPLITUDE = 0.10f;
+    private static final float ARTWORK_MOTION_PAN = 0.8f;
     private volatile String theGamesDbRequestKey;
 
     public PreloaderDialog(Activity activity) {
@@ -153,6 +166,7 @@ public class PreloaderDialog {
         if (hasArtwork) {
             artworkView.setImageBitmap(artworkBitmap);
             artworkView.setVisibility(View.VISIBLE);
+            startArtworkMotion(artworkView);
         } else {
             artworkView.setImageDrawable(null);
             artworkView.setVisibility(View.GONE);
@@ -379,6 +393,7 @@ public class PreloaderDialog {
         View launchScrim = dialog.findViewById(R.id.LaunchScrim);
         artworkView.setImageBitmap(artworkBitmap);
         artworkView.setVisibility(View.VISIBLE);
+        startArtworkMotion(artworkView);
         launchScrim.setVisibility(View.VISIBLE);
         applyLaunchTextColors(true);
     }
@@ -424,7 +439,60 @@ public class PreloaderDialog {
         releaseArtwork();
     }
 
+    private void startArtworkMotion(final ImageView view) {
+        stopArtworkMotion();
+        if (view == null || !ArtworkRepository.isMotionEnabled(activity)) return;
+        final ValueAnimator animator = ValueAnimator.ofFloat(0f, 1f);
+        animator.setDuration(ARTWORK_MOTION_PERIOD_MS);
+        animator.setInterpolator(new LinearInterpolator());
+        animator.setRepeatCount(ValueAnimator.INFINITE);
+        animator.addUpdateListener(a -> {
+            double angle = ((Float) a.getAnimatedValue()) * 2.0 * Math.PI;
+            float zoom = 1f + ARTWORK_MOTION_AMPLITUDE * (float) ((1.0 - Math.cos(angle)) / 2.0);
+            float margin = (zoom - 1f) / 2f;
+            view.setScaleX(zoom);
+            view.setScaleY(zoom);
+            view.setTranslationX((float) (view.getWidth() * margin * ARTWORK_MOTION_PAN * Math.sin(angle)));
+            view.setTranslationY((float) (view.getHeight() * margin * ARTWORK_MOTION_PAN * 0.75f * Math.sin(angle * 2.0)));
+        });
+        // Safety net: if the window goes away without close() (activity destroyed with the dialog
+        // still up), a running infinite animator would keep the view - and the activity - alive.
+        artworkMotionDetach = new View.OnAttachStateChangeListener() {
+            @Override public void onViewAttachedToWindow(View v) {}
+            @Override public void onViewDetachedFromWindow(View v) { animator.cancel(); }
+        };
+        view.addOnAttachStateChangeListener(artworkMotionDetach);
+        artworkMotionView = view;
+        artworkMotion = animator;
+        animator.start();
+    }
+
+    // An infinite animator must never outlive the dialog (it would keep the view and the activity
+    // alive), and cancel() belongs on the UI thread, while close() may be called from any thread.
+    private void stopArtworkMotion() {
+        final ValueAnimator animator = artworkMotion;
+        if (animator == null) return;
+        final ImageView view = artworkMotionView;
+        final View.OnAttachStateChangeListener detach = artworkMotionDetach;
+        artworkMotion = null;
+        artworkMotionView = null;
+        artworkMotionDetach = null;
+        final Runnable cancel = () -> {
+            animator.cancel();
+            if (view != null) {
+                if (detach != null) view.removeOnAttachStateChangeListener(detach);
+                view.setScaleX(1f);
+                view.setScaleY(1f);
+                view.setTranslationX(0f);
+                view.setTranslationY(0f);
+            }
+        };
+        if (Looper.myLooper() == Looper.getMainLooper()) cancel.run();
+        else activity.runOnUiThread(cancel);
+    }
+
     private void releaseArtwork() {
+        stopArtworkMotion();
         if (artworkBitmap != null) {
             try {
                 if (!artworkBitmap.isRecycled()) artworkBitmap.recycle();

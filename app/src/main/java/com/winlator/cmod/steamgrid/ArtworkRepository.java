@@ -68,8 +68,11 @@ public final class ArtworkRepository {
     public static final String EXTRA_SOURCE = "artworkSource";
     public static final String SOURCE_NONE = "none";
 
-    /** Settings > Experimental: download covers/banners automatically (default on). */
+    /** Settings > COVER ART: download covers/banners automatically (default on). */
     public static final String PREF_AUTO_DOWNLOAD = "auto_download_artwork";
+
+    /** Settings > COVER ART: slow zoom/drift on big artwork (default on). */
+    public static final String PREF_ANIMATED_ARTWORK = "animated_artwork";
 
     private static final String BASE_URL = "https://www.steamgriddb.com/api/v2/";
     private static final String DEFAULT_API_KEY = "0324c52513634547a7b32d6d323635d0";
@@ -267,6 +270,10 @@ public final class ArtworkRepository {
     }
 
     // ------------------------------------------------------------------ settings and state
+
+    public static boolean isMotionEnabled(Context context) {
+        return prefs(context).getBoolean(PREF_ANIMATED_ARTWORK, true);
+    }
 
     public static boolean isAutoDownloadEnabled(Context context) {
         return prefs(context).getBoolean(PREF_AUTO_DOWNLOAD, true);

@@ -301,7 +301,8 @@ private fun TabContent(controller: MainShellController, tab: Int) {
     when (tab) {
         R.id.main_menu_shortcuts -> LibraryRoute(
             shownSerial = serial,
-            active = controller.selectedTab == tab
+            active = controller.selectedTab == tab,
+            detailOpen = controller.detailActive
         )
         R.id.main_menu_input_controls -> InputControlsRoute(
             initialProfileId = controller.inputControlsProfileId,

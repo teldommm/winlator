@@ -1,7 +1,6 @@
 package com.winlator.cmod.ui.library
 
 import android.graphics.Bitmap
-import android.os.Build
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -14,9 +13,6 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.BlurredEdgeTreatment
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.asImageBitmap
@@ -33,12 +29,6 @@ import kotlinx.coroutines.withContext
 // 256px exe icon was blown up to fill a whole portrait tile, and a portrait cover was stretched
 // across a landscape screen (a ~4x zoom of one horizontal strip). Now a missing cover shows the
 // icon at its own size on a plain tile, and a cover-only backdrop is blurred instead of enlarged.
-
-// A portrait cover used as a wide backdrop: blurred where the platform can (Android 12+), otherwise
-// just dimmed so the enlarged pixels don't read as a sharp, stretched picture (minSdk is 28).
-internal fun Modifier.softenBackdrop(): Modifier =
-    if (Build.VERSION.SDK_INT >= 31) this.blur(28.dp, BlurredEdgeTreatment.Unbounded).alpha(.75f)
-    else this.alpha(.30f)
 
 // The game icon at a fixed size, centred on a plain tile. For "there is no cover" states.
 @Composable
@@ -60,26 +50,37 @@ internal fun IconTile(iconPath: String?, fallback: Bitmap?, modifier: Modifier =
     }
 }
 
-// Full-bleed background from the banner; with only a portrait cover it is blurred (and softened),
-// so a stretched cover reads as a colour wash instead of a pixelated slice. Draws nothing when
-// the game has no artwork at all.
+// Full-bleed background. With a banner: the banner, slowly breathing. With only a portrait cover:
+// a soft colour wash made from it (see SoftArt), drifting a little more, so a stretched cover never
+// shows as a pixelated slice. Draws nothing when the game has no artwork at all.
 @Composable
 internal fun ArtBackdrop(bannerPath: String?, coverPath: String?, modifier: Modifier = Modifier) {
-    val path = bannerPath ?: coverPath
-    val key = remember(path) { LibraryImageCache.keyFor(path) }
-    val bitmap by produceState<Bitmap?>(LibraryImageCache.peek(key), key) {
-        value = withContext(Dispatchers.IO) { LibraryImageCache.load(path) }
-    }
-    val art = bitmap
-    if (art != null) {
-        Box(modifier.clipToBounds()) {
-            val fill = Modifier.fillMaxSize()
-            Image(
-                art.asImageBitmap(),
-                null,
-                if (bannerPath == null) fill.softenBackdrop() else fill,
-                contentScale = ContentScale.Crop
-            )
+    if (bannerPath != null) {
+        val key = remember(bannerPath) { LibraryImageCache.keyFor(bannerPath) }
+        val banner by produceState<Bitmap?>(LibraryImageCache.peek(key), key) {
+            value = withContext(Dispatchers.IO) { LibraryImageCache.load(bannerPath) }
+        }
+        val art = banner
+        if (art != null) {
+            Box(modifier.clipToBounds()) {
+                Image(art.asImageBitmap(), null, Modifier.fillMaxSize().kenBurns(), contentScale = ContentScale.Crop)
+            }
+        }
+    } else if (coverPath != null) {
+        val key = remember(coverPath) { LibraryImageCache.keyFor(coverPath) }
+        val soft by produceState<Bitmap?>(SoftArt.peek(key), key) {
+            value = withContext(Dispatchers.IO) { SoftArt.load(coverPath) }
+        }
+        val art = soft
+        if (art != null) {
+            Box(modifier.clipToBounds()) {
+                Image(
+                    art.asImageBitmap(),
+                    null,
+                    Modifier.fillMaxSize().kenBurns(amplitude = 0.12f, periodMs = 26_000, pan = 0.9f),
+                    contentScale = ContentScale.Crop
+                )
+            }
         }
     }
 }

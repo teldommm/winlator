@@ -3,6 +3,8 @@ package com.winlator.cmod.ui.library
 import android.graphics.Bitmap
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.snapping.SnapPosition
@@ -136,6 +138,8 @@ internal fun LandscapePagerCore(
                             .coerceIn(0f, 1f)
                         val cardScale = 1f - (0.30f * pageOffset)
                         val selected = pageOffset < 0.5f
+                        // Only the focused card moves; fading the strength keeps the swipe free of a jump.
+                        val motion by animateFloatAsState(if (selected) 1f else 0f, tween(400), label = "pageMotion")
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Surface(
                                 onClick = { callbacks.onOpen(candidate.shortcutPath) },
@@ -147,7 +151,13 @@ internal fun LandscapePagerCore(
                                 border = BorderStroke(if (selected) 2.dp else 1.dp, Color.White.copy(if (selected) .88f else .20f))
                             ) {
                                 val pageCover = candidate.coverPath ?: candidate.generatedCoverPath
-                                if (pageCover != null) PagerImage(pageCover, null, Modifier.fillMaxSize())
+                                if (pageCover != null) {
+                                    PagerImage(
+                                        pageCover,
+                                        null,
+                                        Modifier.fillMaxSize().kenBurns(amplitude = 0.05f, periodMs = 18_000, pan = 0.8f, strength = motion)
+                                    )
+                                }
                                 else IconTile(candidate.iconPath, candidate.fallbackIcon, Modifier.fillMaxSize())
                             }
                         }

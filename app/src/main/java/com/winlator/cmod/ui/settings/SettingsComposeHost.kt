@@ -111,6 +111,7 @@ data class SettingsModel(
     val shareClipboard: Boolean,
     val pauseWine: Boolean,
     val autoDownloadArtwork: Boolean,
+    val animatedArtwork: Boolean,
     val removeLoadingBar: Boolean,
     val wineDebug: Boolean,
     val wineDebugChannels: String,
@@ -233,6 +234,11 @@ internal fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) 
             item("auto-download-artwork") {
                 GroupCard {
                     ToggleRow("Auto-download artwork from the internet", model.autoDownloadArtwork) { callbacks.onBooleanChanged("auto_download_artwork", it) }
+                }
+            }
+            item("animated-artwork") {
+                GroupCard {
+                    ToggleRow("Animated artwork", model.animatedArtwork) { callbacks.onBooleanChanged("animated_artwork", it) }
                 }
             }
 

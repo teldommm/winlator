@@ -175,20 +175,23 @@ private fun LandscapeDetail(title: String, subtitle: String, artwork: Bitmap?, c
     }
 }
 
-// Banner: full-bleed crop. Cover only: blurred backdrop, plus (portrait header) the cover itself
-// at its own proportions above the title instead of a 2x zoom into its middle.
+// Banner: full-bleed crop, slowly breathing. Cover only: a soft colour wash of it drifting behind
+// (SoftArt) plus, in the portrait header, the cover itself at its own proportions with a gentle
+// zoom of its own, out of step with the backdrop. Motion is off unless the screen allowed it
+// (LocalArtworkMotion, the "Animated artwork" setting).
 @Composable
 private fun DetailArtwork(artwork: Bitmap?, coverOnly: Boolean, showCover: Boolean) {
     if (artwork == null) return
     val image = artwork.asImageBitmap()
     Box(Modifier.fillMaxSize().clipToBounds()) {
         if (!coverOnly) {
-            Image(image, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            Image(image, null, Modifier.fillMaxSize().kenBurns(), contentScale = ContentScale.Crop)
         } else {
+            val soft = remember(artwork) { SoftArt.from(artwork) }
             Image(
-                image,
+                soft.asImageBitmap(),
                 null,
-                Modifier.fillMaxSize().softenBackdrop(),
+                Modifier.fillMaxSize().kenBurns(amplitude = 0.12f, periodMs = 26_000, pan = 0.9f),
                 contentScale = ContentScale.Crop
             )
             if (showCover) {
@@ -196,7 +199,12 @@ private fun DetailArtwork(artwork: Bitmap?, coverOnly: Boolean, showCover: Boole
                     Image(
                         image,
                         null,
-                        Modifier.padding(top = 16.dp, bottom = 112.dp).fillMaxHeight().aspectRatio(2f / 3f).clip(WinZShapes.Small),
+                        Modifier
+                            .padding(top = 16.dp, bottom = 112.dp)
+                            .fillMaxHeight()
+                            .aspectRatio(2f / 3f)
+                            .kenBurns(amplitude = 0.04f, periodMs = 18_000, pan = 0f, phase = 0.5f)
+                            .clip(WinZShapes.Small),
                         contentScale = ContentScale.Crop
                     )
                 }
