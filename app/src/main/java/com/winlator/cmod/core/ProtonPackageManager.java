@@ -1,24 +1,18 @@
 package com.winlator.cmod.core;
 
 import android.content.Context;
-import android.util.Log;
+import android.content.SharedPreferences;
+
+import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.xenvironment.ImageFs;
 import com.winlator.cmod.xenvironment.ImageFsInstaller;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
-import okhttp3.ResponseBody;
+import java.util.Locale;
 
 public abstract class ProtonPackageManager {
     private static final String TAG = "ProtonPackageManager";
@@ -26,7 +20,6 @@ public abstract class ProtonPackageManager {
     private static final String RELEASE_BASE_URL = "https://github.com/Other-backup/winlator-imagefs/releases/download/protons-zst-latest/";
     private static final String RELEASE_NEW_BASE_URL = "https://github.com/Other-backup/winlator-imagefs-v2/releases/download/c/";
     private static final String RELEASE_D_BASE_URL = "https://github.com/Other-backup/winlator-imagefs-v2/releases/download/d/";
-    private static final OkHttpClient HTTP = new OkHttpClient();
 
     public static class PackageInfo {
         public final String identifier;
@@ -75,14 +68,69 @@ public abstract class ProtonPackageManager {
                     new long[]{52428800L, 52428800L, 52428800L, 52428800L, 7195940L})
     );
 
+    // Extra packages from the optional Proton manifest (Winlator Services). An entry with the same
+    // identifier as a built-in package replaces it, anything else is added after the built-ins.
+    private static volatile List<PackageInfo> remotePackages = new ArrayList<>();
+    private static final String KEY_MANIFEST_CACHE_URL = "svc_proton_manifest_cache_url";
+    private static final String KEY_MANIFEST_CACHE_BODY = "svc_proton_manifest_cache_body";
+    private static final int MANIFEST_MAX_BYTES = 1024 * 1024;
+
     public static List<PackageInfo> getPackages() {
-        return new ArrayList<>(PACKAGES);
+        ArrayList<PackageInfo> merged = new ArrayList<>(PACKAGES);
+        for (PackageInfo remote : remotePackages) {
+            int index = indexOfIdentifier(merged, remote.identifier);
+            if (index >= 0) merged.set(index, remote);
+            else merged.add(remote);
+        }
+        return merged;
     }
 
     public static PackageInfo getPackage(String identifier) {
-        for (PackageInfo packageInfo : PACKAGES)
+        for (PackageInfo packageInfo : getPackages())
             if (packageInfo.identifier.equals(identifier)) return packageInfo;
         return null;
+    }
+
+    private static int indexOfIdentifier(List<PackageInfo> list, String identifier) {
+        for (int i = 0; i < list.size(); i++)
+            if (list.get(i).identifier.equals(identifier)) return i;
+        return -1;
+    }
+
+    /**
+     * Loads the Proton manifest configured in Winlator Services. Blocking network call: run it off
+     * the main thread. The last manifest that downloaded and parsed cleanly is kept, so a failed
+     * fetch (offline, host down) does not make the extra packages disappear - the failure is still
+     * thrown so the caller can tell the user why the list did not update.
+     */
+    public static void refreshRemote(Context context) throws Downloader.DownloadException {
+        Context app = context.getApplicationContext();
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(app);
+        String manifestUrl = RemoteSources.protonManifestUrl(app);
+        if (manifestUrl.isEmpty()) {
+            remotePackages = new ArrayList<>();
+            prefs.edit().remove(KEY_MANIFEST_CACHE_URL).remove(KEY_MANIFEST_CACHE_BODY).apply();
+            return;
+        }
+
+        if (manifestUrl.equals(prefs.getString(KEY_MANIFEST_CACHE_URL, null))) {
+            List<PackageInfo> cached = ProtonManifest.parse(prefs.getString(KEY_MANIFEST_CACHE_BODY, ""));
+            remotePackages = cached != null ? cached : new ArrayList<>();
+        } else {
+            remotePackages = new ArrayList<>();
+        }
+
+        if (!RemoteSources.isHttps(manifestUrl)) {
+            throw new Downloader.DownloadException(Downloader.Reason.INVALID_URL,
+                    "The Proton manifest address must start with https://");
+        }
+        String text = Downloader.fetchText(manifestUrl, MANIFEST_MAX_BYTES);
+        List<PackageInfo> parsed = ProtonManifest.parse(text);
+        if (parsed == null) {
+            throw new Downloader.DownloadException(Downloader.Reason.BAD_RESPONSE, "The Proton manifest is not valid");
+        }
+        remotePackages = parsed;
+        prefs.edit().putString(KEY_MANIFEST_CACHE_URL, manifestUrl).putString(KEY_MANIFEST_CACHE_BODY, text).apply();
     }
 
     public static boolean isKnownPackage(String identifier) {
@@ -101,97 +149,34 @@ public abstract class ProtonPackageManager {
 
     public static List<String> getInstalledIdentifiers(Context context) {
         ArrayList<String> identifiers = new ArrayList<>();
-        for (PackageInfo packageInfo : PACKAGES)
+        for (PackageInfo packageInfo : getPackages())
             if (isInstalled(context, packageInfo.identifier)) identifiers.add(packageInfo.identifier);
         return identifiers;
     }
 
-    public static boolean downloadPackage(PackageInfo packageInfo, File output, Callback<Integer> progressCallback) {
-        if (packageInfo == null || output == null || packageInfo.partSizes == null || packageInfo.partSizes.length == 0)
-            return false;
-
-        long totalSize = 0;
-        for (long size : packageInfo.partSizes) totalSize += size;
-        long downloadedSize = 0;
-        FileUtils.delete(output);
-
-        try (FileOutputStream outputStream = new FileOutputStream(output)) {
-            for (int i = 0; i < packageInfo.partSizes.length; i++) {
-                String address = packageInfo.directUrl != null
-                        ? packageInfo.directUrl
-                        : RELEASE_BASE_URL + packageInfo.fileName + "." + String.format("%02d", i);
-                long expectedPartSize = packageInfo.partSizes[i];
-                long downloadedPartSize = 0;
-
-                Request request = new Request.Builder().url(address).build();
-                try (Response response = HTTP.newCall(request).execute()) {
-                    ResponseBody body = response.body();
-                    if (!response.isSuccessful() || body == null) {
-                        throw new IllegalStateException("HTTP " + response.code() + " while downloading " + packageInfo.fileName);
-                    }
-
-                    try (InputStream inputStream = body.byteStream()) {
-                        byte[] data = new byte[64 * 1024];
-                        int count;
-                        while ((count = inputStream.read(data)) != -1) {
-                            outputStream.write(data, 0, count);
-                            downloadedPartSize += count;
-                            downloadedSize += count;
-                            if (progressCallback != null && totalSize > 0) {
-                                progressCallback.call(Math.min(100, (int)(downloadedSize * 100 / totalSize)));
-                            }
-                        }
-                    }
-                }
-
-                if (expectedPartSize > 0 && downloadedPartSize != expectedPartSize) {
-                    throw new IllegalStateException(
-                            "Size mismatch for " + packageInfo.fileName + " part " + i
-                                    + ": expected " + expectedPartSize + ", got " + downloadedPartSize
-                    );
-                }
-            }
-            outputStream.flush();
+    /**
+     * Downloads a package (all of its parts) into {@code output}, verifying part sizes, the total
+     * size and, when the package has one, its SHA-256. The reason for a failure is in the exception.
+     */
+    public static void downloadPackageOrThrow(PackageInfo packageInfo, File output, Callback<Integer> progressCallback)
+            throws Downloader.DownloadException {
+        if (packageInfo == null || output == null || packageInfo.partSizes == null || packageInfo.partSizes.length == 0) {
+            throw new Downloader.DownloadException(Downloader.Reason.INVALID_URL, "Nothing to download");
         }
-        catch (Exception e) {
-            Log.e(TAG, "Unable to download " + packageInfo.identifier, e);
-            FileUtils.delete(output);
-            return false;
+        ArrayList<Downloader.Part> parts = new ArrayList<>();
+        for (int i = 0; i < packageInfo.partSizes.length; i++) {
+            String address = packageInfo.directUrl != null
+                    ? packageInfo.directUrl
+                    : RELEASE_BASE_URL + packageInfo.fileName + "." + String.format(Locale.ROOT, "%02d", i);
+            parts.add(new Downloader.Part(address, packageInfo.partSizes[i]));
         }
-
-        if (totalSize > 0 && output.length() != totalSize) {
-            Log.e(TAG, "Downloaded size mismatch for " + packageInfo.identifier
-                    + ": expected " + totalSize + ", got " + output.length());
-            FileUtils.delete(output);
-            return false;
+        Downloader.Options options = new Downloader.Options().sha256(packageInfo.sha256);
+        if (progressCallback != null) {
+            options.progress(percent -> {
+                if (percent >= 0) progressCallback.call(percent);
+            });
         }
-
-        if (packageInfo.sha256 != null && !packageInfo.sha256.isEmpty()
-                && !verifySha256(output, packageInfo.sha256)) {
-            Log.e(TAG, "SHA-256 mismatch for " + packageInfo.identifier);
-            FileUtils.delete(output);
-            return false;
-        }
-
-        if (progressCallback != null) progressCallback.call(100);
-        return true;
-    }
-
-    private static boolean verifySha256(File file, String expected) {
-        try (InputStream input = new FileInputStream(file)) {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] buffer = new byte[64 * 1024];
-            int read;
-            while ((read = input.read(buffer)) != -1) digest.update(buffer, 0, read);
-            byte[] hash = digest.digest();
-            StringBuilder hex = new StringBuilder(hash.length * 2);
-            for (byte value : hash) hex.append(String.format("%02x", value & 0xff));
-            return expected.equalsIgnoreCase(hex.toString());
-        }
-        catch (Exception e) {
-            Log.e(TAG, "Unable to verify SHA-256 for " + file, e);
-            return false;
-        }
+        Downloader.downloadParts(parts, output, options);
     }
 
     public static boolean installPackage(Context context, String identifier, File archiveFile) {

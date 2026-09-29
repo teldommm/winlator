@@ -4,7 +4,6 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
 import android.content.Context
 import android.graphics.BitmapFactory
-import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -53,10 +52,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.preference.PreferenceManager
 import com.winlator.cmod.R
 import com.winlator.cmod.contents.AdrenotoolsManager
 import com.winlator.cmod.contents.ContentProfile
+import com.winlator.cmod.components.ComponentCatalog
+import com.winlator.cmod.components.ContentsSource
+import com.winlator.cmod.components.InstallOutcome
+import com.winlator.cmod.components.ProtonSource
 import com.winlator.cmod.contents.ContentsManager
 import com.winlator.cmod.contents.RemoteDriverCatalog
 import com.winlator.cmod.core.DefaultVersion
@@ -69,12 +71,6 @@ import com.winlator.cmod.ui.theme.controlAccentColor
 import com.winlator.cmod.ui.theme.accentSwitchColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import java.io.File
-import java.io.FileOutputStream
-import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 import com.winlator.cmod.ui.theme.WinZShapes
 import com.winlator.cmod.ui.theme.hairlineColor
 import com.winlator.cmod.ui.theme.dividerColor
@@ -84,7 +80,8 @@ internal data class DriverOption(
     val id: String,
     val label: String,
     val installed: Boolean,
-    val remoteUrl: String? = null
+    val remoteUrl: String? = null,
+    val remoteSha256: String? = null
 )
 internal data class WineRuntimeOption(
     val id: String,
@@ -105,16 +102,10 @@ internal data class SettingsCatalog(
 
 private suspend fun syncRemoteContents(context: Context, manager: ContentsManager) {
     withContext(Dispatchers.IO) {
-        runCatching {
-            manager.syncContents()
-            val prefs = PreferenceManager.getDefaultSharedPreferences(context)
-            val url = prefs.getString("downloadable_contents_url", ContentsManager.REMOTE_PROFILES)
-                ?: ContentsManager.REMOTE_PROFILES
-            OkHttpClient().newCall(Request.Builder().url(url).build()).execute().use { response ->
-                if (response.isSuccessful) response.body?.string()?.let(manager::setRemoteProfiles)
-            }
-            manager.syncContents()
-        }
+        // Same refresh the component manager does. A failing source only means its remote rows are
+        // missing from the list, so each one is isolated from the other.
+        runCatching { ContentsSource(manager).refresh(context) }
+        runCatching { ProtonSource().refresh(context) }
     }
 }
 
@@ -184,33 +175,11 @@ private suspend fun loadWineRuntimeOptionsUncached(context: Context): List<WineR
     )
 }
 
-internal suspend fun installWineRuntimeComponent(context: Context, option: WineRuntimeOption): String? {
-    if (option.installed) return option.id
-
-    ProtonPackageManager.getPackage(option.id)?.let { packageInfo ->
-        val archive = File(context.cacheDir, "winz-${System.nanoTime()}-${packageInfo.fileName}")
-        val installed = withContext(Dispatchers.IO) {
-            try {
-                ProtonPackageManager.downloadPackage(packageInfo, archive) { _ -> } &&
-                    ProtonPackageManager.installPackage(context, packageInfo.identifier, archive)
-            } finally {
-                archive.delete()
-            }
-        }
-        return packageInfo.identifier.takeIf {
-            installed && ProtonPackageManager.isInstalled(context, packageInfo.identifier)
-        }
+internal suspend fun installWineRuntimeComponent(context: Context, option: WineRuntimeOption): InstallOutcome =
+    withContext(Dispatchers.IO) {
+        if (option.installed) InstallOutcome.ok(option.id)
+        else ComponentCatalog(context).installRuntime(option.id, option.type, option.version)
     }
-
-    val installedName = installRuntimeComponent(context, option.type, option.version) ?: return null
-    val manager = ContentsManager(context)
-    manager.syncContents()
-    val type = ContentProfile.ContentType.getTypeByName(option.type) ?: return null
-    return manager.getInstalledProfiles(type)
-        .filter { it.verName == installedName }
-        .maxByOrNull { it.verCode }
-        ?.let { ContentsManager.getEntryName(it) }
-}
 
 // Last full catalog per architecture (arm64 / x86_64 containers), process-wide.
 private val cachedCatalogs = java.util.concurrent.ConcurrentHashMap<Boolean, SettingsCatalog>()
@@ -352,7 +321,7 @@ private suspend fun loadSettingsCatalogUncached(
         }
         if (!alreadyInstalled) {
             driverOptions["remote:${remote.name}:${remote.url}"] =
-                DriverOption(remote.name, remote.name, false, remote.url)
+                DriverOption(remote.name, remote.name, false, remote.url, remote.sha256)
         }
     }
     if (selectedDriver.isNotBlank() && driverOptions.values.none { it.id.equals(selectedDriver, ignoreCase = true) }) {
@@ -391,72 +360,18 @@ internal suspend fun installRuntimeComponent(
     context: Context,
     typeName: String,
     version: String
-): String? {
-    val manager = ContentsManager(context)
-    val profile = withContext(Dispatchers.IO) {
-        try {
-            syncRemoteContents(context, manager)
-            val type = ContentProfile.ContentType.getTypeByName(typeName) ?: return@withContext null
-            manager.getProfiles(type).orEmpty().firstOrNull {
-                it.verName == version && it.remoteUrl != null
-            }
-        } catch (_: Exception) {
-            null
-        }
-    } ?: return null
-
-    val archive = File(context.cacheDir, "winz-${System.nanoTime()}")
-    val downloaded = withContext(Dispatchers.IO) {
-        try {
-            OkHttpClient().newCall(Request.Builder().url(profile.remoteUrl).build()).execute().use { response ->
-                if (!response.isSuccessful || response.body == null) {
-                    false
-                } else {
-                    response.body!!.byteStream().use { input ->
-                        FileOutputStream(archive).use { output -> input.copyTo(output, 64 * 1024) }
-                    }
-                    true
-                }
-            }
-        } catch (_: Exception) {
-            false
-        }
-    }
-    if (!downloaded) return null
-
-    val result = suspendCoroutine<String?> { continuation ->
-        manager.extraContentFile(Uri.fromFile(archive), object : ContentsManager.OnInstallFinishedCallback {
-            override fun onFailed(reason: ContentsManager.InstallFailedReason, error: Exception) {
-                continuation.resume(null)
-            }
-
-            override fun onSucceed(extracted: ContentProfile) {
-                manager.finishInstallContent(extracted, object : ContentsManager.OnInstallFinishedCallback {
-                    override fun onFailed(reason: ContentsManager.InstallFailedReason, error: Exception) {
-                        continuation.resume(
-                            if (reason == ContentsManager.InstallFailedReason.ERROR_EXIST) profile.verName else null
-                        )
-                    }
-
-                    override fun onSucceed(installed: ContentProfile) {
-                        continuation.resume(installed.verName)
-                    }
-                })
-            }
-        })
-    }
-    archive.delete()
-    ContentsManager.cleanTmpDir(context)
-    manager.syncContents()
-    return result
+): InstallOutcome = withContext(Dispatchers.IO) {
+    ComponentCatalog(context).installContent(typeName, version)
 }
 
-internal suspend fun installAdrenoDriver(context: Context, option: DriverOption): String? =
+internal suspend fun installAdrenoDriver(context: Context, option: DriverOption): InstallOutcome =
     withContext(Dispatchers.IO) {
         if (option.remoteUrl != null) {
-            RemoteDriverCatalog.install(context, option.remoteUrl).takeIf { it.isNotBlank() }
+            ComponentCatalog(context).installDriver(option.remoteUrl, option.remoteSha256)
+        } else if (option.installed) {
+            InstallOutcome.ok(option.id)
         } else {
-            option.id.takeIf { option.installed }
+            InstallOutcome.failed("${option.label} is not available")
         }
     }
 

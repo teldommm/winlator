@@ -27,6 +27,7 @@ import com.winlator.cmod.ExternalControllerBindingsActivity
 import com.winlator.cmod.R
 import com.winlator.cmod.core.FileUtils
 import com.winlator.cmod.core.HttpUtils
+import com.winlator.cmod.core.RemoteSources
 import com.winlator.cmod.inputcontrols.ControlsProfile
 import com.winlator.cmod.inputcontrols.ExternalController
 import com.winlator.cmod.inputcontrols.InputControlsManager
@@ -56,9 +57,6 @@ import kotlin.math.roundToInt
 //  - Refresh points are explicit: whenever the activity (re)starts — e.g. back from
 //    ControlsEditorActivity / ExternalControllerBindingsActivity, same as the fragment's
 //    onStart — and whenever MainShell re-shows the tab (shownSerial).
-
-private const val INPUT_CONTROLS_URL =
-    "https://raw.githubusercontent.com/brunodev85/winlator/main/input_controls/%s"
 
 @Composable
 fun InputControlsRoute(initialProfileId: Int, shownSerial: Int) {
@@ -295,7 +293,7 @@ internal class InputControlsScreenState(
 
     private fun downloadProfileList() {
         val loadingOverlay = ThemedLoadingOverlayHost.show(activity, activity.getString(R.string.loading))
-        HttpUtils.download(String.format(INPUT_CONTROLS_URL, "index.txt")) { content ->
+        HttpUtils.download(RemoteSources.inputControlsUrl(activity, "index.txt")) { content ->
             activity.runOnUiThread {
                 ThemedLoadingOverlayHost.dismiss(loadingOverlay)
                 if (content == null) {
@@ -324,7 +322,7 @@ internal class InputControlsScreenState(
         currentProfile = null
         val processed = AtomicInteger()
         for (position in positions) {
-            HttpUtils.download(String.format(INPUT_CONTROLS_URL, items[position])) { content ->
+            HttpUtils.download(RemoteSources.inputControlsUrl(activity, items[position])) { content ->
                 try {
                     if (content != null) manager.importProfile(JSONObject(content))
                 } catch (ignored: JSONException) {

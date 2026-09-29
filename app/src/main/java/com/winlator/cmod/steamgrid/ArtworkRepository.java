@@ -15,8 +15,10 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonParseException;
 import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.container.Shortcut;
+import com.winlator.cmod.core.Downloader;
 import com.winlator.cmod.core.ExeIconExtractor;
 import com.winlator.cmod.core.FileUtils;
+import com.winlator.cmod.core.RemoteSources;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -41,8 +43,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.ResponseBody;
 import retrofit2.Response;
 import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
@@ -74,7 +74,6 @@ public final class ArtworkRepository {
     /** Settings > COVER ART: slow zoom/drift on big artwork (default on). */
     public static final String PREF_ANIMATED_ARTWORK = "animated_artwork";
 
-    private static final String BASE_URL = "https://www.steamgriddb.com/api/v2/";
     private static final String DEFAULT_API_KEY = "0324c52513634547a7b32d6d323635d0";
 
     // Vertical (portrait) sizes SteamGridDB knows, best first: 660x930 is 0.71, the closest
@@ -113,6 +112,8 @@ public final class ArtworkRepository {
     });
 
     private static volatile SteamGridDBApi api;
+    // Base URL the cached Retrofit instance was built for; rebuilt when Winlator Services changes it.
+    private static volatile String apiBase;
     private static volatile OkHttpClient http;
 
     // Session state: repeated failures must not turn into a request per scroll.
@@ -579,7 +580,7 @@ public final class ArtworkRepository {
         Match best = null;
         for (String query : queries) {
             if (query.isEmpty()) continue;
-            Match found = search(auth, query);
+            Match found = search(context, auth, query);
             if (found != null && (best == null || found.score > best.score)) best = found;
             if (best != null && best.score >= EARLY_STOP_SCORE) break;
         }
@@ -590,8 +591,8 @@ public final class ArtworkRepository {
         return t;
     }
 
-    private static Match search(String auth, String query) throws IOException {
-        Response<SteamGridSearchResponse> response = api().searchGame(auth, query).execute();
+    private static Match search(Context context, String auth, String query) throws IOException {
+        Response<SteamGridSearchResponse> response = api(context).searchGame(auth, query).execute();
         checkHttp(response.code());
         if (!response.isSuccessful() || response.body() == null || response.body().data == null) return null;
 
@@ -613,8 +614,8 @@ public final class ArtworkRepository {
         boolean cover = KIND_COVER.equals(kind);
         String dimensions = cover ? COVER_DIMENSIONS : BANNER_DIMENSIONS;
         Response<SteamGridGridsResponse> response = target.steamAppId > 0
-                ? api().getGridsBySteamAppId(auth, target.steamAppId, null, dimensions, "static").execute()
-                : api().getGridsByGameId(auth, target.sgdbId, null, dimensions, "static").execute();
+                ? api(context).getGridsBySteamAppId(auth, target.steamAppId, null, dimensions, "static").execute()
+                : api(context).getGridsByGameId(auth, target.sgdbId, null, dimensions, "static").execute();
         checkHttp(response.code());
 
         List<SteamGridGridsResponse.Grid> ranked = new ArrayList<>();
@@ -672,26 +673,38 @@ public final class ArtworkRepository {
 
     // ------------------------------------------------------------------ http + images
 
-    private static SteamGridDBApi api() {
+    private static SteamGridDBApi api(Context context) {
+        String base = RemoteSources.steamGridBase(context);
         SteamGridDBApi local = api;
-        if (local == null) {
+        if (local == null || !base.equals(apiBase)) {
             synchronized (ArtworkRepository.class) {
                 local = api;
-                if (local == null) {
+                if (local == null || !base.equals(apiBase)) {
                     Gson gson = new GsonBuilder()
                             .registerTypeAdapter(SteamGridGridsResponse.class, new SteamGridGridsResponseDeserializer())
                             .create();
-                    local = new Retrofit.Builder()
-                            .baseUrl(BASE_URL)
-                            .client(client())
-                            .addConverterFactory(GsonConverterFactory.create(gson))
-                            .build()
-                            .create(SteamGridDBApi.class);
+                    try {
+                        local = buildApi(base, gson);
+                    } catch (IllegalArgumentException invalidBase) {
+                        // A malformed address typed in Winlator Services must not crash artwork loading.
+                        base = RemoteSources.DEFAULT_STEAMGRID;
+                        local = buildApi(base, gson);
+                    }
                     api = local;
+                    apiBase = base;
                 }
             }
         }
         return local;
+    }
+
+    private static SteamGridDBApi buildApi(String base, Gson gson) {
+        return new Retrofit.Builder()
+                .baseUrl(base)
+                .client(client())
+                .addConverterFactory(GsonConverterFactory.create(gson))
+                .build()
+                .create(SteamGridDBApi.class);
     }
 
     private static OkHttpClient client() {
@@ -700,11 +713,12 @@ public final class ArtworkRepository {
             synchronized (ArtworkRepository.class) {
                 local = http;
                 if (local == null) {
-                    local = new OkHttpClient.Builder()
+                    // Derived from the app-wide client so connections and threads are shared;
+                    // only the (shorter) artwork timeouts differ.
+                    local = Downloader.client().newBuilder()
                             .connectTimeout(10, TimeUnit.SECONDS)
                             .readTimeout(20, TimeUnit.SECONDS)
                             .callTimeout(40, TimeUnit.SECONDS)
-                            .followRedirects(true)
                             .build();
                     http = local;
                 }
@@ -714,15 +728,9 @@ public final class ArtworkRepository {
     }
 
     private static boolean downloadTo(String url, File dest, int maxLongSide) {
-        Request request = new Request.Builder()
-                .url(url)
-                .header("User-Agent", "Mozilla/5.0 (Linux; Android) WinLite/1.0")
-                .build();
-        try (okhttp3.Response response = client().newCall(request).execute()) {
-            ResponseBody body = response.body();
-            if (!response.isSuccessful() || body == null) return false;
-            byte[] data = readLimited(body.byteStream(), MAX_DOWNLOAD_BYTES);
-            return data != null && saveBytes(data, dest, maxLongSide);
+        try {
+            byte[] data = Downloader.fetchBytes(url, Downloader.Fetch.limit(MAX_DOWNLOAD_BYTES).timeouts(10_000, 20_000, 40_000));
+            return saveBytes(data, dest, maxLongSide);
         } catch (Exception error) {
             Log.w(TAG, "Image download failed: " + error.getMessage());
             return false;

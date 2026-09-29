@@ -61,4 +61,6 @@ public class ContentProfile {
     public String wineBinPath;
     public String winePrefixPack;
     public String remoteUrl;
+    /** Optional SHA-256 (hex) of the remote archive, from the catalog; verified after download when present. */
+    public String remoteSha256;
 }

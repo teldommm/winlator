@@ -469,9 +469,10 @@ internal fun ShortcutEditorV2(
         if (key in state.installing) return
         state.installing = state.installing + key
         scope.launch {
-            val installed = installRuntimeComponent(context, type, version)
+            val outcome = installRuntimeComponent(context, type, version)
+            val installed = outcome.id
             state.installing = state.installing - key
-            if (installed == null) Toast.makeText(context, "Unable to install $version", Toast.LENGTH_SHORT).show()
+            if (installed == null) Toast.makeText(context, outcome.failureText("Unable to install $version"), Toast.LENGTH_SHORT).show()
             else {
                 done(installed)
                 state.revision++
@@ -484,9 +485,10 @@ internal fun ShortcutEditorV2(
         if (key in state.installing) return
         state.installing = state.installing + key
         scope.launch {
-            val installed = installAdrenoDriver(context, option)
+            val outcome = installAdrenoDriver(context, option)
+            val installed = outcome.id
             state.installing = state.installing - key
-            if (installed == null) Toast.makeText(context, "Unable to install ${option.label}", Toast.LENGTH_SHORT).show()
+            if (installed == null) Toast.makeText(context, outcome.failureText("Unable to install ${option.label}"), Toast.LENGTH_SHORT).show()
             else {
                 state.driverVersion = installed
                 state.graphics("version", installed)

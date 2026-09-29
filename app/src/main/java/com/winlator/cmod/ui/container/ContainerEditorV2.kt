@@ -397,9 +397,10 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
         if (key in installing) return
         installing = installing + key
         scope.launch {
-            val installed = installRuntimeComponent(context, type, version)
+            val outcome = installRuntimeComponent(context, type, version)
+            val installed = outcome.id
             installing = installing - key
-            if (installed == null) Toast.makeText(context, "Unable to install $version", Toast.LENGTH_SHORT).show()
+            if (installed == null) Toast.makeText(context, outcome.failureText("Unable to install $version"), Toast.LENGTH_SHORT).show()
             else {
                 done(installed)
                 revision++
@@ -412,9 +413,10 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
         if (key in installing) return
         installing = installing + key
         scope.launch {
-            val installedId = installWineRuntimeComponent(context, option)
+            val outcome = installWineRuntimeComponent(context, option)
+            val installedId = outcome.id
             installing = installing - key
-            if (installedId == null) Toast.makeText(context, "Unable to install ${option.label}", Toast.LENGTH_LONG).show()
+            if (installedId == null) Toast.makeText(context, outcome.failureText("Unable to install ${option.label}"), Toast.LENGTH_LONG).show()
             else {
                 state.runtime = installedId
                 contents.syncContents()
@@ -428,9 +430,10 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
         if (key in installing) return
         installing = installing + key
         scope.launch {
-            val installed = installAdrenoDriver(context, option)
+            val outcome = installAdrenoDriver(context, option)
+            val installed = outcome.id
             installing = installing - key
-            if (installed == null) Toast.makeText(context, "Unable to install ${option.label}", Toast.LENGTH_SHORT).show()
+            if (installed == null) Toast.makeText(context, outcome.failureText("Unable to install ${option.label}"), Toast.LENGTH_SHORT).show()
             else {
                 state.driverVersion = installed
                 state.graphics("version", installed)

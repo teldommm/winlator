@@ -29,12 +29,8 @@ import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.ui.theme.WinlatorLegacyTheme;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.net.URLEncoder;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -44,10 +40,10 @@ import com.winlator.cmod.steamgrid.ArtworkRepository;
 
 public class PreloaderDialog {
     private static final String TAG = "PreloaderDialog";
-    private static final String THEGAMESDB_SEARCH = "https://thegamesdb.net/search.php?name=%s&platform_id%%5B%%5D=1";
-    private static final String THEGAMESDB_CDN = "https://cdn.thegamesdb.net/images/original/";
     private static final Pattern THEGAMESDB_GAME_ID = Pattern.compile("game\\.php\\?id=(\\d+)", Pattern.CASE_INSENSITIVE);
     private static final ExecutorService ARTWORK_EXECUTOR = Executors.newSingleThreadExecutor();
+    private static final int MAX_PAGE_BYTES = 8 * 1024 * 1024;
+    private static final int MAX_IMAGE_BYTES = 16 * 1024 * 1024;
 
     private final Activity activity;
     private Dialog dialog;
@@ -309,7 +305,7 @@ public class PreloaderDialog {
 
     private int findTheGamesDbGameId(String title) throws Exception {
         String encoded = URLEncoder.encode(title, "UTF-8");
-        String searchUrl = String.format(THEGAMESDB_SEARCH, encoded);
+        String searchUrl = RemoteSources.gamesDbSearchUrl(activity, encoded);
         String html = downloadText(searchUrl);
         Matcher matcher = THEGAMESDB_GAME_ID.matcher(html);
         if (!matcher.find()) return -1;
@@ -321,36 +317,16 @@ public class PreloaderDialog {
     }
 
     private String downloadText(String urlString) throws Exception {
-        HttpURLConnection connection = null;
-        BufferedReader reader = null;
-        try {
-            connection = (HttpURLConnection) new URL(urlString).openConnection();
-            connection.setInstanceFollowRedirects(true);
-            connection.setConnectTimeout(6000);
-            connection.setReadTimeout(8000);
-            connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) AppleWebKit/537.36 WinZ/1.0");
-            connection.setRequestProperty("Accept", "text/html,application/xhtml+xml");
-            int responseCode = connection.getResponseCode();
-            if (responseCode < 200 || responseCode >= 300) throw new IllegalStateException("HTTP " + responseCode);
-
-            reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-            StringBuilder builder = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null && builder.length() < 2_000_000) {
-                builder.append(line).append('\n');
-            }
-            return builder.toString();
-        } finally {
-            if (reader != null) try { reader.close(); } catch (Exception ignored) {}
-            if (connection != null) connection.disconnect();
-        }
+        return Downloader.fetchText(urlString, Downloader.Fetch.limit(MAX_PAGE_BYTES)
+                .header("Accept", "text/html,application/xhtml+xml")
+                .timeouts(6000, 8000, 0));
     }
 
     private boolean downloadTheGamesDbHorizontalArtwork(int gameId, File destination) {
         String[] categories = {"fanart", "screenshot", "screenshots"};
         for (String category : categories) {
             for (int index = 1; index <= 3; index++) {
-                String url = THEGAMESDB_CDN + category + "/" + gameId + "-" + index + ".jpg";
+                String url = RemoteSources.gamesDbCdn(activity) + category + "/" + gameId + "-" + index + ".jpg";
                 if (downloadImageAsPng(url, destination)) {
                     Log.d(TAG, "TheGamesDB " + category + " saved for game " + gameId);
                     return true;
@@ -361,18 +337,10 @@ public class PreloaderDialog {
     }
 
     private boolean downloadImageAsPng(String urlString, File destination) {
-        HttpURLConnection connection = null;
         Bitmap bitmap = null;
         try {
-            connection = (HttpURLConnection) new URL(urlString).openConnection();
-            connection.setInstanceFollowRedirects(true);
-            connection.setConnectTimeout(6000);
-            connection.setReadTimeout(10000);
-            connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) AppleWebKit/537.36 WinZ/1.0");
-            int responseCode = connection.getResponseCode();
-            if (responseCode < 200 || responseCode >= 300) return false;
-
-            bitmap = BitmapFactory.decodeStream(connection.getInputStream());
+            byte[] data = Downloader.fetchBytes(urlString, Downloader.Fetch.limit(MAX_IMAGE_BYTES).timeouts(6000, 10000, 0));
+            bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
             if (bitmap == null || bitmap.getWidth() <= 0 || bitmap.getHeight() <= 0) return false;
             if (bitmap.getWidth() < bitmap.getHeight()) return false;
 
@@ -390,7 +358,6 @@ public class PreloaderDialog {
             if (bitmap != null) {
                 try { if (!bitmap.isRecycled()) bitmap.recycle(); } catch (Exception ignored) {}
             }
-            if (connection != null) connection.disconnect();
         }
     }
 

@@ -26,6 +26,7 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Dns
@@ -118,7 +119,6 @@ data class SettingsModel(
     val box64Logs: Boolean,
     val customApiKeyEnabled: Boolean,
     val customApiKey: String,
-    val contentsUrl: String,
     val wineDebugOptions: List<String>
 )
 
@@ -136,7 +136,6 @@ interface SettingsCallbacks {
     fun onBooleanChanged(key: String, value: Boolean)
     fun onCursorSpeedChanged(percent: Int)
     fun onCustomApiKeyChanged(value: String)
-    fun onContentsUrlChanged(value: String)
     fun onWineDebugChannelsChanged(value: String)
     fun onReinstallImageFs()
     fun onPresetAction(kind: String, id: String, action: String)
@@ -282,7 +281,14 @@ internal fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) 
                     ToggleRow(stringResource(R.string.remove_loading_bar_when_booting_games), model.removeLoadingBar) { callbacks.onBooleanChanged("remove_loading_bar_when_booting_games", it) }
                 }
             }
-            item("contents-url") { EditableValueCard("Downloadable Contents URL", model.contentsUrl, callbacks::onContentsUrlChanged) }
+            item("services-title") { SectionTitle("Winlator Services") }
+            item("services") {
+                NavigationRow(
+                    Icons.Outlined.Cloud,
+                    "Winlator Services",
+                    "Download sources for components, drivers, controls and artwork"
+                ) { activity?.let { WinlatorServicesDialog.show(it) } }
+            }
 
             item("imagefs-title") { SectionTitle(stringResource(R.string.imagefs)) }
             item("imagefs") { NavigationRow(Icons.Outlined.Refresh, stringResource(R.string.reinstall_imagefs), null) { confirmReinstallImageFs = true } }
@@ -689,11 +695,6 @@ private fun SoundFontCard(choices: List<SettingChoice>, onInstall: () -> Unit, o
             Text("Install SoundFont")
         }
     }
-}
-
-@Composable
-private fun EditableValueCard(label: String, initial: String, onSave: (String) -> Unit) {
-    GroupCard { EditableInlineValue(label, initial, onSave) }
 }
 
 @Composable

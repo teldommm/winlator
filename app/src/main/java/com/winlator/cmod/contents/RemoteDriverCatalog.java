@@ -4,136 +4,141 @@ import android.content.Context;
 import android.net.Uri;
 
 import com.winlator.cmod.contentdialog.DriverRepo;
+import com.winlator.cmod.core.Downloader;
+import com.winlator.cmod.core.RemoteSources;
 
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-import androidx.preference.PreferenceManager;
-
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
-
 public final class RemoteDriverCatalog {
     private RemoteDriverCatalog() {}
 
-    // Moved from the now-removed RepositoryManagerDialog (its UI was dead code — never
-    // reachable, since AdrenotoolsFragment was only ever instantiated from the also-dead
-    // ContainerDetailFragment). This loader itself is live: it's this class's only caller.
-    public static DriverRepo getStevenMxzRepo() {
-        return new DriverRepo("StevenMXZ Turnip Drivers", "https://api.github.com/repos/StevenMXZ/freedreno_turnip-CI/releases");
-    }
+    private static final int LISTING_MAX_BYTES = 4 * 1024 * 1024;
+    private static final int MAX_DRIVERS_PER_REPO = 40;
 
-    public static List<DriverRepo> loadDriverRepos(Context context, int limit) {
-        android.content.SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
-        String jsonStr = prefs.getString("custom_driver_repos", "");
-        ArrayList<DriverRepo> result = new ArrayList<>();
-        if (jsonStr.isEmpty()) {
-            result.add(getStevenMxzRepo());
-            result.add(new DriverRepo("Whitebelyash Drivers", "https://api.github.com/repos/whitebelyash/AdrenoToolsDrivers/releases"));
-            result.add(new DriverRepo("Weab-Chan Turnip Drivers", "https://api.github.com/repos/Weab-chan/freedreno_turnip-CI/releases"));
-        } else {
-            try {
-                JSONArray array = new JSONArray(jsonStr);
-                for (int i = 0; i < array.length(); i++) {
-                    result.add(DriverRepo.fromJson(array.getJSONObject(i)));
-                }
-            } catch (Exception ignored) { }
-        }
-        for (int i = result.size() - 1; i >= 0; i--) {
-            DriverRepo repo = result.get(i);
-            if (repo.name.toLowerCase().contains("kimchi") || repo.apiUrl.toLowerCase().contains("k11mch1")) {
-                result.remove(i);
-            }
-        }
-        if (limit > 0 && result.size() > limit) {
-            return new ArrayList<>(result.subList(0, limit));
-        }
-        return result;
+    // The repository list (defaults and the user's own) lives in RemoteSources and is edited
+    // from Winlator Services.
+    private static List<DriverRepo> configuredRepos(Context context) {
+        return RemoteSources.driverRepos(context);
     }
 
     public static final class Entry {
         public final String repository;
         public final String name;
         public final String url;
+        /** SHA-256 (hex) from the release asset's digest, null when GitHub did not provide one. */
+        public final String sha256;
 
-        Entry(String repository, String name, String url) {
+        Entry(String repository, String name, String url, String sha256) {
             this.repository = repository;
             this.name = name;
             this.url = url;
+            this.sha256 = sha256;
         }
     }
 
     public static List<Entry> load(Context context) {
+        return load(context, new ArrayList<>());
+    }
+
+    /**
+     * Lists the drivers of every configured repository. A repository that cannot be read does not
+     * stop the others; one human-readable line per failure is added to {@code errors}.
+     */
+    public static List<Entry> load(Context context, List<String> errors) {
         ArrayList<Entry> result = new ArrayList<>();
-        OkHttpClient http = new OkHttpClient();
-        for (DriverRepo repo : loadDriverRepos(context, 0)) {
+        for (DriverRepo repo : configuredRepos(context)) {
             if (repo.apiUrl == null || repo.apiUrl.isEmpty()) continue;
-            try (Response response = http.newCall(new Request.Builder().url(repo.apiUrl).build()).execute()) {
-                if (!response.isSuccessful() || response.body() == null) continue;
-                JSONArray releases = new JSONArray(response.body().string());
-                int accepted = 0;
-                for (int i = 0; i < releases.length() && accepted < 40; i++) {
-                    JSONObject release = releases.optJSONObject(i);
-                    if (release == null) continue;
-                    JSONArray assets = release.optJSONArray("assets");
-                    if (assets == null) continue;
-
-                    String releaseName = release.optString("name", release.optString("tag_name", "")).trim();
-                    ArrayList<JSONObject> zipAssets = new ArrayList<>();
-                    for (int j = 0; j < assets.length(); j++) {
-                        JSONObject asset = assets.optJSONObject(j);
-                        if (asset == null) continue;
-                        String url = asset.optString("browser_download_url", "");
-                        String assetName = asset.optString("name", "");
-                        if (!url.isEmpty() && assetName.toLowerCase(Locale.ENGLISH).endsWith(".zip")) {
-                            zipAssets.add(asset);
-                        }
-                    }
-
-                    for (JSONObject asset : zipAssets) {
-                        if (accepted >= 40) break;
-                        String url = asset.optString("browser_download_url", "");
-                        String assetName = asset.optString("name", "");
-                        String assetLabel = assetName.replaceFirst("(?i)\\.zip$", "").trim();
-
-                        String name;
-                        if (zipAssets.size() > 1) {
-                            name = assetLabel.isEmpty() ? releaseName : assetLabel;
-                        } else {
-                            name = releaseName.isEmpty() ? assetLabel : releaseName;
-                        }
-                        if (name.isEmpty()) continue;
-
-                        result.add(new Entry(repo.name, name, url));
-                        accepted++;
-                    }
-                }
-            } catch (Exception ignored) {
+            String text;
+            try {
+                text = Downloader.fetchText(repo.apiUrl, LISTING_MAX_BYTES);
+            } catch (Downloader.DownloadException e) {
+                errors.add(repo.name + ": " + e.userMessage());
+                continue;
+            }
+            try {
+                parseReleases(repo, new JSONArray(text), result);
+            } catch (JSONException e) {
+                errors.add(repo.name + ": " + apiMessage(text));
             }
         }
         return result;
     }
 
-    public static String install(Context context, String url) {
-        File archive = new File(context.getCacheDir(), "winz-driver-" + System.nanoTime() + ".zip");
-        try (Response response = new OkHttpClient().newCall(new Request.Builder().url(url).build()).execute()) {
-            if (!response.isSuccessful() || response.body() == null) return "";
-            try (InputStream input = response.body().byteStream(); FileOutputStream output = new FileOutputStream(archive)) {
-                byte[] buffer = new byte[64 * 1024];
-                int read;
-                while ((read = input.read(buffer)) != -1) output.write(buffer, 0, read);
+    // GitHub answers errors (rate limit, unknown repository) with an object that has a "message".
+    static String apiMessage(String text) {
+        try {
+            String message = new JSONObject(text).optString("message", "").trim();
+            if (!message.isEmpty()) return message.length() > 80 ? message.substring(0, 80) : message;
+        } catch (JSONException ignored) {
+        }
+        return "unexpected response from the server";
+    }
+
+    static void parseReleases(DriverRepo repo, JSONArray releases, List<Entry> out) {
+        int accepted = 0;
+        for (int i = 0; i < releases.length() && accepted < MAX_DRIVERS_PER_REPO; i++) {
+            JSONObject release = releases.optJSONObject(i);
+            if (release == null) continue;
+            JSONArray assets = release.optJSONArray("assets");
+            if (assets == null) continue;
+
+            String releaseName = release.optString("name", release.optString("tag_name", "")).trim();
+            ArrayList<JSONObject> zipAssets = new ArrayList<>();
+            for (int j = 0; j < assets.length(); j++) {
+                JSONObject asset = assets.optJSONObject(j);
+                if (asset == null) continue;
+                String url = asset.optString("browser_download_url", "");
+                String assetName = asset.optString("name", "");
+                if (!url.isEmpty() && assetName.toLowerCase(Locale.ENGLISH).endsWith(".zip")) {
+                    zipAssets.add(asset);
+                }
             }
-            return new AdrenotoolsManager(context).installDriver(Uri.fromFile(archive));
-        } catch (Exception ignored) {
-            return "";
+
+            for (JSONObject asset : zipAssets) {
+                if (accepted >= MAX_DRIVERS_PER_REPO) break;
+                String url = asset.optString("browser_download_url", "");
+                String assetName = asset.optString("name", "");
+                String assetLabel = assetName.replaceFirst("(?i)\\.zip$", "").trim();
+
+                String name;
+                if (zipAssets.size() > 1) {
+                    name = assetLabel.isEmpty() ? releaseName : assetLabel;
+                } else {
+                    name = releaseName.isEmpty() ? assetLabel : releaseName;
+                }
+                if (name.isEmpty()) continue;
+
+                out.add(new Entry(repo.name, name, url, digestOf(asset)));
+                accepted++;
+            }
+        }
+    }
+
+    // Release assets carry "digest": "sha256:<hex>" on current GitHub API versions.
+    static String digestOf(JSONObject asset) {
+        String digest = asset.optString("digest", "").trim().toLowerCase(Locale.ROOT);
+        return digest.startsWith("sha256:") && digest.length() == 7 + 64 ? digest.substring(7) : null;
+    }
+
+    /** Downloads and installs a driver archive; the returned id is empty when it is not a valid driver. */
+    public static String installOrThrow(Context context, String url, String sha256) throws Downloader.DownloadException {
+        return installOrThrow(context, url, sha256, null);
+    }
+
+    public static String installOrThrow(Context context, String url, String sha256, Downloader.Progress progress)
+            throws Downloader.DownloadException {
+        File archive = new File(context.getCacheDir(), "winlite-driver-" + System.nanoTime() + ".zip");
+        try {
+            Downloader.downloadToFile(url, archive, new Downloader.Options().sha256(sha256).progress(progress));
+            String installed = new AdrenotoolsManager(context).installDriver(Uri.fromFile(archive));
+            return installed == null ? "" : installed;
         } finally {
             archive.delete();
         }

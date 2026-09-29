@@ -11,10 +11,15 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.PreferenceManager;
 
+import com.winlator.cmod.components.ComponentCatalog;
+import com.winlator.cmod.components.ComponentEntry;
+import com.winlator.cmod.components.ComponentException;
+import com.winlator.cmod.components.ComponentSource;
+import com.winlator.cmod.components.ContentsSource;
+import com.winlator.cmod.components.RemovePlan;
 import com.winlator.cmod.contents.AdrenotoolsManager;
 import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
-import com.winlator.cmod.contents.RemoteDriverCatalog;
 import com.winlator.cmod.core.ProtonPackageManager;
 import com.winlator.cmod.core.WineInfo;
 import com.winlator.cmod.core.WineRuntimeGuard;
@@ -24,29 +29,19 @@ import com.winlator.cmod.ui.onboarding.OnboardingComposeController;
 import com.winlator.cmod.xenvironment.ImageFs;
 import com.winlator.cmod.xenvironment.ImageFsInstaller;
 
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
 
 // Shared by OnboardingActivity (full first-run onboarding, still a standalone Activity)
 // and ComponentManagerFragment (the "Components" settings screen, hosted as a Fragment
 // of MainActivity). Both used to carry their own copy of this catalog/install/remove
 // logic; this class is that logic once, driven through Host so it doesn't need to know
-// whether it's living inside an Activity or a Fragment. onRuntimeSelected/onRequestPermissions
+// whether it's living inside an Activity or a Fragment. Where components come from (catalog,
+// Proton, drivers) is the job of the ComponentSource classes; what a row does when installed or
+// removed is the job of its ComponentEntry - this class only sequences them and drives the UI. onRuntimeSelected/onRequestPermissions
 // only ever fire from the pages OnboardingActivity's full flow shows (Runtime/Access),
 // which ComponentManagerFragment's component-manager mode never reaches - its ExtraCallbacks
 // simply leaves those two as no-ops.
@@ -65,26 +60,10 @@ public class ComponentCatalogController {
         default void onRequestPermissions() {}
     }
 
-    private interface FailureCallback { void call(String error); }
-    private interface ContentInstalledCallback { void call(ContentProfile installed); }
-
-    private static final class ComponentItem {
-        ContentProfile profile;
-        ProtonPackageManager.PackageInfo packageInfo;
-        String type;
-        String name;
-        String url;
-        String entryName;
-        int versionCode;
-        boolean installed;
-        boolean recommended;
-    }
-
     private final Host host;
-    private final OkHttpClient http = new OkHttpClient();
     private final ExecutorService io = Executors.newSingleThreadExecutor();
-    private final ArrayList<ComponentItem> catalog = new ArrayList<>();
-    private final ArrayList<RemoteDriverCatalog.Entry> remoteDrivers = new ArrayList<>();
+    private final ArrayList<ComponentEntry> catalog = new ArrayList<>();
+    private ComponentCatalog componentCatalog;
 
     private SharedPreferences preferences;
     private ContentsManager contentsManager;
@@ -108,9 +87,10 @@ public class ComponentCatalogController {
         pendingInstallVersionCode = autoInstallVersionCode;
 
         preferences = PreferenceManager.getDefaultSharedPreferences(host.context());
-        contentsManager = new ContentsManager(host.context());
+        componentCatalog = new ComponentCatalog(host.context());
+        contentsManager = componentCatalog.contentsManager();
         contentsManager.syncContents();
-        adrenotoolsManager = new AdrenotoolsManager(host.context());
+        adrenotoolsManager = componentCatalog.adrenotools();
 
         ImageFs imageFs = ImageFs.find(host.context());
         coreReady = imageFs.isValid() && imageFs.getVersion() >= ImageFsInstaller.LATEST_VERSION;
@@ -137,12 +117,12 @@ public class ComponentCatalogController {
         return preferences;
     }
 
-    // Call once the compose controller is attached: loads the catalog, remote drivers,
-    // and kicks off the core install if it isn't already done.
+    // Call once the compose controller is attached: shows what is installed right away, then
+    // refreshes every source from the network and kicks off the core install if it isn't done.
     public void start() {
+        rebuildCatalog();
         syncComposeCatalog();
         loadCatalog();
-        loadRemoteDrivers();
         if (!coreReady) startCoreInstallation();
     }
 
@@ -154,9 +134,8 @@ public class ComponentCatalogController {
         return new OnboardingCallbacks() {
             @Override
             public void onInstall(@NonNull String componentId) {
-                ComponentItem item = findComponent(componentId);
-                if (item != null) installComponent(item);
-                else if (componentId.startsWith("remote-driver:")) installRemoteDriver(componentId);
+                ComponentEntry entry = findComponent(componentId);
+                if (entry != null) installComponent(entry);
             }
 
             @Override
@@ -223,7 +202,7 @@ public class ComponentCatalogController {
                 syncComposeCatalog();
                 if (!success && host.isAlive()) {
                     Toast.makeText(host.context(),
-                            "WinZ core installation failed. Tap retry to try again.", Toast.LENGTH_LONG).show();
+                            host.context().getString(R.string.app_name) + " core installation failed. Tap retry to try again.", Toast.LENGTH_LONG).show();
                 }
             }
         });
@@ -307,127 +286,56 @@ public class ComponentCatalogController {
         });
     }
 
+    // Refreshes the sources one after another, showing each as soon as it is in. A failing source
+    // no longer just leaves its part of the list empty: the reason is reported to the user.
     private void loadCatalog() {
         io.execute(() -> {
-            try {
-                String url = preferences.getString("downloadable_contents_url", ContentsManager.REMOTE_PROFILES);
-                try (Response response = http.newCall(new Request.Builder().url(url).build()).execute()) {
-                    if (response.isSuccessful() && response.body() != null) {
-                        contentsManager.setRemoteProfiles(response.body().string());
-                    }
+            String firstError = null;
+            int failures = 0;
+            for (ComponentSource source : componentCatalog.sources()) {
+                try {
+                    source.refresh(host.context());
+                } catch (ComponentException e) {
+                    if (firstError == null) firstError = "Couldn't load " + source.title().toLowerCase() + ": " + e.getMessage();
+                    failures++;
+                } catch (Exception e) {
+                    if (firstError == null) firstError = "Couldn't load " + source.title().toLowerCase();
+                    failures++;
                 }
-            } catch (Exception ignored) {
+                rebuildCatalog();
+                runOnUi(() -> {
+                    syncComposeCatalog();
+                    maybeAutoInstall();
+                });
             }
-            contentsManager.syncContents();
-            rebuildCatalog();
-            runOnUi(() -> {
-                syncComposeCatalog();
-                maybeAutoInstall();
-            });
+            if (firstError != null) {
+                final String message = failures > 1 ? firstError + " (+" + (failures - 1) + " more)" : firstError;
+                runOnUi(() -> {
+                    if (host.isAlive()) Toast.makeText(host.context(), message, Toast.LENGTH_LONG).show();
+                });
+            }
         });
     }
 
     private void rebuildCatalog() {
-        ArrayList<ComponentItem> rebuilt = new ArrayList<>();
-        Set<String> seen = new HashSet<>();
-        Map<String, ComponentItem> newest = new HashMap<>();
-
-        for (ContentProfile.ContentType type : ContentProfile.ContentType.values()) {
-            for (ContentProfile profile : contentsManager.getProfiles(type)) {
-                String typeName = displayType(type);
-                if (typeName.isEmpty() || profile.verName == null || profile.verName.isEmpty()) continue;
-                ComponentItem item = new ComponentItem();
-                item.profile = profile;
-                item.type = typeName;
-                item.name = profile.verName;
-                item.versionCode = profile.verCode;
-                item.url = profile.remoteUrl;
-                item.installed = isInstalled(profile);
-                item.entryName = item.installed ? installedEntryName(type, profile) : "";
-                String key = typeName + ":" + profile.verCode + ":" + profile.verName;
-                if (!seen.add(key)) continue;
-                rebuilt.add(item);
-                ComponentItem current = newest.get(typeName);
-                if (current == null || item.versionCode > current.versionCode) newest.put(typeName, item);
-            }
-        }
-
-        for (ContentProfile.ContentType type : ContentProfile.ContentType.values()) {
-            for (ContentProfile profile : contentsManager.getInstalledProfiles(type)) {
-                String typeName = displayType(type);
-                if (typeName.isEmpty()) continue;
-                String key = typeName + ":" + profile.verCode + ":" + profile.verName;
-                if (seen.add(key)) {
-                    ComponentItem item = new ComponentItem();
-                    item.profile = profile;
-                    item.type = typeName;
-                    item.name = profile.verName;
-                    item.versionCode = profile.verCode;
-                    item.installed = true;
-                    item.entryName = ContentsManager.getEntryName(profile);
-                    rebuilt.add(item);
-                }
-            }
-        }
-
-        for (ProtonPackageManager.PackageInfo packageInfo : ProtonPackageManager.getPackages()) {
-            if (ProtonPackageManager.DEFAULT_IDENTIFIER.equals(packageInfo.identifier)) continue;
-            ComponentItem item = new ComponentItem();
-            item.packageInfo = packageInfo;
-            item.type = "Proton";
-            item.name = packageInfo.title;
-            item.versionCode = 0;
-            item.installed = ProtonPackageManager.isInstalled(host.context(), packageInfo.identifier);
-            item.entryName = item.installed ? packageInfo.identifier : "";
-            rebuilt.add(item);
-        }
-
-        for (ComponentItem item : newest.values()) item.recommended = true;
-        rebuilt.sort(Comparator.comparing((ComponentItem i) -> i.type)
-                .thenComparing((ComponentItem i) -> i.versionCode, Comparator.reverseOrder()));
+        ArrayList<ComponentEntry> rebuilt = new ArrayList<>(componentCatalog.entries());
+        // Catalog rows grouped by type, newest first; driver rows follow in the order they were listed.
+        rebuilt.sort(Comparator.comparing((ComponentEntry e) -> e.isDriver())
+                .thenComparing((ComponentEntry e) -> e.type)
+                .thenComparing((ComponentEntry e) -> e.versionCode, Comparator.reverseOrder()));
         synchronized (catalog) {
             catalog.clear();
             catalog.addAll(rebuilt);
         }
     }
 
-    private String installedEntryName(ContentProfile.ContentType type, ContentProfile candidate) {
-        for (ContentProfile installed : contentsManager.getInstalledProfiles(type)) {
-            if (installed.verCode == candidate.verCode && installed.verName.equals(candidate.verName)) {
-                return ContentsManager.getEntryName(installed);
-            }
-        }
-        return "";
-    }
-
-    private boolean isInstalled(ContentProfile candidate) {
-        for (ContentProfile installed : contentsManager.getInstalledProfiles(candidate.type)) {
-            if (installed.verCode == candidate.verCode && installed.verName.equals(candidate.verName)) return true;
-        }
-        return false;
-    }
-
     public static String displayType(ContentProfile.ContentType type) {
-        String raw = type.toString();
-        String key = raw.toLowerCase(Locale.ENGLISH).replace("content_type_", "").replace("_", "");
-        if (key.contains("wowbox64")) return "WOWBox64";
-        if (key.contains("box64")) return "Box64";
-        if (key.contains("fexcore")) return "FEXCore";
-        if (key.contains("vkd3d")) return "VKD3D";
-        if (key.contains("dxvk")) return "DXVK";
-        if (key.contains("proton")) return "Proton";
-        if (key.contains("wine")) return "Wine";
-        return "";
+        return ContentsSource.displayType(type);
     }
 
-    private String componentId(ComponentItem item) {
-        if (item.packageInfo != null) return "release-proton:" + item.packageInfo.identifier;
-        return item.type + ":" + item.versionCode + ":" + item.name;
-    }
-
-    private ComponentItem findComponent(String id) {
+    private ComponentEntry findComponent(String id) {
         synchronized (catalog) {
-            for (ComponentItem item : catalog) if (componentId(item).equals(id)) return item;
+            for (ComponentEntry entry : catalog) if (entry.id.equals(id)) return entry;
         }
         return null;
     }
@@ -436,39 +344,19 @@ public class ComponentCatalogController {
         if (composeController == null || !host.isAlive()) return;
         ArrayList<OnboardingComponent> ui = new ArrayList<>();
         synchronized (catalog) {
-            for (ComponentItem item : catalog) {
-                String runtime = (item.type.equals("Wine") || item.type.equals("Proton")) && item.installed
-                        ? item.entryName : null;
+            for (ComponentEntry entry : catalog) {
+                String runtime = entry.runtimeName();
                 boolean inUse = runtime != null && !runtime.isEmpty() && WineRuntimeGuard.isInUse(host.context(), runtime);
                 ui.add(new OnboardingComponent(
-                        componentId(item),
-                        item.type,
-                        item.name,
-                        item.installed,
-                        item.recommended,
-                        item.installed,
+                        entry.id,
+                        entry.type,
+                        entry.label(),
+                        entry.installed,
+                        entry.recommended,
+                        entry.removable(),
                         runtime,
                         inUse,
                         false
-                ));
-            }
-        }
-
-        Set<String> existingDrivers = new HashSet<>();
-        for (String id : adrenotoolsManager.enumarateInstalledDrivers()) {
-            String label = adrenotoolsManager.getDriverName(id) + " " + adrenotoolsManager.getDriverVersion(id);
-            ui.add(new OnboardingComponent(
-                    "adrenotools:" + id, "AdrenoTools", label.trim(), true, false, true,
-                    null, false, false
-            ));
-            existingDrivers.add(label.trim().toLowerCase(Locale.ENGLISH));
-        }
-        synchronized (remoteDrivers) {
-            for (RemoteDriverCatalog.Entry driver : remoteDrivers) {
-                if (existingDrivers.contains(driver.name.toLowerCase(Locale.ENGLISH))) continue;
-                ui.add(new OnboardingComponent(
-                        remoteDriverId(driver), "AdrenoTools", driver.name + " • " + driver.repository,
-                        false, false, false, null, false, false
                 ));
             }
         }
@@ -476,132 +364,25 @@ public class ComponentCatalogController {
         refreshBundledRuntimeState();
     }
 
-    private void installComponent(ComponentItem item) {
-        if (item.packageInfo != null) {
-            installProtonPackage(item);
-            return;
-        }
-        if (installBusy || item.url == null || item.url.isEmpty()) return;
+    private void installComponent(ComponentEntry entry) {
+        if (installBusy || !entry.canInstall()) return;
         installBusy = true;
-        String id = componentId(item);
+        String id = entry.id;
         composeController.setInstallBusy(id, true);
-        composeController.updateInstallProgress("Preparing " + item.name, 0);
+        composeController.updateInstallProgress("Preparing " + entry.name, 0);
         io.execute(() -> {
-            File archive = new File(host.context().getCacheDir(), "winz-component-" + System.nanoTime());
+            String error = null;
             try {
-                if (!download(item.url, archive, item.name)) throw new Exception("Download failed");
-                installContentArchive(Uri.fromFile(archive), item.name, 72, installed -> {
-                    rebuildCatalog();
-                    runOnUi(() -> finishInstall(id, null));
-                }, error -> runOnUi(() -> finishInstall(id, error)));
-            } catch (Exception error) {
-                runOnUi(() -> finishInstall(id, "Unable to install " + item.name + "."));
-            } finally {
-                archive.delete();
+                entry.install(host.context(), this::postInstallProgress);
+            } catch (ComponentException e) {
+                error = e.getMessage();
+            } catch (Exception e) {
+                error = "Unable to install " + entry.name + ".";
             }
+            rebuildCatalog();
+            final String message = error;
+            runOnUi(() -> finishInstall(id, message));
         });
-    }
-
-    private void installProtonPackage(ComponentItem item) {
-        if (installBusy || item.packageInfo == null) return;
-        installBusy = true;
-        String id = componentId(item);
-        ProtonPackageManager.PackageInfo packageInfo = item.packageInfo;
-        composeController.setInstallBusy(id, true);
-        composeController.updateInstallProgress("Preparing " + item.name, 0);
-        io.execute(() -> {
-            File archive = new File(host.context().getCacheDir(), packageInfo.identifier + "-" + System.nanoTime());
-            boolean installed = false;
-            try {
-                boolean downloaded = ProtonPackageManager.downloadPackage(
-                        packageInfo,
-                        archive,
-                        progress -> postInstallProgress(
-                                "Downloading " + item.name,
-                                Math.min(70, progress * 70 / 100)
-                        )
-                );
-                if (downloaded) {
-                    postInstallProgress("Installing " + item.name, 72);
-                    installed = ProtonPackageManager.installPackage(host.context(), packageInfo.identifier, archive);
-                }
-            } finally {
-                archive.delete();
-            }
-            if (installed) rebuildCatalog();
-            final boolean success = installed;
-            runOnUi(() -> finishInstall(
-                    id,
-                    success ? null : "Unable to install " + item.name + "."
-            ));
-        });
-    }
-
-    private void installContentArchive(Uri uri, String displayName, int startProgress,
-                                       ContentInstalledCallback success, FailureCallback failure) {
-        postInstallProgress("Installing " + displayName, startProgress);
-        contentsManager.extraContentFile(uri, archiveProgress -> {
-            int progress = archiveProgress < 0
-                    ? -1
-                    : startProgress + ((92 - startProgress) * archiveProgress / 100);
-            postInstallProgress("Installing " + displayName, progress);
-        }, new ContentsManager.OnInstallFinishedCallback() {
-            @Override
-            public void onFailed(ContentsManager.InstallFailedReason reason, Exception error) {
-                failure.call("Package validation failed: " + reason);
-            }
-
-            @Override
-            public void onSucceed(ContentProfile extracted) {
-                String installedName = extracted.verName != null && !extracted.verName.isEmpty()
-                        ? extracted.verName : displayName;
-                postInstallProgress("Validating " + installedName, 92);
-                contentsManager.finishInstallContent(extracted, new ContentsManager.OnInstallFinishedCallback() {
-                    @Override
-                    public void onFailed(ContentsManager.InstallFailedReason reason, Exception error) {
-                        if (reason == ContentsManager.InstallFailedReason.ERROR_EXIST) {
-                            postInstallProgress("Installed " + installedName, 100);
-                            success.call(extracted);
-                        }
-                        else failure.call("Installation failed: " + reason);
-                    }
-
-                    @Override
-                    public void onSucceed(ContentProfile installed) {
-                        postInstallProgress("Installed " + installedName, 100);
-                        success.call(installed != null ? installed : extracted);
-                    }
-                });
-            }
-        });
-    }
-
-    private boolean download(String url, File out, String displayName) {
-        try (Response response = http.newCall(new Request.Builder().url(url).build()).execute()) {
-            if (!response.isSuccessful() || response.body() == null) return false;
-            long total = response.body().contentLength();
-            long copied = 0;
-            int lastProgress = -1;
-            postInstallProgress("Downloading " + displayName, total > 0 ? 0 : -1);
-            try (InputStream input = response.body().byteStream(); FileOutputStream output = new FileOutputStream(out)) {
-                byte[] buffer = new byte[64 * 1024];
-                int read;
-                while ((read = input.read(buffer)) != -1) {
-                    output.write(buffer, 0, read);
-                    copied += read;
-                    if (total > 0) {
-                        int progress = Math.min(70, (int)((copied * 70L) / total));
-                        if (progress != lastProgress) {
-                            lastProgress = progress;
-                            postInstallProgress("Downloading " + displayName, progress);
-                        }
-                    }
-                }
-            }
-            return true;
-        } catch (Exception ignored) {
-            return false;
-        }
     }
 
     private void postInstallProgress(String label, int progress) {
@@ -634,185 +415,60 @@ public class ComponentCatalogController {
         if (error != null && host.isAlive()) Toast.makeText(host.context(), error, Toast.LENGTH_LONG).show();
     }
 
-    private ContentProfile findInstalledProfile(String componentId) {
-        ComponentItem item = findComponent(componentId);
-        if (item == null) return null;
-        for (ContentProfile profile : contentsManager.getInstalledProfiles(item.profile.type)) {
-            if (profile.verCode == item.versionCode && profile.verName.equals(item.name)) return profile;
-        }
-        return null;
-    }
-
     private void requestRemoveComponent(String componentId) {
-        if (componentId.startsWith("adrenotools:")) {
-            String driverId = componentId.substring("adrenotools:".length());
-            com.winlator.cmod.ui.ThemedAlertHost.confirm(
-                    host.hostActivity(),
-                    "Delete driver?",
-                    "The installed driver files will be removed.",
-                    "Delete",
-                    () -> removeDriver(driverId),
-                    true
-            );
-            return;
-        }
-        ComponentItem item = findComponent(componentId);
-        if (item != null && item.packageInfo != null) {
-            requestRemoveProtonPackage(item, componentId);
-            return;
-        }
-        ContentProfile profile = findInstalledProfile(componentId);
-        if (profile == null) return;
-        if (!WineRuntimeGuard.canRemove(host.context(), profile)) {
-            String using = WineRuntimeGuard.getContainerUsing(host.context(), ContentsManager.getEntryName(profile));
-            com.winlator.cmod.ui.ThemedAlertHost.info(
-                    host.hostActivity(),
-                    "Runtime is in use",
-                    profile.verName + " cannot be deleted because it is used by " + using + "."
-            );
+        ComponentEntry entry = findComponent(componentId);
+        if (entry == null) return;
+        RemovePlan plan = entry.planRemoval(host.context());
+        if (plan == null) return;
+        if (plan.blocked) {
+            com.winlator.cmod.ui.ThemedAlertHost.info(host.hostActivity(), plan.title, plan.message);
             return;
         }
         com.winlator.cmod.ui.ThemedAlertHost.confirm(
                 host.hostActivity(),
-                "Delete component?",
-                "The installed files will be removed from WinZ.",
+                plan.title,
+                plan.message,
                 "Delete",
-                () -> removeContent(profile, componentId),
+                () -> removeComponent(entry),
                 true
         );
     }
 
-    private void requestRemoveProtonPackage(ComponentItem item, String componentId) {
-        String identifier = item.packageInfo.identifier;
-        String using = WineRuntimeGuard.getContainerUsing(host.context(), identifier);
-        if (using != null) {
-            com.winlator.cmod.ui.ThemedAlertHost.info(
-                    host.hostActivity(),
-                    "Runtime is in use",
-                    item.name + " cannot be deleted because it is used by " + using + "."
-            );
-            return;
-        }
-        com.winlator.cmod.ui.ThemedAlertHost.confirm(
-                host.hostActivity(),
-                "Delete component?",
-                "The installed files will be removed from WinZ.",
-                "Delete",
-                () -> {
-                    if (installBusy) return;
-                    installBusy = true;
-                    composeController.setInstallBusy(componentId, true);
-                    io.execute(() -> {
-                        ProtonPackageManager.deletePackage(host.context(), identifier);
-                        rebuildCatalog();
-                        runOnUi(() -> {
-                            finishInstall(componentId, null);
-                            if (host.isAlive()) Toast.makeText(host.context(), "Component removed", Toast.LENGTH_SHORT).show();
-                        });
-                    });
-                },
-                true
-        );
-    }
-
-    private void removeContent(ContentProfile profile, String id) {
-        if (installBusy || !WineRuntimeGuard.canRemove(host.context(), profile)) return;
-        installBusy = true;
-        composeController.setInstallBusy(id, true);
-        io.execute(() -> {
-            contentsManager.removeContent(profile);
-            contentsManager.syncContents();
-            rebuildCatalog();
-            runOnUi(() -> {
-                finishInstall(id, null);
-                if (host.isAlive()) Toast.makeText(host.context(), "Component removed", Toast.LENGTH_SHORT).show();
-            });
-        });
-    }
-
-    private void removeDriver(String id) {
+    private void removeComponent(ComponentEntry entry) {
         if (installBusy) return;
         installBusy = true;
-        composeController.setInstallBusy("adrenotools:" + id, true);
+        composeController.setInstallBusy(entry.id, true);
         io.execute(() -> {
-            adrenotoolsManager.removeDriver(id);
-            runOnUi(() -> {
-                installBusy = false;
-                if (composeController != null) composeController.setInstallBusy(null, false);
-                syncComposeCatalog();
-                if (host.isAlive()) Toast.makeText(host.context(), "Driver removed", Toast.LENGTH_SHORT).show();
-            });
-        });
-    }
-
-    private void loadRemoteDrivers() {
-        io.execute(() -> {
-            List<RemoteDriverCatalog.Entry> loaded = RemoteDriverCatalog.load(host.context());
-            synchronized (remoteDrivers) {
-                remoteDrivers.clear();
-                remoteDrivers.addAll(loaded);
+            String error = null;
+            try {
+                entry.remove(host.context());
+            } catch (ComponentException e) {
+                error = e.getMessage();
+            } catch (Exception e) {
+                error = "Unable to remove " + entry.name + ".";
             }
+            rebuildCatalog();
+            final String message = error;
             runOnUi(() -> {
-                syncComposeCatalog();
-                maybeAutoInstall();
-            });
-        });
-    }
-
-    private String remoteDriverId(RemoteDriverCatalog.Entry driver) {
-        return "remote-driver:" + driver.name + ":" + Integer.toHexString(driver.url.hashCode());
-    }
-
-    private void installRemoteDriver(String componentId) {
-        RemoteDriverCatalog.Entry found = null;
-        synchronized (remoteDrivers) {
-            for (RemoteDriverCatalog.Entry driver : remoteDrivers) {
-                if (remoteDriverId(driver).equals(componentId)) {
-                    found = driver;
-                    break;
-                }
-            }
-        }
-        if (found == null || installBusy) return;
-        final RemoteDriverCatalog.Entry driver = found;
-        installBusy = true;
-        composeController.setInstallBusy(componentId, true);
-        composeController.updateInstallProgress("Installing " + driver.name, -1);
-        io.execute(() -> {
-            String installed = RemoteDriverCatalog.install(host.context(), driver.url);
-            runOnUi(() -> {
-                installBusy = false;
-                if (composeController != null) composeController.setInstallBusy(null, false);
-                syncComposeCatalog();
-                if ((installed == null || installed.isEmpty()) && host.isAlive()) {
-                    Toast.makeText(host.context(), "Unable to install " + driver.name + ".", Toast.LENGTH_LONG).show();
-                }
+                finishInstall(entry.id, message);
+                if (message == null && host.isAlive()) Toast.makeText(host.context(), entry.removedMessage(), Toast.LENGTH_SHORT).show();
             });
         });
     }
 
     private void maybeAutoInstall() {
         if (autoInstallDispatched || installBusy || pendingInstallType == null || pendingInstallType.isEmpty()) return;
-        if (pendingInstallType.equalsIgnoreCase("AdrenoTools")) {
-            synchronized (remoteDrivers) {
-                for (RemoteDriverCatalog.Entry driver : remoteDrivers) {
-                    if (pendingInstallVersion == null || driver.name.equalsIgnoreCase(pendingInstallVersion)) {
-                        autoInstallDispatched = true;
-                        installRemoteDriver(remoteDriverId(driver));
-                        return;
-                    }
-                }
-            }
-            return;
-        }
         synchronized (catalog) {
-            for (ComponentItem item : catalog) {
-                if (!item.type.equalsIgnoreCase(pendingInstallType)) continue;
+            for (ComponentEntry entry : catalog) {
+                if (!entry.type.equalsIgnoreCase(pendingInstallType)) continue;
+                // A driver that is already installed is not what an auto-install is looking for.
+                if (entry.isDriver() && entry.installed) continue;
                 if (pendingInstallVersion != null && !pendingInstallVersion.isEmpty()
-                        && !item.name.equalsIgnoreCase(pendingInstallVersion)) continue;
-                if (pendingInstallVersionCode != Integer.MIN_VALUE && item.versionCode != pendingInstallVersionCode) continue;
+                        && !entry.name.equalsIgnoreCase(pendingInstallVersion)) continue;
+                if (!entry.isDriver() && pendingInstallVersionCode != Integer.MIN_VALUE
+                        && entry.versionCode != pendingInstallVersionCode) continue;
                 autoInstallDispatched = true;
-                if (!item.installed) installComponent(item);
+                if (!entry.installed) installComponent(entry);
                 return;
             }
         }
@@ -833,15 +489,25 @@ public class ComponentCatalogController {
                 case LOCAL_PACKAGE_DRIVER:
                     installLocalDriver(uri, displayName);
                     break;
-                case LOCAL_PACKAGE_CONTENT:
-                    installContentArchive(uri, displayName, 5, installed -> {
-                        rebuildCatalog();
-                        runOnUi(() -> {
-                            finishInstall("local", null);
-                            revealCategory(installed != null ? displayType(installed.type) : null);
-                        });
-                    }, error -> runOnUi(() -> finishInstall("local", error)));
+                case LOCAL_PACKAGE_CONTENT: {
+                    ContentProfile installed = null;
+                    String error = null;
+                    try {
+                        installed = componentCatalog.contents().installArchive(uri, displayName, 5, this::postInstallProgress);
+                    } catch (ComponentException e) {
+                        error = e.getMessage();
+                    } catch (Exception e) {
+                        error = "Unable to install " + displayName + ".";
+                    }
+                    rebuildCatalog();
+                    final ContentProfile done = installed;
+                    final String message = error;
+                    runOnUi(() -> {
+                        finishInstall("local", message);
+                        if (done != null) revealCategory(displayType(done.type));
+                    });
                     break;
+                }
                 default:
                     runOnUi(() -> finishInstall("local",
                             "Unsupported package. Pick a component (.wcp) or a driver (.zip)."));
@@ -889,6 +555,7 @@ public class ComponentCatalogController {
         postInstallProgress("Installing " + displayName, -1);
         String installed = adrenotoolsManager.installDriver(uri);
         boolean ok = installed != null && !installed.isEmpty();
+        rebuildCatalog();
         runOnUi(() -> {
             finishInstall("local", ok ? null : "Unable to install the driver. Make sure it's an AdrenoTools driver package.");
             if (ok) revealCategory("AdrenoTools");

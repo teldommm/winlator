@@ -7,7 +7,9 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 
+import com.winlator.cmod.core.Downloader;
 import com.winlator.cmod.core.FileUtils;
+import com.winlator.cmod.core.RemoteSources;
 import com.winlator.cmod.core.TarCompressorUtils;
 
 import org.json.JSONArray;
@@ -24,7 +26,6 @@ import java.util.Map;
 
 public class ContentsManager {
     public static final String PROFILE_NAME = "profile.json";
-    public static final String REMOTE_PROFILES = "https://raw.githubusercontent.com/StevenMXZ/Winlator-Contents/main/contents.json";
     public static final String[] DXVK_TRUST_FILES = {"${system32}/d3d8.dll", "${system32}/d3d9.dll", "${system32}/d3d10.dll", "${system32}/d3d10_1.dll",
             "${system32}/d3d10core.dll", "${system32}/d3d11.dll", "${system32}/dxgi.dll", "${syswow64}/d3d8.dll", "${syswow64}/d3d9.dll", "${syswow64}/d3d10.dll",
             "${syswow64}/d3d10_1.dll", "${syswow64}/d3d10core.dll", "${syswow64}/d3d11.dll", "${syswow64}/dxgi.dll"};
@@ -105,14 +106,14 @@ public class ContentsManager {
                 try {
                     JSONObject object = content.getJSONObject(i);
                     String remoteUrl = object.getString("remoteUrl");
-                    if ("https://github.com/StevenMXZ/Winlator-Contents/releases/download/1.0/Proton.9.0-x86_64.wcp".equals(remoteUrl)
-                            || "https://github.com/StevenMXZ/Winlator-Contents/releases/download/1.0/proton-10-arm64ec.wcp.xz".equals(remoteUrl))
-                        continue;
+                    if (RemoteSources.isIgnoredContentUrl(remoteUrl)) continue;
                     ContentProfile remoteProfile = new ContentProfile();
                     remoteProfile.remoteUrl = remoteUrl;
                     remoteProfile.type = ContentProfile.ContentType.getTypeByName(object.getString("type"));
                     remoteProfile.verName = object.getString("verName");
                     remoteProfile.verCode = object.getInt("verCode");
+                    String sha256 = object.optString("sha256", "").trim();
+                    remoteProfile.remoteSha256 = sha256.isEmpty() ? null : sha256;
                     remoteProfiles.add(remoteProfile);
                 } catch (JSONException e) {
                     e.printStackTrace();
@@ -122,6 +123,24 @@ public class ContentsManager {
             e.printStackTrace();
         }
         syncContents();
+    }
+
+    private static final int CATALOG_MAX_BYTES = 2 * 1024 * 1024;
+
+    /**
+     * Downloads the catalog at {@code url} and makes it the current remote list. Blocking (call it
+     * off the main thread). If the download fails or the answer is not a JSON array the previous
+     * remote list is left as it was and the reason is thrown, instead of silently ending up empty.
+     */
+    public void loadRemoteProfiles(String url) throws Downloader.DownloadException {
+        String json = Downloader.fetchText(url, CATALOG_MAX_BYTES);
+        try {
+            new JSONArray(json);
+        } catch (JSONException e) {
+            throw new Downloader.DownloadException(Downloader.Reason.BAD_RESPONSE,
+                    "The component list is not valid JSON");
+        }
+        setRemoteProfiles(json);
     }
 
     public void syncContents() {

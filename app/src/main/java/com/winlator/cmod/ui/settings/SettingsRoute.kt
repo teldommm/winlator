@@ -27,7 +27,6 @@ import com.winlator.cmod.R
 import com.winlator.cmod.box64.Box64EditPresetDialog
 import com.winlator.cmod.box64.Box64Preset
 import com.winlator.cmod.box64.Box64PresetManager
-import com.winlator.cmod.contents.ContentsManager
 import com.winlator.cmod.core.AppDefaults
 import com.winlator.cmod.core.FileUtils
 import com.winlator.cmod.core.LosslessDll
@@ -174,8 +173,6 @@ internal class SettingsScreenState(
             preferences.getBoolean("enable_box64_logs", false),
             preferences.getBoolean("enable_custom_api_key", false),
             preferences.getString("custom_api_key", "") ?: "",
-            preferences.getString("downloadable_contents_url", ContentsManager.REMOTE_PROFILES)
-                ?: ContentsManager.REMOTE_PROFILES,
             wineDebugOptions
         )
     }
@@ -328,12 +325,6 @@ internal class SettingsScreenState(
 
     override fun onCustomApiKeyChanged(value: String) {
         preferences.edit().putString("custom_api_key", value.trim()).apply()
-        rebuild()
-    }
-
-    override fun onContentsUrlChanged(value: String) {
-        val normalized = value.trim().ifEmpty { ContentsManager.REMOTE_PROFILES }
-        preferences.edit().putString("downloadable_contents_url", normalized).apply()
         rebuild()
     }
 

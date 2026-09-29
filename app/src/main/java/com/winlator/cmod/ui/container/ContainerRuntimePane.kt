@@ -131,9 +131,10 @@ internal fun ContainerRuntimePane(
         if (key in installing) return
         installing = installing + key
         scope.launch {
-            val installed = installRuntimeComponent(context, type, version)
+            val outcome = installRuntimeComponent(context, type, version)
+            val installed = outcome.id
             installing = installing - key
-            if (installed == null) Toast.makeText(context, "Unable to install $version", Toast.LENGTH_SHORT).show()
+            if (installed == null) Toast.makeText(context, outcome.failureText("Unable to install $version"), Toast.LENGTH_SHORT).show()
             else { done(installed); revision++ }
         }
     }
@@ -142,9 +143,10 @@ internal fun ContainerRuntimePane(
         if (key in installing) return
         installing = installing + key
         scope.launch {
-            val installed = installAdrenoDriver(context, option)
+            val outcome = installAdrenoDriver(context, option)
+            val installed = outcome.id
             installing = installing - key
-            if (installed == null) Toast.makeText(context, "Unable to install ${option.label}", Toast.LENGTH_SHORT).show()
+            if (installed == null) Toast.makeText(context, outcome.failureText("Unable to install ${option.label}"), Toast.LENGTH_SHORT).show()
             else { driverVersion = installed; saveGraphics("version", installed); revision++ }
         }
     }
