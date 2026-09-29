@@ -70,7 +70,7 @@ import com.winlator.cmod.ui.theme.dividerColor
 import com.winlator.cmod.ui.theme.hairlineColor
 
 // "Winlator servers" (the button in the component manager): one window for every remote address the app uses (component catalog,
-// Proton manifest, driver repositories, input-controls profiles, artwork). Same hosting technique
+// driver repositories, input-controls profiles, artwork). Same hosting technique
 // as PresetEditorComposeDialog: a ComposeView added onto the activity's content root, so it shares
 // the themed dialog shell and scrim of every other dialog in the app.
 //
@@ -144,7 +144,6 @@ object WinlatorServicesDialog {
 @Composable
 private fun ColumnScope.ServicesScreen(context: Context, onCancel: () -> Unit, onSaved: () -> Unit) {
     var contentsUrl by remember { mutableStateOf(RemoteSources.contentsUrl(context)) }
-    var protonManifest by remember { mutableStateOf(RemoteSources.protonManifestUrl(context)) }
     var inputControls by remember { mutableStateOf(RemoteSources.get(context, RemoteSources.KEY_INPUT_CONTROLS, RemoteSources.DEFAULT_INPUT_CONTROLS)) }
     var steamGrid by remember { mutableStateOf(RemoteSources.get(context, RemoteSources.KEY_STEAMGRID, RemoteSources.DEFAULT_STEAMGRID)) }
     var gamesSearch by remember { mutableStateOf(RemoteSources.get(context, RemoteSources.KEY_GAMESDB_SEARCH, RemoteSources.DEFAULT_GAMESDB_SEARCH)) }
@@ -153,7 +152,6 @@ private fun ColumnScope.ServicesScreen(context: Context, onCancel: () -> Unit, o
     var newRepoName by remember { mutableStateOf("") }
     var newRepoUrl by remember { mutableStateOf("") }
 
-    val manifestInvalid = protonManifest.isNotBlank() && !RemoteSources.isHttps(protonManifest)
     val gamesSearchInvalid = !gamesSearch.contains(RemoteSources.QUERY_PLACEHOLDER)
 
     fun addPendingRepo() {
@@ -188,12 +186,6 @@ private fun ColumnScope.ServicesScreen(context: Context, onCancel: () -> Unit, o
         ) {
             GroupLabel("Components")
             ServiceField("Contents URL", contentsUrl, RemoteSources.DEFAULT_CONTENTS_URL) { contentsUrl = it }
-            ServiceField(
-                label = "Proton manifest URL (optional)",
-                value = protonManifest,
-                default = RemoteSources.DEFAULT_PROTON_MANIFEST,
-                error = if (manifestInvalid) "Must start with https://" else null
-            ) { protonManifest = it }
 
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
                 Text(
@@ -267,7 +259,6 @@ private fun ColumnScope.ServicesScreen(context: Context, onCancel: () -> Unit, o
     TextButton(
         onClick = {
             contentsUrl = RemoteSources.DEFAULT_CONTENTS_URL
-            protonManifest = RemoteSources.DEFAULT_PROTON_MANIFEST
             inputControls = RemoteSources.DEFAULT_INPUT_CONTROLS
             steamGrid = RemoteSources.DEFAULT_STEAMGRID
             gamesSearch = RemoteSources.DEFAULT_GAMESDB_SEARCH
@@ -297,15 +288,15 @@ private fun ColumnScope.ServicesScreen(context: Context, onCancel: () -> Unit, o
             onClick = {
                 if (newRepoUrl.isNotBlank()) addPendingRepo()
                 RemoteSources.set(context, RemoteSources.KEY_CONTENTS_URL, contentsUrl, RemoteSources.DEFAULT_CONTENTS_URL)
-                RemoteSources.set(context, RemoteSources.KEY_PROTON_MANIFEST, protonManifest, RemoteSources.DEFAULT_PROTON_MANIFEST)
                 RemoteSources.set(context, RemoteSources.KEY_INPUT_CONTROLS, inputControls, RemoteSources.DEFAULT_INPUT_CONTROLS)
                 RemoteSources.set(context, RemoteSources.KEY_STEAMGRID, steamGrid, RemoteSources.DEFAULT_STEAMGRID)
                 RemoteSources.set(context, RemoteSources.KEY_GAMESDB_SEARCH, gamesSearch, RemoteSources.DEFAULT_GAMESDB_SEARCH)
                 RemoteSources.set(context, RemoteSources.KEY_GAMESDB_CDN, gamesCdn, RemoteSources.DEFAULT_GAMESDB_CDN)
                 RemoteSources.saveDriverRepos(context, repos.toList())
+                RemoteSources.dropLegacyKeys(context)
                 onSaved()
             },
-            enabled = !manifestInvalid && !gamesSearchInvalid,
+            enabled = !gamesSearchInvalid,
             modifier = Modifier.weight(1f),
             colors = ButtonDefaults.buttonColors(containerColor = controlAccentColor(), contentColor = Color.White)
         ) { Text("Save") }

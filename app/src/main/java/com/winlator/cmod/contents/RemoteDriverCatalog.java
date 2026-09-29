@@ -43,10 +43,6 @@ public final class RemoteDriverCatalog {
         }
     }
 
-    public static List<Entry> load(Context context) {
-        return load(context, new ArrayList<>());
-    }
-
     /**
      * Lists the drivers of every configured repository. A repository that cannot be read does not
      * stop the others; one human-readable line per failure is added to {@code errors}.

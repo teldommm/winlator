@@ -145,16 +145,10 @@ public final class ComponentCatalog {
     }
 
     /**
-     * Installs a Proton package by identifier: the bundled default, one from the Proton manifest set
-     * in Winlator servers, or nothing to do when it is already there.
+     * Installs the bundled Proton package again, or does nothing when it is already there. (Every
+     * other Proton is a catalog component, see {@link #installContent}.)
      */
     public InstallOutcome installProton(String identifier) {
-        // Pull in the manifest first so an identifier that only exists there can be found; a failed
-        // fetch still leaves the cached one loaded, so it is not fatal here.
-        try {
-            proton.refresh(context);
-        } catch (ComponentException ignored) {
-        }
         ComponentEntry entry = proton.entryFor(context, identifier);
         if (entry == null) return InstallOutcome.failed("Unknown Proton package " + identifier);
         if (entry.installed) return InstallOutcome.ok(identifier);

@@ -9,7 +9,6 @@ import androidx.annotation.NonNull;
 
 import com.winlator.cmod.core.Downloader;
 import com.winlator.cmod.core.FileUtils;
-import com.winlator.cmod.core.RemoteSources;
 import com.winlator.cmod.core.TarCompressorUtils;
 
 import org.json.JSONArray;
@@ -106,7 +105,6 @@ public class ContentsManager {
                 try {
                     JSONObject object = content.getJSONObject(i);
                     String remoteUrl = object.getString("remoteUrl");
-                    if (RemoteSources.isIgnoredContentUrl(remoteUrl)) continue;
                     ContentProfile remoteProfile = new ContentProfile();
                     remoteProfile.remoteUrl = remoteUrl;
                     remoteProfile.type = ContentProfile.ContentType.getTypeByName(object.getString("type"));

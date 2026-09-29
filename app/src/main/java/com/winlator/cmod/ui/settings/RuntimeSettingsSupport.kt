@@ -250,7 +250,7 @@ private suspend fun loadSettingsCatalogUncached(
     selectedBox: String,
     selectedDriver: String
 ): SettingsCatalog = withContext(Dispatchers.IO) {
-    // One refresh (catalog, Proton manifest, driver repositories) and one snapshot of the rows;
+    // One refresh (catalog, driver repositories) and one snapshot of the rows;
     // the version lists and the remote drivers below are read from it.
     val catalog = ComponentCatalog(context)
     catalog.refreshQuietly(true)

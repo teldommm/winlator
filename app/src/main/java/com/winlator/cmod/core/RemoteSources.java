@@ -11,7 +11,6 @@ import org.json.JSONArray;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -28,15 +27,12 @@ public final class RemoteSources {
 
     public static final String KEY_CONTENTS_URL = "downloadable_contents_url";
     public static final String KEY_DRIVER_REPOS = "custom_driver_repos";
-    public static final String KEY_PROTON_MANIFEST = "svc_proton_manifest_url";
     public static final String KEY_INPUT_CONTROLS = "svc_input_controls_url";
     public static final String KEY_STEAMGRID = "svc_steamgriddb_url";
     public static final String KEY_GAMESDB_SEARCH = "svc_thegamesdb_search_url";
     public static final String KEY_GAMESDB_CDN = "svc_thegamesdb_cdn_url";
 
     public static final String DEFAULT_CONTENTS_URL = "https://raw.githubusercontent.com/StevenMXZ/Winlator-Contents/main/contents.json";
-    /** Empty by default: Proton packages come from the built-in list only. */
-    public static final String DEFAULT_PROTON_MANIFEST = "";
     public static final String DEFAULT_INPUT_CONTROLS = "https://raw.githubusercontent.com/brunodev85/winlator/main/input_controls/";
     public static final String DEFAULT_STEAMGRID = "https://www.steamgriddb.com/api/v2/";
     public static final String DEFAULT_GAMESDB_SEARCH = "https://thegamesdb.net/search.php?name={query}&platform_id%5B%5D=1";
@@ -44,16 +40,6 @@ public final class RemoteSources {
 
     public static final String QUERY_PLACEHOLDER = "{query}";
 
-    /** Catalog entries the app deliberately hides (superseded builds the default catalog still lists). */
-    private static final String[] IGNORED_CONTENT_URLS = {
-            "https://github.com/StevenMXZ/Winlator-Contents/releases/download/1.0/Proton.9.0-x86_64.wcp",
-            "https://github.com/StevenMXZ/Winlator-Contents/releases/download/1.0/proton-10-arm64ec.wcp.xz"
-    };
-
-    public static boolean isIgnoredContentUrl(String url) {
-        for (String ignored : IGNORED_CONTENT_URLS) if (ignored.equals(url)) return true;
-        return false;
-    }
 
     private static final Pattern GITHUB_REPO_URL = Pattern.compile(
             "^(?:https?://)?(?:www\\.)?github\\.com/([\\w.-]+)/([\\w.-]+?)(?:\\.git)?(?:[/?#].*)?$", Pattern.CASE_INSENSITIVE);
@@ -90,11 +76,6 @@ public final class RemoteSources {
 
     public static String contentsUrl(Context context) {
         return get(context, KEY_CONTENTS_URL, DEFAULT_CONTENTS_URL);
-    }
-
-    /** Empty string when no Proton manifest is configured. */
-    public static String protonManifestUrl(Context context) {
-        return get(context, KEY_PROTON_MANIFEST, DEFAULT_PROTON_MANIFEST);
     }
 
     /** Full URL of a file inside the input-controls folder ({@code index.txt}, a profile, ...). */
@@ -197,20 +178,27 @@ public final class RemoteSources {
 
     // ------------------------------------------------------------------ reset
 
+    /**
+     * Removes the settings of the Proton manifest, a feature that no longer exists (Protons come
+     * from the component catalog like every other component). Harmless when they were never set.
+     */
+    public static void dropLegacyKeys(Context context) {
+        prefs(context).edit()
+                .remove("svc_proton_manifest_url")
+                .remove("svc_proton_manifest_cache_url")
+                .remove("svc_proton_manifest_cache_body")
+                .apply();
+    }
+
     public static void resetAll(Context context) {
         prefs(context).edit()
                 .remove(KEY_CONTENTS_URL)
                 .remove(KEY_DRIVER_REPOS)
-                .remove(KEY_PROTON_MANIFEST)
                 .remove(KEY_INPUT_CONTROLS)
                 .remove(KEY_STEAMGRID)
                 .remove(KEY_GAMESDB_SEARCH)
                 .remove(KEY_GAMESDB_CDN)
                 .apply();
-    }
-
-    /** Lower-cased scheme check used to keep remote package addresses on https. */
-    public static boolean isHttps(String url) {
-        return url != null && url.trim().toLowerCase(Locale.ROOT).startsWith("https://");
+        dropLegacyKeys(context);
     }
 }

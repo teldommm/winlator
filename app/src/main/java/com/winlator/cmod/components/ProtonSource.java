@@ -11,7 +11,11 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Proton runtimes: the optional manifest from Winlator servers, plus installed folders no list mentions. */
+/**
+ * Proton runtimes that are not part of the component catalog: the bundled default (so it can be
+ * downloaded again) and installed folders no list mentions any more. Downloadable Protons come from
+ * the catalog like every other component, see {@link ContentsSource}.
+ */
 public final class ProtonSource implements ComponentSource {
     @Override
     public String title() {
@@ -19,26 +23,16 @@ public final class ProtonSource implements ComponentSource {
     }
 
     @Override
-    public void refresh(Context context) throws ComponentException {
-        try {
-            ProtonPackageManager.refreshRemote(context);
-        } catch (Downloader.DownloadException e) {
-            throw new ComponentException(e.userMessage(), e);
-        }
+    public void refresh(Context context) {
+        // Nothing to fetch: the listing is local (the bundled package and what is installed).
     }
 
     @Override
     public List<ComponentEntry> entries(Context context) {
+        // The bundled default has its own card in the component manager, so it is not a row here.
+        // What is listed: installed earlier from a package no list offers any more - nothing to
+        // download, but it can still be removed here (and is still selectable as a runtime).
         ArrayList<ComponentEntry> out = new ArrayList<>();
-        for (ProtonPackageManager.PackageInfo info : ProtonPackageManager.getPackages()) {
-            // The default runtime ships with the app and has its own row (bundled runtime).
-            if (ProtonPackageManager.DEFAULT_IDENTIFIER.equals(info.identifier)) continue;
-            ProtonEntry entry = new ProtonEntry(info);
-            entry.installed = ProtonPackageManager.isInstalled(context, info.identifier);
-            out.add(entry);
-        }
-        // Installed earlier from a package no list offers any more: nothing to download, but it can
-        // still be removed here (and is still selectable as a runtime).
         for (String identifier : ProtonPackageManager.getInstalledUnlisted(context)) {
             out.add(unlistedEntry(identifier));
         }
