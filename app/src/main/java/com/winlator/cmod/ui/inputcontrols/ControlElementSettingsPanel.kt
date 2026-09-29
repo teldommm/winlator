@@ -224,11 +224,6 @@ internal fun ColumnScope.ControlElementSettingsPanelContent(
                     onPreview = {},
                     onChange = cb::onFollowSpeedChanged
                 )
-                Text(
-                    "Lower = more overshoot allowed before the stick moves, and a softer glide after the finger.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
         }
 

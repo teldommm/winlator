@@ -196,7 +196,7 @@
     <string name="fexcore_preset">FEXCore Preset</string>
     <string name="open_with_android_browser">Open Android Browser in Wine</string>
     <string name="share_android_clipboard">Share Android Clipboard with Wine</string>
-    <string name="shutdown">Shutdown</string>
+    <string name="shutdown">Shutdown...</string>
     <string name="installing_wine_files">Installing Wine Files...</string>
     <string name="installing_drivers_files">Installing System Driver Files...</string>
     <string name="high_refresh_rate">Enable High Refresh Rate Mode</string>
