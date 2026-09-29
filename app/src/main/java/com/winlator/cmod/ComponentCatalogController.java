@@ -26,6 +26,7 @@ import com.winlator.cmod.core.WineRuntimeGuard;
 import com.winlator.cmod.ui.onboarding.OnboardingCallbacks;
 import com.winlator.cmod.ui.onboarding.OnboardingComponent;
 import com.winlator.cmod.ui.onboarding.OnboardingComposeController;
+import com.winlator.cmod.ui.settings.WinlatorServicesDialog;
 import com.winlator.cmod.xenvironment.ImageFs;
 import com.winlator.cmod.xenvironment.ImageFsInstaller;
 
@@ -156,6 +157,14 @@ public class ComponentCatalogController {
             @Override
             public void onBrowseLocal() {
                 extra.onBrowseLocal();
+            }
+
+            @Override
+            public void onOpenServers() {
+                // Addresses may have changed: pull the lists again from the new sources.
+                WinlatorServicesDialog.show(host.hostActivity(), () -> {
+                    if (host.isAlive()) loadCatalog();
+                });
             }
 
             @Override

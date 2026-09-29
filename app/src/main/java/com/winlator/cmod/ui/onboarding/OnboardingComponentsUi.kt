@@ -202,7 +202,8 @@ internal fun OnboardingComponentsScreen(
                 title = if (managerMode) "Components" else "Choose components",
                 subtitle = if (managerMode) "Install and manage runtime versions."
                 else "Install a Wine or Proton layer before continuing.",
-                onBrowseLocal = { cb.onBrowseLocal() }
+                onBrowseLocal = { cb.onBrowseLocal() },
+                onOpenServers = { cb.onOpenServers() }
             )
             // 12dp under the 64dp header, like the Containers list: first content row at 76dp.
             Spacer(Modifier.height(12.dp))
@@ -268,7 +269,7 @@ internal fun OnboardingComponentsScreen(
                         )
                     )
                     Spacer(Modifier.height(16.dp))
-                    SourceSelector { cb.onBrowseLocal() }
+                    SourceSelector(servers = { cb.onOpenServers() }, local = { cb.onBrowseLocal() })
                     if (showLocalInstallProgress) {
                         Spacer(Modifier.height(10.dp))
                         InstallProgressCard(installingLabel, installingProgress)
@@ -364,7 +365,7 @@ private fun ComponentList(
 
 // compact = the landscape header variant: wraps its content (no stretched halves) at 44dp.
 @Composable
-private fun SourceSelector(compact: Boolean = false, local: () -> Unit) {
+private fun SourceSelector(compact: Boolean = false, servers: () -> Unit, local: () -> Unit) {
     Surface(
         if (compact) Modifier else Modifier.fillMaxWidth(),
         shape = WinZShapes.Medium,
@@ -373,7 +374,7 @@ private fun SourceSelector(compact: Boolean = false, local: () -> Unit) {
     ) {
         Row(Modifier.height(if (compact) 44.dp else 56.dp)) {
             val part = if (compact) Modifier else Modifier.weight(1f)
-            SourcePart(Icons.Outlined.Dns, "Winlator servers", true, {}, part)
+            SourcePart(Icons.Outlined.Dns, "Winlator servers", true, servers, part)
             SourcePart(Icons.Outlined.Folder, "Local package", false, local, part, accent = true)
         }
     }
@@ -409,7 +410,8 @@ private fun LandscapeComponentsHeader(
     onBack: () -> Unit,
     title: String,
     subtitle: String,
-    onBrowseLocal: () -> Unit
+    onBrowseLocal: () -> Unit,
+    onOpenServers: () -> Unit
 ) {
     Row(
         Modifier
@@ -442,7 +444,7 @@ private fun LandscapeComponentsHeader(
             )
         }
         Spacer(Modifier.width(12.dp))
-        SourceSelector(compact = true, local = onBrowseLocal)
+        SourceSelector(compact = true, servers = onOpenServers, local = onBrowseLocal)
     }
 }
 

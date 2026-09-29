@@ -17,7 +17,7 @@ import java.util.regex.Pattern;
 
 /**
  * Single place for every remote address the app talks to. Defaults live here; the installed app
- * can override each one through "Winlator Services" (Settings). A blank stored value means
+ * can override each one through "Winlator servers" (Components screen). A blank stored value means
  * "use the default", so resetting a field is just removing its preference.
  *
  * Existing preference keys ({@link #KEY_CONTENTS_URL}, {@link #KEY_DRIVER_REPOS}) are kept as they

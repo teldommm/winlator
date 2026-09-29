@@ -213,6 +213,21 @@ public final class ContentsSource implements ComponentSource {
         }
 
         @Override
+        public String runtimeId() {
+            return type.equals("Wine") || type.equals("Proton") ? ContentsManager.getEntryName(profile) : null;
+        }
+
+        @Override
+        public String downloadUrl() {
+            return profile.remoteUrl;
+        }
+
+        @Override
+        public String sha256() {
+            return profile.remoteSha256;
+        }
+
+        @Override
         public boolean canInstall() {
             return !installed && profile.remoteUrl != null && !profile.remoteUrl.isEmpty();
         }

@@ -9,7 +9,7 @@ import java.util.Locale;
 import java.util.regex.Pattern;
 
 /**
- * Reads the optional Proton manifest from Winlator Services.
+ * Reads the optional Proton manifest from Winlator servers.
  *
  * <pre>
  * [ {"identifier": "proton-11.0-2-arm64ec", "title": "Proton 11.0-2 arm64ec",

@@ -7,7 +7,6 @@ import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.contents.RemoteDriverCatalog;
 import com.winlator.cmod.core.Downloader;
-import com.winlator.cmod.core.ProtonPackageManager;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -78,6 +77,39 @@ public final class ComponentCatalog {
         return all;
     }
 
+    /**
+     * Refreshes the sources from the network, ignoring failures: whatever was loaded before (or is
+     * cached) stays in {@link #entries()}. For screens that only need the lists, not the reasons -
+     * the component manager itself refreshes source by source and reports errors.
+     *
+     * @param includeDrivers the driver repositories cost one request each, so pickers that don't
+     *                       show remote drivers can skip them
+     */
+    public void refreshQuietly(boolean includeDrivers) {
+        for (ComponentSource source : sources) {
+            if (!includeDrivers && source == drivers) continue;
+            try {
+                source.refresh(context);
+            } catch (Exception ignored) {
+                // Keep going: one unreachable source must not hide the others.
+            }
+        }
+    }
+
+    /** Like {@link #entries()} but without the drivers: catalog rows (Wine, Proton, DXVK, ...) and Proton packages. */
+    public List<ComponentEntry> componentEntries() {
+        ArrayList<ComponentEntry> all = new ArrayList<>();
+        for (ComponentSource source : sources) {
+            if (source == drivers) continue;
+            try {
+                all.addAll(source.entries(context));
+            } catch (RuntimeException ignored) {
+                // See entries().
+            }
+        }
+        return all;
+    }
+
     // ------------------------------------------------------------------ one-shot installs
 
     /**
@@ -112,7 +144,10 @@ public final class ComponentCatalog {
         }
     }
 
-    /** Installs a Proton package (built-in list or the manifest from Winlator Services) by identifier. */
+    /**
+     * Installs a Proton package by identifier: the bundled default, one from the Proton manifest set
+     * in Winlator servers, or nothing to do when it is already there.
+     */
     public InstallOutcome installProton(String identifier) {
         // Pull in the manifest first so an identifier that only exists there can be found; a failed
         // fetch still leaves the cached one loaded, so it is not fatal here.
@@ -120,21 +155,17 @@ public final class ComponentCatalog {
             proton.refresh(context);
         } catch (ComponentException ignored) {
         }
-        for (ComponentEntry entry : proton.entries(context)) {
-            if (!entry.id.equals("release-proton:" + identifier)) continue;
-            try {
-                entry.install(context, NO_PROGRESS);
-                return InstallOutcome.ok(identifier);
-            } catch (ComponentException e) {
-                return InstallOutcome.failed(e.getMessage());
-            } catch (RuntimeException e) {
-                return InstallOutcome.failed("Unable to install " + entry.name);
-            }
+        ComponentEntry entry = proton.entryFor(context, identifier);
+        if (entry == null) return InstallOutcome.failed("Unknown Proton package " + identifier);
+        if (entry.installed) return InstallOutcome.ok(identifier);
+        try {
+            entry.install(context, NO_PROGRESS);
+            return InstallOutcome.ok(identifier);
+        } catch (ComponentException e) {
+            return InstallOutcome.failed(e.getMessage());
+        } catch (RuntimeException e) {
+            return InstallOutcome.failed("Unable to install " + entry.name);
         }
-        // The default runtime ships inside the app and is not part of the downloadable list.
-        return ProtonPackageManager.isKnownPackage(identifier)
-                ? InstallOutcome.failed(identifier + " is not available for download")
-                : InstallOutcome.failed("Unknown Proton package " + identifier);
     }
 
     /**
@@ -143,7 +174,7 @@ public final class ComponentCatalog {
      * container stores as its runtime.
      */
     public InstallOutcome installRuntime(String identifier, String typeName, String version) {
-        if (ProtonPackageManager.isKnownPackage(identifier)) return installProton(identifier);
+        if (proton.entryFor(context, identifier) != null) return installProton(identifier);
 
         InstallOutcome outcome = installContent(typeName, version);
         if (!outcome.succeeded()) return outcome;

@@ -40,6 +40,24 @@ public abstract class ComponentEntry {
         return null;
     }
 
+    /**
+     * The identifier a container stores as its runtime, for Wine / Proton rows - also for rows that
+     * are not installed yet (unlike {@link #runtimeName()}). Null for every other kind of row.
+     */
+    public String runtimeId() {
+        return null;
+    }
+
+    /** Address the row downloads from, or null when it has none (installed-only rows). */
+    public String downloadUrl() {
+        return null;
+    }
+
+    /** Expected SHA-256 (hex) of the download, or null when unknown. */
+    public String sha256() {
+        return null;
+    }
+
     public boolean isDriver() {
         return false;
     }

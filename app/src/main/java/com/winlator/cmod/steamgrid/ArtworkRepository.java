@@ -112,7 +112,7 @@ public final class ArtworkRepository {
     });
 
     private static volatile SteamGridDBApi api;
-    // Base URL the cached Retrofit instance was built for; rebuilt when Winlator Services changes it.
+    // Base URL the cached Retrofit instance was built for; rebuilt when Winlator servers changes it.
     private static volatile String apiBase;
     private static volatile OkHttpClient http;
 
@@ -686,9 +686,10 @@ public final class ArtworkRepository {
                     try {
                         local = buildApi(base, gson);
                     } catch (IllegalArgumentException invalidBase) {
-                        // A malformed address typed in Winlator Services must not crash artwork loading.
-                        base = RemoteSources.DEFAULT_STEAMGRID;
-                        local = buildApi(base, gson);
+                        // A malformed address typed in Winlator servers must not crash artwork loading:
+                        // use the default for it. apiBase still remembers the address that was asked
+                        // for, so the fallback is not rebuilt on every call.
+                        local = buildApi(RemoteSources.DEFAULT_STEAMGRID, gson);
                     }
                     api = local;
                     apiBase = base;

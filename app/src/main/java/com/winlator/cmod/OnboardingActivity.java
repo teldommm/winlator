@@ -292,9 +292,8 @@ public class OnboardingActivity extends AppCompatActivity implements ComponentCa
         if (WineInfo.MAIN_WINE_VERSION.identifier().equals(identifier)) {
             return WineRuntimeGuard.isBundledMainInstalled(this);
         }
-        if (ProtonPackageManager.isKnownPackage(identifier)) {
-            return ProtonPackageManager.isInstalled(this, identifier);
-        }
+        if (ProtonPackageManager.isInstalled(this, identifier)) return true;
+        if (ProtonPackageManager.isKnownPackage(identifier)) return false;
         ContentProfile profile = contentsManager.getProfileByEntryName(identifier);
         return profile != null && (profile.type == ContentProfile.ContentType.CONTENT_TYPE_WINE
                 || profile.type == ContentProfile.ContentType.CONTENT_TYPE_PROTON);

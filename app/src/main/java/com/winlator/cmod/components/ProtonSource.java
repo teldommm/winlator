@@ -11,7 +11,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Proton runtimes: the built-in list plus whatever the optional manifest from Winlator Services adds. */
+/** Proton runtimes: the optional manifest from Winlator servers, plus installed folders no list mentions. */
 public final class ProtonSource implements ComponentSource {
     @Override
     public String title() {
@@ -37,7 +37,37 @@ public final class ProtonSource implements ComponentSource {
             entry.installed = ProtonPackageManager.isInstalled(context, info.identifier);
             out.add(entry);
         }
+        // Installed earlier from a package no list offers any more: nothing to download, but it can
+        // still be removed here (and is still selectable as a runtime).
+        for (String identifier : ProtonPackageManager.getInstalledUnlisted(context)) {
+            out.add(unlistedEntry(identifier));
+        }
         return out;
+    }
+
+    /**
+     * The entry for one package identifier: a listed package (including the bundled default, which
+     * the component manager shows as its own card and so leaves out of {@link #entries}), or an
+     * installed folder no list mentions. Null when the identifier is not a Proton package.
+     */
+    public ComponentEntry entryFor(Context context, String identifier) {
+        ProtonPackageManager.PackageInfo info = ProtonPackageManager.getPackage(identifier);
+        if (info != null) {
+            ProtonEntry entry = new ProtonEntry(info);
+            entry.installed = ProtonPackageManager.isInstalled(context, identifier);
+            return entry;
+        }
+        if (ProtonPackageManager.getInstalledUnlisted(context).contains(identifier)) {
+            return unlistedEntry(identifier);
+        }
+        return null;
+    }
+
+    // Nothing to download (no address), but it can be removed and selected as a runtime.
+    private static ProtonEntry unlistedEntry(String identifier) {
+        ProtonEntry entry = new ProtonEntry(new ProtonPackageManager.PackageInfo(identifier, identifier, identifier, new long[0]));
+        entry.installed = true;
+        return entry;
     }
 
     private static final class ProtonEntry extends ComponentEntry {
@@ -51,6 +81,21 @@ public final class ProtonSource implements ComponentSource {
         @Override
         public String runtimeName() {
             return installed ? info.identifier : null;
+        }
+
+        @Override
+        public String runtimeId() {
+            return info.identifier;
+        }
+
+        @Override
+        public String downloadUrl() {
+            return info.directUrl;
+        }
+
+        @Override
+        public String sha256() {
+            return info.sha256;
         }
 
         @Override

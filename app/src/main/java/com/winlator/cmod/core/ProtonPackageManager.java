@@ -11,15 +11,13 @@ import com.winlator.cmod.xenvironment.ImageFsInstaller;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 
 public abstract class ProtonPackageManager {
-    private static final String TAG = "ProtonPackageManager";
     public static final String DEFAULT_IDENTIFIER = "proton-9.0-arm64ec";
-    private static final String RELEASE_BASE_URL = "https://github.com/Other-backup/winlator-imagefs/releases/download/protons-zst-latest/";
-    private static final String RELEASE_NEW_BASE_URL = "https://github.com/Other-backup/winlator-imagefs-v2/releases/download/c/";
-    private static final String RELEASE_D_BASE_URL = "https://github.com/Other-backup/winlator-imagefs-v2/releases/download/d/";
+    // Where the bundled runtime comes from at build time (see downloadProton in app/build.gradle).
+    private static final String BUNDLED_URL = "https://github.com/Other-backup/winlator-imagefs-v2/releases/download/c/proton-9.0-arm64ec.tar.zst";
 
     public static class PackageInfo {
         public final String identifier;
@@ -48,28 +46,17 @@ public abstract class ProtonPackageManager {
         }
     }
 
+    // The only package the app itself knows about: the Proton that ships inside the APK. Every other
+    // Proton (custom builds) comes from the component catalog (contents.json) or from the Proton
+    // manifest set in Winlator servers - nothing else is hard-coded here.
     private static final List<PackageInfo> PACKAGES = Arrays.asList(
-            new PackageInfo("proton-9.0-arm64ec", "Proton 9 arm64ec", "proton-9.0-arm64ec.tar.zst",
-                    new long[]{73570637L}, RELEASE_NEW_BASE_URL + "proton-9.0-arm64ec.tar.zst",
-                    "5f9375640479a5b2c4c3998fda689bb5085febc8fcdb7b6998c79d925392991a"),
-            new PackageInfo("proton-10.0-5-arm64ec", "Proton 10.0-5 arm64ec", "proton-wine-10.0-5-arm64ec.tar.zst",
-                    new long[]{132067976L}, RELEASE_D_BASE_URL + "proton-wine-10.0-5-arm64ec.tar.zst",
-                    "8cf0db4bb5e7e266e9e22e45e76722fb62cfbbf4e5e0e167a90c05c508e310ee"),
-            new PackageInfo("proton-9.0-x86_64", "Proton 9 x86_64", "proton-9.0-x86_64.tar.zst",
-                    new long[]{54043009L}, RELEASE_NEW_BASE_URL + "proton-9.0-x86_64.tar.zst",
-                    "b4688130cd15818c2c46e66f2f7f7146d459a2d95bee1b3daf970f50dc4f8331"),
-            new PackageInfo("proton-10.0-5-x86_64", "Proton 10.0-5 x86_64", "proton-10.0-5-x86_64.wcp",
-                    new long[]{72882772L}, RELEASE_D_BASE_URL + "proton-10.0-5-x86_64.wcp",
-                    "2a5759e48b5f856d36eedac3e5159054629260a792fcf9c167140e02c06d8f0c"),
-            new PackageInfo("proton-11.0-1-arm64ec", "Proton 11.0-1 arm64ec", "proton-wine-11.0-1-arm64ec.wcp.xz",
-                    new long[]{127896076L}, RELEASE_D_BASE_URL + "proton-wine-11.0-1-arm64ec.wcp.xz",
-                    "a360f849f0ce3a808dacec854f25a641735a62ecc0eca8e09b7b7f7ff44041ff"),
-            new PackageInfo("proton-10-arm64ec", "Proton 10 arm64ec (Legacy)", "proton-10-arm64ec.tar.zst",
-                    new long[]{52428800L, 52428800L, 52428800L, 52428800L, 7195940L})
+            new PackageInfo(DEFAULT_IDENTIFIER, "Proton 9 arm64ec", "proton-9.0-arm64ec.tar.zst",
+                    new long[]{73570637L}, BUNDLED_URL,
+                    "5f9375640479a5b2c4c3998fda689bb5085febc8fcdb7b6998c79d925392991a")
     );
 
-    // Extra packages from the optional Proton manifest (Winlator Services). An entry with the same
-    // identifier as a built-in package replaces it, anything else is added after the built-ins.
+    // Extra packages from the optional Proton manifest (Winlator servers). An entry with the same
+    // identifier as the bundled package replaces it, anything else is added after it.
     private static volatile List<PackageInfo> remotePackages = new ArrayList<>();
     private static final String KEY_MANIFEST_CACHE_URL = "svc_proton_manifest_cache_url";
     private static final String KEY_MANIFEST_CACHE_BODY = "svc_proton_manifest_cache_body";
@@ -98,7 +85,7 @@ public abstract class ProtonPackageManager {
     }
 
     /**
-     * Loads the Proton manifest configured in Winlator Services. Blocking network call: run it off
+     * Loads the Proton manifest configured in Winlator servers. Blocking network call: run it off
      * the main thread. The last manifest that downloaded and parsed cleanly is kept, so a failed
      * fetch (offline, host down) does not make the extra packages disappear - the failure is still
      * thrown so the caller can tell the user why the list did not update.
@@ -151,32 +138,46 @@ public abstract class ProtonPackageManager {
         ArrayList<String> identifiers = new ArrayList<>();
         for (PackageInfo packageInfo : getPackages())
             if (isInstalled(context, packageInfo.identifier)) identifiers.add(packageInfo.identifier);
+        identifiers.addAll(getInstalledUnlisted(context));
         return identifiers;
     }
 
     /**
-     * Downloads a package (all of its parts) into {@code output}, verifying part sizes, the total
-     * size and, when the package has one, its SHA-256. The reason for a failure is in the exception.
+     * Proton runtimes that are installed (a non-empty {@code opt/proton-*} folder) but that no list
+     * mentions: installed from a package that used to be built into the app, or from a manifest that
+     * has since changed. They stay usable and removable instead of silently disappearing.
+     */
+    public static List<String> getInstalledUnlisted(Context context) {
+        ArrayList<String> found = new ArrayList<>();
+        File[] folders = new File(ImageFs.find(context).getRootDir(), "opt").listFiles();
+        if (folders == null) return found;
+        for (File folder : folders) {
+            String name = folder.getName();
+            if (!folder.isDirectory() || !name.startsWith("proton-") || isKnownPackage(name)) continue;
+            File[] files = folder.listFiles();
+            if (files != null && files.length > 0) found.add(name);
+        }
+        Collections.sort(found);
+        return found;
+    }
+
+    /**
+     * Downloads a package into {@code output}, verifying its size (when known) and, when the
+     * package has one, its SHA-256. The reason for a failure is in the exception.
      */
     public static void downloadPackageOrThrow(PackageInfo packageInfo, File output, Callback<Integer> progressCallback)
             throws Downloader.DownloadException {
-        if (packageInfo == null || output == null || packageInfo.partSizes == null || packageInfo.partSizes.length == 0) {
-            throw new Downloader.DownloadException(Downloader.Reason.INVALID_URL, "Nothing to download");
+        if (packageInfo == null || output == null || packageInfo.directUrl == null) {
+            throw new Downloader.DownloadException(Downloader.Reason.INVALID_URL, "This package has no download address");
         }
-        ArrayList<Downloader.Part> parts = new ArrayList<>();
-        for (int i = 0; i < packageInfo.partSizes.length; i++) {
-            String address = packageInfo.directUrl != null
-                    ? packageInfo.directUrl
-                    : RELEASE_BASE_URL + packageInfo.fileName + "." + String.format(Locale.ROOT, "%02d", i);
-            parts.add(new Downloader.Part(address, packageInfo.partSizes[i]));
-        }
-        Downloader.Options options = new Downloader.Options().sha256(packageInfo.sha256);
+        long size = packageInfo.partSizes != null && packageInfo.partSizes.length > 0 ? packageInfo.partSizes[0] : 0L;
+        Downloader.Options options = new Downloader.Options().expectedSize(size).sha256(packageInfo.sha256);
         if (progressCallback != null) {
             options.progress(percent -> {
                 if (percent >= 0) progressCallback.call(percent);
             });
         }
-        Downloader.downloadParts(parts, output, options);
+        Downloader.downloadToFile(packageInfo.directUrl, output, options);
     }
 
     public static boolean installPackage(Context context, String identifier, File archiveFile) {

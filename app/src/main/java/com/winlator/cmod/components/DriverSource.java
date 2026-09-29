@@ -110,6 +110,16 @@ public final class DriverSource implements ComponentSource {
         }
 
         @Override
+        public String downloadUrl() {
+            return driver.url;
+        }
+
+        @Override
+        public String sha256() {
+            return driver.sha256;
+        }
+
+        @Override
         public boolean removable() {
             return false;
         }

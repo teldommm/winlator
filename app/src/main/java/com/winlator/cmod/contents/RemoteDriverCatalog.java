@@ -23,7 +23,7 @@ public final class RemoteDriverCatalog {
     private static final int MAX_DRIVERS_PER_REPO = 40;
 
     // The repository list (defaults and the user's own) lives in RemoteSources and is edited
-    // from Winlator Services.
+    // from Winlator servers.
     private static List<DriverRepo> configuredRepos(Context context) {
         return RemoteSources.driverRepos(context);
     }

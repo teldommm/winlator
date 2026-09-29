@@ -69,7 +69,7 @@ import com.winlator.cmod.ui.theme.controlAccentColor
 import com.winlator.cmod.ui.theme.dividerColor
 import com.winlator.cmod.ui.theme.hairlineColor
 
-// "Winlator Services": one window for every remote address the app uses (component catalog,
+// "Winlator servers" (the button in the component manager): one window for every remote address the app uses (component catalog,
 // Proton manifest, driver repositories, input-controls profiles, artwork). Same hosting technique
 // as PresetEditorComposeDialog: a ComposeView added onto the activity's content root, so it shares
 // the themed dialog shell and scrim of every other dialog in the app.
@@ -80,7 +80,11 @@ object WinlatorServicesDialog {
     private const val VIEW_TAG = "winlator_services_dialog"
 
     @JvmStatic
-    fun show(context: Context) {
+    fun show(context: Context) = show(context, null)
+
+    /** [onSaved] runs after the person pressed Save, so the caller can reload what it shows. */
+    @JvmStatic
+    fun show(context: Context, onSaved: Runnable?) {
         val activity = context as? Activity ?: return
         val root = activity.findViewById<ViewGroup>(android.R.id.content)
         if (root.findViewWithTag<View>(VIEW_TAG) != null) return
@@ -122,7 +126,10 @@ object WinlatorServicesDialog {
                                         .heightIn(max = 620.dp)
                                         .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { }
                                 ) {
-                                    ServicesScreen(context = activity, onCancel = dismiss, onSaved = dismiss)
+                                    ServicesScreen(context = activity, onCancel = dismiss, onSaved = {
+                                        onSaved?.run()
+                                        dismiss()
+                                    })
                                 }
                             }
                         }
@@ -160,7 +167,7 @@ private fun ColumnScope.ServicesScreen(context: Context, onCancel: () -> Unit, o
         newRepoUrl = ""
     }
 
-    Text("Winlator Services", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+    Text("Winlator servers", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
     Text(
         "Choose where the app downloads components, drivers, controls and artwork from",
         style = MaterialTheme.typography.bodySmall,

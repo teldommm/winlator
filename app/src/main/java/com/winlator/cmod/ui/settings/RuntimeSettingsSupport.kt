@@ -56,11 +56,7 @@ import com.winlator.cmod.R
 import com.winlator.cmod.contents.AdrenotoolsManager
 import com.winlator.cmod.contents.ContentProfile
 import com.winlator.cmod.components.ComponentCatalog
-import com.winlator.cmod.components.ContentsSource
 import com.winlator.cmod.components.InstallOutcome
-import com.winlator.cmod.components.ProtonSource
-import com.winlator.cmod.contents.ContentsManager
-import com.winlator.cmod.contents.RemoteDriverCatalog
 import com.winlator.cmod.core.DefaultVersion
 import com.winlator.cmod.core.GPUInformation
 import com.winlator.cmod.core.ProtonPackageManager
@@ -100,15 +96,6 @@ internal data class SettingsCatalog(
     val rendererDrivers: Map<String, String>
 )
 
-private suspend fun syncRemoteContents(context: Context, manager: ContentsManager) {
-    withContext(Dispatchers.IO) {
-        // Same refresh the component manager does. A failing source only means its remote rows are
-        // missing from the list, so each one is isolated from the other.
-        runCatching { ContentsSource(manager).refresh(context) }
-        runCatching { ProtonSource().refresh(context) }
-    }
-}
-
 // Last loaded runtime list, process-wide. Screens start from it (produceState initial value) so a
 // runtime label is right on the first frame instead of flashing the raw id
 // ("proton-9.0-arm64ec-1") or nothing until the load — which includes a network fetch of the
@@ -121,50 +108,40 @@ internal fun cachedWineRuntimeOptions(): List<WineRuntimeOption> = cachedRuntime
 internal suspend fun loadWineRuntimeOptions(context: Context): List<WineRuntimeOption> =
     loadWineRuntimeOptionsUncached(context).also { cachedRuntimeOptions = it }
 
+// The runtime picker lists exactly what the component manager lists (ComponentCatalog rows of type
+// Wine / Proton, installed or not), plus the bundled main runtime, which the manager shows as its
+// own card rather than as a row.
 private suspend fun loadWineRuntimeOptionsUncached(context: Context): List<WineRuntimeOption> = withContext(Dispatchers.IO) {
-    val manager = ContentsManager(context)
-    syncRemoteContents(context, manager)
+    val catalog = ComponentCatalog(context)
+    catalog.refreshQuietly(false)
+    val protonType = ContentProfile.ContentType.CONTENT_TYPE_PROTON.toString()
+    val wineType = ContentProfile.ContentType.CONTENT_TYPE_WINE.toString()
     val out = LinkedHashMap<String, WineRuntimeOption>()
 
-    listOf(
-        ContentProfile.ContentType.CONTENT_TYPE_WINE,
-        ContentProfile.ContentType.CONTENT_TYPE_PROTON
-    ).forEach { type ->
-        manager.getProfiles(type).orEmpty().forEach { profile ->
-            val id = ContentsManager.getEntryName(profile)
-            out[id] = WineRuntimeOption(
-                id = id,
-                label = profile.verName,
-                type = type.toString(),
-                version = profile.verName,
-                installed = profile.remoteUrl == null
-            )
-        }
-    }
-
-    ProtonPackageManager.getPackages().forEach { packageInfo ->
-        val installed = ProtonPackageManager.isInstalled(context, packageInfo.identifier)
-        val existing = out[packageInfo.identifier]
-        if (existing?.installed != true) {
-            out[packageInfo.identifier] = WineRuntimeOption(
-                id = packageInfo.identifier,
-                label = packageInfo.title,
-                type = ContentProfile.ContentType.CONTENT_TYPE_PROTON.toString(),
-                version = packageInfo.title,
-                installed = installed
-            )
-        }
+    catalog.componentEntries().forEach { entry ->
+        if (entry.type != wineType && entry.type != protonType) return@forEach
+        val id = entry.runtimeId() ?: return@forEach
+        // An installed row is never replaced by a not-installed twin.
+        if (out[id]?.installed == true) return@forEach
+        out[id] = WineRuntimeOption(
+            id = id,
+            label = entry.name,
+            type = entry.type,
+            version = entry.name,
+            installed = entry.installed
+        )
     }
 
     val mainId = WineInfo.MAIN_WINE_VERSION.identifier()
-    if (WineRuntimeGuard.isBundledMainInstalled(context) && out[mainId] == null) {
-        out[mainId] = WineRuntimeOption(
-            id = mainId,
-            label = ProtonPackageManager.getPackage(mainId)?.title ?: mainId,
-            type = ContentProfile.ContentType.CONTENT_TYPE_PROTON.toString(),
-            version = WineInfo.MAIN_WINE_VERSION.fullVersion(),
-            installed = true
-        )
+    if (out[mainId] == null) {
+        val mainInstalled = WineRuntimeGuard.isBundledMainInstalled(context)
+        val mainPackage = ProtonPackageManager.getPackage(mainId)
+        if (mainPackage != null) {
+            // Listed even when removed, so it can be downloaded again from the picker.
+            out[mainId] = WineRuntimeOption(mainId, mainPackage.title, protonType, mainPackage.title, mainInstalled)
+        } else if (mainInstalled) {
+            out[mainId] = WineRuntimeOption(mainId, mainId, protonType, WineInfo.MAIN_WINE_VERSION.fullVersion(), true)
+        }
     }
 
     out.values.sortedWith(
@@ -273,8 +250,11 @@ private suspend fun loadSettingsCatalogUncached(
     selectedBox: String,
     selectedDriver: String
 ): SettingsCatalog = withContext(Dispatchers.IO) {
-    val manager = ContentsManager(context)
-    syncRemoteContents(context, manager)
+    // One refresh (catalog, Proton manifest, driver repositories) and one snapshot of the rows;
+    // the version lists and the remote drivers below are read from it.
+    val catalog = ComponentCatalog(context)
+    catalog.refreshQuietly(true)
+    val rows = catalog.entries()
 
     fun versions(
         type: ContentProfile.ContentType,
@@ -285,20 +265,19 @@ private suspend fun loadSettingsCatalogUncached(
         val allowed: (String) -> Boolean = { value ->
             !filterArm || arm64 || !value.contains("arm64ec", ignoreCase = true)
         }
+        val ofType = rows.filter { it.type == type.toString() }
         val all = linkedSetOf<String>()
         bundled.filter { it.isNotBlank() && allowed(it) }.forEach(all::add)
-        runCatching { manager.getProfiles(type) }.getOrNull().orEmpty()
-            .map { it.verName }.filter(allowed).forEach(all::add)
+        ofType.map { it.name }.filter(allowed).forEach(all::add)
         if (selected.isNotBlank()) all.add(selected)
 
         val installed = linkedSetOf<String>()
         bundled.filter { it.isNotBlank() && allowed(it) }.forEach(installed::add)
-        runCatching { manager.getInstalledProfiles(type) }.getOrNull().orEmpty()
-            .map { it.verName }.filter(allowed).forEach(installed::add)
+        ofType.filter { it.installed }.map { it.name }.filter(allowed).forEach(installed::add)
         return VersionCatalog(all.toList(), installed)
     }
 
-    val adreno = AdrenotoolsManager(context)
+    val adreno = catalog.adrenotools()
     val rendererDrivers = linkedMapOf("system" to "System")
     val driverOptions = linkedMapOf<String, DriverOption>()
 
@@ -315,13 +294,14 @@ private suspend fun loadSettingsCatalogUncached(
         rendererDrivers[id] = label
         driverOptions[id.lowercase()] = DriverOption(id, label, true)
     }
-    runCatching { RemoteDriverCatalog.load(context) }.getOrNull().orEmpty().forEach { remote ->
+    rows.filter { it.isDriver() && !it.installed }.forEach { remote ->
+        val url = remote.downloadUrl() ?: return@forEach
         val alreadyInstalled = driverOptions.values.any {
             it.id.equals(remote.name, ignoreCase = true) || it.label.equals(remote.name, ignoreCase = true)
         }
         if (!alreadyInstalled) {
-            driverOptions["remote:${remote.name}:${remote.url}"] =
-                DriverOption(remote.name, remote.name, false, remote.url, remote.sha256)
+            driverOptions["remote:${remote.name}:$url"] =
+                DriverOption(remote.name, remote.name, false, url, remote.sha256())
         }
     }
     if (selectedDriver.isNotBlank() && driverOptions.values.none { it.id.equals(selectedDriver, ignoreCase = true) }) {

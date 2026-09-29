@@ -46,6 +46,7 @@ interface OnboardingCallbacks {
     fun onInstallBundledRuntime()
     fun onRemoveBundledRuntime()
     fun onBrowseLocal()
+    fun onOpenServers()
     fun onRuntimeSelected(runtimeIdentifier: String)
     fun onRequestPermissions()
     fun onRetryCore()

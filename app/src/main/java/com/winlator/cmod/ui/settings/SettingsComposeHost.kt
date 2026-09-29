@@ -26,7 +26,6 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Dns
@@ -280,14 +279,6 @@ internal fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) 
                     GroupDivider()
                     ToggleRow(stringResource(R.string.remove_loading_bar_when_booting_games), model.removeLoadingBar) { callbacks.onBooleanChanged("remove_loading_bar_when_booting_games", it) }
                 }
-            }
-            item("services-title") { SectionTitle("Winlator Services") }
-            item("services") {
-                NavigationRow(
-                    Icons.Outlined.Cloud,
-                    "Winlator Services",
-                    "Download sources for components, drivers, controls and artwork"
-                ) { activity?.let { WinlatorServicesDialog.show(it) } }
             }
 
             item("imagefs-title") { SectionTitle(stringResource(R.string.imagefs)) }
