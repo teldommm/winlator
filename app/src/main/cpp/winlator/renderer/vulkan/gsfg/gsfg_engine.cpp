@@ -187,8 +187,8 @@ void computeBarrier(VkCommandBuffer cmd) {
 class Pipelines {
 public:
     Pipelines(VkDevice dev, const std::vector<uint8_t>& pack, const GModel& samplerSource,
-              const bool* needed)
-        : dev_(dev) {
+              const bool* needed, bool useOriginals, std::atomic<int>* progPipe, std::atomic<int64_t>* progSince)
+        : dev_(dev), useOriginals_(useOriginals), progPipe_(progPipe), progSince_(progSince) {
         ok_ = build(pack, samplerSource, needed);
         if (!ok_) destroy();
     }
@@ -232,14 +232,20 @@ private:
             const GPipeDef& d = defs[i];
             if (d.pipe >= kMaxPipe || (needed && !needed[d.pipe])) continue;
 
+            // Ids >= 100 are patched builds of shader (id - 100); see lut_transform.py.
             const Ent* ent = nullptr;
-            for (const Ent& e : ents) if (e.id == d.pipe) ent = &e;
+            bool patched = false;
+            if (!useOriginals_)
+                for (const Ent& e : ents) if (e.id == 100u + d.pipe) { ent = &e; patched = true; }
+            if (!ent)
+                for (const Ent& e : ents) if (e.id == d.pipe) ent = &e;
             if (!ent || (size_t)ent->off + ent->size > pack.size()) {
                 GSFG_LOGE("shader pack is missing pipeline %d", (int)d.pipe);
                 return false;
             }
 
-            GSFG_LOGI("pipeline %d (%u bytes SPIR-V): creating shader module", (int)d.pipe, ent->size);
+            GSFG_LOGI("pipeline %d (%u bytes SPIR-V%s): creating shader module", (int)d.pipe, ent->size,
+                      patched ? ", patched table" : "");
             VkShaderModuleCreateInfo mi{};
             mi.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
             mi.codeSize = ent->size;
@@ -275,8 +281,11 @@ private:
             pi.layout = lay[d.pipe];
             GSFG_LOGI("pipeline %d: compiling", (int)d.pipe);
             const double t0 = gsfgNowMs();
+            if (progPipe_) progPipe_->store((int)d.pipe, std::memory_order_relaxed);
+            if (progSince_) progSince_->store((int64_t)t0, std::memory_order_relaxed);
             const VkResult pr = vkd.CreateComputePipelines(dev_, VK_NULL_HANDLE, 1, &pi, nullptr, &pipe[d.pipe]);
             GSFG_LOGI("pipeline %d: compiled in %.0f ms", (int)d.pipe, gsfgNowMs() - t0);
+            if (progPipe_) progPipe_->store(-1, std::memory_order_relaxed);
             if (pr != VK_SUCCESS) {
                 GSFG_LOGE("pipeline %d failed to compile: VkResult %d", (int)d.pipe, (int)pr);
                 return false;
@@ -298,6 +307,9 @@ private:
     }
 
     VkDevice dev_{};
+    bool useOriginals_ = false;
+    std::atomic<int>*     progPipe_ = nullptr;
+    std::atomic<int64_t>* progSince_ = nullptr;
     bool ok_ = false;
     std::vector<VkShaderModule> mods_;
 };
@@ -685,7 +697,28 @@ void Engine::refreshKnobs() {
                                                         : "normal output");
     }
 }
-Engine::~Engine() { chain_.reset(); pipelines_.reset(); }
+Engine::~Engine() {
+    if (initThread_.joinable()) initThread_.join();   // blocks only if the driver never returns
+    chain_.reset();
+    pipelines_.reset();
+}
+
+double Engine::pendingSeconds() const {
+    if (progPipe_.load(std::memory_order_relaxed) < 0) return 0.0;
+    return (gsfgNowMs() - (double)progSinceMs_.load(std::memory_order_relaxed)) / 1000.0;
+}
+
+bool Engine::beginInit(VkDevice device, VkPhysicalDevice physicalDevice, const std::string& packPath) {
+    if (device == VK_NULL_HANDLE || physicalDevice == VK_NULL_HANDLE || packPath.empty()) return false;
+    if (!gsfgVkdReady()) { GSFG_LOGW("dispatch not initialised; frame generation unavailable"); return false; }
+    if (initThread_.joinable()) return false;
+    state_.store((int)InitState::Pending, std::memory_order_release);
+    initThread_ = std::thread([this, device, physicalDevice, packPath]() {
+        const bool ok = init(device, physicalDevice, packPath);
+        state_.store((int)(ok ? InitState::Ready : InitState::Failed), std::memory_order_release);
+    });
+    return true;
+}
 
 bool Engine::init(VkDevice device, VkPhysicalDevice physicalDevice, const std::string& packPath) {
     if (device == VK_NULL_HANDLE || physicalDevice == VK_NULL_HANDLE || packPath.empty()) return false;
@@ -720,9 +753,13 @@ bool Engine::init(VkDevice device, VkPhysicalDevice physicalDevice, const std::s
     }
     GSFG_LOGI("init: building pipelines");
     const double tp = gsfgNowMs();
-    pipelines_ = std::make_unique<Pipelines>(device, pack, *gsfgModel(variant_, 1), needed);
+    const bool useOriginals = gsfgProp("debug.gsfg.origshaders", 0) != 0;
+    if (useOriginals) GSFG_LOGW("debug.gsfg.origshaders=1: using the unmodified vendor SPIR-V");
+    pipelines_ = std::make_unique<Pipelines>(device, pack, *gsfgModel(variant_, 1), needed, useOriginals,
+                                             &progPipe_, &progSinceMs_);
     GSFG_LOGI("init: pipelines %s in %.0f ms", pipelines_->ok() ? "built" : "FAILED", gsfgNowMs() - tp);
     if (!pipelines_->ok()) { pipelines_.reset(); return false; }
+    if (!initThread_.joinable()) state_.store((int)InitState::Ready, std::memory_order_release);
     GSFG_LOGI("GSFG pipelines ready: variant %d (%s), device \"%s\" vendor 0x%x api %u.%u.%u, pack %zu bytes",
               variant_, variant_ ? "Adreno 840 shaders" : "standard shaders", props.deviceName,
               (unsigned)props.vendorID, VK_VERSION_MAJOR(props.apiVersion), VK_VERSION_MINOR(props.apiVersion),

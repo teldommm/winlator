@@ -137,7 +137,34 @@ void VulkanRendererContext::destroyCompositeTargets() {
 // ===================== Native GSFG: generation passes ========================
 
 bool VulkanRendererContext::ensureGsfgEngine() {
-    if (gsfgEngine_) return gsfgEngine_->valid();
+    using InitState = gsfg::Engine::InitState;
+    if (gsfgEngine_) {
+        switch (gsfgEngine_->initState()) {
+            case InitState::Ready:
+                return gsfgEngine_->valid();
+            case InitState::Pending: {
+                // Pipelines compile on a worker thread. Until they are ready frames are presented
+                // normally; say what is going on every couple of seconds so a slow (or stuck)
+                // driver compiler is visible in the log instead of looking like a hang.
+                static std::chrono::steady_clock::time_point last{};
+                const auto now = std::chrono::steady_clock::now();
+                if (now - last > std::chrono::seconds(2)) {
+                    last = now;
+                    RLOG("gsfg-native: still compiling shaders (pipeline %d for %.1f s)",
+                         gsfgEngine_->pendingPipeline(), gsfgEngine_->pendingSeconds());
+                }
+                return false;
+            }
+            case InitState::Failed:
+                RLOG_E("gsfg-native: engine initialisation failed; frame generation unavailable "
+                       "(see Winlator_GSFG errors)");
+                gsfgEngine_.reset();          // joins the finished worker; gsfgEngineTried_ stays set
+                return false;
+            case InitState::Idle:
+                return false;
+        }
+        return false;
+    }
     if (gsfgEngineTried_) return false;      // failed once; don't retry every frame
     gsfgEngineTried_ = true;
 
@@ -150,17 +177,15 @@ bool VulkanRendererContext::ensureGsfgEngine() {
         RLOG_E("gsfg-native: dispatch incomplete; frame generation unavailable");
         return false;
     }
-
-    RLOG("gsfg-native: dispatch table ok, initialising engine");
+    RLOG("gsfg-native: dispatch table ok, compiling shaders in the background");
     auto engine = std::make_unique<gsfg::Engine>();
-    if (!engine->init(device, physicalDevice, gsfgPackPath_)) {
-        RLOG_E("gsfg-native: engine init failed (pack %s)", gsfgPackPath_.c_str());
+    if (!engine->beginInit(device, physicalDevice, gsfgPackPath_)) {
+        RLOG_E("gsfg-native: could not start engine initialisation (pack %s)", gsfgPackPath_.c_str());
         return false;
     }
     gsfgEngine_ = std::move(engine);
     fgConfigDirty_.store(true, std::memory_order_relaxed);
-    RLOG("gsfg-native: engine ready");
-    return true;
+    return false;                             // ready once the worker finishes
 }
 
 bool VulkanRendererContext::fgCapsOk() const {
