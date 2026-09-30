@@ -294,11 +294,7 @@ internal fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) 
                     GroupDivider()
                     ToggleRow(stringResource(R.string.remove_loading_bar_when_booting_games), model.removeLoadingBar) { callbacks.onBooleanChanged("remove_loading_bar_when_booting_games", it) }
                     GroupDivider()
-                    ToggleRow(
-                        "Back up saves of all games",
-                        model.gameSavesAllShortcuts,
-                        "Find each game's save files and back them up when it exits"
-                    ) { callbacks.onBooleanChanged("game_saves_all_shortcuts", it) }
+                    ToggleRow("Back up saves of all games", model.gameSavesAllShortcuts) { callbacks.onBooleanChanged("game_saves_all_shortcuts", it) }
                 }
             }
 

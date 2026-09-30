@@ -181,7 +181,11 @@ internal fun OnboardingComponentsScreen(
                 "Wine & Proton" -> it.type == "Wine" || it.type == "Proton"
                 else -> it.type == category
             }
-        }
+        // Installed rows first. The catalog order is by type and version code, so an installed
+        // row with a low version code (a local package, an older build) or of the second type
+        // in "Wine & Proton" used to sink below the uninstalled ones. The sort is stable, so the
+        // order inside each group stays as the catalog gave it.
+        }.sortedByDescending { it.installed }
     }
     val hasInstalledRuntime = bundledInstalled.value || all.any {
         it.installed && (it.type == "Wine" || it.type == "Proton") && !it.runtimeIdentifier.isNullOrBlank()

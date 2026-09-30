@@ -73,6 +73,14 @@ import com.winlator.cmod.ui.theme.dividerColor
 // same window Compose already runs in elsewhere in this app (via fragments), so the ComposeView
 // finds its lifecycle/viewmodel/saved-state owners for free — no extra dependency needed.
 object ThemedAlertHost {
+    // Number of overlays currently attached. Overlays live in the Activity's own view tree, so
+    // an Activity that swallows touches in dispatchTouchEvent (e.g. XServerDisplayActivity while
+    // the game is paused) must let them through while this is true. Main thread only.
+    private var activeOverlays = 0
+
+    @JvmStatic
+    fun isShowing(): Boolean = activeOverlays > 0
+
     @JvmStatic
     @JvmOverloads
     fun confirm(
@@ -398,6 +406,16 @@ object ThemedAlertHost {
                 }
             }
         }
+        composeView.addOnAttachStateChangeListener(object : android.view.View.OnAttachStateChangeListener {
+            override fun onViewAttachedToWindow(v: android.view.View) {
+                activeOverlays++
+            }
+
+            override fun onViewDetachedFromWindow(v: android.view.View) {
+                v.removeOnAttachStateChangeListener(this)
+                if (activeOverlays > 0) activeOverlays--
+            }
+        })
         root.addView(
             composeView,
             ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)

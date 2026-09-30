@@ -2336,7 +2336,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     @Override
     public boolean dispatchTouchEvent(MotionEvent event) {
-        if (isPaused && (drawerLayout == null || !drawerLayout.isDrawerOpen(GravityCompat.START))) return true;
+        // While paused, swallow touches so they don't reach the game - but not when the drawer is open
+        // or a themed overlay (e.g. the Exit confirmation) is on screen, otherwise its buttons are dead.
+        if (isPaused && !ThemedAlertHost.isShowing()
+                && (drawerLayout == null || !drawerLayout.isDrawerOpen(GravityCompat.START))) return true;
         return super.dispatchTouchEvent(event);
     }
 
