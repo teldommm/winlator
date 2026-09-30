@@ -47,6 +47,9 @@ public class ControlsEditorActivity extends AppCompatActivity {
     private int pendingBuiltinOverrideId = -1;
     private static final int PICK_ICON_REQUEST = 7001;
     private static final String BUILTIN_ICON_PREFIX = "builtin:";
+    // Built-in icon 0 is the "no icon" tile (assets/inputcontrols/icons/0.png): an element with
+    // iconId 0 shows its text instead of a picture.
+    private static final byte NO_ICON_ID = 0;
     private static final String CUSTOM_ICON_PREFIX = "path:";
 
     private ControlsEditorOverlay overlay;
@@ -299,6 +302,7 @@ public class ControlsEditorActivity extends AppCompatActivity {
                 if (e == null) return;
                 startEdit(e);
                 e.setType(ControlElement.Type.values()[index]);
+                inputControlsView.keepInside(e);
                 commit(e);
             }
 
@@ -308,6 +312,7 @@ public class ControlsEditorActivity extends AppCompatActivity {
                 if (e == null) return;
                 startEdit(e);
                 e.setShape(ControlElement.Shape.values()[index]);
+                inputControlsView.keepInside(e);
                 commit(e);
             }
 
@@ -317,6 +322,7 @@ public class ControlsEditorActivity extends AppCompatActivity {
                 if (e == null) return;
                 startEdit(e);
                 e.setRange(ControlElement.Range.values()[index]);
+                inputControlsView.keepInside(e);
                 commit(e);
             }
 
@@ -326,6 +332,7 @@ public class ControlsEditorActivity extends AppCompatActivity {
                 if (e == null) return;
                 startEdit(e);
                 e.setOrientation((byte) (vertical ? 1 : 0));
+                inputControlsView.keepInside(e);
                 commit(e);
             }
 
@@ -335,6 +342,7 @@ public class ControlsEditorActivity extends AppCompatActivity {
                 if (e == null) return;
                 startEdit(e);
                 e.setBindingCount(columns);
+                inputControlsView.keepInside(e);
                 commit(e);
             }
 
@@ -344,6 +352,7 @@ public class ControlsEditorActivity extends AppCompatActivity {
                 if (e == null) return;
                 startEdit(e);
                 e.setScale(percent / 100f);
+                inputControlsView.keepInside(e);
                 inputControlsView.invalidate();
             }
 
@@ -353,6 +362,7 @@ public class ControlsEditorActivity extends AppCompatActivity {
                 if (e == null) return;
                 startEdit(e);
                 e.setScale(percent / 100f);
+                inputControlsView.keepInside(e);
                 commit(e);
                 overlay.onCanvasChanged();
             }
@@ -475,7 +485,8 @@ public class ControlsEditorActivity extends AppCompatActivity {
             public void onIconLongPress(String iconKey) {
                 ControlElement e = target();
                 if (e == null) return;
-                if (iconKey.startsWith(BUILTIN_ICON_PREFIX)) {
+                if (iconKey.startsWith(BUILTIN_ICON_PREFIX)
+                        && !iconKey.equals(BUILTIN_ICON_PREFIX + NO_ICON_ID)) {
                     flushPendingTextSave();
                     pendingIconElement = e;
                     pendingBuiltinOverrideId = Byte.parseByte(iconKey.substring(BUILTIN_ICON_PREFIX.length()));
@@ -739,7 +750,7 @@ public class ControlsEditorActivity extends AppCompatActivity {
         for (final byte id : iconIds) {
             File overrideFile = getBuiltinOverridePath(id);
             Bitmap bmp = null;
-            if (overrideFile.exists()) {
+            if (id != NO_ICON_ID && overrideFile.exists()) {
                 bmp = loadAndScaleBitmap(overrideFile.getAbsolutePath());
                 if (bmp == null) Log.w("Icons", "Override exists but failed to decode: " + overrideFile.getName());
             }
@@ -756,6 +767,12 @@ public class ControlsEditorActivity extends AppCompatActivity {
                 }
             }
 
+            if (id == NO_ICON_ID) {
+                // "No icon": the button shows its text label. First tile of the strip, and not
+                // replaceable with a picture (it is never drawn, so a replacement would do nothing).
+                icons.add(0, new CachedIcon(BUILTIN_ICON_PREFIX + id, bmp, ControlElementIconTint.BLUE, false, false, null, id));
+                continue;
+            }
             boolean hasOverride = overrideFile.exists();
             icons.add(new CachedIcon(BUILTIN_ICON_PREFIX + id, bmp, ControlElementIconTint.BLUE, hasOverride, true, null, id));
         }

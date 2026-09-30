@@ -478,8 +478,8 @@ private fun ThemedTextField(label: String, value: String, onValueChange: (String
 }
 
 // One horizontally scrolling row, like WinLite's icon strip (was a vertical grid capped at
-// 220dp, which ate most of the panel's height). Custom icons come first, then the built-ins,
-// in the order the Activity builds the list.
+// 220dp, which ate most of the panel's height). The "no icon" tile (built-in 0) comes first, then
+// the custom icons, then the other built-ins, in the order the Activity builds the list.
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun IconRow(icons: List<ControlElementIcon>, cb: ControlElementSettingsCallbacks) {

@@ -441,6 +441,7 @@ public class InputControlsView extends View {
             ControlElement element = new ControlElement(this);
             element.setX(cursor.x);
             element.setY(cursor.y);
+            keepInside(element);
             profile.addElement(element);
             profile.save();
             selectElement(element);
@@ -481,6 +482,7 @@ public class InputControlsView extends View {
         int step = snappingSize * 4;
         copy.setX(clampInt(selectedElement.getX() + step, 0, getMaxWidth()));
         copy.setY(clampInt(selectedElement.getY() + step, 0, getMaxHeight()));
+        keepInside(copy);
         profile.addElement(copy);
         profile.save();
         selectElement(copy);
@@ -548,6 +550,53 @@ public class InputControlsView extends View {
 
     private static int clampInt(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    // ---- keeping elements on screen (editor) ----
+    // The whole bounding box stays inside the visible view. getMaxWidth()/getMaxHeight() are
+    // rounded to the grid and can be a little larger than the view, so the real size is the limit.
+    // An element bigger than the view on an axis is centred on that axis.
+
+    private float boundsWidth() {
+        return Math.min(getWidth(), getMaxWidth());
+    }
+
+    private float boundsHeight() {
+        return Math.min(getHeight(), getMaxHeight());
+    }
+
+    private static float clampAxis(float value, float half, float extent) {
+        float lo = half;
+        float hi = extent - half;
+        if (lo > hi) return extent * 0.5f;
+        return Math.max(lo, Math.min(hi, value));
+    }
+
+    // Same, but on a grid line when one fits, so a released element is still grid-aligned.
+    private float clampAxisToGrid(float value, float half, float extent) {
+        float lo = half;
+        float hi = extent - half;
+        if (lo > hi) return extent * 0.5f;
+        float gridLo = (float) Math.ceil(lo / snappingSize) * snappingSize;
+        float gridHi = (float) Math.floor(hi / snappingSize) * snappingSize;
+        if (gridLo <= gridHi) return Math.max(gridLo, Math.min(gridHi, value));
+        return Math.max(lo, Math.min(hi, value));
+    }
+
+    /**
+     * Pushes the element back so it is fully on screen. Call it after anything that moves or
+     * resizes an element in the editor (drag, pinch, scale / shape / type changes, new copies).
+     */
+    public void keepInside(ControlElement element) {
+        if (element == null || getWidth() <= 0 || getHeight() <= 0) return;
+        Rect box = element.getBoundingBox();
+        float halfW = box.width() * 0.5f;
+        float halfH = box.height() * 0.5f;
+        int x = Math.round(clampAxis(element.getX(), halfW, boundsWidth()));
+        int y = Math.round(clampAxis(element.getY(), halfH, boundsHeight()));
+        if (x != element.getX()) element.setX(x);
+        if (y != element.getY()) element.setY(y);
+        invalidate();
     }
 
     public ControlElement getSelectedElement() {
@@ -1618,6 +1667,7 @@ public class InputControlsView extends View {
         scale = Math.max(MIN_ELEMENT_SCALE, Math.min(MAX_ELEMENT_SCALE, scale));
         if (scale != element.getScale()) {
             element.setScale(scale);
+            keepInside(element);
             invalidate();
         }
     }
@@ -1653,8 +1703,15 @@ public class InputControlsView extends View {
         guideLineX = snappedX[1];
         guideLineY = snappedY[1];
 
-        element.setX(Math.round(snappedX[0]));
-        element.setY(Math.round(snappedY[0]));
+        // The finger may go anywhere; the element stops at the screen edge. If that moved it off
+        // the guide it had snapped to, the guide is not shown.
+        float insideX = clampAxis(snappedX[0], halfW, boundsWidth());
+        float insideY = clampAxis(snappedY[0], halfH, boundsHeight());
+        if (insideX != snappedX[0]) guideLineX = Float.NaN;
+        if (insideY != snappedY[0]) guideLineY = Float.NaN;
+
+        element.setX(Math.round(insideX));
+        element.setY(Math.round(insideY));
 
         // Tick when a guide is newly acquired (not on grid lines — they're every cell and
         // would turn into a constant buzz).
@@ -1722,8 +1779,14 @@ public class InputControlsView extends View {
     private void settleElement(final ControlElement element) {
         final float fromX = element.getX();
         final float fromY = element.getY();
-        final float toX = Float.isNaN(guideLineX) ? Mathf.roundTo(fromX, snappingSize) : fromX;
-        final float toY = Float.isNaN(guideLineY) ? Mathf.roundTo(fromY, snappingSize) : fromY;
+        // Rounding to the grid must not carry the element back over the edge.
+        Rect settleBox = element.getBoundingBox();
+        final float toX = Float.isNaN(guideLineX)
+                ? clampAxisToGrid(Mathf.roundTo(fromX, snappingSize), settleBox.width() * 0.5f, boundsWidth())
+                : fromX;
+        final float toY = Float.isNaN(guideLineY)
+                ? clampAxisToGrid(Mathf.roundTo(fromY, snappingSize), settleBox.height() * 0.5f, boundsHeight())
+                : fromY;
         final int startX = dragStartX, startY = dragStartY;
 
         elementSettleAnimator = ValueAnimator.ofFloat(0f, 1f);
