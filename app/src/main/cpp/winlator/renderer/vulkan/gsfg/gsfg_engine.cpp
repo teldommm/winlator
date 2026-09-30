@@ -12,6 +12,7 @@
 
 #include <cstdlib>
 #include <cctype>
+#include <chrono>
 
 #ifdef __ANDROID__
 #include <android/log.h>
@@ -38,6 +39,10 @@ static int gsfgProp(const char* name, int def) {
     return v ? atoi(v) : def;
 }
 #endif
+
+static double gsfgNowMs() {
+    return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
 
 // Check a Vulkan call and log the failing step with its VkResult.
 #define GCHECK(expr, what) do { const VkResult r_ = (expr); if (r_ != VK_SUCCESS) { \
@@ -234,6 +239,7 @@ private:
                 return false;
             }
 
+            GSFG_LOGI("pipeline %d (%u bytes SPIR-V): creating shader module", (int)d.pipe, ent->size);
             VkShaderModuleCreateInfo mi{};
             mi.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
             mi.codeSize = ent->size;
@@ -267,7 +273,10 @@ private:
             pi.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
             pi.stage.module = mod; pi.stage.pName = "main";
             pi.layout = lay[d.pipe];
+            GSFG_LOGI("pipeline %d: compiling", (int)d.pipe);
+            const double t0 = gsfgNowMs();
             const VkResult pr = vkd.CreateComputePipelines(dev_, VK_NULL_HANDLE, 1, &pi, nullptr, &pipe[d.pipe]);
+            GSFG_LOGI("pipeline %d: compiled in %.0f ms", (int)d.pipe, gsfgNowMs() - t0);
             if (pr != VK_SUCCESS) {
                 GSFG_LOGE("pipeline %d failed to compile: VkResult %d", (int)d.pipe, (int)pr);
                 return false;
@@ -388,6 +397,7 @@ private:
         VkPhysicalDeviceMemoryProperties mp{};
         vkd.GetPhysicalDeviceMemoryProperties(pd, &mp);
 
+        GSFG_LOGI("graph: creating %d images", model_->nImages);
         // ---- images
         images_.assign(model_->nImages, VK_NULL_HANDLE);
         views_.assign(model_->nViews, VK_NULL_HANDLE);
@@ -421,6 +431,7 @@ private:
         }
         if (!allocate(mp, bits, total, req.data(), offs.data(), model_->nImages, /*image=*/true)) return false;
 
+        GSFG_LOGI("graph: creating %d views", model_->nViews);
         for (int i = 0; i < model_->nViews; i++) {
             const GView& gv = model_->views[i];
             VkImageViewCreateInfo vi{};
@@ -430,6 +441,7 @@ private:
             GCHECK(vkd.CreateImageView(dev_, &vi, nullptr, &views_[i]), "CreateImageView");
         }
 
+        GSFG_LOGI("graph: creating %d buffers", model_->nBuffers);
         // ---- buffers (device-local scratch; the graph never reads them from the host)
         buffers_.assign(model_->nBuffers, VK_NULL_HANDLE);
         bufSize_.assign(model_->nBuffers, 0);
@@ -504,6 +516,7 @@ private:
 
     // One descriptor set per (generation count, ring slot, dispatch), written once.
     bool createDescriptors() {
+        GSFG_LOGI("graph: creating descriptor pool and sets");
         uint32_t nSets = 0, nImg = 0, nStore = 0, nBuf = 0;
         auto count = [&](const GDisp& d) {
             nSets += 3;
@@ -678,6 +691,7 @@ bool Engine::init(VkDevice device, VkPhysicalDevice physicalDevice, const std::s
     if (device == VK_NULL_HANDLE || physicalDevice == VK_NULL_HANDLE || packPath.empty()) return false;
     if (!gsfgVkdReady()) { GSFG_LOGW("dispatch not initialised; frame generation unavailable"); return false; }
     device_ = device; physical_ = physicalDevice;
+    GSFG_LOGI("init: begin, pack %s", packPath.c_str());
 
     std::vector<uint8_t> pack;
     {
@@ -689,6 +703,7 @@ bool Engine::init(VkDevice device, VkPhysicalDevice physicalDevice, const std::s
         if (!f) return false;
     }
 
+    GSFG_LOGI("init: pack read, %zu bytes", pack.size());
     // The reference ships different shaders for Adreno 840.
     VkPhysicalDeviceProperties props{};
     vkd.GetPhysicalDeviceProperties(physicalDevice, &props);
@@ -703,7 +718,10 @@ bool Engine::init(VkDevice device, VkPhysicalDevice physicalDevice, const std::s
             for (int r = 0; r < 3; r++) needed[t.init[r]->pipe] = true;
         }
     }
+    GSFG_LOGI("init: building pipelines");
+    const double tp = gsfgNowMs();
     pipelines_ = std::make_unique<Pipelines>(device, pack, *gsfgModel(variant_, 1), needed);
+    GSFG_LOGI("init: pipelines %s in %.0f ms", pipelines_->ok() ? "built" : "FAILED", gsfgNowMs() - tp);
     if (!pipelines_->ok()) { pipelines_.reset(); return false; }
     GSFG_LOGI("GSFG pipelines ready: variant %d (%s), device \"%s\" vendor 0x%x api %u.%u.%u, pack %zu bytes",
               variant_, variant_ ? "Adreno 840 shaders" : "standard shaders", props.deviceName,
@@ -758,6 +776,7 @@ bool Engine::prepare(uint32_t width, uint32_t height, VkFormat format) {
     if (!needsRebuild(width, height, format)) return chain_ && chain_->valid();
 
     const float scale = effectiveFlowScale(width);
+    GSFG_LOGI("prepare: building graph for %ux%u fmt %d scale %.2f", width, height, (int)format, (double)scale);
     chain_.reset();      // the old images may still be referenced; the caller waits for idle first
     chain_ = std::make_unique<Chain>(device_, physical_, *pipelines_, variant_, width, height, scale);
     if (!chain_->valid()) {

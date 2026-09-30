@@ -145,11 +145,13 @@ bool VulkanRendererContext::ensureGsfgEngine() {
         RLOG_E("gsfg-native: no shader pack path set");
         return false;
     }
+    RLOG("gsfg-native: creating engine (pack %s)", gsfgPackPath_.c_str());
     if (!gsfgVkdInit(vk_)) {
         RLOG_E("gsfg-native: dispatch incomplete; frame generation unavailable");
         return false;
     }
 
+    RLOG("gsfg-native: dispatch table ok, initialising engine");
     auto engine = std::make_unique<gsfg::Engine>();
     if (!engine->init(device, physicalDevice, gsfgPackPath_)) {
         RLOG_E("gsfg-native: engine init failed (pack %s)", gsfgPackPath_.c_str());
