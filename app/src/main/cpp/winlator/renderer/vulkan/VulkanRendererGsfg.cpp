@@ -214,6 +214,13 @@ void VulkanRendererContext::recordFrameGenProcess(VkCommandBuffer cb) {
     }
     // Take frame N as the graph's newest input (blit + feature encode) and, when generating,
     // run every stage shared by the generated frames.
+    static int sProcessLog = 0;
+    if (sProcessLog < 90) {
+        sProcessLog++;
+        RLOG("gsfg-native: process: composite target %u/%zu image %p %ux%u, planned generations=%u, cmdSlot frame=%u",
+             compositeIndex, compositeTargets.size(), (void*)src.img, compositeW, compositeH,
+             fgPlan_.generations, (unsigned)currentFrame);
+    }
     gsfgEngine_->process(cb, src.img, compositeW, compositeH, fgPlan_.generations);
 }
 
@@ -224,7 +231,17 @@ void VulkanRendererContext::recordFrameGenGeneration(VkCommandBuffer cb, uint32_
 
     gsfgEngine_->generateInto(cb, g);
     const VkImage generated = gsfgEngine_->finalImage(g);
-    if (generated == VK_NULL_HANDLE) return;
+    if (generated == VK_NULL_HANDLE) {
+        // The swapchain image for this present was already acquired; leaving it untouched would present garbage.
+        RLOG_E("gsfg-native: generation %u produced no output image (engine state inconsistent)", g);
+        return;
+    }
+    static int sGenLog = 0;
+    if (sGenLog < 90) {
+        sGenLog++;
+        RLOG("gsfg-native: generation %u -> swapchain image %u (engine image %p) cursorOverlay=%d", g,
+             fgPlan_.imgIdx[g], (void*)generated, (int)(cursorDrawnPerPresent() && cursorOverlay_.draw));
+    }
 
     if (fgQueryPool_ != VK_NULL_HANDLE && g + 1 == fgPlan_.generations) {
         vk_.CmdWriteTimestamp(cb, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, fgQueryPool_, currentFrame * 2 + 1);

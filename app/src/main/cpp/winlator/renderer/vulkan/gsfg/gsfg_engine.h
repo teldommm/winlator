@@ -110,6 +110,21 @@ private:
     bool     generating_{};
     bool     needSeed_{true};
     bool     unavailable_{};
+
+    // Diagnostics. Knobs (adb shell setprop debug.gsfg.<name> <int>):
+    //   trace  1 = log every frame (default: the first 90 frames after each graph build + state changes)
+    //   show   1 = generated frames show the CURRENT input frame instead of the graph output. The graph
+    //              still runs, so cost and pacing are unchanged; it separates compositor plumbing
+    //              (blits, swapchain, pacing, cursor) from the shaders.
+    int      traceLeft_{0};
+    bool     traceAll_{false};
+    int      showMode_{0};
+    VkImage  lastSource_{};
+    uint32_t lastPlanGens_{~0u};
+    bool     lastWarm_{false};
+    bool     lastGenerating_{false};
+    void     refreshKnobs();
+    bool     tracing() const { return traceAll_ || traceLeft_ > 0; }
 };
 
 } // namespace gsfg

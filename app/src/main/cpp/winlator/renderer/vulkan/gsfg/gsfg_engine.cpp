@@ -10,14 +10,38 @@
 #include <cstring>
 #include <fstream>
 
+#include <cstdlib>
+#include <cctype>
+
 #ifdef __ANDROID__
 #include <android/log.h>
-#define GSFG_LOGI(...) __android_log_print(ANDROID_LOG_INFO, "GsfgEngine", __VA_ARGS__)
-#define GSFG_LOGW(...) __android_log_print(ANDROID_LOG_WARN, "GsfgEngine", __VA_ARGS__)
+#include <sys/system_properties.h>
+#define GSFG_TAG "Winlator_GSFG"
+#define GSFG_LOGI(...) __android_log_print(ANDROID_LOG_INFO,  GSFG_TAG, __VA_ARGS__)
+#define GSFG_LOGW(...) __android_log_print(ANDROID_LOG_WARN,  GSFG_TAG, __VA_ARGS__)
+#define GSFG_LOGE(...) __android_log_print(ANDROID_LOG_ERROR, GSFG_TAG, __VA_ARGS__)
+// Debug knobs: `adb shell setprop debug.gsfg.<name> <int>` (read while running, no restart needed).
+static int gsfgProp(const char* name, int def) {
+    char v[PROP_VALUE_MAX] = {0};
+    return __system_property_get(name, v) > 0 ? atoi(v) : def;
+}
 #else
 #define GSFG_LOGI(...) do { fprintf(stderr, "[gsfg I] " __VA_ARGS__); fputc('\n', stderr); } while (0)
 #define GSFG_LOGW(...) do { fprintf(stderr, "[gsfg W] " __VA_ARGS__); fputc('\n', stderr); } while (0)
+#define GSFG_LOGE(...) do { fprintf(stderr, "[gsfg E] " __VA_ARGS__); fputc('\n', stderr); } while (0)
+// Host tests: debug.gsfg.trace -> GSFG_TRACE.
+static int gsfgProp(const char* name, int def) {
+    std::string n = "GSFG_";
+    const char* dot = strrchr(name, '.');
+    for (const char* p = dot ? dot + 1 : name; *p; p++) n += (char)toupper((unsigned char)*p);
+    const char* v = getenv(n.c_str());
+    return v ? atoi(v) : def;
+}
 #endif
+
+// Check a Vulkan call and log the failing step with its VkResult.
+#define GCHECK(expr, what) do { const VkResult r_ = (expr); if (r_ != VK_SUCCESS) { \
+        GSFG_LOGE("%s failed: VkResult %d", what, (int)r_); return false; } } while (0)
 
 namespace gsfg {
 namespace {
@@ -175,7 +199,10 @@ public:
 
 private:
     bool build(const std::vector<uint8_t>& pack, const GModel& sm, const bool* needed) {
-        if (pack.size() < 8 || memcmp(pack.data(), "GSFG", 4) != 0) return false;
+        if (pack.size() < 8 || memcmp(pack.data(), "GSFG", 4) != 0) {
+            GSFG_LOGE("shader pack has a bad header (size %zu)", pack.size());
+            return false;
+        }
         uint32_t count; memcpy(&count, pack.data() + 4, 4);
         if (pack.size() < 8 + (size_t)count * 12) return false;
         struct Ent { uint32_t id, size, off; };
@@ -190,7 +217,7 @@ private:
             si.mipmapMode = (VkSamplerMipmapMode)sm.samplers[i].mip;
             si.addressModeU = si.addressModeV = si.addressModeW = (VkSamplerAddressMode)sm.samplers[i].addr;
             si.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
-            if (vkd.CreateSampler(dev_, &si, nullptr, &samp[i]) != VK_SUCCESS) return false;
+            GCHECK(vkd.CreateSampler(dev_, &si, nullptr, &samp[i]), "CreateSampler");
             nSamp = i + 1;
         }
 
@@ -203,7 +230,7 @@ private:
             const Ent* ent = nullptr;
             for (const Ent& e : ents) if (e.id == d.pipe) ent = &e;
             if (!ent || (size_t)ent->off + ent->size > pack.size()) {
-                GSFG_LOGW("shader pack is missing pipeline %d", (int)d.pipe);
+                GSFG_LOGE("shader pack is missing pipeline %d", (int)d.pipe);
                 return false;
             }
 
@@ -212,7 +239,7 @@ private:
             mi.codeSize = ent->size;
             mi.pCode = reinterpret_cast<const uint32_t*>(pack.data() + ent->off);   // offsets are 4-aligned
             VkShaderModule mod = VK_NULL_HANDLE;
-            if (vkd.CreateShaderModule(dev_, &mi, nullptr, &mod) != VK_SUCCESS) return false;
+            GCHECK(vkd.CreateShaderModule(dev_, &mi, nullptr, &mod), "CreateShaderModule");
             mods_.push_back(mod);
 
             VkDescriptorSetLayoutBinding bnd[13]{};
@@ -225,14 +252,14 @@ private:
             VkDescriptorSetLayoutCreateInfo di{};
             di.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
             di.bindingCount = d.nBind; di.pBindings = bnd;
-            if (vkd.CreateDescriptorSetLayout(dev_, &di, nullptr, &dsl[d.pipe]) != VK_SUCCESS) return false;
+            GCHECK(vkd.CreateDescriptorSetLayout(dev_, &di, nullptr, &dsl[d.pipe]), "CreateDescriptorSetLayout");
 
             VkPushConstantRange pcr{VK_SHADER_STAGE_COMPUTE_BIT, 0, 112};
             VkPipelineLayoutCreateInfo li{};
             li.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
             li.setLayoutCount = 1; li.pSetLayouts = &dsl[d.pipe];
             li.pushConstantRangeCount = 1; li.pPushConstantRanges = &pcr;
-            if (vkd.CreatePipelineLayout(dev_, &li, nullptr, &lay[d.pipe]) != VK_SUCCESS) return false;
+            GCHECK(vkd.CreatePipelineLayout(dev_, &li, nullptr, &lay[d.pipe]), "CreatePipelineLayout");
 
             VkComputePipelineCreateInfo pi{};
             pi.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
@@ -240,8 +267,9 @@ private:
             pi.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
             pi.stage.module = mod; pi.stage.pName = "main";
             pi.layout = lay[d.pipe];
-            if (vkd.CreateComputePipelines(dev_, VK_NULL_HANDLE, 1, &pi, nullptr, &pipe[d.pipe]) != VK_SUCCESS) {
-                GSFG_LOGW("pipeline %d failed to compile", (int)d.pipe);
+            const VkResult pr = vkd.CreateComputePipelines(dev_, VK_NULL_HANDLE, 1, &pi, nullptr, &pipe[d.pipe]);
+            if (pr != VK_SUCCESS) {
+                GSFG_LOGE("pipeline %d failed to compile: VkResult %d", (int)d.pipe, (int)pr);
                 return false;
             }
         }
@@ -278,12 +306,20 @@ public:
         model_ = gsfgModel(variant, geo_.cls);
         if (!model_) return;
         valid_ = createResources(pd) && createDescriptors();
-        if (!valid_) destroy();
+        if (!valid_) { GSFG_LOGE("graph resources could not be created (see the errors above)"); destroy(); }
+        else GSFG_LOGI("graph ready: %d images, %d views, %d buffers, descriptor sets created", model_->nImages,
+                       model_->nViews, model_->nBuffers);
     }
     ~Chain() { destroy(); }
 
     bool valid() const { return valid_; }
     const Geometry& geometry() const { return geo_; }
+    int  takeDispatchCount() { const int n = dispCount_; dispCount_ = 0; return n; }
+    VkImage inputImage(uint64_t count, uint32_t n) const {
+        return images_[model_->tmpl[(n > 0 ? n : 1) - 1].inDst[count % 3]];
+    }
+    int nImages() const { return model_ ? model_->nImages : 0; }
+    int nBuffers() const { return model_ ? model_->nBuffers : 0; }
 
     // Frame N in: copy it into the ring slot, encode its features, and - when
     // `n` generated frames are planned - run every stage they share.
@@ -369,7 +405,15 @@ private:
             ii.samples = VK_SAMPLE_COUNT_1_BIT; ii.tiling = VK_IMAGE_TILING_OPTIMAL;
             ii.usage = (VkImageUsageFlags)gi.usage; ii.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
             ii.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            if (vkd.CreateImage(dev_, &ii, nullptr, &images_[i]) != VK_SUCCESS) return false;
+            {
+                const VkResult r = vkd.CreateImage(dev_, &ii, nullptr, &images_[i]);
+                if (r != VK_SUCCESS) {
+                    GSFG_LOGE("CreateImage #%d (%ux%u fmt %d layers %d usage 0x%x) failed: VkResult %d", i,
+                              ii.extent.width, ii.extent.height, (int)ii.format, (int)ii.arrayLayers,
+                              (unsigned)ii.usage, (int)r);
+                    return false;
+                }
+            }
             vkd.GetImageMemoryRequirements(dev_, images_[i], &req[i]);
             bits &= req[i].memoryTypeBits;
             total = (total + req[i].alignment - 1) / req[i].alignment * req[i].alignment;
@@ -383,7 +427,7 @@ private:
             vi.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
             vi.image = images_[gv.image]; vi.viewType = (VkImageViewType)gv.vt; vi.format = (VkFormat)gv.fmt;
             vi.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, (uint32_t)gv.baseLayer, (uint32_t)gv.layers};
-            if (vkd.CreateImageView(dev_, &vi, nullptr, &views_[i]) != VK_SUCCESS) return false;
+            GCHECK(vkd.CreateImageView(dev_, &vi, nullptr, &views_[i]), "CreateImageView");
         }
 
         // ---- buffers (device-local scratch; the graph never reads them from the host)
@@ -399,7 +443,13 @@ private:
             bi.size = (VkDeviceSize)bufSize_[i];
             bi.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
             bi.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-            if (vkd.CreateBuffer(dev_, &bi, nullptr, &buffers_[i]) != VK_SUCCESS) return false;
+            {
+                const VkResult r = vkd.CreateBuffer(dev_, &bi, nullptr, &buffers_[i]);
+                if (r != VK_SUCCESS) {
+                    GSFG_LOGE("CreateBuffer #%d (%lld bytes) failed: VkResult %d", i, (long long)bi.size, (int)r);
+                    return false;
+                }
+            }
             vkd.GetBufferMemoryRequirements(dev_, buffers_[i], &breq[i]);
             bits &= breq[i].memoryTypeBits;
             total = (total + breq[i].alignment - 1) / breq[i].alignment * breq[i].alignment;
@@ -421,11 +471,16 @@ private:
             ai.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
             ai.allocationSize = total; ai.memoryTypeIndex = type;
             VkDeviceMemory mem = VK_NULL_HANDLE;
-            if (vkd.AllocateMemory(dev_, &ai, nullptr, &mem) == VK_SUCCESS) {
+            const VkResult ar = vkd.AllocateMemory(dev_, &ai, nullptr, &mem);
+            if (ar == VK_SUCCESS) {
                 mems_.push_back(mem);
-                for (int i = 0; i < n; i++) if (!bind(i, mem, offs[i])) return false;
+                for (int i = 0; i < n; i++)
+                    if (!bind(i, mem, offs[i])) { GSFG_LOGE("bind %s #%d failed", image ? "image" : "buffer", i); return false; }
+                GSFG_LOGI("allocated %.1f MB in one block for %d %s", (double)total / 1048576.0, n, image ? "images" : "buffers");
                 return true;
             }
+            GSFG_LOGW("single %.1f MB allocation failed (VkResult %d); falling back to one block per resource",
+                      (double)total / 1048576.0, (int)ar);
         }
         for (int i = 0; i < n; i++) {                    // fall back to one allocation per resource
             uint32_t t = pickMemoryType(mp, req[i].memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
@@ -435,9 +490,14 @@ private:
             ai.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
             ai.allocationSize = req[i].size; ai.memoryTypeIndex = t;
             VkDeviceMemory mem = VK_NULL_HANDLE;
-            if (vkd.AllocateMemory(dev_, &ai, nullptr, &mem) != VK_SUCCESS) return false;
+            const VkResult ar = vkd.AllocateMemory(dev_, &ai, nullptr, &mem);
+            if (ar != VK_SUCCESS) {
+                GSFG_LOGE("AllocateMemory %s #%d (%lld bytes) failed: VkResult %d", image ? "image" : "buffer", i,
+                          (long long)req[i].size, (int)ar);
+                return false;
+            }
             mems_.push_back(mem);
-            if (!bind(i, mem, 0)) return false;
+            if (!bind(i, mem, 0)) { GSFG_LOGE("bind %s #%d failed", image ? "image" : "buffer", i); return false; }
         }
         return true;
     }
@@ -464,7 +524,7 @@ private:
         VkDescriptorPoolCreateInfo pi{};
         pi.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         pi.maxSets = nSets + 32; pi.poolSizeCount = 3; pi.pPoolSizes = ps;
-        if (vkd.CreateDescriptorPool(dev_, &pi, nullptr, &pool_) != VK_SUCCESS) return false;
+        GCHECK(vkd.CreateDescriptorPool(dev_, &pi, nullptr, &pool_), "CreateDescriptorPool");
 
         for (int n = 1; n <= 3; n++) {
             const GTemplate& t = model_->tmpl[n - 1];
@@ -489,7 +549,7 @@ private:
         VkDescriptorSetAllocateInfo ai{};
         ai.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         ai.descriptorPool = pool_; ai.descriptorSetCount = 1; ai.pSetLayouts = &pl_.dsl[d.pipe];
-        if (vkd.AllocateDescriptorSets(dev_, &ai, &out) != VK_SUCCESS) return false;
+        GCHECK(vkd.AllocateDescriptorSets(dev_, &ai, &out), "AllocateDescriptorSets");
 
         VkWriteDescriptorSet w[13]{};
         VkDescriptorImageInfo  ii[13]{};
@@ -563,6 +623,7 @@ private:
         vkd.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pl_.pipe[d.pipe]);
         vkd.CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pl_.lay[d.pipe], 0, 1, &set, 0, nullptr);
         vkd.CmdPushConstants(cmd, pl_.lay[d.pipe], VK_SHADER_STAGE_COMPUTE_BIT, 0, 112, pc);
+        dispCount_++;
         vkd.CmdDispatch(cmd, evalGroup(d.groups[0], geo_, ints), evalGroup(d.groups[1], geo_, ints),
                         evalGroup(d.groups[2], geo_, ints));
     }
@@ -583,6 +644,8 @@ private:
     Geometry geo_{};
     const GModel* model_{};
     bool valid_ = false, initialised_ = false;
+    int  dispCount_ = 0;
+    uint64_t memBytes_ = 0;
 
     std::vector<VkImage> images_;
     std::vector<VkImageView> views_;
@@ -599,6 +662,16 @@ private:
 // Engine
 // ============================================================================
 Engine::Engine() = default;
+
+void Engine::refreshKnobs() {
+    traceAll_ = gsfgProp("debug.gsfg.trace", 0) != 0;
+    const int show = gsfgProp("debug.gsfg.show", 0);
+    if (show != showMode_) {
+        showMode_ = show;
+        GSFG_LOGW("debug knob show=%d (%s)", show, show ? "generated frames show the current INPUT frame, graph output ignored"
+                                                        : "normal output");
+    }
+}
 Engine::~Engine() { chain_.reset(); pipelines_.reset(); }
 
 bool Engine::init(VkDevice device, VkPhysicalDevice physicalDevice, const std::string& packPath) {
@@ -632,7 +705,11 @@ bool Engine::init(VkDevice device, VkPhysicalDevice physicalDevice, const std::s
     }
     pipelines_ = std::make_unique<Pipelines>(device, pack, *gsfgModel(variant_, 1), needed);
     if (!pipelines_->ok()) { pipelines_.reset(); return false; }
-    GSFG_LOGI("GSFG pipelines ready (variant %d)", variant_);
+    GSFG_LOGI("GSFG pipelines ready: variant %d (%s), device \"%s\" vendor 0x%x api %u.%u.%u, pack %zu bytes",
+              variant_, variant_ ? "Adreno 840 shaders" : "standard shaders", props.deviceName,
+              (unsigned)props.vendorID, VK_VERSION_MAJOR(props.apiVersion), VK_VERSION_MINOR(props.apiVersion),
+              VK_VERSION_PATCH(props.apiVersion), pack.size());
+    refreshKnobs();
     return true;
 }
 
@@ -693,6 +770,7 @@ bool Engine::prepare(uint32_t width, uint32_t height, VkFormat format) {
     builtExtent_ = VkExtent2D{width, height};
     builtFormat_ = format;
     builtFlowScale_ = scale;
+    traceLeft_ = 90; lastPlanGens_ = ~0u; lastWarm_ = false; lastGenerating_ = false; lastSource_ = VK_NULL_HANDLE;
     frameCount_ = 0; lastCount_ = 0; lastGenerations_ = 0;
     planCalls_ = 0; warmStreak_ = 0; warm_ = false; generating_ = false; needSeed_ = true;
     pacer_.Reset();
@@ -714,6 +792,14 @@ uint32_t Engine::plan(uint32_t capacity, uint64_t sourceFrames) {
     warmStreak_ = warm_ ? warmStreak_ + 1 : 0;
     generating_ = warm_ && warmStreak_ >= kRecurrenceFrames && plan_.generations > 0;
 
+    if ((planCalls_ % 60) == 0) refreshKnobs();
+    if (tracing() || generating_ != lastGenerating_ || warm_ != lastWarm_ || (uint32_t)plan_.generations != lastPlanGens_) {
+        GSFG_LOGI("plan: frame %llu capacity %u -> pacer gens %zu (warm=%d pacerWarm=%d streak=%u) => generating=%d",
+                  (unsigned long long)frameCount_, capacity, plan_.generations, (int)warm_, (int)plan_.warm,
+                  warmStreak_, (int)generating_);
+        lastGenerating_ = generating_; lastWarm_ = warm_; lastPlanGens_ = (uint32_t)plan_.generations;
+    }
+
     if ((planCalls_++ % kTelemetryInterval) == 0) {
         const PacerStats stats = pacer_.Stats();
         const float wanted = stats.source_rate * (float)(plan_.generations + 1);
@@ -734,7 +820,17 @@ void Engine::process(VkCommandBuffer cmd, VkImage source, uint32_t, uint32_t, ui
     const uint64_t count = frameCount_++;
     lastCount_ = count;
     lastGenerations_ = std::min<uint32_t>(generations, kMaxGenerations);
-    chain_->ingest(cmd, source, count, lastGenerations_, needSeed_ && lastGenerations_ > 0);
+    lastSource_ = source;
+    const bool firstGen = needSeed_ && lastGenerations_ > 0;
+    chain_->ingest(cmd, source, count, lastGenerations_, firstGen);
+    if (tracing()) {
+        GSFG_LOGI("process: frame %llu ring %d gens %u firstGen=%d -> %d dispatches (source %p)",
+                  (unsigned long long)count, (int)(count % 3), lastGenerations_, (int)firstGen,
+                  chain_->takeDispatchCount(), (void*)source);
+        if (traceLeft_ > 0) traceLeft_--;
+    } else {
+        chain_->takeDispatchCount();
+    }
     // A frame that only feeds the ring leaves the temporal state stale: the next generating
     // frame is treated like the first one (first-frame descriptors plus the seed pass).
     if (lastGenerations_ == 0) needSeed_ = true;
@@ -744,10 +840,18 @@ void Engine::generateInto(VkCommandBuffer cmd, uint32_t generation) {
     if (!chain_ || !chain_->valid() || generation >= lastGenerations_) return;
     const bool seed = needSeed_ && generation + 1 == lastGenerations_;
     chain_->generate(cmd, lastCount_, lastGenerations_, generation, seed);
+    if (tracing()) {
+        GSFG_LOGI("generate: frame %llu gen %u/%u seed=%d -> %d dispatches, output image %p",
+                  (unsigned long long)lastCount_, generation + 1, lastGenerations_, (int)seed,
+                  chain_->takeDispatchCount(), (void*)finalImage(generation));
+    } else {
+        chain_->takeDispatchCount();
+    }
     if (seed) needSeed_ = false;
 }
 
 VkImage Engine::finalImage(uint32_t generation) const {
+    if (showMode_ == 1 && lastSource_ != VK_NULL_HANDLE) return lastSource_;
     return chain_ ? chain_->finalImage(generation, lastCount_, lastGenerations_) : VK_NULL_HANDLE;
 }
 
