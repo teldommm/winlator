@@ -5,7 +5,6 @@ project(Winlator)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -Wno-unused-function -Wimplicit-function-declaration")
 
 add_subdirectory(adrenotools)
-add_subdirectory(thirdparty/dxbc)
 
 # Add Winlator shared library
 # NOTE: the DisplayX and EGL X-server renderer path (winlator/renderer/{egl,window,shader,
@@ -201,23 +200,12 @@ include_directories(
 
 add_library(vulkan_renderer SHARED
         winlator/renderer/vulkan/vulkan_jni.cpp
-        winlator/renderer/vulkan/VulkanRendererLsfg.cpp
-        winlator/renderer/vulkan/lsfg/lsfg_alpha.cpp
-        winlator/renderer/vulkan/lsfg/lsfg_beta.cpp
-        winlator/renderer/vulkan/lsfg/lsfg_chain.cpp
-        winlator/renderer/vulkan/lsfg/lsfg_common.cpp
-        winlator/renderer/vulkan/lsfg/lsfg_delta.cpp
-        winlator/renderer/vulkan/lsfg/lsfg_dll.cpp
-        winlator/renderer/vulkan/lsfg/lsfg_dxbc.cpp
-        winlator/renderer/vulkan/lsfg/lsfg_engine.cpp
-        winlator/renderer/vulkan/lsfg/lsfg_gamma.cpp
-        winlator/renderer/vulkan/lsfg/lsfg_generate.cpp
-        winlator/renderer/vulkan/lsfg/lsfg_jni.cpp
-        winlator/renderer/vulkan/lsfg/lsfg_mipmaps.cpp
-        winlator/renderer/vulkan/lsfg/lsfg_pacer.cpp
-        winlator/renderer/vulkan/lsfg/lsfg_probe.cpp
-        winlator/renderer/vulkan/lsfg/lsfg_shaders.cpp
-        winlator/renderer/vulkan/lsfg/lsfg_vkd.cpp
+        winlator/renderer/vulkan/VulkanRendererGsfg.cpp
+        winlator/renderer/vulkan/gsfg/gsfg_engine.cpp
+        winlator/renderer/vulkan/gsfg/gsfg_graph_data.cpp
+        winlator/renderer/vulkan/gsfg/gsfg_pacer.cpp
+        winlator/renderer/vulkan/gsfg/gsfg_probe.cpp
+        winlator/renderer/vulkan/gsfg/gsfg_vkd.cpp
 
         ${VULKAN_CONTEXT_LEGACY}
         winlator/renderer/vulkan/VulkanRendererFilters.cpp
@@ -246,7 +234,6 @@ target_compile_options(vulkan_renderer PRIVATE
 )
 
 target_link_libraries(vulkan_renderer
-        dxbc
         log
         android
         vulkan

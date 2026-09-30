@@ -1,7 +1,7 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #include "VulkanRendererContext.h"
-#include "lsfg/lsfg_engine.h"
+#include "gsfg/gsfg_engine.h"
 #include <stdexcept>
 #include <cstdlib>
 #include <cstring>
@@ -115,6 +115,7 @@ void VulkanRendererContext::loadDeviceDispatch() {
     LOAD_D2(GetDeviceQueue);
     LOAD_D2(CreateComputePipelines);
     LOAD_D2(CmdDispatch);
+    LOAD_D2(CmdFillBuffer);
     LOAD_D2(UnmapMemory);
     LOAD_D2(CmdClearColorImage);
     LOAD_D2(ResetDescriptorPool);
@@ -363,43 +364,36 @@ void VulkanRendererContext::createLogicalDevice() {
     ci.pQueueCreateInfos=&qi; ci.queueCreateInfoCount=1;
     ci.enabledExtensionCount=(uint32_t)extList.size(); ci.ppEnabledExtensionNames=extList.data();
 
-    // --- Native LSFG frame generation: enable the three features its shaders
-    // need. The renderer has historically enabled NO features at all
-    // (pEnabledFeatures = nullptr, no pNext), so all three are off by default.
-    // Only chain anything when the device passes every gate: on any other
-    // device this block is inert and vkCreateDevice is called exactly as it
-    // always has been.
-    lsfgCaps_ = lsfg::Caps{};
-    lsfgCaps_.features = lsfg::queryFeatures(vk_, physicalDevice);
+    // --- Native GSFG frame generation: its shaders need shaderFloat16 (arithmetic
+    // only). The renderer has historically enabled NO features at all
+    // (pEnabledFeatures = nullptr, no pNext), so it is off by default. Only chain
+    // anything when the device passes every gate: on any other device this block
+    // is inert and vkCreateDevice is called exactly as it always has been.
+    gsfgCaps_ = gsfg::Caps{};
+    gsfgCaps_.features = gsfg::queryFeatures(vk_, physicalDevice);
 
-    VkPhysicalDeviceVulkan12Features lsfgV12{};
-    VkPhysicalDeviceFeatures2        lsfgF2{};
-    if (lsfgCaps_.features.deviceGatesPass()) {
-        lsfgV12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
-        lsfgV12.vulkanMemoryModel = VK_TRUE;
-        // Device scope is a separate SPIR-V capability; enable it only when the
-        // driver offers it, so a driver without it still gets the base model.
-        lsfgV12.vulkanMemoryModelDeviceScope =
-            lsfgCaps_.features.vulkanMemoryModelDeviceScope ? VK_TRUE : VK_FALSE;
+    VkPhysicalDeviceVulkan12Features gsfgV12{};
+    VkPhysicalDeviceFeatures2        gsfgF2{};
+    if (gsfgCaps_.features.deviceGatesPass()) {
+        gsfgV12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+        gsfgV12.shaderFloat16 = VK_TRUE;
 
-        lsfgF2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-        lsfgF2.pNext = &lsfgV12;
-        lsfgF2.features.shaderStorageImageWriteWithoutFormat = VK_TRUE;
-        lsfgF2.features.shaderStorageImageExtendedFormats    = VK_TRUE;
+        gsfgF2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+        gsfgF2.pNext = &gsfgV12;
 
         // pEnabledFeatures MUST stay null while a VkPhysicalDeviceFeatures2 is
-        // chained — the two are mutually exclusive.
-        ci.pNext = &lsfgF2;
-        lsfgCaps_.featuresEnabled = true;
+        // chained - the two are mutually exclusive.
+        ci.pNext = &gsfgF2;
+        gsfgCaps_.featuresEnabled = true;
     }
 
     if (vk_.CreateDevice(physicalDevice,&ci,nullptr,&device)!=VK_SUCCESS) {
         // A driver that rejects the feature chain must not cost us the whole
-        // renderer: retry once with the pre-LSFG device create, unchanged.
-        if (lsfgCaps_.featuresEnabled) {
-            RLOG_E("createLogicalDevice: CreateDevice failed WITH LSFG features; retrying without");
+        // renderer: retry once with the pre-GSFG device create, unchanged.
+        if (gsfgCaps_.featuresEnabled) {
+            RLOG_E("createLogicalDevice: CreateDevice failed WITH GSFG features; retrying without");
             ci.pNext = nullptr;
-            lsfgCaps_.featuresEnabled = false;
+            gsfgCaps_.featuresEnabled = false;
             if (vk_.CreateDevice(physicalDevice,&ci,nullptr,&device)!=VK_SUCCESS)
                 throw std::runtime_error("device");
         } else {
@@ -463,11 +457,11 @@ void VulkanRendererContext::createSwapchain() {
     uint32_t fmtN=0; vk_.GetPhysicalDeviceSurfaceFormatsKHR(physicalDevice,surface,&fmtN,nullptr);
     std::vector<VkSurfaceFormatKHR> fmts(fmtN); vk_.GetPhysicalDeviceSurfaceFormatsKHR(physicalDevice,surface,&fmtN,fmts.data());
     swapchainFmt = VK_FORMAT_R8G8B8A8_UNORM;
-    lsfgCaps_.probedFormat = swapchainFmt;
-    lsfgCaps_.storageOnSwapchainFormat = lsfg::probeStorageFormat(vk_, physicalDevice, swapchainFmt);
-    lsfgCaps_.linearBlitOnSwapchainFormat = lsfg::probeLinearBlit(vk_, physicalDevice, swapchainFmt);
-    lsfg::explain(lsfgCaps_);
-    RLOG("lsfg-native: %s", lsfgCaps_.reason);
+    gsfgCaps_.probedFormat = swapchainFmt;
+    gsfgCaps_.formatsOk = gsfg::probeFormats(vk_, physicalDevice, swapchainFmt);
+    gsfgCaps_.linearBlitOnSwapchainFormat = gsfg::probeLinearBlit(vk_, physicalDevice, swapchainFmt);
+    gsfg::explain(gsfgCaps_);
+    RLOG("gsfg-native: %s", gsfgCaps_.reason);
     const bool nativeFg = fgArmed_.load() && fgCapsOk();
     uint32_t imgCount=caps.minImageCount+1;
     if (nativeFg) imgCount = std::max(imgCount, std::min(caps.minImageCount + kMaxPresentsPerFrame, 8u));
@@ -479,7 +473,7 @@ void VulkanRendererContext::createSwapchain() {
     vk_.GetPhysicalDeviceSurfacePresentModesKHR(physicalDevice,surface,&pmCount,availablePresentModes.data());
     VkPresentModeKHR presentMode=VK_PRESENT_MODE_FIFO_KHR;
     for (auto pm:availablePresentModes) if(pm==requestedPresentMode){presentMode=pm;break;}
-    // LSFG presents generated frames before the real one and relies on FIFO
+    // GSFG presents generated frames before the real one and relies on FIFO
     // ordering them onto consecutive vblanks; mailbox would let them collapse.
     if (nativeFg) presentMode = VK_PRESENT_MODE_FIFO_KHR;
     if(verboseLog){
@@ -785,8 +779,8 @@ void VulkanRendererContext::recreateSyncObjects() {
 
 void VulkanRendererContext::cleanupSwapchain() {
     vk_.DeviceWaitIdle(device);
-    lsfgEngine_.reset();
-    lsfgEngineTried_ = false;
+    gsfgEngine_.reset();
+    gsfgEngineTried_ = false;
     compositeArmed = false;
     destroyCompositeTargets();
     destroyFgQueryPool();
@@ -1360,22 +1354,22 @@ void VulkanRendererContext::renderFrame() {
     const uint32_t capacity = (uint32_t)std::min<size_t>(
         std::min(kMaxPresentsPerFrame - 1, fgSwapchainCapacity_),
         compositeTargets.empty() ? 0 : compositeTargets.size() - 1);
-    if (compositeActive() && ensureLsfgEngine()) {
+    if (compositeActive() && ensureGsfgEngine()) {
         if (fgConfigDirty_.exchange(false, std::memory_order_relaxed)) {
-            lsfgEngine_->configure(
+            gsfgEngine_->configure(
                 (uint32_t)std::max(fgMultiplier_.load(std::memory_order_relaxed), 2), 0,
                 fgFlowScale_.load(std::memory_order_relaxed),
                 fgRefreshHz_.load(std::memory_order_relaxed));
         }
         // The flow-pyramid size depends on the guest extent. Set it before the
-        // first prepare so the 25-pipeline chain is built once at the right size.
+        // first prepare so the graph is built once at the right size.
         if (containerWidth > 0 && containerHeight > 0)
-            lsfgEngine_->setGuestExtent((uint32_t)containerWidth, (uint32_t)containerHeight);
-        if (lsfgEngine_->needsRebuild(compositeW, compositeH, swapchainFmt))
+            gsfgEngine_->setGuestExtent((uint32_t)containerWidth, (uint32_t)containerHeight);
+        if (gsfgEngine_->needsRebuild(compositeW, compositeH, swapchainFmt))
             vk_.DeviceWaitIdle(device);
-        if (lsfgEngine_->prepare(compositeW, compositeH, swapchainFmt)) {
-            lsfgEngine_->setPresentedRate(fgPresentedRate_);
-            fgPlan_.generations = lsfgEngine_->plan(capacity, ++fgSourceFrames_);
+        if (gsfgEngine_->prepare(compositeW, compositeH, swapchainFmt)) {
+            gsfgEngine_->setPresentedRate(fgPresentedRate_);
+            fgPlan_.generations = gsfgEngine_->plan(capacity, ++fgSourceFrames_);
         }
     }
     fgPlan_.presents = fgPlan_.generations + 1;

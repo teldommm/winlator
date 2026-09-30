@@ -24,16 +24,16 @@ Java_com_winlator_cmod_widget_VulkanXServerView_nativeConfigureFrameGen(
     std::string unsupported;
     {
         std::unique_lock<std::shared_mutex> frameLock(ctx->frameMutex);
-        if (!ctx->fgCapsOk()) unsupported = ctx->lsfgCaps_.reason;
+        if (!ctx->fgCapsOk()) unsupported = ctx->gsfgCaps_.reason;
     }
     if (!unsupported.empty()) {
         ctx->setFrameGenArmed(false, 0);
         return env->NewStringUTF(unsupported.c_str());
     }
-    if (!cachePath) return env->NewStringUTF("Shader cache is unavailable");
+    if (!cachePath) return env->NewStringUTF("GSFG shader pack is unavailable");
     const char* path = env->GetStringUTFChars(cachePath, nullptr);
     if (!path) return nullptr;
-    ctx->setLsfgCachePath(path);
+    ctx->setGsfgPackPath(path);
     env->ReleaseStringUTFChars(cachePath, path);
     ctx->setFrameGenTuning(flowScale, refreshHz);
     ctx->setFrameGenArmed(true, std::clamp((int)multiplier, 2, 4));

@@ -63,7 +63,6 @@ import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.GPUInformation;
 import com.winlator.cmod.core.GameSaveManager;
 import com.winlator.cmod.core.KeyValueSet;
-import com.winlator.cmod.core.LosslessDll;
 import com.winlator.cmod.core.OnExtractFileListener;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.ProcessHelper;
@@ -183,7 +182,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private Runnable refreshInputPanel;
     private Shortcut shortcut;
     private int activeLsfgMultiplier;
-    private java.io.File activeLsfgDll;
     private float activeLsfgFlowScale = 0.80f;
     private boolean graphicsFsrEnabled;
     private int graphicsUpscalerModeIndex;
@@ -1211,16 +1209,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
             int lsfgMultiplier = shortcut != null ? shortcut.getLsfgMultiplier()
                     : container != null ? container.getLsfgMultiplier() : 0;
-            java.io.File lsfgDll = LosslessDll.isGlobalDllAvailable(this) ? LosslessDll.globalDllFile(this)
-                    : shortcut != null ? LosslessDll.containerDllFile(shortcut)
-                    : LosslessDll.containerDllFile(container);
             float lsfgFlowScale = shortcut != null ? shortcut.getLsfgFlowScale()
                     : container != null ? container.getLsfgFlowScale() : 0.80f;
             activeLsfgMultiplier = lsfgMultiplier;
-            activeLsfgDll = lsfgDll;
             activeLsfgFlowScale = lsfgFlowScale;
             vkRenderer.setFrameGenRefreshRate(pickHighestRefreshRate());
-            vkRenderer.setFrameGenNative(lsfgDll, lsfgMultiplier, lsfgFlowScale);
+            vkRenderer.setFrameGenNative(lsfgMultiplier, lsfgFlowScale);
         }
 
         if (shortcut != null) {
@@ -1808,7 +1802,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     container.saveData();
                 }
                 if (vkRenderer != null)
-                    vkRenderer.setFrameGenNative(activeLsfgDll, activeLsfgMultiplier, activeLsfgFlowScale);
+                    vkRenderer.setFrameGenNative(activeLsfgMultiplier, activeLsfgFlowScale);
             }
 
             @Override
@@ -1823,7 +1817,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     container.saveData();
                 }
                 if (vkRenderer != null)
-                    vkRenderer.setFrameGenNative(activeLsfgDll, activeLsfgMultiplier, activeLsfgFlowScale);
+                    vkRenderer.setFrameGenNative(activeLsfgMultiplier, activeLsfgFlowScale);
             }
 
         };

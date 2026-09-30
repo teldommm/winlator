@@ -13,7 +13,7 @@ import android.widget.FrameLayout;
 import androidx.annotation.NonNull;
 
 import com.winlator.cmod.R;
-import com.winlator.cmod.core.LsfgNative;
+import com.winlator.cmod.core.GsfgNative;
 import java.io.File;
 import android.widget.Toast;
 import com.winlator.cmod.renderer.GPUImage;
@@ -73,7 +73,6 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
     private boolean pendingSwapRB         = false;
     private int pendingLsfgMultiplier = 0;
     private float pendingLsfgFlowScale = 0.80f;
-    private File pendingLsfgDll;
     private float pendingFrameGenRefreshHz;
     private volatile String frameGenError = "";
 
@@ -673,9 +672,8 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
         synchronized (lock) { if (nativeHandle != 0) nativeSetSwapRB(nativeHandle, enabled); }
     }
 
-    public void setFrameGenNative(File dll, int multiplier, float flowScale) {
+    public void setFrameGenNative(int multiplier, float flowScale) {
         synchronized (lock) {
-            pendingLsfgDll = dll;
             pendingLsfgMultiplier = multiplier < 2 ? 0 : Math.min(multiplier, 4);
             pendingLsfgFlowScale = flowScale;
         }
@@ -691,30 +689,30 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
         queueEvent(() -> { synchronized (lock) { if (nativeHandle != 0) applyFrameGenNative(); } });
     }
 
-    // Runs on an existing worker, under lock; cache translation never blocks the UI.
+    // Runs on an existing worker, under lock. The GSFG shader pack is a bundled asset; the
+    // first call copies it out of the APK so native code can read it by path.
     private void applyFrameGenNative() {
         int multiplier = pendingLsfgMultiplier;
         String error = null;
-        String cachePath = null;
+        String packPath = null;
         if (multiplier >= 2) {
-            int status = LsfgNative.ensureCache(getContext(), pendingLsfgDll, false);
-            if (status == LsfgNative.STATUS_OK) cachePath = LsfgNative.cacheFile(getContext()).getAbsolutePath();
-            else {
-                error = LsfgNative.explain(status);
+            packPath = GsfgNative.ensurePack(getContext());
+            if (packPath == null) {
+                error = "GSFG shader pack is missing from the app";
                 multiplier = 0;
             }
         }
         float refreshHz = pendingFrameGenRefreshHz > 0f ? pendingFrameGenRefreshHz
                 : getDisplay() != null ? getDisplay().getRefreshRate() : 0f;
-        String nativeError = nativeConfigureFrameGen(nativeHandle, cachePath,
+        String nativeError = nativeConfigureFrameGen(nativeHandle, packPath,
                 multiplier, pendingLsfgFlowScale, refreshHz);
         if (error == null) error = nativeError;
         if (error != null) {
-            boolean oldDriver = error.contains("Vulkan version below") || error.contains("storage images")
-                    || error.contains("shader") || error.contains("feature");
-            frameGenError = "LSFG Native can't run: "
+            boolean oldDriver = error.contains("Vulkan version below") || error.contains("shaderFloat16")
+                    || error.contains("feature");
+            frameGenError = "GSFG can't run: "
                     + (oldDriver ? (error.contains("Vulkan version below")
-                            ? "this Renderer Driver lacks Vulkan 1.3. " : "this Renderer Driver lacks a required Vulkan feature. ")
+                            ? "this Renderer Driver lacks Vulkan 1.2. " : "this Renderer Driver lacks 16-bit float shader support. ")
                             + "Set Renderer Driver to a Turnip driver, then relaunch the game."
                             : error + (error.endsWith(".") ? "" : "."));
             final String message = frameGenError;

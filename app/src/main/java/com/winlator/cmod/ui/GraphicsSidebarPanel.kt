@@ -69,7 +69,7 @@ object GraphicsSidebarPanelHost {
 
 private val UPSCALER_LABELS = listOf("SGSR", "FSR", "Lanczos 2", "Color Boost")
 private val POSTFX_LABELS = listOf("None", "DLS", "CRT", "HDR", "Natural")
-private val FRAMEGEN_LABELS = listOf("Off", "LSFG 2x", "LSFG 3x", "LSFG 4x")
+private val FRAMEGEN_LABELS = listOf("Off", "GSFG 2x", "GSFG 3x", "GSFG 4x")
 private val RESHADE_EFFECTS = listOf(
     "Off", "Game Clarity", "Cinematic", "Vivid", "Competitive", "Adaptive Sharpen",
     "Filmic", "Arcade", "Retro CRT", "Upscale Sharp", "Pixel Clean", "Anime Edge"

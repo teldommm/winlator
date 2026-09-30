@@ -29,7 +29,6 @@ import com.winlator.cmod.box64.Box64Preset
 import com.winlator.cmod.box64.Box64PresetManager
 import com.winlator.cmod.core.AppDefaults
 import com.winlator.cmod.core.FileUtils
-import com.winlator.cmod.core.LosslessDll
 import com.winlator.cmod.core.PreloaderDialog
 import com.winlator.cmod.core.RemoteSources
 import com.winlator.cmod.fexcore.FEXCoreEditPresetDialog
@@ -155,7 +154,6 @@ internal class SettingsScreenState(
             fexChoices,
             preferences.getString("fexcore_preset", FEXCorePreset.COMPATIBILITY) ?: FEXCorePreset.COMPATIBILITY,
             soundFontChoices,
-            LosslessDll.isGlobalDllAvailable(activity),
             resolveStoredPath("winlator_path_uri", AppDefaults.DEFAULT_WINLATOR_PATH),
             resolveStoredPath("shortcuts_export_path_uri", AppDefaults.DEFAULT_SHORTCUT_EXPORT_PATH),
             (preferences.getFloat("cursor_speed", 1.0f) * 100.0f).roundToInt(),
@@ -299,17 +297,6 @@ internal class SettingsScreenState(
             },
             true
         )
-    }
-
-    override fun onImportLosslessDll() {
-        pickDocument { uri ->
-            if (LosslessDll.importGlobalLosslessDll(activity, uri)) {
-                Toast.makeText(activity, "Lossless.dll imported", Toast.LENGTH_SHORT).show()
-                rebuild()
-            } else {
-                Toast.makeText(activity, "Unable to import Lossless.dll", Toast.LENGTH_SHORT).show()
-            }
-        }
     }
 
     override fun onChooseWinlatorPath() = pickTreeFor("winlator_path_uri")
