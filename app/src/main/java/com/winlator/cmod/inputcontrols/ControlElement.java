@@ -1084,11 +1084,11 @@ public class ControlElement {
             if (customColor != 0) elementJSONObject.put("customColor", customColor);
             if (mouseMoveMode) elementJSONObject.put("mouseMoveMode", true);
             if (swipeable) elementJSONObject.put("swipeable", true);
-            if (dynamicStick) {
-                elementJSONObject.put("dynamicStick", true);
-                elementJSONObject.put("zoneScale", Float.valueOf(zoneScale));
-                elementJSONObject.put("followSpeed", Float.valueOf(followSpeed));
-            }
+            if (dynamicStick) elementJSONObject.put("dynamicStick", true);
+            // Tuning is kept even while the switch is off (only non-default values are written),
+            // so toggling Dynamic Stick off and on again doesn't reset Zone Size / Follow Speed.
+            if (zoneScale != DEFAULT_ZONE_SCALE) elementJSONObject.put("zoneScale", Float.valueOf(zoneScale));
+            if (followSpeed != DEFAULT_FOLLOW_SPEED) elementJSONObject.put("followSpeed", Float.valueOf(followSpeed));
             if (customIconPath != null) elementJSONObject.put("customIconPath", customIconPath);
 
             if (type == Type.RANGE_BUTTON && range != null) {
