@@ -33,8 +33,11 @@ import com.winlator.cmod.xenvironment.ImageFsInstaller;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 // Shared by OnboardingActivity (full first-run onboarding, still a standalone Activity)
 // and ComponentManagerFragment (the "Components" settings screen, hosted as a Fragment
@@ -62,7 +65,17 @@ public class ComponentCatalogController {
     }
 
     private final Host host;
+    // Three single-thread queues, so that none of them can hold up another:
+    //  io       - installs, removals and local packages (one at a time, guarded by installBusy);
+    //  loadIo   - refreshing the lists from the network (can take a while on a slow server);
+    //  syncExec - turning the catalog into UI rows (reads the containers from disk).
+    // Installs used to share one queue with the refresh, so pressing Download right after opening
+    // the screen showed "Preparing" while nothing happened until every list had loaded.
     private final ExecutorService io = Executors.newSingleThreadExecutor();
+    private final ExecutorService loadIo = Executors.newSingleThreadExecutor();
+    private final ExecutorService syncExec = Executors.newSingleThreadExecutor();
+    private final AtomicInteger loadGeneration = new AtomicInteger();
+    private final AtomicInteger syncSequence = new AtomicInteger();
     private final ArrayList<ComponentEntry> catalog = new ArrayList<>();
     private ComponentCatalog componentCatalog;
 
@@ -90,7 +103,6 @@ public class ComponentCatalogController {
         preferences = PreferenceManager.getDefaultSharedPreferences(host.context());
         componentCatalog = new ComponentCatalog(host.context());
         contentsManager = componentCatalog.contentsManager();
-        contentsManager.syncContents();
         adrenotoolsManager = componentCatalog.adrenotools();
 
         ImageFs imageFs = ImageFs.find(host.context());
@@ -118,17 +130,19 @@ public class ComponentCatalogController {
         return preferences;
     }
 
-    // Call once the compose controller is attached: shows what is installed right away, then
-    // refreshes every source from the network and kicks off the core install if it isn't done.
+    // Call once the compose controller is attached: loadCatalog() shows what is installed first
+    // (read off the UI thread) and then refreshes every source from the network; the core install
+    // starts here if it isn't done.
     public void start() {
-        rebuildCatalog();
-        syncComposeCatalog();
         loadCatalog();
         if (!coreReady) startCoreInstallation();
     }
 
     public void shutdown() {
+        loadGeneration.incrementAndGet();
         io.shutdownNow();
+        loadIo.shutdownNow();
+        syncExec.shutdownNow();
     }
 
     public OnboardingCallbacks createCallbacks(ExtraCallbacks extra) {
@@ -217,12 +231,10 @@ public class ComponentCatalogController {
         });
     }
 
+    // The bundled runtime's state is published together with the component rows (see
+    // syncComposeCatalog), from one read of the disk.
     private void refreshBundledRuntimeState() {
-        if (composeController == null || !host.isAlive()) return;
-        composeController.updateBundledRuntime(
-                WineRuntimeGuard.isBundledMainInstalled(host.context()),
-                WineRuntimeGuard.isInUse(host.context(), WineInfo.MAIN_WINE_VERSION.identifier())
-        );
+        syncComposeCatalog();
     }
 
     private void installBundledRuntime() {
@@ -254,26 +266,32 @@ public class ComponentCatalogController {
     }
 
     private void requestRemoveBundledRuntime() {
-        String using = WineRuntimeGuard.getContainerUsing(host.context(), WineInfo.MAIN_WINE_VERSION.identifier());
-        String bundledName = ProtonPackageManager.getPackage(ProtonPackageManager.DEFAULT_IDENTIFIER) != null
-                ? ProtonPackageManager.getPackage(ProtonPackageManager.DEFAULT_IDENTIFIER).title
-                : ProtonPackageManager.DEFAULT_IDENTIFIER;
-        if (using != null) {
-            com.winlator.cmod.ui.ThemedAlertHost.info(
-                    host.hostActivity(),
-                    "Proton is in use",
-                    bundledName + " cannot be deleted because it is used by " + using + "."
-            );
-            return;
-        }
-        com.winlator.cmod.ui.ThemedAlertHost.confirm(
-                host.hostActivity(),
-                "Delete " + bundledName + "?",
-                "The bundled Proton files will be removed. You can install them again later.",
-                "Delete",
-                this::removeBundledRuntime,
-                true
-        );
+        if (installBusy) return;
+        io.execute(() -> {
+            String using = WineRuntimeGuard.getContainerUsing(host.context(), WineInfo.MAIN_WINE_VERSION.identifier());
+            runOnUi(() -> {
+                if (!host.isAlive()) return;
+                String bundledName = ProtonPackageManager.getPackage(ProtonPackageManager.DEFAULT_IDENTIFIER) != null
+                        ? ProtonPackageManager.getPackage(ProtonPackageManager.DEFAULT_IDENTIFIER).title
+                        : ProtonPackageManager.DEFAULT_IDENTIFIER;
+                if (using != null) {
+                    com.winlator.cmod.ui.ThemedAlertHost.info(
+                            host.hostActivity(),
+                            "Proton is in use",
+                            bundledName + " cannot be deleted because it is used by " + using + "."
+                    );
+                    return;
+                }
+                com.winlator.cmod.ui.ThemedAlertHost.confirm(
+                        host.hostActivity(),
+                        "Delete " + bundledName + "?",
+                        "The bundled Proton files will be removed. You can install them again later.",
+                        "Delete",
+                        this::removeBundledRuntime,
+                        true
+                );
+            });
+        });
     }
 
     private void removeBundledRuntime() {
@@ -295,13 +313,23 @@ public class ComponentCatalogController {
         });
     }
 
-    // Refreshes the sources one after another, showing each as soon as it is in. A failing source
-    // no longer just leaves its part of the list empty: the reason is reported to the user.
+    // Shows what is installed (read off the UI thread), then refreshes the sources one after
+    // another, showing each as soon as it is in. A failing source no longer just leaves its part
+    // of the list empty: the reason is reported to the user. Runs on its own queue, so installs are
+    // never stuck behind it; a newer call (the servers were edited) makes an older, still running
+    // one stop before its next source.
     private void loadCatalog() {
-        io.execute(() -> {
+        final int generation = loadGeneration.incrementAndGet();
+        loadIo.execute(() -> {
+            if (generation != loadGeneration.get()) return;
+            contentsManager.syncContents();
+            rebuildCatalog();
+            syncComposeCatalog();
+
             String firstError = null;
             int failures = 0;
             for (ComponentSource source : componentCatalog.sources()) {
+                if (generation != loadGeneration.get()) return;
                 try {
                     source.refresh(host.context());
                 } catch (ComponentException e) {
@@ -317,7 +345,7 @@ public class ComponentCatalogController {
                     maybeAutoInstall();
                 });
             }
-            if (firstError != null) {
+            if (firstError != null && generation == loadGeneration.get()) {
                 final String message = failures > 1 ? firstError + " (+" + (failures - 1) + " more)" : firstError;
                 runOnUi(() -> {
                     if (host.isAlive()) Toast.makeText(host.context(), message, Toast.LENGTH_LONG).show();
@@ -326,7 +354,9 @@ public class ComponentCatalogController {
         });
     }
 
-    private void rebuildCatalog() {
+    // Serialized: the loader and the installer both rebuild, and the one that computes last must
+    // also publish last, or an older picture (an install not in it yet) could overwrite a newer one.
+    private synchronized void rebuildCatalog() {
         ArrayList<ComponentEntry> rebuilt = new ArrayList<>(componentCatalog.entries());
         // Catalog rows grouped by type, newest first; driver rows follow in the order they were listed.
         rebuilt.sort(Comparator.comparing((ComponentEntry e) -> e.isDriver())
@@ -349,28 +379,51 @@ public class ComponentCatalogController {
         return null;
     }
 
+    // Safe to call from any thread. Builds the rows on its own queue - it has to look at the
+    // containers to tell which runtimes are in use, which is disk work - and hands the finished
+    // list to the UI. Only the newest request is published, so a slow older one cannot overwrite it.
     private void syncComposeCatalog() {
         if (composeController == null || !host.isAlive()) return;
-        ArrayList<OnboardingComponent> ui = new ArrayList<>();
-        synchronized (catalog) {
-            for (ComponentEntry entry : catalog) {
-                String runtime = entry.runtimeName();
-                boolean inUse = runtime != null && !runtime.isEmpty() && WineRuntimeGuard.isInUse(host.context(), runtime);
-                ui.add(new OnboardingComponent(
-                        entry.id,
-                        entry.type,
-                        entry.label(),
-                        entry.installed,
-                        entry.recommended,
-                        entry.removable(),
-                        runtime,
-                        inUse,
-                        false
-                ));
-            }
+        final int sequence = syncSequence.incrementAndGet();
+        try {
+            syncExec.execute(() -> publishCatalog(sequence));
+        } catch (RejectedExecutionException ignored) {
+            // The screen is closing.
         }
-        composeController.setComponents(ui);
-        refreshBundledRuntimeState();
+    }
+
+    private void publishCatalog(int sequence) {
+        if (sequence != syncSequence.get() || !host.isAlive()) return;
+        Context context = host.context();
+        // One read of the containers for the whole list.
+        Set<String> used = WineRuntimeGuard.runtimesInUse(context);
+        ArrayList<ComponentEntry> snapshot;
+        synchronized (catalog) {
+            snapshot = new ArrayList<>(catalog);
+        }
+        ArrayList<OnboardingComponent> ui = new ArrayList<>(snapshot.size());
+        for (ComponentEntry entry : snapshot) {
+            String runtime = entry.runtimeName();
+            boolean inUse = runtime != null && !runtime.isEmpty() && used.contains(runtime);
+            ui.add(new OnboardingComponent(
+                    entry.id,
+                    entry.type,
+                    entry.label(),
+                    entry.installed,
+                    entry.recommended,
+                    entry.removable(),
+                    runtime,
+                    inUse,
+                    false
+            ));
+        }
+        final boolean bundledInstalled = WineRuntimeGuard.isBundledMainInstalled(context);
+        final boolean bundledInUse = used.contains(WineInfo.MAIN_WINE_VERSION.identifier());
+        runOnUi(() -> {
+            if (sequence != syncSequence.get() || composeController == null || !host.isAlive()) return;
+            composeController.setComponents(ui);
+            composeController.updateBundledRuntime(bundledInstalled, bundledInUse);
+        });
     }
 
     private void installComponent(ComponentEntry entry) {
@@ -416,8 +469,9 @@ public class ComponentCatalogController {
         return name == null || name.trim().isEmpty() ? "local component" : name;
     }
 
+    // Every install / removal has already re-read the installed packages on the io thread, so
+    // nothing is read from disk here.
     private void finishInstall(String id, String error) {
-        contentsManager.syncContents();
         installBusy = false;
         if (composeController != null) composeController.setInstallBusy(null, false);
         syncComposeCatalog();
@@ -426,21 +480,27 @@ public class ComponentCatalogController {
 
     private void requestRemoveComponent(String componentId) {
         ComponentEntry entry = findComponent(componentId);
-        if (entry == null) return;
-        RemovePlan plan = entry.planRemoval(host.context());
-        if (plan == null) return;
-        if (plan.blocked) {
-            com.winlator.cmod.ui.ThemedAlertHost.info(host.hostActivity(), plan.title, plan.message);
-            return;
-        }
-        com.winlator.cmod.ui.ThemedAlertHost.confirm(
-                host.hostActivity(),
-                plan.title,
-                plan.message,
-                "Delete",
-                () -> removeComponent(entry),
-                true
-        );
+        if (entry == null || installBusy) return;
+        // Working out whether the component may go reads the containers: off the UI thread.
+        io.execute(() -> {
+            RemovePlan plan = entry.planRemoval(host.context());
+            if (plan == null) return;
+            runOnUi(() -> {
+                if (!host.isAlive()) return;
+                if (plan.blocked) {
+                    com.winlator.cmod.ui.ThemedAlertHost.info(host.hostActivity(), plan.title, plan.message);
+                    return;
+                }
+                com.winlator.cmod.ui.ThemedAlertHost.confirm(
+                        host.hostActivity(),
+                        plan.title,
+                        plan.message,
+                        "Delete",
+                        () -> removeComponent(entry),
+                        true
+                );
+            });
+        });
     }
 
     private void removeComponent(ComponentEntry entry) {

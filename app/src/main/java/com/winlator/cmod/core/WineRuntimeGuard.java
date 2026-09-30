@@ -9,6 +9,8 @@ import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.xenvironment.ImageFs;
 
 import java.io.File;
+import java.util.HashSet;
+import java.util.Set;
 
 public final class WineRuntimeGuard {
     private WineRuntimeGuard() {}
@@ -20,6 +22,20 @@ public final class WineRuntimeGuard {
             if (runtimeIdentifier.equals(container.getWineVersion())) return container.getName();
         }
         return null;
+    }
+
+    /**
+     * Every runtime identifier some container uses, from one read of the containers. Screens that
+     * ask about many runtimes at once (the component list) use this instead of calling
+     * {@link #isInUse} per row, which loads all containers from disk every time.
+     */
+    public static Set<String> runtimesInUse(Context context) {
+        HashSet<String> used = new HashSet<>();
+        for (Container container : new ContainerManager(context).getContainers()) {
+            String version = container.getWineVersion();
+            if (version != null && !version.isEmpty()) used.add(version);
+        }
+        return used;
     }
 
     public static boolean isInUse(Context context, String runtimeIdentifier) {

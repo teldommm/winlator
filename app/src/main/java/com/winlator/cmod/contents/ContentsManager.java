@@ -82,8 +82,11 @@ public class ContentsManager {
     }
 
     private final Context context;
-    private HashMap<ContentProfile.ContentType, List<ContentProfile>> profilesMap;
-    private ArrayList<ContentProfile> remoteProfiles;
+    // Both fields are snapshots: built completely, then published with one assignment, and never
+    // changed afterwards. The component screens read them from several threads (UI, the catalog
+    // loader, the installer), so a reader must never see a map that is still being filled.
+    private volatile HashMap<ContentProfile.ContentType, List<ContentProfile>> profilesMap;
+    private volatile ArrayList<ContentProfile> remoteProfiles;
 
     public ContentsManager(Context context) {
         this.context = context;
@@ -130,8 +133,8 @@ public class ContentsManager {
     }
 
     public void setRemoteProfiles(String json) {
+        ArrayList<ContentProfile> parsed = new ArrayList<>();
         try {
-            remoteProfiles = new ArrayList<>();
             JSONArray content = new JSONArray(json);
             for (int i = 0; i < content.length(); i++) {
                 try {
@@ -144,7 +147,7 @@ public class ContentsManager {
                     remoteProfile.verCode = object.getInt("verCode");
                     String sha256 = object.optString("sha256", "").trim();
                     remoteProfile.remoteSha256 = sha256.isEmpty() ? null : sha256;
-                    remoteProfiles.add(remoteProfile);
+                    parsed.add(remoteProfile);
                 } catch (JSONException e) {
                     e.printStackTrace();
                 }
@@ -152,6 +155,7 @@ public class ContentsManager {
         } catch (JSONException e) {
             e.printStackTrace();
         }
+        remoteProfiles = parsed;
         syncContents();
     }
 
@@ -173,12 +177,18 @@ public class ContentsManager {
         setRemoteProfiles(json);
     }
 
-    public void syncContents() {
-        profilesMap = new HashMap<>();
-        for (ContentProfile.ContentType type : ContentProfile.ContentType.values()) profilesMap.put(type, new LinkedList<>());
+    /**
+     * Reads the installed packages from disk and merges in the catalog. Serialized, so two syncs
+     * (say the installer's and the catalog loader's) cannot publish out of order and leave an older
+     * picture of the disk behind; the new map is published only once it is complete.
+     */
+    public synchronized void syncContents() {
+        HashMap<ContentProfile.ContentType, List<ContentProfile>> map = new HashMap<>();
+        for (ContentProfile.ContentType type : ContentProfile.ContentType.values()) map.put(type, new LinkedList<>());
+        ArrayList<ContentProfile> remotes = remoteProfiles;
 
         for (ContentProfile.ContentType type : ContentProfile.ContentType.values()) {
-            List<ContentProfile> profiles = profilesMap.get(type);
+            List<ContentProfile> profiles = map.get(type);
             File typeFile = getContentTypeDir(context, type);
             File[] fileList = typeFile.listFiles();
             if (fileList != null) {
@@ -193,8 +203,8 @@ public class ContentsManager {
                     }
                 }
             }
-            if (remoteProfiles != null) {
-                for (ContentProfile remote : remoteProfiles) {
+            if (remotes != null) {
+                for (ContentProfile remote : remotes) {
                     if (remote.type == type) {
                         boolean exists = false;
                         for (ContentProfile profile : profiles) {
@@ -211,6 +221,7 @@ public class ContentsManager {
                 }
             }
         }
+        profilesMap = map;
     }
 
     public void extraContentFile(Uri uri, OnInstallFinishedCallback callback) {
@@ -331,8 +342,8 @@ public class ContentsManager {
     }
 
     public List<ContentProfile> getProfiles(ContentProfile.ContentType type) {
-        if (profilesMap != null) return profilesMap.get(type);
-        return null;
+        HashMap<ContentProfile.ContentType, List<ContentProfile>> map = profilesMap;
+        return map != null ? map.get(type) : null;
     }
 
     public List<ContentProfile> getInstalledProfiles(ContentProfile.ContentType type) {
@@ -438,10 +449,25 @@ public class ContentsManager {
     }
 
     public void removeContent(ContentProfile profile) {
-        if (profilesMap.get(profile.type).contains(profile)) {
+        HashMap<ContentProfile.ContentType, List<ContentProfile>> map = profilesMap;
+        List<ContentProfile> profiles = map == null ? null : map.get(profile.type);
+        // Matched by name, not by object: a sync that ran after the caller looked the profile up
+        // has replaced the instances, and the removal must not silently do nothing because of that.
+        boolean installed = false;
+        String entryName = getEntryName(profile);
+        if (profiles != null) {
+            for (ContentProfile candidate : profiles) {
+                if (candidate.remoteUrl == null && entryName.equals(getEntryName(candidate))) {
+                    installed = true;
+                    break;
+                }
+            }
+        }
+        if (installed) {
             forgetRemoteInstalls(getEntryName(profile));
             FileUtils.delete(getInstallDir(context, profile));
-            profilesMap.get(profile.type).remove(profile);
+            // The published lists are never edited in place; the sync builds the new picture
+            // from what is left on disk.
             syncContents();
         }
     }
@@ -451,12 +477,13 @@ public class ContentsManager {
     }
 
     public ContentProfile getProfileByEntryName(String entryName) {
-        if (entryName == null || entryName.isEmpty() || profilesMap == null) return null;
+        HashMap<ContentProfile.ContentType, List<ContentProfile>> map = profilesMap;
+        if (entryName == null || entryName.isEmpty() || map == null) return null;
         int firstDashIndex = entryName.indexOf('-');
         if (firstDashIndex <= 0 || firstDashIndex >= entryName.length() - 1) return null;
         ContentProfile.ContentType type = ContentProfile.ContentType.getTypeByName(entryName.substring(0, firstDashIndex));
         if (type == null) return null;
-        List<ContentProfile> profiles = profilesMap.get(type);
+        List<ContentProfile> profiles = map.get(type);
         if (profiles == null) return null;
 
         for (ContentProfile profile : profiles) {
