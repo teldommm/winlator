@@ -2142,22 +2142,48 @@ public class XServerDisplayActivity extends AppCompatActivity {
         return "freedreno".equalsIgnoreCase(graphicsDriver) ? "freedreno" : "zink";
     }
 
-    // Patch component of the driver's Vulkan version ("1.3.<patch>"). GPUInformation returns
-    // "Unknown" when the query fails (driver not installed/broken meta.json); splitting that and
-    // taking [2] used to throw ArrayIndexOutOfBoundsException and abort the container launch.
-    // Falls back to the system driver's patch, then to 0.
-    private String resolveVulkanPatchVersion(String driverId) {
-        String patch = vulkanPatchOf(GPUInformation.getVulkanVersion(driverId, this));
-        if (patch == null && !"System".equals(driverId)) {
-            patch = vulkanPatchOf(GPUInformation.getVulkanVersion("System", this));
+    // Builds WRAPPER_VK_VERSION ("major.minor.patch"). The wrapper writes it verbatim into
+    // VkPhysicalDeviceProperties::apiVersion, so it must never exceed what the driver supports:
+    // a requested version above the driver's is lowered to the driver's. If the driver query
+    // fails ("Unknown"), the system driver is used as a fallback, then the requested version.
+    private String resolveVulkanVersion(String requested, String driverId) {
+        int[] req = parseVulkanVersion(requested);
+        if (req == null) req = parseVulkanVersion(DefaultVersion.VULKAN);
+
+        String driverVersion = GPUInformation.getVulkanVersion(driverId, this);
+        int[] driver = parseVulkanVersion(driverVersion);
+        if (driver == null && !"System".equals(driverId)) {
+            driver = parseVulkanVersion(GPUInformation.getVulkanVersion("System", this));
         }
-        return patch != null ? patch : "0";
+
+        int major = req[0], minor = req[1], patch = 0;
+        if (driver != null) {
+            if (driver[0] < major || (driver[0] == major && driver[1] < minor)) {
+                major = driver[0];
+                minor = driver[1];
+            }
+            patch = driver[2];
+        }
+        String result = major + "." + minor + "." + patch;
+        Log.d("GraphicsDriverExtraction", "Vulkan version: requested=" + requested
+                + ", driver=" + driverVersion + ", advertised=" + result);
+        return result;
     }
 
-    private static String vulkanPatchOf(String version) {
+    // Parses "M.m" or "M.m.p" into {major, minor, patch}; null if not parseable ("Unknown", null, ...).
+    private static int[] parseVulkanVersion(String version) {
         if (version == null) return null;
-        String[] parts = version.split("\\.");
-        return parts.length >= 3 && parts[2].matches("\\d+") ? parts[2] : null;
+        String[] parts = version.trim().split("\\.");
+        if (parts.length < 2) return null;
+        try {
+            int major = Integer.parseInt(parts[0]);
+            int minor = Integer.parseInt(parts[1]);
+            int patch = parts.length >= 3 ? Integer.parseInt(parts[2]) : 0;
+            if (major < 1 || minor < 0 || patch < 0) return null;
+            return new int[]{major, minor, patch};
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private void extractOpenGLDriver(File rootDir) {
@@ -2264,8 +2290,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             adrenotoolsManager.setDriverById(envVars, imageFs, adrenoToolsDriverId);
         }
 
-        String vulkanVersion = graphicsDriverConfig.get("vulkanVersion");
-        vulkanVersion = vulkanVersion + "." + resolveVulkanPatchVersion(adrenoToolsDriverId);
+        String vulkanVersion = resolveVulkanVersion(graphicsDriverConfig.get("vulkanVersion"), adrenoToolsDriverId);
         envVars.put("WRAPPER_VK_VERSION", vulkanVersion);
 
         String blacklistedExtensions = graphicsDriverConfig.get("blacklistedExtensions");

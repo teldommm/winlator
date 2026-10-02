@@ -208,7 +208,7 @@ internal fun ContainerRuntimePane(
                         driverVersion = it; saveGraphics("version", it)
                     }
                 }
-                SettingsDivider(); SettingChoice("Vulkan Version", vulkanVersion, listOf("1.1", "1.2", "1.3")) { vulkanVersion = it; saveGraphics("vulkanVersion", it) }
+                SettingsDivider(); SettingChoice("Vulkan Version", vulkanVersion, com.winlator.cmod.core.DefaultVersion.VULKAN_VERSIONS.toList()) { vulkanVersion = it; saveGraphics("vulkanVersion", it) }
                 SettingsDivider(); SettingChoice("Max Device Memory", maxDeviceMemory, listOf("0", "512", "1024", "2048", "4096", "8192", "12288", "16384")) { maxDeviceMemory = it; saveGraphics("maxDeviceMemory", it) }
                 SettingsDivider(); SettingChoice("Driver Present Mode", graphicsPresentMode, listOf("mailbox", "fifo", "immediate", "relaxed")) { graphicsPresentMode = it; saveGraphics("presentMode", it) }
                 SettingsDivider(); SettingToggle("Sync Frame", syncFrame) { syncFrame = it; saveGraphics("syncFrame", if (it) "1" else "0") }
