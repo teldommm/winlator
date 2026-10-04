@@ -1,72 +1,134 @@
 #pragma once
-// Static description of the GSFG compute graph, generated from traces of the
-// reference implementation (see tools/gsfg_export). Sizes, push constants and
-// dispatch counts are expressions over a handful of "quantities" derived from
-// the capture size and flow scale, so one table serves every resolution.
+// ============================================================================
+// gsfg_graph - the GSFG 1.1 compute graph, built in code.
+//
+// buildGraph() describes, for one capture size / flow scale / device variant,
+// every image and buffer of the graph and the dispatch sequences that run it:
+//
+//   encode     per source frame: flow-resolution copy, image pyramid, and the
+//              seven feature levels, written into the frame's ring slot
+//   temporal   UI/stability mask over the last three frames (generating only)
+//   flow       global prior -> coarse levels 6..3 -> primary levels 2..0,
+//              plus a local branch (levels 2..1) started from scratch
+//   blend      primary and local estimates merged at level 2
+//   synth      guide -> evidence -> final frame at capture resolution
+//   prior      carries this frame's level-0 flow into the next frame
+//
+// The work that does not depend on the interpolation time t is shared by all
+// generated frames; from the finest primary level on, every generated frame
+// has its own block (kGenBlock dispatches).
+//
+// The shapes, push constants and bindings are those of the reference
+// implementation (libGameScopeV2.so), as recovered from its traces. Barriers
+// are not stored: they follow from the read/write sets of the dispatches.
+// ============================================================================
+
 #include <cstdint>
+#include <string>
+#include <vector>
+
+#include <vulkan/vulkan.h>
 
 namespace gsfg {
 
-constexpr int kQuantities = 92;   // see quantities() in gsfg_engine.cpp
-
-struct GExpr {           // ints: kind 0 = const a | 1 = q[a]
-    uint8_t kind;        // groups: 0 const a | 2 ceil(q[a]/b) | 3 ints[a]*ints[b]
-    int32_t a;           // buffers: 0 const a | 1 align16(q[a]*b)
-    int32_t b;
-};
-
-struct GDesc { uint8_t binding; uint8_t type; int8_t sampler; uint16_t idx[3]; };
-
-// bar: bit0 = compute->compute barrier before the dispatch,
-//      bit1 = command-buffer boundary in the reference (full barrier).
-struct GDisp {
-    uint8_t  pipe, bar, nDesc, hasAlt;
-    uint16_t descOff;
-    GExpr    ints[20];
-    GExpr    groups[3];
-    uint32_t floats[8];
-    uint32_t falt[8];    // used instead of `floats` when the flow field is small
-};
-
-struct GImage   { int fmt, layers, usage, dim; };
-struct GView    { int image, vt, fmt, baseLayer, layers; };
-struct GSampler { int mag, min, mip, addr; };
-
-// Generating frame without valid temporal state (first one, or after two or more
-// ingest-only frames in a row): a few descriptors differ
-// from steady state (dispatch `disp`, descriptor `slot` -> buffer/view `idx`).
-struct GFix { uint16_t disp; uint8_t slot; uint16_t idx; };
-struct GFixList { const GFix* f; int n; };
-
-struct GTemplate {
-    int nd, nA, genStart;
-    const GDisp*    disp;
-    uint16_t        inDst[3];
-    const uint16_t* outSrc;      // [generation*3 + ring] -> image index
-    int             genStarts[3];
-    const GDisp*    init[3];     // prior pass (fast_prior_img), after the last generated frame; per ring slot
-    GFixList        fix[3];      // first-generating-frame descriptor fixes, per ring slot
-};
-
-struct GModel {
-    int nImages, nViews, nBuffers, nSamplers;
-    const GImage*    images;
-    const GView*     views;
-    const GExpr*     buffers;
-    const GSampler*  samplers;
-    int nDescs;
-    const GDesc*     descs;
-    const GTemplate* tmpl;       // [n-1], n = generations 1..3
-};
-
-struct GPipeDef {
-    uint8_t pipe, nBind;
-    struct { uint8_t binding, type; } b[13];
-};
-
+constexpr int kLevels   = 7;     // pyramid and feature levels 0..6
+constexpr int kRing     = 3;     // source frames kept: current, previous, oldest
 constexpr int kGenBlock = 21;    // dispatches per generated frame
+constexpr int kMaxBind  = 13;
 
-const GModel*    gsfgModel(int variant, int cls);   // variant 0 std, 1 Adreno 840; cls 0 low, 1 mid, 2 full
-const GPipeDef*  gsfgPipeDefs(int& count);
+// Sizes derived from the capture size W x H and the flow scale S.
+struct Extent { int w = 0, h = 0; int area() const { return w * h; } };
+
+struct Geometry {
+    Extent input;              // capture size
+    Extent quarter;            // input >> 2: synthesis evidence resolution
+    Extent flow;               // max(64, round(input * S)): base of the image pyramid
+    Extent pyr[kLevels];       // image pyramid; pyr[0] = flow. Halves until a side would drop below 4.
+    Extent feat[kLevels];      // feature/flow levels; feat[0] = flow >> 2. Halves until a side would reach 0.
+    int    featOffset[kLevels + 1];   // running sum of feature-level areas (texel offsets into the mask pyramid)
+    int    pyrLevels;          // pyramid levels that actually differ from the one above (reference: NDP)
+    int    cls;                // 0: S < 0.5, 1: 0.5 <= S < 1, 2: S == 1 (no downscale pass)
+};
+
+Geometry makeGeometry(uint32_t width, uint32_t height, float scale);
+
+// ---- resources ---------------------------------------------------------------
+struct ImageDesc {
+    VkFormat          format;
+    uint32_t          width, height, layers;
+    VkImageUsageFlags usage;
+    std::string       name;
+};
+
+struct BufferDesc {
+    VkDeviceSize size;
+    std::string  name;
+};
+
+enum class BindKind : uint8_t { Sampled, Storage, Buffer };
+
+// One descriptor. `res` is an image index (Sampled/Storage) or a buffer index,
+// one per ring position (frame count % 3). `cold` (if >= 0) replaces it on a
+// generating frame without valid temporal state.
+struct Binding {
+    uint8_t  binding;
+    BindKind kind;
+    int8_t   sampler;          // Sampled only: 0 clamp-to-border, 1 clamp-to-edge
+    uint16_t res[kRing];
+    int16_t  cold;
+};
+
+struct Dispatch {
+    uint8_t  pipe;
+    uint8_t  barrier;          // bit0 compute->compute barrier, bit1 full barrier (stage boundary)
+    const char* stage;
+    std::vector<Binding> bind;
+    int32_t  ints[20];
+    float    floats[8];
+    uint32_t groups[3];
+};
+
+// The dispatch list for one number of generated frames n (1..3).
+struct Template {
+    std::vector<Dispatch> disp;
+    int encodeCount = 0;       // dispatches of an ingest-only frame (the encode stage)
+    int sharedCount = 0;       // dispatches shared by all generated frames (incl. encode)
+    int genStart[3] = {};      // first dispatch of each generated frame's block
+    Dispatch prior;            // after the last generated frame
+};
+
+struct Graph {
+    int      variant = 0;      // 0 standard shaders, 1 Adreno 840 shaders
+    Geometry geo;
+    std::vector<ImageDesc>  images;
+    std::vector<BufferDesc> buffers;
+    uint16_t input[kRing] = {};    // ring slot images that receive the composited frame
+    uint16_t output = 0;           // final frame, capture size, RGBA8
+    Template tmpl[3];              // n = 1..3
+};
+
+bool buildGraph(int variant, uint32_t width, uint32_t height, float scale, Graph& out);
+
+// ---- shader interface ---------------------------------------------------------
+// Descriptor layout of each pipeline (as the reference declares it; a few
+// layouts carry bindings the shader never reads) and the shader's file name.
+struct PipeDef {
+    uint8_t     pipe;
+    const char* name;
+    uint8_t     nBind;
+    struct { uint8_t binding; BindKind kind; } b[kMaxBind];
+};
+
+const PipeDef* pipeDefs(int& count);
+const PipeDef* pipeDef(int pipe);
+
+// Pipelines a variant can use (any size, any scale, any n).
+std::vector<int> pipelinesFor(int variant);
+
+struct SamplerDef { VkFilter filter; VkSamplerAddressMode address; };
+constexpr SamplerDef kSamplers[2] = {
+    {VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER},   // transparent black border
+    {VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE},
+};
 
 } // namespace gsfg

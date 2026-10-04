@@ -2,8 +2,8 @@
 // ============================================================================
 // gsfg_engine - the compositor's handle on native GSFG frame generation.
 //
-// Replays, from static tables, the compute graph of the reference GSFG 1.1
-// implementation (35 SPIR-V shaders, ~63 dispatches per generated frame):
+// Runs the GSFG 1.1 compute graph built by gsfg_graph (35 SPIR-V shaders,
+// ~63 dispatches for the first generated frame, 21 for each further one):
 //
 //   prepare(w, h, format)            build/rebuild the graph for this size
 //   plan(capacity, sourceFrames)     how many frames to generate this time
@@ -16,8 +16,8 @@
 // Ordering is unchanged from the old engine: generated frames lie BETWEEN N-1
 // and N, so they are presented first and the real frame last.
 //
-// Dispatch shape, push constants, descriptor bindings and barriers come from
-// traces of the reference library; see tools/gsfg_export in the study archive.
+// The graph (resources, dispatches, push constants, bindings; barriers derived
+// from read/write sets) is described in gsfg_graph.h.
 // ============================================================================
 
 #include <cstdint>

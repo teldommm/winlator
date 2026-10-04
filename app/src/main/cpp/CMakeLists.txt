@@ -202,7 +202,7 @@ add_library(vulkan_renderer SHARED
         winlator/renderer/vulkan/vulkan_jni.cpp
         winlator/renderer/vulkan/VulkanRendererGsfg.cpp
         winlator/renderer/vulkan/gsfg/gsfg_engine.cpp
-        winlator/renderer/vulkan/gsfg/gsfg_graph_data.cpp
+        winlator/renderer/vulkan/gsfg/gsfg_graph.cpp
         winlator/renderer/vulkan/gsfg/gsfg_pacer.cpp
         winlator/renderer/vulkan/gsfg/gsfg_probe.cpp
         winlator/renderer/vulkan/gsfg/gsfg_vkd.cpp

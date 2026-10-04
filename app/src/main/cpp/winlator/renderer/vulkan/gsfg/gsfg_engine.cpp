@@ -29,95 +29,13 @@ constexpr float kFlowScaleMin   = 0.25f;
 constexpr float kFlowScaleMax   = 1.0f;
 constexpr float kFlowScaleSteps = 20.0f;
 constexpr int   kMaxPipe = 40;
+constexpr uint32_t kPushBytes = 112;        // 20 ints + 8 floats, as the reference declares
 
-// ---- geometry --------------------------------------------------------------
-// Names and order follow the exporter (gexport_core.quantities): eighteen sized
-// entities x (w, h, w*h), then cumulative level areas, then level-change flags.
-enum DimId { D_W = 0, D_W4, D_FLOW, D_P0, D_L0 = D_P0 + 7, D_ONE = D_L0 + 7, D_COUNT };
-
-struct Geometry {
-    int32_t q[kQuantities];
-    int     dw[D_COUNT], dh[D_COUNT];
-    int     fw, fh;
-    bool    small;
-    int     cls;
-};
-
-// The reference rounds in float32: floor(float(x) * s + 0.5f). `volatile` keeps
-// the compiler from fusing the multiply-add, which would round differently.
-int flowRound(int x, float s) {
-    volatile float p = (float)x * s;
-    volatile float r = p + 0.5f;
-    return std::max(64, (int)std::floor(r));   // each side of the flow field is at least 64
-}
-
-void buildGeometry(int W, int H, float S, Geometry& g) {
-    g.fw = flowRound(W, S);
-    g.fh = flowRound(H, S);
-    g.cls = S >= 1.0f ? 2 : (S >= 0.5f ? 1 : 0);
-    g.small = std::min(g.fw, g.fh) < 256;
-
-    g.dw[D_W] = W;        g.dh[D_W] = H;
-    g.dw[D_W4] = W >> 2;  g.dh[D_W4] = H >> 2;
-    g.dw[D_FLOW] = g.fw;  g.dh[D_FLOW] = g.fh;
-    g.dw[D_P0] = g.fw;    g.dh[D_P0] = g.fh;
-    for (int j = 1; j < 7; j++) {                   // pyramid: halve, keep a level if a side would drop below 4
-        int nw = g.dw[D_P0 + j - 1] >> 1, nh = g.dh[D_P0 + j - 1] >> 1;
-        if (std::min(nw, nh) < 4) { nw = g.dw[D_P0 + j - 1]; nh = g.dh[D_P0 + j - 1]; }
-        g.dw[D_P0 + j] = nw; g.dh[D_P0 + j] = nh;
-    }
-    g.dw[D_L0] = g.fw >> 2; g.dh[D_L0] = g.fh >> 2;
-    for (int j = 1; j < 7; j++) {                   // levels: halve, keep a level if a side would reach 0
-        int nw = g.dw[D_L0 + j - 1] >> 1, nh = g.dh[D_L0 + j - 1] >> 1;
-        if (std::min(nw, nh) == 0) { nw = g.dw[D_L0 + j - 1]; nh = g.dh[D_L0 + j - 1]; }
-        g.dw[D_L0 + j] = nw; g.dh[D_L0 + j] = nh;
-    }
-    g.dw[D_ONE] = 1; g.dh[D_ONE] = 1;
-
-    int k = 0;
-    for (int i = 0; i < D_COUNT; i++) {
-        g.q[k++] = g.dw[i];
-        g.q[k++] = g.dh[i];
-        g.q[k++] = g.dw[i] * g.dh[i];
-    }
-    int32_t acc = 0;
-    for (int j = 0; j < 7; j++) { acc += g.dw[D_L0 + j] * g.dh[D_L0 + j]; g.q[k++] = acc; }   // SL1..SL7
-    acc = 0;
-    for (int j = 0; j < 7; j++) { acc += g.dw[D_P0 + j] * g.dh[D_P0 + j]; g.q[k++] = acc; }   // SP1..SP7
-    int dp[7] = {}, dl[7] = {};
-    for (int j = 1; j < 7; j++) {
-        dp[j] = (g.dw[D_P0 + j] != g.dw[D_P0 + j - 1] || g.dh[D_P0 + j] != g.dh[D_P0 + j - 1]) ? 1 : 0;
-        dl[j] = (g.dw[D_L0 + j] != g.dw[D_L0 + j - 1] || g.dh[D_L0 + j] != g.dh[D_L0 + j - 1]) ? 1 : 0;
-    }
-    for (int j = 1; j < 7; j++) { g.q[k++] = dp[j]; g.q[k++] = dl[j]; }                        // DP1,DL1 .. DP6,DL6
-    for (int j = 1; j < 6; j++) { g.q[k++] = dp[j] + dp[j + 1]; g.q[k++] = dl[j] + dl[j + 1]; } // DP12,DL12 .. DP56,DL56
-    int ndl = 0, ndp = 0;
-    for (int j = 1; j < 7; j++) { ndl += dl[j]; ndp += dp[j]; }
-    g.q[k++] = ndl;                                                                            // NDL
-    g.q[k++] = ndp;                                                                            // NDP
-}
-
-int32_t evalInt(const GExpr& e, const Geometry& g) { return e.kind == 0 ? e.a : g.q[e.a]; }
-
-uint32_t evalGroup(const GExpr& e, const Geometry& g, const int32_t* ints) {
-    switch (e.kind) {
-        case 0: return (uint32_t)e.a;
-        case 2: return (uint32_t)((g.q[e.a] + e.b - 1) / e.b);
-        case 3: return (uint32_t)(ints[e.a] * ints[e.b]);
-    }
-    return 1;
-}
-
-int64_t evalBuffer(const GExpr& e, const Geometry& g) {
-    if (e.kind == 0) return e.a;
-    return (((int64_t)g.q[e.a] * e.b) + 15) & ~(int64_t)15;
-}
-
-VkDescriptorType descType(int t) {
-    switch (t) {
-        case 1: return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        case 3: return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        default: return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+VkDescriptorType descType(BindKind k) {
+    switch (k) {
+        case BindKind::Sampled: return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        case BindKind::Storage: return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        default:                return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     }
 }
 
@@ -157,10 +75,8 @@ void computeBarrier(VkCommandBuffer cmd) {
 // ============================================================================
 class Pipelines {
 public:
-    Pipelines(VkDevice dev, const std::vector<uint8_t>& pack, const GModel& samplerSource,
-              const bool* needed)
-        : dev_(dev) {
-        ok_ = build(pack, samplerSource, needed);
+    Pipelines(VkDevice dev, const std::vector<uint8_t>& pack, const std::vector<int>& pipes) : dev_(dev) {
+        ok_ = build(pack, pipes);
         if (!ok_) destroy();
     }
     ~Pipelines() { destroy(); }
@@ -170,11 +86,10 @@ public:
     VkPipeline            pipe[kMaxPipe]{};
     VkPipelineLayout      lay[kMaxPipe]{};
     VkDescriptorSetLayout dsl[kMaxPipe]{};
-    VkSampler             samp[4]{};
-    int                   nSamp = 0;
+    VkSampler             samp[2]{};
 
 private:
-    bool build(const std::vector<uint8_t>& pack, const GModel& sm, const bool* needed) {
+    bool build(const std::vector<uint8_t>& pack, const std::vector<int>& pipes) {
         if (pack.size() < 8 || memcmp(pack.data(), "GSFG", 4) != 0) return false;
         uint32_t count; memcpy(&count, pack.data() + 4, 4);
         if (pack.size() < 8 + (size_t)count * 12) return false;
@@ -182,28 +97,24 @@ private:
         std::vector<Ent> ents(count);
         memcpy(ents.data(), pack.data() + 8, (size_t)count * 12);
 
-        for (int i = 0; i < sm.nSamplers && i < 4; i++) {
+        for (int i = 0; i < 2; i++) {
             VkSamplerCreateInfo si{};
             si.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-            si.magFilter = (VkFilter)sm.samplers[i].mag;
-            si.minFilter = (VkFilter)sm.samplers[i].min;
-            si.mipmapMode = (VkSamplerMipmapMode)sm.samplers[i].mip;
-            si.addressModeU = si.addressModeV = si.addressModeW = (VkSamplerAddressMode)sm.samplers[i].addr;
+            si.magFilter = si.minFilter = kSamplers[i].filter;
+            si.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+            si.addressModeU = si.addressModeV = si.addressModeW = kSamplers[i].address;
             si.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
             if (vkd.CreateSampler(dev_, &si, nullptr, &samp[i]) != VK_SUCCESS) return false;
-            nSamp = i + 1;
         }
 
-        int npd = 0;
-        const GPipeDef* defs = gsfgPipeDefs(npd);
-        for (int i = 0; i < npd; i++) {
-            const GPipeDef& d = defs[i];
-            if (d.pipe >= kMaxPipe || (needed && !needed[d.pipe])) continue;
+        for (int p : pipes) {
+            const PipeDef* d = pipeDef(p);
+            if (!d || p >= kMaxPipe) { GSFG_LOGW("no interface for pipeline %d", p); return false; }
 
             const Ent* ent = nullptr;
-            for (const Ent& e : ents) if (e.id == d.pipe) ent = &e;
+            for (const Ent& e : ents) if (e.id == (uint32_t)p) ent = &e;
             if (!ent || (size_t)ent->off + ent->size > pack.size()) {
-                GSFG_LOGW("shader pack is missing pipeline %d", (int)d.pipe);
+                GSFG_LOGW("shader pack is missing pipeline %d (%s)", p, d->name);
                 return false;
             }
 
@@ -215,33 +126,33 @@ private:
             if (vkd.CreateShaderModule(dev_, &mi, nullptr, &mod) != VK_SUCCESS) return false;
             mods_.push_back(mod);
 
-            VkDescriptorSetLayoutBinding bnd[13]{};
-            for (int b = 0; b < d.nBind; b++) {
-                bnd[b].binding = d.b[b].binding;
-                bnd[b].descriptorType = descType(d.b[b].type);
+            VkDescriptorSetLayoutBinding bnd[kMaxBind]{};
+            for (int b = 0; b < d->nBind; b++) {
+                bnd[b].binding = d->b[b].binding;
+                bnd[b].descriptorType = descType(d->b[b].kind);
                 bnd[b].descriptorCount = 1;
                 bnd[b].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
             }
             VkDescriptorSetLayoutCreateInfo di{};
             di.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-            di.bindingCount = d.nBind; di.pBindings = bnd;
-            if (vkd.CreateDescriptorSetLayout(dev_, &di, nullptr, &dsl[d.pipe]) != VK_SUCCESS) return false;
+            di.bindingCount = d->nBind; di.pBindings = bnd;
+            if (vkd.CreateDescriptorSetLayout(dev_, &di, nullptr, &dsl[p]) != VK_SUCCESS) return false;
 
-            VkPushConstantRange pcr{VK_SHADER_STAGE_COMPUTE_BIT, 0, 112};
+            VkPushConstantRange pcr{VK_SHADER_STAGE_COMPUTE_BIT, 0, kPushBytes};
             VkPipelineLayoutCreateInfo li{};
             li.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-            li.setLayoutCount = 1; li.pSetLayouts = &dsl[d.pipe];
+            li.setLayoutCount = 1; li.pSetLayouts = &dsl[p];
             li.pushConstantRangeCount = 1; li.pPushConstantRanges = &pcr;
-            if (vkd.CreatePipelineLayout(dev_, &li, nullptr, &lay[d.pipe]) != VK_SUCCESS) return false;
+            if (vkd.CreatePipelineLayout(dev_, &li, nullptr, &lay[p]) != VK_SUCCESS) return false;
 
             VkComputePipelineCreateInfo pi{};
             pi.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
             pi.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
             pi.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
             pi.stage.module = mod; pi.stage.pName = "main";
-            pi.layout = lay[d.pipe];
-            if (vkd.CreateComputePipelines(dev_, VK_NULL_HANDLE, 1, &pi, nullptr, &pipe[d.pipe]) != VK_SUCCESS) {
-                GSFG_LOGW("pipeline %d failed to compile", (int)d.pipe);
+            pi.layout = lay[p];
+            if (vkd.CreateComputePipelines(dev_, VK_NULL_HANDLE, 1, &pi, nullptr, &pipe[p]) != VK_SUCCESS) {
+                GSFG_LOGW("pipeline %d (%s) failed to compile", p, d->name);
                 return false;
             }
         }
@@ -257,7 +168,7 @@ private:
         }
         for (VkShaderModule m : mods_) vkd.DestroyShaderModule(dev_, m, nullptr);
         mods_.clear();
-        for (int i = 0; i < 4; i++) { if (samp[i]) vkd.DestroySampler(dev_, samp[i], nullptr); samp[i] = VK_NULL_HANDLE; }
+        for (int i = 0; i < 2; i++) { if (samp[i]) vkd.DestroySampler(dev_, samp[i], nullptr); samp[i] = VK_NULL_HANDLE; }
     }
 
     VkDevice dev_{};
@@ -266,32 +177,30 @@ private:
 };
 
 // ============================================================================
-// Chain: every image, view and buffer of the graph at one resolution, plus the
-// pre-built descriptor sets, and the recording of the dispatch sequences.
+// Chain: the graph (gsfg_graph) at one resolution - its images, buffers and
+// pre-built descriptor sets - and the recording of its dispatch sequences.
 // ============================================================================
 class Chain {
 public:
-    Chain(VkDevice dev, VkPhysicalDevice pd, const Pipelines& pl, int variant, uint32_t W, uint32_t H,
-          float S)
-        : dev_(dev), pl_(pl), W_(W), H_(H) {
-        buildGeometry((int)W, (int)H, S, geo_);
-        model_ = gsfgModel(variant, geo_.cls);
-        if (!model_) return;
+    Chain(VkDevice dev, VkPhysicalDevice pd, const Pipelines& pl, int variant, uint32_t W, uint32_t H, float S)
+        : dev_(dev), pl_(pl) {
+        if (!buildGraph(variant, W, H, S, graph_)) return;
         valid_ = createResources(pd) && createDescriptors();
         if (!valid_) destroy();
     }
     ~Chain() { destroy(); }
 
     bool valid() const { return valid_; }
-    const Geometry& geometry() const { return geo_; }
+    const Graph& graph() const { return graph_; }
+    const Geometry& geometry() const { return graph_.geo; }
 
-    // Frame N in: copy it into the ring slot, encode its features, and - when
-    // `n` generated frames are planned - run every stage they share.
-    void ingest(VkCommandBuffer cmd, VkImage source, uint64_t count, uint32_t n, bool first) {
-        const int r = (int)(count % 3);
+    // Frame N in: copy it into its ring slot and encode it; when `n` frames are
+    // to be generated, also run every stage they share. `cold`: no valid
+    // temporal state, so the shared stages read the cold inputs.
+    void ingest(VkCommandBuffer cmd, VkImage source, uint64_t count, uint32_t n, bool cold) {
+        const int r = (int)(count % kRing);
         if (!initialised_) initResources(cmd);
 
-        const GTemplate& t1 = model_->tmpl[0];
         fullBarrier(cmd);
         // Blit the composited frame into the ring slot (NEAREST, same size; the
         // blit also converts BGRA<->RGBA when the swapchain is BGRA).
@@ -303,12 +212,13 @@ public:
                        | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_TRANSFER_READ_BIT
                        | VK_ACCESS_TRANSFER_WRITE_BIT,
                    VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT);
+        const Extent in = graph_.geo.input;
         VkImageBlit blit{};
         blit.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-        blit.srcOffsets[1] = {(int32_t)W_, (int32_t)H_, 1};
+        blit.srcOffsets[1] = {in.w, in.h, 1};
         blit.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-        blit.dstOffsets[1] = {(int32_t)W_, (int32_t)H_, 1};
-        vkd.CmdBlitImage(cmd, source, VK_IMAGE_LAYOUT_GENERAL, images_[t1.inDst[r]],
+        blit.dstOffsets[1] = {in.w, in.h, 1};
+        vkd.CmdBlitImage(cmd, source, VK_IMAGE_LAYOUT_GENERAL, images_[graph_.input[r]],
                          VK_IMAGE_LAYOUT_GENERAL, 1, &blit, VK_FILTER_NEAREST);
         memBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
                    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT
@@ -318,86 +228,86 @@ public:
                    VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_TRANSFER_READ_BIT
                        | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT);
 
-        const GTemplate& t = model_->tmpl[(n > 0 ? n : 1) - 1];
-        const int end = n > 0 ? t.genStart : t.nA;      // A only for an ingest-only frame
-        const uint32_t nn = n > 0 ? n : 1;
+        const int ti = (n > 0 ? (int)n : 1) - 1;
+        const Template& t = graph_.tmpl[ti];
+        const int end = n > 0 ? t.sharedCount : t.encodeCount;   // encode only for an ingest-only frame
         for (int d = 0; d < end; d++)
-            run(cmd, t.disp[d], (first && n > 0) ? firstSetFor(nn, r, d) : setFor(nn, r, d));
+            run(cmd, t.disp[d], (cold && n > 0) ? coldSet(ti, r, d) : sets_[ti][r][d]);
     }
 
-    // One generated frame: its private block of the graph, then - after the last
-    // generated frame of every generating source frame - the prior pass
-    // (fast_prior_img) that carries this frame's result into the next one.
+    // Generated frame g of n: its own block of the graph, then - after the last
+    // one - the prior pass that carries this frame's flow into the next frame.
     void generate(VkCommandBuffer cmd, uint64_t count, uint32_t n, uint32_t g, bool prior) {
-        const int r = (int)(count % 3);
-        const GTemplate& t = model_->tmpl[n - 1];
+        const int r = (int)(count % kRing);
+        const int ti = (int)n - 1;
+        const Template& t = graph_.tmpl[ti];
         fullBarrier(cmd);
-        const int lo = t.genStarts[g];
-        for (int d = lo; d < lo + kGenBlock; d++) run(cmd, t.disp[d], setFor(n, r, d));
-        if (prior) run(cmd, *t.init[r], initSet(n, r));
+        const int lo = t.genStart[g];
+        const int hi = g + 1 < n ? t.genStart[g + 1] : (int)t.disp.size();
+        for (int d = lo; d < hi; d++) run(cmd, t.disp[d], sets_[ti][r][d]);
+        if (prior) run(cmd, t.prior, priorSets_[ti][r]);
         memBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
                    VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT);
     }
 
-    VkImage finalImage(uint32_t g, uint64_t count, uint32_t n) const {
+    VkImage finalImage(uint32_t g, uint32_t n) const {
         if (!valid_ || n == 0 || g >= n) return VK_NULL_HANDLE;
-        return images_[model_->tmpl[n - 1].outSrc[g * 3 + (count % 3)]];
+        return images_[graph_.output];
     }
 
-    // Test hook: the set index a dispatch would use.
-    const GModel* model() const { return model_; }
-
 private:
-
     bool createResources(VkPhysicalDevice pd) {
         VkPhysicalDeviceMemoryProperties mp{};
         vkd.GetPhysicalDeviceMemoryProperties(pd, &mp);
 
-        // ---- images
-        images_.assign(model_->nImages, VK_NULL_HANDLE);
-        views_.assign(model_->nViews, VK_NULL_HANDLE);
-        std::vector<VkMemoryRequirements> req(model_->nImages);
+        // ---- images: one 2D-array view over all layers each
+        const int nImages = (int)graph_.images.size();
+        images_.assign(nImages, VK_NULL_HANDLE);
+        views_.assign(nImages, VK_NULL_HANDLE);
+        std::vector<VkMemoryRequirements> req(nImages);
         uint32_t bits = 0xffffffffu; VkDeviceSize total = 0;
-        std::vector<VkDeviceSize> offs(model_->nImages);
-        for (int i = 0; i < model_->nImages; i++) {
-            const GImage& gi = model_->images[i];
+        std::vector<VkDeviceSize> offs(nImages);
+        for (int i = 0; i < nImages; i++) {
+            const ImageDesc& gi = graph_.images[i];
             VkImageCreateInfo ii{};
             ii.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
             ii.imageType = VK_IMAGE_TYPE_2D;
-            ii.format = (VkFormat)gi.fmt;
-            ii.extent = {(uint32_t)std::max(1, geo_.dw[gi.dim]), (uint32_t)std::max(1, geo_.dh[gi.dim]), 1};
-            ii.mipLevels = 1; ii.arrayLayers = (uint32_t)gi.layers;
+            ii.format = gi.format;
+            ii.extent = {gi.width, gi.height, 1};
+            ii.mipLevels = 1; ii.arrayLayers = gi.layers;
             ii.samples = VK_SAMPLE_COUNT_1_BIT; ii.tiling = VK_IMAGE_TILING_OPTIMAL;
-            ii.usage = (VkImageUsageFlags)gi.usage; ii.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+            ii.usage = gi.usage; ii.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
             ii.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            if (vkd.CreateImage(dev_, &ii, nullptr, &images_[i]) != VK_SUCCESS) return false;
+            if (vkd.CreateImage(dev_, &ii, nullptr, &images_[i]) != VK_SUCCESS) {
+                GSFG_LOGW("image %d (%s %ux%u) could not be created", i, gi.name.c_str(), gi.width, gi.height);
+                return false;
+            }
             vkd.GetImageMemoryRequirements(dev_, images_[i], &req[i]);
             bits &= req[i].memoryTypeBits;
             total = (total + req[i].alignment - 1) / req[i].alignment * req[i].alignment;
             offs[i] = total; total += req[i].size;
         }
-        if (!allocate(mp, bits, total, req.data(), offs.data(), model_->nImages, /*image=*/true)) return false;
+        if (!allocate(mp, bits, total, req.data(), offs.data(), nImages, /*image=*/true)) return false;
 
-        for (int i = 0; i < model_->nViews; i++) {
-            const GView& gv = model_->views[i];
+        for (int i = 0; i < nImages; i++) {
+            const ImageDesc& gi = graph_.images[i];
             VkImageViewCreateInfo vi{};
             vi.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-            vi.image = images_[gv.image]; vi.viewType = (VkImageViewType)gv.vt; vi.format = (VkFormat)gv.fmt;
-            vi.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, (uint32_t)gv.baseLayer, (uint32_t)gv.layers};
+            vi.image = images_[i]; vi.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY; vi.format = gi.format;
+            vi.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, gi.layers};
             if (vkd.CreateImageView(dev_, &vi, nullptr, &views_[i]) != VK_SUCCESS) return false;
         }
 
         // ---- buffers (device-local scratch; the graph never reads them from the host)
-        buffers_.assign(model_->nBuffers, VK_NULL_HANDLE);
-        bufSize_.assign(model_->nBuffers, 0);
-        std::vector<VkMemoryRequirements> breq(model_->nBuffers);
-        std::vector<VkDeviceSize> boffs(model_->nBuffers);
+        const int nBuffers = (int)graph_.buffers.size();
+        buffers_.assign(nBuffers, VK_NULL_HANDLE);
+        std::vector<VkMemoryRequirements> breq(nBuffers);
+        std::vector<VkDeviceSize> boffs(nBuffers);
         bits = 0xffffffffu; total = 0;
-        for (int i = 0; i < model_->nBuffers; i++) {
-            bufSize_[i] = evalBuffer(model_->buffers[i], geo_);
+        for (int i = 0; i < nBuffers; i++) {
             VkBufferCreateInfo bi{};
             bi.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-            bi.size = (VkDeviceSize)bufSize_[i];
+            bi.size = graph_.buffers[i].size;
             bi.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
             bi.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
             if (vkd.CreateBuffer(dev_, &bi, nullptr, &buffers_[i]) != VK_SUCCESS) return false;
@@ -406,7 +316,7 @@ private:
             total = (total + breq[i].alignment - 1) / breq[i].alignment * breq[i].alignment;
             boffs[i] = total; total += breq[i].size;
         }
-        return allocate(mp, bits, total, breq.data(), boffs.data(), model_->nBuffers, /*image=*/false);
+        return allocate(mp, bits, total, breq.data(), boffs.data(), nBuffers, /*image=*/false);
     }
 
     bool allocate(const VkPhysicalDeviceMemoryProperties& mp, uint32_t bits, VkDeviceSize total,
@@ -443,82 +353,87 @@ private:
         return true;
     }
 
-    // One descriptor set per (generation count, ring slot, dispatch), written once.
+    // One descriptor set per (generation count, ring position, dispatch), written once;
+    // plus the cold variants and the prior pass.
     bool createDescriptors() {
         uint32_t nSets = 0, nImg = 0, nStore = 0, nBuf = 0;
-        auto count = [&](const GDisp& d) {
-            nSets += 3;
-            for (int x = 0; x < d.nDesc; x++) {
-                const int ty = model_->descs[d.descOff + x].type;
-                (ty == 1 ? nImg : ty == 3 ? nStore : nBuf) += 3;
-            }
+        auto count = [&](const Dispatch& d, uint32_t copies) {
+            nSets += copies;
+            for (const Binding& b : d.bind)
+                (b.kind == BindKind::Sampled ? nImg : b.kind == BindKind::Storage ? nStore : nBuf) += copies;
         };
-        for (int n = 1; n <= 3; n++) {
-            const GTemplate& t = model_->tmpl[n - 1];
-            for (int d = 0; d < t.nd; d++) count(t.disp[d]);
-            for (int r = 0; r < 3; r++) { count(*t.init[r]); nSets -= 2; }   // init is per ring already
+        for (const Template& t : graph_.tmpl) {
+            for (const Dispatch& d : t.disp) {
+                bool cold = false;
+                for (const Binding& b : d.bind) cold |= b.cold >= 0;
+                count(d, cold ? 2 * kRing : kRing);
+            }
+            count(t.prior, kRing);
         }
         VkDescriptorPoolSize ps[3] = {
-            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, nImg + 128},
-            {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, nStore + 128},
-            {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, nBuf + 128}};
+            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, nImg},
+            {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, nStore},
+            {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, nBuf}};
         VkDescriptorPoolCreateInfo pi{};
         pi.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        pi.maxSets = nSets + 32; pi.poolSizeCount = 3; pi.pPoolSizes = ps;
+        pi.maxSets = nSets; pi.poolSizeCount = 3; pi.pPoolSizes = ps;
         if (vkd.CreateDescriptorPool(dev_, &pi, nullptr, &pool_) != VK_SUCCESS) return false;
 
-        for (int n = 1; n <= 3; n++) {
-            const GTemplate& t = model_->tmpl[n - 1];
-            for (int r = 0; r < 3; r++) {
-                std::vector<VkDescriptorSet>& v = sets_[n - 1][r];
-                v.resize(t.nd);
-                for (int d = 0; d < t.nd; d++)
-                    if (!makeSet(t.disp[d], r, v[d])) return false;
-                if (!makeSet(*t.init[r], r, initSets_[n - 1][r])) return false;
-                for (int k = 0; k < t.fix[r].n; k++) {
-                    const GFix& fx = t.fix[r].f[k];
-                    VkDescriptorSet s = VK_NULL_HANDLE;
-                    if (!makeSet(t.disp[fx.disp], r, s, fx.slot, fx.idx)) return false;
-                    firstSets_[n - 1][r].push_back({fx.disp, s});
+        for (int ti = 0; ti < 3; ti++) {
+            const Template& t = graph_.tmpl[ti];
+            for (int r = 0; r < kRing; r++) {
+                sets_[ti][r].resize(t.disp.size());
+                for (size_t d = 0; d < t.disp.size(); d++) {
+                    if (!makeSet(t.disp[d], r, false, sets_[ti][r][d])) return false;
+                    bool cold = false;
+                    for (const Binding& b : t.disp[d].bind) cold |= b.cold >= 0;
+                    if (cold) {
+                        VkDescriptorSet s = VK_NULL_HANDLE;
+                        if (!makeSet(t.disp[d], r, true, s)) return false;
+                        coldSets_[ti][r].push_back({(int)d, s});
+                    }
                 }
+                if (!makeSet(t.prior, r, false, priorSets_[ti][r])) return false;
             }
         }
         return true;
     }
 
-    bool makeSet(const GDisp& d, int r, VkDescriptorSet& out, int overSlot = -1, int overIdx = 0) {
+    bool makeSet(const Dispatch& d, int r, bool cold, VkDescriptorSet& out) {
         VkDescriptorSetAllocateInfo ai{};
         ai.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         ai.descriptorPool = pool_; ai.descriptorSetCount = 1; ai.pSetLayouts = &pl_.dsl[d.pipe];
         if (vkd.AllocateDescriptorSets(dev_, &ai, &out) != VK_SUCCESS) return false;
 
-        VkWriteDescriptorSet w[13]{};
-        VkDescriptorImageInfo  ii[13]{};
-        VkDescriptorBufferInfo bi[13]{};
-        for (int x = 0; x < d.nDesc; x++) {
-            const GDesc& gd = model_->descs[d.descOff + x];
+        const size_t n = d.bind.size();
+        std::vector<VkWriteDescriptorSet> w(n);
+        std::vector<VkDescriptorImageInfo> ii(n);
+        std::vector<VkDescriptorBufferInfo> bi(n);
+        for (size_t x = 0; x < n; x++) {
+            const Binding& b = d.bind[x];
+            w[x] = {};
             w[x].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            w[x].dstSet = out; w[x].dstBinding = gd.binding; w[x].descriptorCount = 1;
-            w[x].descriptorType = descType(gd.type);
-            const int idx = (x == overSlot) ? overIdx : gd.idx[r];
-            if (gd.type == 7) {
+            w[x].dstSet = out; w[x].dstBinding = b.binding; w[x].descriptorCount = 1;
+            w[x].descriptorType = descType(b.kind);
+            const int idx = (cold && b.cold >= 0) ? b.cold : b.res[r];
+            if (b.kind == BindKind::Buffer) {
                 bi[x] = {buffers_[idx], 0, VK_WHOLE_SIZE};
                 w[x].pBufferInfo = &bi[x];
             } else {
                 ii[x].imageView = views_[idx];
                 ii[x].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-                ii[x].sampler = gd.sampler >= 0 ? pl_.samp[gd.sampler] : VK_NULL_HANDLE;
+                ii[x].sampler = b.kind == BindKind::Sampled ? pl_.samp[b.sampler] : VK_NULL_HANDLE;
                 w[x].pImageInfo = &ii[x];
             }
         }
-        vkd.UpdateDescriptorSets(dev_, d.nDesc, w, 0, nullptr);
+        vkd.UpdateDescriptorSets(dev_, (uint32_t)n, w.data(), 0, nullptr);
         return true;
     }
 
-    // UNDEFINED -> GENERAL for every image, and a zeroed scratch buffer set.
+    // UNDEFINED -> GENERAL for every image, and zeroed buffers (the cold prior must read zeros).
     void initResources(VkCommandBuffer cmd) {
-        std::vector<VkImageMemoryBarrier> b(model_->nImages);
-        for (int i = 0; i < model_->nImages; i++) {
+        std::vector<VkImageMemoryBarrier> b(images_.size());
+        for (size_t i = 0; i < images_.size(); i++) {
             b[i] = {};
             b[i].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
             b[i].srcAccessMask = 0;
@@ -527,7 +442,7 @@ private:
             b[i].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED; b[i].newLayout = VK_IMAGE_LAYOUT_GENERAL;
             b[i].srcQueueFamilyIndex = b[i].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             b[i].image = images_[i];
-            b[i].subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, (uint32_t)model_->images[i].layers};
+            b[i].subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, graph_.images[i].layers};
         }
         vkd.CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                                VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr,
@@ -538,34 +453,22 @@ private:
         initialised_ = true;
     }
 
-    VkDescriptorSet setFor(uint32_t n, int r, int d) const { return sets_[n - 1][r][d]; }
-    VkDescriptorSet firstSetFor(uint32_t n, int r, int d) const {
-        for (const auto& p : firstSets_[n - 1][r]) if (p.first == d) return p.second;
-        return sets_[n - 1][r][d];
+    VkDescriptorSet coldSet(int ti, int r, int d) const {
+        for (const auto& p : coldSets_[ti][r]) if (p.first == d) return p.second;
+        return sets_[ti][r][d];
     }
-    VkDescriptorSet initSet(uint32_t n, int r) const { return initSets_[n - 1][r]; }
 
-    void run(VkCommandBuffer cmd, const GDisp& d, VkDescriptorSet set) {
-        if (d.bar & 2) fullBarrier(cmd);
-        else if (d.bar & 1) computeBarrier(cmd);
+    void run(VkCommandBuffer cmd, const Dispatch& d, VkDescriptorSet set) {
+        if (d.barrier & 2) fullBarrier(cmd);
+        else if (d.barrier & 1) computeBarrier(cmd);
 
-        int32_t ints[20];
-        for (int j = 0; j < 20; j++) ints[j] = evalInt(d.ints[j], geo_);
-        uint32_t pc[28];
-        memcpy(pc, ints, sizeof(ints));
-        memcpy(pc + 20, d.floats, 32);
-        if (d.hasAlt) {   // the last two floats follow the number of distinct pyramid levels (quantity NDP)
-            const int ndp = geo_.q[kQuantities - 1];
-            const float f6 = (float)std::min(ndp, 5), f7 = (float)ndp;
-            memcpy(&pc[26], &f6, 4);
-            memcpy(&pc[27], &f7, 4);
-        }
-
+        uint8_t pc[kPushBytes];
+        memcpy(pc, d.ints, 80);
+        memcpy(pc + 80, d.floats, 32);
         vkd.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pl_.pipe[d.pipe]);
         vkd.CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pl_.lay[d.pipe], 0, 1, &set, 0, nullptr);
-        vkd.CmdPushConstants(cmd, pl_.lay[d.pipe], VK_SHADER_STAGE_COMPUTE_BIT, 0, 112, pc);
-        vkd.CmdDispatch(cmd, evalGroup(d.groups[0], geo_, ints), evalGroup(d.groups[1], geo_, ints),
-                        evalGroup(d.groups[2], geo_, ints));
+        vkd.CmdPushConstants(cmd, pl_.lay[d.pipe], VK_SHADER_STAGE_COMPUTE_BIT, 0, kPushBytes, pc);
+        vkd.CmdDispatch(cmd, d.groups[0], d.groups[1], d.groups[2]);
     }
 
     void destroy() {
@@ -580,20 +483,17 @@ private:
 
     VkDevice dev_{};
     const Pipelines& pl_;
-    uint32_t W_{}, H_{};
-    Geometry geo_{};
-    const GModel* model_{};
+    Graph graph_;
     bool valid_ = false, initialised_ = false;
 
     std::vector<VkImage> images_;
     std::vector<VkImageView> views_;
     std::vector<VkBuffer> buffers_;
-    std::vector<int64_t> bufSize_;
     std::vector<VkDeviceMemory> mems_;
     VkDescriptorPool pool_{};
-    std::vector<VkDescriptorSet> sets_[3][3];
-    VkDescriptorSet initSets_[3][3]{};
-    std::vector<std::pair<int, VkDescriptorSet>> firstSets_[3][3];
+    std::vector<VkDescriptorSet> sets_[3][kRing];
+    VkDescriptorSet priorSets_[3][kRing]{};
+    std::vector<std::pair<int, VkDescriptorSet>> coldSets_[3][kRing];
 };
 
 // ============================================================================
@@ -622,18 +522,10 @@ bool Engine::init(VkDevice device, VkPhysicalDevice physicalDevice, const std::s
     vkd.GetPhysicalDeviceProperties(physicalDevice, &props);
     variant_ = (props.vendorID == 0x5143 && strstr(props.deviceName, "840")) ? 1 : 0;
 
-    bool needed[kMaxPipe] = {};
-    for (int c = 0; c < 3; c++) {
-        const GModel* m = gsfgModel(variant_, c);
-        for (int n = 0; n < 3; n++) {
-            const GTemplate& t = m->tmpl[n];
-            for (int d = 0; d < t.nd; d++) needed[t.disp[d].pipe] = true;
-            for (int r = 0; r < 3; r++) needed[t.init[r]->pipe] = true;
-        }
-    }
-    pipelines_ = std::make_unique<Pipelines>(device, pack, *gsfgModel(variant_, 1), needed);
+    const std::vector<int> pipes = pipelinesFor(variant_);
+    pipelines_ = std::make_unique<Pipelines>(device, pack, pipes);
     if (!pipelines_->ok()) { pipelines_.reset(); return false; }
-    GSFG_LOGI("GSFG pipelines ready (variant %d)", variant_);
+    GSFG_LOGI("GSFG pipelines ready (variant %d, %zu pipelines)", variant_, pipes.size());
     return true;
 }
 
@@ -698,10 +590,23 @@ bool Engine::prepare(uint32_t width, uint32_t height, VkFormat format) {
     planCalls_ = 0; warmStreak_ = 0; warm_ = false; generating_ = false;
     temporalValid_ = false; idleFrames_ = 0;
     pacer_.Reset();
-    GSFG_LOGI("graph built at %ux%u, flow %dx%d scale %.2f (preset %.2f, guest %ux%u), class %d%s",
-              width, height, chain_->geometry().fw, chain_->geometry().fh, (double)scale,
-              (double)flowScale_, peakGuestExtent_.width, peakGuestExtent_.height, cls_,
-              chain_->geometry().small ? " (small flow)" : "");
+    {
+        const Graph& g = chain_->graph();
+        const Geometry& geo = g.geo;
+        uint64_t bytes = 0;
+        for (const ImageDesc& im : g.images) {
+            const uint32_t texel = im.format == VK_FORMAT_R32G32B32A32_SFLOAT ? 16
+                                 : im.format == VK_FORMAT_R16G16B16A16_SFLOAT ? 8 : 4;
+            bytes += (uint64_t)im.width * im.height * im.layers * texel;
+        }
+        for (const BufferDesc& b : g.buffers) bytes += b.size;
+        GSFG_LOGI("graph built at %ux%u, flow %dx%d scale %.2f (preset %.2f, guest %ux%u), class %d: "
+                  "%zu images, %zu buffers, ~%.1f MB; levels %dx%d .. %dx%d",
+                  width, height, geo.flow.w, geo.flow.h, (double)scale, (double)flowScale_,
+                  peakGuestExtent_.width, peakGuestExtent_.height, cls_, g.images.size(), g.buffers.size(),
+                  (double)bytes / 1048576.0, geo.feat[0].w, geo.feat[0].h, geo.feat[kLevels - 1].w,
+                  geo.feat[kLevels - 1].h);
+    }
     return true;
 }
 
@@ -762,7 +667,7 @@ void Engine::generateInto(VkCommandBuffer cmd, uint32_t generation) {
 }
 
 VkImage Engine::finalImage(uint32_t generation) const {
-    return chain_ ? chain_->finalImage(generation, lastCount_, lastGenerations_) : VK_NULL_HANDLE;
+    return chain_ ? chain_->finalImage(generation, lastGenerations_) : VK_NULL_HANDLE;
 }
 
 float Engine::sourceRate() const { return pacer_.Stats().source_rate; }
