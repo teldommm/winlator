@@ -354,6 +354,21 @@ public class Shortcut {
         putExtra("lsfgTargetRate", String.valueOf(Math.max(0, Math.min(1000, hz))));
     }
 
+    public int getLsfgTargetMemo() {
+        String value = getExtra("lsfgTargetMemo", null);
+        try {
+            return value != null && !value.isEmpty()
+                    ? Math.max(0, Math.min(1000, Integer.parseInt(value)))
+                    : container.getLsfgTargetMemo();
+        } catch (NumberFormatException e) {
+            return container.getLsfgTargetMemo();
+        }
+    }
+
+    public void setLsfgTargetMemo(int hz) {
+        putExtra("lsfgTargetMemo", String.valueOf(Math.max(0, Math.min(1000, hz))));
+    }
+
     public float getLsfgFlowScale() {
         String value = getExtra("lsfgFlowScale", null);
         try {

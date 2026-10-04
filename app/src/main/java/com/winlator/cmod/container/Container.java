@@ -22,6 +22,7 @@ public class Container {
     public static final String DEFAULT_ENV_VARS = "WRAPPER_MAX_IMAGE_COUNT=0 ZINK_DESCRIPTORS=lazy ZINK_DEBUG=compact MESA_SHADER_CACHE_DISABLE=false MESA_SHADER_CACHE_MAX_SIZE=512MB mesa_glthread=true WINEESYNC=1 TU_DEBUG=noconform,sysmem DXVK_HUD=devinfo,fps,frametimes,gpuload,version,api";
     public static final String DEFAULT_SCREEN_SIZE = "1280x720";
     public static final String DEFAULT_GRAPHICS_DRIVER = "wrapper";
+    public static final String DEFAULT_GRAPHICS_WRAPPER = "wrapper";
     public static final String DEFAULT_AUDIO_DRIVER = "pulse-audio-gn";
     public static final String DEFAULT_EMULATOR = "FEXCore";
     public static final String DEFAULT_DXWRAPPER = "dxvk+vkd3d";
@@ -138,6 +139,20 @@ public class Container {
     public boolean getRendererSwapRB() { return rendererSwapRB; }
     public void setRendererSwapRB(boolean v) { this.rendererSwapRB = v; }
 
+    public String getGraphicsWrapper() {
+        return normalizeGraphicsWrapper(getExtra("graphicsWrapper", DEFAULT_GRAPHICS_WRAPPER));
+    }
+
+    public void setGraphicsWrapper(String graphicsWrapper) {
+        putExtra("graphicsWrapper", normalizeGraphicsWrapper(graphicsWrapper));
+    }
+
+    public static String normalizeGraphicsWrapper(String graphicsWrapper) {
+        if (graphicsWrapper == null) return DEFAULT_GRAPHICS_WRAPPER;
+        return "wrapper-legacy".equals(graphicsWrapper.toLowerCase(java.util.Locale.ENGLISH))
+                ? "wrapper-legacy" : DEFAULT_GRAPHICS_WRAPPER;
+    }
+
     public String getSurfaceFormat() {
         String value = getExtra("surfaceFormat", null);
         if (value == null || value.isEmpty()) value = "bgra8";
@@ -172,6 +187,25 @@ public class Container {
 
     public void setLsfgTargetRate(int hz) {
         putExtra("lsfgTargetRate", String.valueOf(Math.max(0, Math.min(1000, hz))));
+    }
+
+    /** Used for "LSFG Adaptive FPS" when no target has been entered yet. */
+    public static final int DEFAULT_LSFG_TARGET_RATE = 60;
+
+    /**
+     * Last Adaptive target in Hz, kept even while a fixed multiplier is selected
+     * (lsfgTargetRate is 0 then). 0 = never set.
+     */
+    public int getLsfgTargetMemo() {
+        try {
+            return Math.max(0, Math.min(1000, Integer.parseInt(getExtra("lsfgTargetMemo", "0"))));
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+    }
+
+    public void setLsfgTargetMemo(int hz) {
+        putExtra("lsfgTargetMemo", String.valueOf(Math.max(0, Math.min(1000, hz))));
     }
 
     public float getLsfgFlowScale() {

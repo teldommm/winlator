@@ -31,7 +31,7 @@ Java_com_winlator_cmod_widget_VulkanXServerView_nativeConfigureFrameGen(
     env->ReleaseStringUTFChars(cachePath, path);
 
     // The gates depend on which shader set the cache holds: the precompiled
-    // SPIR-V of Lossless 3.2.2+ runs without Vulkan 1.2 / vulkanMemoryModel,
+    // SPIR-V some Lossless.dll builds carry runs without Vulkan 1.2 / vulkanMemoryModel,
     // the DXBC-translated set does not.
     lsfg::Variant variant = lsfg::Variant::None;
     if (lsfg::cacheVariant(pathStr, variant) != lsfg::DllStatus::Ok) variant = lsfg::Variant::None;

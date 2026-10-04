@@ -86,6 +86,7 @@ import com.winlator.cmod.midi.MidiManager;
 import com.winlator.cmod.ui.GraphicsPanelCallbacks;
 import com.winlator.cmod.ui.GraphicsPanelState;
 import com.winlator.cmod.ui.GraphicsSidebarPanelHost;
+import com.winlator.cmod.ui.GraphicsSidebarPanelKt;
 import com.winlator.cmod.ui.HudPanelCallbacks;
 import com.winlator.cmod.ui.HudPanelState;
 import com.winlator.cmod.ui.HudSidebarPanelHost;
@@ -188,14 +189,17 @@ public class XServerDisplayActivity extends AppCompatActivity {
     // Adaptive frame gen: target Hz, 0 = fixed multiplier. Stored with
     // lsfgMultiplier = 4 (the ceiling the pacer may use to reach the target).
     private int activeLsfgTargetRate = 0;
-    // Sidebar "Adaptive N Hz" entries, built once from the panel's modes.
-    private java.util.List<Integer> frameGenAdaptiveTargets;
+    // Last Adaptive target, kept while a fixed multiplier is selected (activeLsfgTargetRate is 0
+    // then, which is what gets passed to native) so switching back restores it. Persisted
+    // separately as lsfgTargetMemo; never 0 (falls back to DEFAULT_LSFG_TARGET_RATE).
+    private int rememberedLsfgTargetRate = Container.DEFAULT_LSFG_TARGET_RATE;
     private boolean graphicsFsrEnabled;
     private int graphicsUpscalerModeIndex;
     private int graphicsPostFxModeIndex;
     private int graphicsSharpnessPercent = 50;
     private int graphicsReshadeStrength = 65;
     private String graphicsDriver = Container.DEFAULT_GRAPHICS_DRIVER;
+    private String graphicsWrapper = Container.DEFAULT_GRAPHICS_WRAPPER;
     private HashMap<String, String> graphicsDriverConfig;
     private String audioDriver = Container.DEFAULT_AUDIO_DRIVER;
     private String emulator = Container.DEFAULT_EMULATOR;
@@ -309,32 +313,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 + java.util.Arrays.toString(rates) + ", active=" + activeRate);
     }
 
-    // Adaptive targets offered in the sidebar: every distinct refresh rate the
-    // panel supports (rounded, >= 30 Hz), ascending. A saved target the panel
-    // no longer lists (e.g. another device) is kept so the selection survives.
-    private java.util.List<Integer> frameGenAdaptiveTargets() {
-        if (frameGenAdaptiveTargets != null) return frameGenAdaptiveTargets;
-        java.util.TreeSet<Integer> rates = new java.util.TreeSet<>();
-        try {
-            android.view.Display display = getWindowManager().getDefaultDisplay();
-            for (android.view.Display.Mode mode : display.getSupportedModes()) {
-                int hz = Math.round(mode.getRefreshRate());
-                if (hz >= 30) rates.add(hz);
-            }
-        } catch (Exception ignored) {
-        }
-        if (rates.isEmpty()) rates.add(60);
-        if (activeLsfgTargetRate > 0) rates.add(activeLsfgTargetRate);
-        frameGenAdaptiveTargets = new java.util.ArrayList<>(rates);
-        return frameGenAdaptiveTargets;
-    }
-
     private int frameGenSpinnerIndex() {
         if (activeLsfgMultiplier < 2) return 0;
-        if (activeLsfgTargetRate > 0) {
-            int i = frameGenAdaptiveTargets().indexOf(activeLsfgTargetRate);
-            if (i >= 0) return 4 + i;
-        }
+        if (activeLsfgTargetRate > 0) return GraphicsSidebarPanelKt.FRAMEGEN_TARGET_INDEX;
         return Math.min(3, activeLsfgMultiplier - 1);
     }
 
@@ -527,6 +508,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
 
         graphicsDriver = container.getGraphicsDriver();
+        graphicsWrapper = container.getGraphicsWrapper();
         String graphicsDriverConfig = container.getGraphicsDriverConfig();
         audioDriver = Container.normalizeAudioDriver(container.getAudioDriver());
         emulator = container.getEmulator();
@@ -547,6 +529,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
             shortcut.saveData();
 
             graphicsDriver = shortcut.getExtra("graphicsDriver", container.getGraphicsDriver());
+            graphicsWrapper = Container.normalizeGraphicsWrapper(
+                    shortcut.getExtra("graphicsWrapper", container.getGraphicsWrapper()));
             graphicsDriverConfig = shortcut.getExtra("graphicsDriverConfig", container.getGraphicsDriverConfig());
             audioDriver = Container.normalizeAudioDriver(shortcut.getExtra("audioDriver", container.getAudioDriver()));
             emulator = shortcut.getExtra("emulator", container.getEmulator());
@@ -1256,6 +1240,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
             activeLsfgDll = lsfgDll;
             activeLsfgFlowScale = lsfgFlowScale;
             activeLsfgTargetRate = lsfgMultiplier < 2 ? 0 : lsfgTargetRate;
+            int lsfgTargetMemo = shortcut != null ? shortcut.getLsfgTargetMemo()
+                    : container != null ? container.getLsfgTargetMemo() : 0;
+            // Saves from before the memo existed only stored the target while Adaptive was on.
+            rememberedLsfgTargetRate = lsfgTargetMemo > 0 ? lsfgTargetMemo
+                    : activeLsfgTargetRate > 0 ? activeLsfgTargetRate
+                    : Container.DEFAULT_LSFG_TARGET_RATE;
             vkRenderer.setFrameGenRefreshRate(pickHighestRefreshRate());
             vkRenderer.setFrameGenNative(lsfgDll, lsfgMultiplier, lsfgFlowScale, activeLsfgTargetRate);
         }
@@ -1765,7 +1755,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 vkRenderer != null,
                 frameGenSpinnerIndex(),
                 activeLsfgFlowScale,
-                frameGenAdaptiveTargets()
+                rememberedLsfgTargetRate
         );
 
         GraphicsPanelCallbacks callbacks = new GraphicsPanelCallbacks() {
@@ -1837,25 +1827,52 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
             @Override
             public void onFrameGenChanged(int multiplierIndex) {
-                // 0 = Off, 1..3 = fixed 2x..4x, 4.. = "Adaptive N Hz" entries.
-                java.util.List<Integer> targets = frameGenAdaptiveTargets();
-                if (multiplierIndex >= 4 && multiplierIndex - 4 < targets.size()) {
+                // 0 = Off, 1..3 = fixed 2x..4x, 4 = LSFG Adaptive FPS. Adaptive keeps frame
+                // generation armed at the largest multiplier (the pacer decides per frame how
+                // many to generate to hit the target); the other modes clear the target.
+                if (multiplierIndex == GraphicsSidebarPanelKt.FRAMEGEN_TARGET_INDEX) {
                     activeLsfgMultiplier = 4;
-                    activeLsfgTargetRate = targets.get(multiplierIndex - 4);
+                    activeLsfgTargetRate = rememberedLsfgTargetRate;
                 } else {
-                    activeLsfgMultiplier = multiplierIndex < 1 ? 0 : Math.min(multiplierIndex, 3) + 1;
+                    activeLsfgMultiplier = multiplierIndex < 1 ? 0 : multiplierIndex + 1;
                     activeLsfgTargetRate = 0;
                 }
                 if (shortcut != null) {
                     shortcut.setLsfgMultiplier(activeLsfgMultiplier);
                     shortcut.setLsfgTargetRate(activeLsfgTargetRate);
+                    shortcut.setLsfgTargetMemo(rememberedLsfgTargetRate);
                     shortcut.saveData();
                 } else if (container != null) {
                     container.setLsfgMultiplier(activeLsfgMultiplier);
                     container.setLsfgTargetRate(activeLsfgTargetRate);
+                    container.setLsfgTargetMemo(rememberedLsfgTargetRate);
                     container.saveData();
                 }
                 if (vkRenderer != null)
+                    vkRenderer.setFrameGenNative(activeLsfgDll, activeLsfgMultiplier,
+                            activeLsfgFlowScale, activeLsfgTargetRate);
+            }
+
+            @Override
+            public void onFrameGenTargetFpsChanged(int fps) {
+                int clamped = Math.max(0, Math.min(fps, 1000));
+                if (clamped <= 0) return;
+                if (clamped == rememberedLsfgTargetRate) return;
+                rememberedLsfgTargetRate = clamped;
+                // Always persist the memo; only the effective target (and native) follow while
+                // Adaptive is the active mode.
+                boolean adaptive = activeLsfgTargetRate > 0;
+                if (adaptive) activeLsfgTargetRate = clamped;
+                if (shortcut != null) {
+                    if (adaptive) shortcut.setLsfgTargetRate(activeLsfgTargetRate);
+                    shortcut.setLsfgTargetMemo(rememberedLsfgTargetRate);
+                    shortcut.saveData();
+                } else if (container != null) {
+                    if (adaptive) container.setLsfgTargetRate(activeLsfgTargetRate);
+                    container.setLsfgTargetMemo(rememberedLsfgTargetRate);
+                    container.saveData();
+                }
+                if (adaptive && vkRenderer != null)
                     vkRenderer.setFrameGenNative(activeLsfgDll, activeLsfgMultiplier,
                             activeLsfgFlowScale, activeLsfgTargetRate);
             }
@@ -2188,6 +2205,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
         winHandler.sendGamepadState();
     }
 
+    static String resolveGraphicsWrapperArchiveName(String graphicsWrapper) {
+        return "wrapper-legacy".equals(graphicsWrapper) ? "wrapper-legacy" : "wrapper";
+    }
+
     private String getSelectedOpenGLDriver() {
         return "freedreno".equalsIgnoreCase(graphicsDriver) ? "freedreno" : "zink";
     }
@@ -2296,15 +2317,28 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         File graphicsRuntimeMarker = new File(rootDir,
                 "usr/lib/.winlator-graphics-runtime-c7474f7e-25b50a11-v2");
-        if (firstTimeBoot || !graphicsRuntimeMarker.isFile()) {
-            Log.d("XServerDisplayActivity", "Installing paired Pipetto wrapper and common graphics runtime");
-            TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "graphics_driver/wrapper" + ".tzst",
-                    rootDir);
-            TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "layers" + ".tzst", rootDir);
-            TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "graphics_driver/extra_libs" + ".tzst",
-                    rootDir);
-            FileUtils.writeString(graphicsRuntimeMarker,
-                    "wrapper=c7474f7e;extra_libs=25b50a11;layers=9d57736d;opengl=split-v1");
+        // The wrapper libs live in the ImageFS, which is shared by every container, so the
+        // installed variant is tracked in the ImageFS itself (not in per-container extras).
+        File wrapperVariantMarker = new File(rootDir, "usr/lib/.winlator-graphics-wrapper-variant");
+        String wrapperArchive = resolveGraphicsWrapperArchiveName(graphicsWrapper);
+        boolean installCommonRuntime = firstTimeBoot || !graphicsRuntimeMarker.isFile();
+        // ImageFS that predates variant selection always carries the current wrapper.
+        String installedWrapper = wrapperVariantMarker.isFile()
+                ? FileUtils.readString(wrapperVariantMarker).trim() : "wrapper";
+        boolean wrapperChanged = !wrapperArchive.equals(installedWrapper);
+        if (installCommonRuntime || wrapperChanged) {
+            Log.d("XServerDisplayActivity", "Installing graphics wrapper " + wrapperArchive);
+            boolean installed = TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this,
+                    "graphics_driver/" + wrapperArchive + ".tzst", rootDir);
+            if (installed) FileUtils.writeString(wrapperVariantMarker, wrapperArchive);
+            if (installCommonRuntime) {
+                installed &= TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "layers" + ".tzst",
+                        rootDir);
+                installed &= TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this,
+                        "graphics_driver/extra_libs" + ".tzst", rootDir);
+                if (installed) FileUtils.writeString(graphicsRuntimeMarker,
+                        "wrapper=c7474f7e;extra_libs=25b50a11;layers=9d57736d;opengl=split-v1");
+            }
         }
 
         extractOpenGLDriver(rootDir);

@@ -27,9 +27,8 @@ import kotlin.math.roundToInt
 
 // Indices match the original Spinners' positions exactly (upscalerModeIndex: SGSR/FSR/
 // Lanczos2/ColorBoost, postFxModeIndex: None/DLS/CRT/HDR/Natural, reshadeEffectIndex: the
-// 12-entry ReShade list, frameGenMultiplierIndex: Off/2x/3x/4x followed by one
-// "Adaptive N Hz" entry per frameGenAdaptiveTargets value) so Java's existing mapping
-// tables can be reused unchanged.
+// 12-entry ReShade list, frameGenMultiplierIndex: Off/2x/3x/4x, plus 4 = LSFG Adaptive
+// FPS) so Java's existing mapping tables can be reused unchanged.
 data class GraphicsPanelState(
     val fpsLimit: Int,
     val fsrEnabled: Boolean,
@@ -41,8 +40,7 @@ data class GraphicsPanelState(
     val frameGenAvailable: Boolean,
     val frameGenMultiplierIndex: Int,
     val frameGenFlowScale: Float,
-    // Adaptive target rates in Hz; each adds an "Adaptive N Hz" entry after 4x.
-    val frameGenAdaptiveTargets: List<Int> = emptyList()
+    val frameGenTargetFps: Int       // Adaptive target FPS shown in the field (last entered/saved)
 )
 
 interface GraphicsPanelCallbacks {
@@ -56,6 +54,7 @@ interface GraphicsPanelCallbacks {
     fun onReshadeStrengthChanged(percent: Int)
     fun onFrameGenChanged(multiplierIndex: Int)
     fun onFrameGenFlowScaleChanged(scale: Float)
+    fun onFrameGenTargetFpsChanged(fps: Int)
 }
 
 object GraphicsSidebarPanelHost {
@@ -72,7 +71,10 @@ object GraphicsSidebarPanelHost {
 
 private val UPSCALER_LABELS = listOf("SGSR", "FSR", "Lanczos 2", "Color Boost")
 private val POSTFX_LABELS = listOf("None", "DLS", "CRT", "HDR", "Natural")
-private val FRAMEGEN_LABELS = listOf("Off", "LSFG 2x", "LSFG 3x", "LSFG 4x")
+private val FRAMEGEN_LABELS = listOf("Off", "LSFG 2x", "LSFG 3x", "LSFG 4x", "LSFG Adaptive FPS")
+// Index of "LSFG Adaptive FPS": presents paced to a typed-in rate instead of a fixed multiplier.
+const val FRAMEGEN_TARGET_INDEX = 4
+private const val TARGET_FPS_MAX = 1000
 private val RESHADE_EFFECTS = listOf(
     "Off", "Game Clarity", "Cinematic", "Vivid", "Competitive", "Adaptive Sharpen",
     "Filmic", "Arcade", "Retro CRT", "Upscale Sharp", "Pixel Clean", "Anime Edge"
@@ -99,9 +101,9 @@ private fun GraphicsSidebarPanel(
     var reshadeIndex by remember { mutableStateOf(state.reshadeEffectIndex) }
     var reshadeStrength by remember { mutableStateOf(state.reshadeStrengthPercent) }
     var frameGenIndex by remember { mutableStateOf(state.frameGenMultiplierIndex) }
-    val frameGenLabels = remember(state.frameGenAdaptiveTargets) {
-        FRAMEGEN_LABELS + state.frameGenAdaptiveTargets.map { "Adaptive $it Hz" }
-    }
+    // Last Adaptive target. Kept here (state is a one-shot snapshot) so switching to a fixed
+    // multiplier and back doesn't forget what was typed.
+    var targetFps by remember { mutableStateOf(state.frameGenTargetFps) }
 
     // Same visibility rule as the original updateSharpnessVis(): shown while FSR is on OR
     // the Post Effect picker is set to DLS (index 1) — Sharpness feeds whichever is active.
@@ -225,13 +227,23 @@ private fun GraphicsSidebarPanel(
                 Spacer(Modifier.height(10.dp))
                 SidebarDropdownField(
                     caption = null,
-                    options = frameGenLabels,
+                    options = FRAMEGEN_LABELS,
                     selectedIndex = frameGenIndex,
                     onSelect = {
                         frameGenIndex = it
                         callbacks.onFrameGenChanged(it)
                     }
                 )
+                if (frameGenIndex == FRAMEGEN_TARGET_INDEX) {
+                    Spacer(Modifier.height(10.dp))
+                    TargetFpsField(
+                        initialFps = targetFps,
+                        onFpsChanged = {
+                            targetFps = it
+                            callbacks.onFrameGenTargetFpsChanged(it)
+                        }
+                    )
+                }
                 if (frameGenIndex > 0) {
                     Spacer(Modifier.height(12.dp))
                     // Dragging only updates the label; the (expensive) frame-gen pipeline rebuild and
@@ -258,6 +270,47 @@ private fun GraphicsSidebarPanel(
         // Settings on this panel are saved as they change (per shortcut, or to the container when
         // launched without one) — there's no separate "Save Preset" step.
     }
+}
+
+// Target FPS for LSFG adaptive pacing. Like the FPS limiter's Custom field, the value is applied
+// once - on Done or focus loss - not per keystroke (typing "90" must not pace to 9 first).
+@Composable
+private fun TargetFpsField(initialFps: Int, onFpsChanged: (Int) -> Unit) {
+    var text by remember { mutableStateOf(if (initialFps > 0) initialFps.toString() else "") }
+    var applied by remember { mutableStateOf(initialFps.coerceAtLeast(0)) }
+    val focusManager = LocalFocusManager.current
+
+    fun value(): Int? = text.toIntOrNull()?.takeIf { it > 0 }?.coerceAtMost(TARGET_FPS_MAX)
+
+    DisposableEffect(Unit) {
+        onDispose { SidebarTextInputFocus.active = false }
+    }
+
+    OutlinedTextField(
+        value = text,
+        onValueChange = { t -> text = t.filter(Char::isDigit).take(4) },
+        singleLine = true,
+        label = { Text("Target FPS") },
+        placeholder = { Text("e.g. 60") },
+        suffix = { Text("FPS") },
+        supportingText = { Text("Generated frames are timed to this rate. Above the display refresh rate = match the display.") },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+        keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+        modifier = Modifier
+            .fillMaxWidth()
+            .onFocusChanged { focus ->
+                val wasActive = SidebarTextInputFocus.active
+                SidebarTextInputFocus.active = focus.isFocused
+                if (wasActive && !focus.isFocused) {
+                    val v = value() ?: return@onFocusChanged
+                    text = v.toString()
+                    if (v != applied) {
+                        applied = v
+                        onFpsChanged(v)
+                    }
+                }
+            }
+    )
 }
 
 @Composable
@@ -305,7 +358,7 @@ private fun FpsLimiterCard(initialFps: Int, onFpsChanged: (Int) -> Unit) {
             label = "FPS Limit",
             valueText = when {
                 position <= 0 -> "Off"
-                position >= FPS_CUSTOM_POSITION -> customValue()?.let { "Custom · $it FPS" } ?: "Custom"
+                position >= FPS_CUSTOM_POSITION -> "Custom"
                 else -> "${position * FPS_STEP} FPS"
             },
             value = position.toFloat(),
@@ -328,7 +381,8 @@ private fun FpsLimiterCard(initialFps: Int, onFpsChanged: (Int) -> Unit) {
                 // 1 FPS, then 14, ... while typing "144", and save to disk each time.
                 onValueChange = { text -> customText = text.filter(Char::isDigit).take(4) },
                 singleLine = true,
-                placeholder = { Text("Enter custom FPS") },
+                label = { Text("Max FPS") },
+                placeholder = { Text("e.g. 144") },
                 suffix = { Text("FPS") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),

@@ -17,7 +17,7 @@
 //     are frequently not storage-capable — so the format is probed separately
 //     once the swapchain has picked one.
 //
-// That is the DXBC-TRANSLATED variant only. Lossless Scaling 3.2.2 also ships
+// That is the DXBC-TRANSLATED variant only. Some Lossless.dll builds also ship
 // precompiled SPIR-V (base+49 fp16, base+98 fp32; checked on the real DLL:
 // 25/25 modules each). Those are SPIR-V 1.0 with the GLSL450 memory model and
 // need only StorageImageWriteWithoutFormat + StorageImageExtendedFormats (+

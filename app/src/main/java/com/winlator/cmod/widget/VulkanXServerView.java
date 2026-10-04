@@ -706,7 +706,7 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
         String cachePath = null;
         if (multiplier >= 2) {
             // Prefer the fp16 shader set when the device enabled shaderFloat16.
-            // Only Lossless 3.2.2+ carries it; older DLLs fall back to fp32 or
+            // Only DLLs with precompiled SPIR-V carry it; others fall back to fp32 or
             // the DXBC-translated set on their own (see lsfg_dll selectVariant).
             boolean preferFp16 = nativeFrameGenSupportsFp16(nativeHandle);
             int status = LsfgNative.ensureCache(getContext(), pendingLsfgDll, preferFp16);
@@ -726,13 +726,13 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
             boolean oldDriver = error.contains("Vulkan version below") || error.contains("storage images")
                     || error.contains("shader") || error.contains("feature") || error.contains("vulkanMemoryModel");
             // Vulkan 1.2 / vulkanMemoryModel are only needed by the DXBC-translated
-            // shaders (Lossless 3.2.1 and older); 3.2.2+ ships precompiled SPIR-V.
+            // shaders (DXBC-only DLLs); DLLs with precompiled SPIR-V do not need them.
             boolean translationOnly = error.contains("Vulkan version below") || error.contains("vulkanMemoryModel");
             frameGenError = "LSFG Native can't run: "
                     + (oldDriver ? (error.contains("Vulkan version below")
                             ? "this Renderer Driver lacks Vulkan 1.2. " : "this Renderer Driver lacks a required Vulkan feature. ")
                             + (translationOnly
-                                    ? "Import Lossless.dll 3.2.2 or newer, or set Renderer Driver to a Turnip driver, then relaunch the game."
+                                    ? "Import a Lossless.dll with precompiled SPIR-V shaders, or set Renderer Driver to a Turnip driver, then relaunch the game."
                                     : "Set Renderer Driver to a Turnip driver, then relaunch the game.")
                             : error + (error.endsWith(".") ? "" : "."));
             final String message = frameGenError;

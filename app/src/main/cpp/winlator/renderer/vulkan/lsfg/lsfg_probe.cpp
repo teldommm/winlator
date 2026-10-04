@@ -87,10 +87,10 @@ void explain(Caps& caps, Variant v) {
         why = "swapchain format is not storage-image capable";
     } else if (translated && !f.apiAtLeast12) {
         why = "device Vulkan version below 1.2 (translated SPIR-V 1.5 will not load; "
-              "a Lossless.dll with precompiled shaders, 3.2.2+, would)";
+              "a Lossless.dll with precompiled SPIR-V shaders would)";
     } else if (translated && (!f.vulkanMemoryModel || !caps.memoryModelEnabled)) {
         why = "driver lacks vulkanMemoryModel (needed by translated shaders; "
-              "a Lossless.dll with precompiled shaders, 3.2.2+, would not need it)";
+              "a Lossless.dll with precompiled SPIR-V shaders would not need it)";
     } else if (v == Variant::SpirvFp16 && !caps.float16Enabled) {
         why = "driver lacks shaderFloat16 (needed by the fp16 shader set)";
     }

@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.ViewCompositionStrategy
@@ -292,6 +293,18 @@ private fun ShellTab(controller: MainShellController, tab: Int) {
             )
     ) {
         TabContent(controller, tab)
+
+        // Tabs stay composed after their first visit and are stacked in one Box; graphicsLayer
+        // alpha only hides them visually, it doesn't stop hit-testing. A pointer touch that
+        // lands where the selected tab has no pointer-input node (empty space) would fall
+        // through to the next sibling below — e.g. the File Manager's rows, opening its
+        // file menu / drive picker over Library. Being a pointer-input node makes this overlay
+        // the hit target, so an unselected tab never receives touches (same trick as
+        // DetailLayer). Not tied to alpha: the outgoing tab must stop at once, not after
+        // its fade-out.
+        if (!selected) {
+            Box(Modifier.matchParentSize().pointerInput(Unit) { })
+        }
     }
 }
 

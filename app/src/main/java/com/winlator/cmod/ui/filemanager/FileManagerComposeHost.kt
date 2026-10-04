@@ -20,10 +20,15 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.ContentCut
 import androidx.compose.material.icons.outlined.ContentPaste
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -55,7 +60,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.MainActivity
-import com.winlator.cmod.R
 import com.winlator.cmod.core.ExeIconExtractor
 import com.winlator.cmod.ui.LandscapeScreenHeader
 import com.winlator.cmod.ui.PortraitMainHeader
@@ -331,18 +335,18 @@ private fun FileRow(entry: FileEntryUiModel, callbacks: FileManagerCallbacks) {
             if (entry.isExecutable) {
                 DropdownMenuItem(
                     text = { Text("Run / Open") },
-                    leadingIcon = { Icon(painterResource(R.drawable.ui_ic_play), null) },
+                    leadingIcon = { Icon(Icons.Outlined.PlayArrow, null) },
                     onClick = { menuExpanded = false; callbacks.onRunFile(entry.path) }
                 )
                 DropdownMenuItem(
                     text = { Text("Add this game") },
-                    leadingIcon = { Icon(painterResource(R.drawable.ui_ic_add), null) },
+                    leadingIcon = { Icon(Icons.Outlined.Add, null) },
                     onClick = { menuExpanded = false; callbacks.onAddGame(entry.path) }
                 )
             }
             DropdownMenuItem(
                 text = { Text("Copy") },
-                leadingIcon = { Icon(painterResource(R.drawable.ui_ic_copy), null) },
+                leadingIcon = { Icon(Icons.Outlined.ContentCopy, null) },
                 onClick = { menuExpanded = false; callbacks.onCopyFile(entry.path) }
             )
             DropdownMenuItem(
@@ -352,13 +356,13 @@ private fun FileRow(entry: FileEntryUiModel, callbacks: FileManagerCallbacks) {
             )
             DropdownMenuItem(
                 text = { Text("Rename") },
-                leadingIcon = { Icon(painterResource(R.drawable.ui_ic_edit), null) },
+                leadingIcon = { Icon(Icons.Outlined.Edit, null) },
                 onClick = { menuExpanded = false; callbacks.onRenameFile(entry.path) }
             )
             DropdownMenuItem(
                 text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
                 leadingIcon = {
-                    Icon(painterResource(R.drawable.ui_ic_delete), null, tint = MaterialTheme.colorScheme.error)
+                    Icon(Icons.Outlined.DeleteOutline, null, tint = MaterialTheme.colorScheme.error)
                 },
                 onClick = { menuExpanded = false; callbacks.onDeleteFile(entry.path) }
             )
