@@ -213,11 +213,12 @@ Geometry makeGeometry(uint32_t width, uint32_t height, float scale) {
     return g;
 }
 
-bool buildGraph(int variant, uint32_t width, uint32_t height, float scale, Graph& g, Layout layout) {
+bool buildGraph(int variant, uint32_t width, uint32_t height, float scale, Graph& g, Layout layout, int maxGenerated) {
     if (width < 1 || height < 1) return false;
     g = Graph{};
     g.variant = variant;
     g.layout = layout;
+    g.maxGenerated = std::clamp(maxGenerated, 1, kMaxGenerated);
     const bool compact = layout == Layout::Compact;
     g.phases = compact ? kPhases : kRing;
     g.geo = makeGeometry(width, height, scale);
@@ -362,27 +363,29 @@ bool buildGraph(int variant, uint32_t width, uint32_t height, float scale, Graph
     // ---- flow: one level of a branch -----------------------------------------
     // mode 2: seeded from the global prior, 1: refines the coarser level, 0: starts from nothing.
     auto level = [&](V& out, const FlowLevel& L, int pUnit, int pUpd, int pMix, int pTail, uint16_t flowIn,
-                     uint16_t hiddenIn, Extent coarser, int mode, float t, const char* stage) {
+                     uint16_t hiddenIn, Extent coarser, int mode, float t, bool timed, const char* stage) {
         const Extent e = F[L.k];
         const float frac = lvlFrac(L.k);
-        b.dispatch(out, pUnit, stage, {Bd::smp(0, feat[L.k].cur(), 0), Bd::smp(1, fixed(flowIn), 1), Bd::sto(2, fixed(L.unit))},
-                   {e.h, e.w, coarser.h, coarser.w, mode}, e).floats[0] = t;
+        Dispatch& un = b.dispatch(out, pUnit, stage, {Bd::smp(0, feat[L.k].cur(), 0), Bd::smp(1, fixed(flowIn), 1), Bd::sto(2, fixed(L.unit))},
+                   {e.h, e.w, coarser.h, coarser.w, mode}, e);
+        un.floats[0] = t; un.timed = timed;
         Dispatch& u = b.dispatch(out, pUpd, stage,
                    {Bd::smp(0, feat[L.k].prev(), 0), Bd::smp(1, fixed(flowIn), 1), Bd::smp(2, fixed(hiddenIn), 1),
                     Bd::smp(3, fixed(L.unit), 1), Bd::sto(4, fixed(L.upd)), Bd::buf(5, L.buf)},
                    {e.h, e.w, coarser.h, coarser.w, mode}, e);
-        u.floats[0] = t; u.floats[1] = frac;
+        u.floats[0] = t; u.floats[1] = frac; u.timed = timed;
         b.dispatch(out, pMix, stage, {Bd::smp(0, fixed(L.upd), 1), Bd::sto(1, fixed(L.mix))}, {e.h, e.w}, e);
         Dispatch& tl = b.dispatch(out, pTail, stage,
                    {Bd::smp(0, fixed(L.mix), 1), Bd::sto(1, fixed(L.hidden)), Bd::sto(2, fixed(L.flow)),
                     Bd::smp(3, fixed(flowIn), 1), Bd::buf(4, L.buf), Bd::buf(5, bMask)},
                    {e.h, e.w, coarser.h, coarser.w, mode, G.featOffset[L.k]}, e);
-        tl.floats[0] = t; tl.floats[1] = frac;
+        tl.floats[0] = t; tl.floats[1] = frac; tl.timed = timed;
     };
 
-    // Shared by every generated frame: global prior, coarse levels, primary levels 2 and 1.
-    // These run at the midpoint regardless of the frames' t (as the reference does).
-    auto sharedFlow = [&](V& out) {
+    // Global prior, coarse levels, primary levels 2 and 1. Shared by evenly spaced
+    // frames and then run once at the midpoint (t = 0.5, untimed); otherwise run
+    // by each generated frame at its own t.
+    auto flow = [&](V& out, float t, bool timed) {
         b.dispatch(out, pPool, "flow.prior",
                    {Bd::buf(0, bPrior, bZero), Bd::buf(1, bPool)},
                    {4, F[0].h, F[0].w, F[6].h, F[6].w, 1}, {0, 0});
@@ -394,20 +397,20 @@ bool buildGraph(int variant, uint32_t width, uint32_t height, float scale, Graph
         Extent coarser = F[6];
         int mode = 2;
         for (const FlowLevel& L : coarse) {
-            level(out, L, 12, 13, 19, 23, flowIn, hiddenIn, coarser, mode, 0.5f, "flow.coarse");
+            level(out, L, 12, 13, 19, 23, flowIn, hiddenIn, coarser, mode, t, timed, "flow.coarse");
             flowIn = L.flow; hiddenIn = L.hidden; coarser = F[L.k]; mode = 1;
         }
         for (int i = 0; i < 2; i++) {
-            level(out, primary[i], pUnitHc8, pUpdPrim, 20, 24, flowIn, hiddenIn, coarser, 1, 0.5f, "flow.primary");
+            level(out, primary[i], pUnitHc8, pUpdPrim, 20, 24, flowIn, hiddenIn, coarser, 1, t, timed, "flow.primary");
             flowIn = primary[i].flow; hiddenIn = primary[i].hidden; coarser = F[primary[i].k];
         }
     };
 
     // One generated frame at time t.
     auto generated = [&](V& out, float t) {
-        level(out, primary[2], pUnitHc8, pUpdPrim, 20, 24, primary[1].flow, primary[1].hidden, F[1], 1, t, "flow.primary");
-        level(out, local[0], pUnitHc8, pUpdLocal, 21, 25, nullFlow, nullState, F[2], 0, t, "flow.local");
-        level(out, local[1], pUnitHc8, pUpdLocal, 21, 25, local[0].flow, local[0].hidden, F[2], 1, t, "flow.local");
+        level(out, primary[2], pUnitHc8, pUpdPrim, 20, 24, primary[1].flow, primary[1].hidden, F[1], 1, t, true, "flow.primary");
+        level(out, local[0], pUnitHc8, pUpdLocal, 21, 25, nullFlow, nullState, F[2], 0, t, true, "flow.local");
+        level(out, local[1], pUnitHc8, pUpdLocal, 21, 25, local[0].flow, local[0].hidden, F[2], 1, t, true, "flow.local");
 
         b.dispatch(out, 27, "blend.resize", {Bd::smp(0, fixed(local[1].flow), 1), Bd::sto(1, fixed(resized))},
                    {F[1].h, F[1].w, F[0].h, F[0].w}, F[0]);
@@ -415,18 +418,21 @@ bool buildGraph(int variant, uint32_t width, uint32_t height, float scale, Graph
         b.dispatch(out, 28, "blend.unit",
                    {Bd::smp(0, fPrev, 0), Bd::smp(1, fCur, 0), Bd::smp(2, fixed(primary[0].flow), 1),
                     Bd::smp(3, fixed(local[0].flow), 1), Bd::sto(4, fixed(blendUnit))},
-                   {F[2].h, F[2].w}, F[2]).floats[0] = t;
+                   {F[2].h, F[2].w}, F[2]);
+        out.back().floats[0] = t; out.back().timed = true;
         b.dispatch(out, 29, "blend.pre",
                    {Bd::smp(0, fPrev, 0), Bd::smp(1, fCur, 0), Bd::smp(2, fixed(primary[0].flow), 1),
                     Bd::smp(3, fixed(local[0].flow), 1), Bd::buf(4, bMask), Bd::smp(5, fixed(primary[0].hidden), 1),
                     Bd::smp(6, fixed(nullL3), 1), Bd::smp(7, fixed(blendUnit), 1), Bd::sto(8, fixed(blendPre))},
-                   {F[2].h, F[2].w, F[2].h, F[2].w, 0, G.featOffset[2]}, F[2]).floats[0] = t;
+                   {F[2].h, F[2].w, F[2].h, F[2].w, 0, G.featOffset[2]}, F[2]);
+        out.back().floats[0] = t; out.back().timed = true;
         b.dispatch(out, 22, "blend.mix", {Bd::smp(0, fixed(blendPre), 1), Bd::sto(1, fixed(blendMix))},
                    {F[2].h, F[2].w}, F[2]);
         b.dispatch(out, 26, "blend.tail",
                    {Bd::smp(0, fixed(blendMix), 1), Bd::sto(1, fixed(blendHidden)), Bd::sto(2, fixed(blendFlow)),
                     Bd::smp(3, fixed(nullFlow), 1), Bd::buf(4, bDummy), Bd::buf(5, bDummy)},
-                   {F[2].h, F[2].w, F[2].h, F[2].w, 0, G.featOffset[2]}, F[2]).floats[0] = t;
+                   {F[2].h, F[2].w, F[2].h, F[2].w, 0, G.featOffset[2]}, F[2]);
+        out.back().floats[0] = t; out.back().timed = true;
 
         b.dispatch(out, 30, "synth.pack",
                    {Bd::smp(0, fixed(primary[2].flow), 1), Bd::smp(1, fixed(resized), 1), Bd::smp(2, fixed(blendFlow), 1),
@@ -439,6 +445,7 @@ bool buildGraph(int variant, uint32_t width, uint32_t height, float scale, Graph
                     Bd::smp(4, fixed(packed), 1), Bd::smp(5, fixed(nullL2), 1), Bd::smp(6, fixed(nullL2), 1),
                     Bd::sto(7, fixed(guide))},
                    {F[0].h, F[0].w, F[0].h, F[0].w, 1}, F[0]);
+        gd.timed = true;
         gd.floats[0] = t; gd.floats[1] = kSynth[0]; gd.floats[2] = kSynth[1]; gd.floats[3] = kSynth[2];
         Dispatch& ev = b.dispatch(out, 32, "synth.evidence",
                    {Bd::smp(0, inPrev, 1), Bd::smp(1, inCur, 1), Bd::smp(2, fixed(packed), 1), Bd::smp(3, fixed(packed), 1),
@@ -446,6 +453,7 @@ bool buildGraph(int variant, uint32_t width, uint32_t height, float scale, Graph
                     Bd::sto(7, fixed(evidenceA)), Bd::sto(8, fixed(evidenceB)), Bd::sto(9, fixed(evidenceC)),
                     Bd::buf(10, bDummy), Bd::buf(11, bDummy), Bd::smp(12, fixed(nullL2), 1)},
                    {G.input.h, G.input.w, F[0].h, F[0].w, 2, 1}, G.quarter);
+        ev.timed = true;
         ev.floats[0] = t; ev.floats[3] = kSynth[2];
         Dispatch& fin = b.dispatch(out, 34, "synth.final",
                    {Bd::smp(0, inPrev, 1), Bd::smp(1, inCur, 1), Bd::smp(2, fixed(packed), 1), Bd::smp(3, fixed(packed), 1),
@@ -453,32 +461,21 @@ bool buildGraph(int variant, uint32_t width, uint32_t height, float scale, Graph
                     Bd::smp(7, fixed(evidenceA), 1), Bd::smp(8, fixed(evidenceB), 1), Bd::sto(9, fixed(g.output)),
                     Bd::sto(10, fixed(guide)), Bd::buf(11, bDummy), Bd::smp(12, fixed(evidenceC), 1)},
                    {G.input.h, G.input.w, F[0].h, F[0].w, 3, 0, 1}, G.input);
+        fin.timed = true;
         fin.floats[0] = t; fin.floats[1] = kSynth[0]; fin.floats[2] = kSynth[1]; fin.floats[3] = kSynth[2];
     };
 
     // ---- templates -----------------------------------------------------------
-    for (int n = 1; n <= 3; n++) {
-        Template& T = g.tmpl[n - 1];
-        V& d = T.disp;
-        encode(d);
-        T.encodeCount = (int)d.size();
-        temporal(d);
-        const int flowStart = (int)d.size();
-        sharedFlow(d);
-        T.sharedCount = (int)d.size();
-        for (int k = 0; k < n; k++) {
-            T.genStart[k] = (int)d.size();
-            generated(d, (float)(k + 1) / (float)(n + 1));
-        }
+    // Stage boundaries (a new command buffer in the reference) are full barriers:
+    // encode; the flow; each generated frame when there are several; the prior pass.
+    auto finish = [&](Template& T, int n, int flowStart) {
         std::vector<Dispatch> pr;
         b.dispatch(pr, 35, "prior", {Bd::smp(0, fixed(primary[2].flow), 1), Bd::buf(1, bPrior)}, {F[0].h, F[0].w}, F[0]);
         T.prior = pr[0];
-
-        // Stage boundaries: encode, flow, each generated frame when there are several, prior.
         std::vector<Dispatch*> seq;
         std::vector<bool> start;
-        for (int i = 0; i < (int)d.size(); i++) {
-            seq.push_back(&d[i]);
+        for (int i = 0; i < (int)T.disp.size(); i++) {
+            seq.push_back(&T.disp[i]);
             bool s = i == 0 || i == flowStart;
             if (n > 1) for (int k = 0; k < n; k++) s = s || i == T.genStart[k];
             start.push_back(s);
@@ -486,11 +483,53 @@ bool buildGraph(int variant, uint32_t width, uint32_t height, float scale, Graph
         seq.push_back(&T.prior);
         start.push_back(true);
         placeBarriers(seq, start);
+    };
+    auto evenTime = [](int k, int n) { return (float)(k + 1) / (float)(n + 1); };
+
+    for (int n = 1; n <= g.maxGenerated; n++) {
+        // Evenly spaced (any t when n = 1): shared flow, then one block per frame.
+        Template& T = g.tmpl[n - 1];
+        encode(T.disp);
+        T.encodeCount = (int)T.disp.size();
+        temporal(T.disp);
+        const int flowStart = (int)T.disp.size();
+        flow(T.disp, n == 1 ? evenTime(0, 1) : 0.5f, n == 1);
+        T.sharedCount = (int)T.disp.size();
+        for (int k = 0; k < n; k++) {
+            T.genStart[k] = (int)T.disp.size();
+            generated(T.disp, evenTime(k, n));
+        }
+        finish(T, n, flowStart);
+
+        if (n < 2) continue;
+        // Any other times: every frame runs the whole flow at its own t.
+        Template& P = g.perFrame[n - 1];
+        encode(P.disp);
+        P.encodeCount = (int)P.disp.size();
+        temporal(P.disp);
+        P.sharedCount = (int)P.disp.size();
+        for (int k = 0; k < n; k++) {
+            P.genStart[k] = (int)P.disp.size();
+            flow(P.disp, evenTime(k, n), true);
+            generated(P.disp, evenTime(k, n));
+        }
+        finish(P, n, P.genStart[0]);
     }
     return true;
 }
 
 // ============================================================================
+bool Graph::evenlySpaced(int n, const float* t) {
+    if (n < 2) return true;
+    for (int k = 0; k < n; k++)
+        if (std::fabs(t[k] - (float)(k + 1) / (float)(n + 1)) > 1e-6f) return false;
+    return true;
+}
+
+const Template& Graph::select(int n, const float* t) const {
+    return evenlySpaced(n, t) ? tmpl[n - 1] : perFrame[n - 1];
+}
+
 const PipeDef* pipeDefs(int& count) {
     count = (int)(sizeof(kPipes) / sizeof(kPipes[0]));
     return kPipes;
@@ -508,7 +547,7 @@ std::vector<int> pipelinesFor(int variant) {
         if (!buildGraph(variant, 1920, 1080, s, g)) continue;
         for (const Template& t : g.tmpl) {
             for (const Dispatch& d : t.disp) used[d.pipe] = true;
-            used[t.prior.pipe] = true;
+            if (!t.disp.empty()) used[t.prior.pipe] = true;
         }
     }
     std::vector<int> out;

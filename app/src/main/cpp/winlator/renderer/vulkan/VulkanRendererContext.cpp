@@ -1357,7 +1357,8 @@ void VulkanRendererContext::renderFrame() {
     if (compositeActive() && ensureGsfgEngine()) {
         if (fgConfigDirty_.exchange(false, std::memory_order_relaxed)) {
             gsfgEngine_->configure(
-                (uint32_t)std::max(fgMultiplier_.load(std::memory_order_relaxed), 2), 0,
+                (uint32_t)std::max(fgMultiplier_.load(std::memory_order_relaxed), 2),
+                (uint32_t)std::max(fgTargetRate_.load(std::memory_order_relaxed), 0),
                 fgFlowScale_.load(std::memory_order_relaxed),
                 fgRefreshHz_.load(std::memory_order_relaxed));
         }
@@ -1370,9 +1371,12 @@ void VulkanRendererContext::renderFrame() {
         if (gsfgEngine_->prepare(compositeW, compositeH, swapchainFmt)) {
             gsfgEngine_->setPresentedRate(fgPresentedRate_);
             fgPlan_.generations = gsfgEngine_->plan(capacity, ++fgSourceFrames_);
+            // Target-rate pacing may put a generated frame on the source frame's
+            // display tick instead of the source frame itself (see gsfg_pacer.hpp).
+            fgPlan_.presentSource = fgPlan_.generations == 0 || gsfgEngine_->presentsSource();
         }
     }
-    fgPlan_.presents = fgPlan_.generations + 1;
+    fgPlan_.presents = fgPlan_.generations + (fgPlan_.presentSource ? 1 : 0);
 
     // A real timeout (rather than UINT64_MAX) makes a wedged acquire visible
     // as VK_TIMEOUT instead of hanging the render thread forever; the
@@ -1409,7 +1413,7 @@ void VulkanRendererContext::renderFrame() {
         }
         fgPlan_.imgIdx[k] = idx;
     }
-    // Real frame N is presented LAST; generated frames take the earlier slots.
+    // Real frame N is presented LAST (when presented at all); generated frames take the earlier slots.
     const uint32_t imgIdx = fgPlan_.imgIdx[fgPlan_.presents - 1];
     VkResult res = VK_SUCCESS;
 

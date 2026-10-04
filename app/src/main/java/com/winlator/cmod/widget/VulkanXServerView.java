@@ -74,6 +74,7 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
     private int pendingLsfgMultiplier = 0;
     private float pendingLsfgFlowScale = 0.80f;
     private float pendingFrameGenRefreshHz;
+    private int pendingFrameGenTargetRate;
     private volatile String frameGenError = "";
 
     private WinlatorHUD hudRef = null;
@@ -140,6 +141,7 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
     private native String nativeConfigureFrameGen(long handle, String cachePath,
                                                    int multiplier, float flowScale, float refreshHz);
     @FastNative private native float nativeGetFrameGenPresentedRate(long handle);
+    @FastNative private native void nativeSetFrameGenTargetRate(long handle, int fps);
 
     private native void nativeDumpRendererInfo(long handle);
     private native void nativeSetFilterMode(long handle, int mode);
@@ -684,6 +686,13 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
         });
     }
 
+    // Target-rate pacing: present this many frames per second (above the panel's refresh rate
+    // = match the display), generated frames on that grid. 0 = the fixed multiplier.
+    public void setFrameGenTargetRate(int fps) {
+        pendingFrameGenTargetRate = Math.max(fps, 0);
+        queueEvent(() -> { synchronized (lock) { if (nativeHandle != 0) nativeSetFrameGenTargetRate(nativeHandle, pendingFrameGenTargetRate); } });
+    }
+
     public void setFrameGenRefreshRate(float refreshHz) {
         pendingFrameGenRefreshHz = refreshHz;
         queueEvent(() -> { synchronized (lock) { if (nativeHandle != 0) applyFrameGenNative(); } });
@@ -706,6 +715,7 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
                 : getDisplay() != null ? getDisplay().getRefreshRate() : 0f;
         String nativeError = nativeConfigureFrameGen(nativeHandle, packPath,
                 multiplier, pendingLsfgFlowScale, refreshHz);
+        nativeSetFrameGenTargetRate(nativeHandle, pendingFrameGenTargetRate);
         if (error == null) error = nativeError;
         if (error != null) {
             boolean oldDriver = error.contains("Vulkan version below") || error.contains("shaderFloat16")

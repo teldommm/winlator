@@ -183,9 +183,9 @@ private:
 class Chain {
 public:
     Chain(VkDevice dev, VkPhysicalDevice pd, const Pipelines& pl, int variant, uint32_t W, uint32_t H, float S,
-          Layout layout)
+          Layout layout, int capacity)
         : dev_(dev), pl_(pl) {
-        if (!buildGraph(variant, W, H, S, graph_, layout)) return;
+        if (!buildGraph(variant, W, H, S, graph_, layout, capacity)) return;
         valid_ = createResources(pd) && createDescriptors();
         if (!valid_) destroy();
     }
@@ -195,10 +195,11 @@ public:
     const Graph& graph() const { return graph_; }
     const Geometry& geometry() const { return graph_.geo; }
 
-    // Frame N in: copy it into its ring slot and encode it; when `n` frames are
-    // to be generated, also run every stage they share. `cold`: no valid
-    // temporal state, so the shared stages read the cold inputs.
-    void ingest(VkCommandBuffer cmd, VkImage source, uint64_t count, uint32_t n, bool cold) {
+    // Frame N in: copy it into its ring slot and encode it; with a template
+    // (frames to generate), also run every stage its frames share. `cold`: no
+    // valid temporal state, so the shared stages read the cold inputs.
+    void ingest(VkCommandBuffer cmd, VkImage source, uint64_t count, const Template* t, bool cold,
+                const float* times) {
         const int r = (int)(count % (uint64_t)graph_.phases);
         if (!initialised_) initResources(cmd);
 
@@ -229,24 +230,26 @@ public:
                    VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_TRANSFER_READ_BIT
                        | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT);
 
-        const int ti = (n > 0 ? (int)n : 1) - 1;
-        const Template& t = graph_.tmpl[ti];
-        const int end = n > 0 ? t.sharedCount : t.encodeCount;   // encode only for an ingest-only frame
+        const Template& T = t ? *t : graph_.tmpl[0];
+        const Sets& S = setsFor(T);
+        const int end = t ? T.sharedCount : T.encodeCount;   // encode only for an ingest-only frame
         for (int d = 0; d < end; d++)
-            run(cmd, t.disp[d], (cold && n > 0) ? coldSet(ti, r, d) : sets_[ti][r][d]);
+            run(cmd, T.disp[d], (cold && t) ? coldSet(S, r, d) : S.disp[r][d], times ? times[0] : 0.0f);
     }
 
     // Generated frame g of n: its own block of the graph, then - after the last
     // one - the prior pass that carries this frame's flow into the next frame.
-    void generate(VkCommandBuffer cmd, uint64_t count, uint32_t n, uint32_t g, bool prior) {
+    // (A frame that runs the whole flow - times not evenly spaced - takes the
+    // cold descriptor set for the global prior just like the shared stages do.)
+    void generate(VkCommandBuffer cmd, uint64_t count, const Template& t, uint32_t n, uint32_t g, bool prior,
+                  bool cold, float time) {
         const int r = (int)(count % (uint64_t)graph_.phases);
-        const int ti = (int)n - 1;
-        const Template& t = graph_.tmpl[ti];
+        const Sets& S = setsFor(t);
         fullBarrier(cmd);
         const int lo = t.genStart[g];
         const int hi = g + 1 < n ? t.genStart[g + 1] : (int)t.disp.size();
-        for (int d = lo; d < hi; d++) run(cmd, t.disp[d], sets_[ti][r][d]);
-        if (prior) run(cmd, t.prior, priorSets_[ti][r]);
+        for (int d = lo; d < hi; d++) run(cmd, t.disp[d], cold ? coldSet(S, r, d) : S.disp[r][d], time);
+        if (prior) run(cmd, t.prior, S.prior[r], time);
         memBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
                    VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT);
     }
@@ -363,13 +366,18 @@ private:
             for (const Binding& b : d.bind)
                 (b.kind == BindKind::Sampled ? nImg : b.kind == BindKind::Storage ? nStore : nBuf) += copies;
         };
-        for (const Template& t : graph_.tmpl) {
-            for (const Dispatch& d : t.disp) {
+        std::vector<const Template*> all;
+        for (int n = 1; n <= graph_.maxGenerated; n++) {
+            all.push_back(&graph_.tmpl[n - 1]);
+            if (n > 1) all.push_back(&graph_.perFrame[n - 1]);
+        }
+        for (const Template* t : all) {
+            for (const Dispatch& d : t->disp) {
                 bool cold = false;
                 for (const Binding& b : d.bind) cold |= b.cold >= 0;
                 count(d, (uint32_t)(cold ? 2 * graph_.phases : graph_.phases));
             }
-            count(t.prior, (uint32_t)graph_.phases);
+            count(t->prior, (uint32_t)graph_.phases);
         }
         VkDescriptorPoolSize ps[3] = {
             {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, nImg},
@@ -380,21 +388,24 @@ private:
         pi.maxSets = nSets; pi.poolSizeCount = 3; pi.pPoolSizes = ps;
         if (vkd.CreateDescriptorPool(dev_, &pi, nullptr, &pool_) != VK_SUCCESS) return false;
 
-        for (int ti = 0; ti < 3; ti++) {
-            const Template& t = graph_.tmpl[ti];
+        sets_.resize(all.size());
+        for (size_t i = 0; i < all.size(); i++) {
+            const Template& t = *all[i];
+            Sets& S = sets_[i];
+            S.t = &t;
             for (int r = 0; r < graph_.phases; r++) {
-                sets_[ti][r].resize(t.disp.size());
+                S.disp[r].resize(t.disp.size());
                 for (size_t d = 0; d < t.disp.size(); d++) {
-                    if (!makeSet(t.disp[d], r, false, sets_[ti][r][d])) return false;
+                    if (!makeSet(t.disp[d], r, false, S.disp[r][d])) return false;
                     bool cold = false;
                     for (const Binding& b : t.disp[d].bind) cold |= b.cold >= 0;
                     if (cold) {
-                        VkDescriptorSet s = VK_NULL_HANDLE;
-                        if (!makeSet(t.disp[d], r, true, s)) return false;
-                        coldSets_[ti][r].push_back({(int)d, s});
+                        VkDescriptorSet c = VK_NULL_HANDLE;
+                        if (!makeSet(t.disp[d], r, true, c)) return false;
+                        S.cold[r].push_back({(int)d, c});
                     }
                 }
-                if (!makeSet(t.prior, r, false, priorSets_[ti][r])) return false;
+                if (!makeSet(t.prior, r, false, S.prior[r])) return false;
             }
         }
         return true;
@@ -454,18 +465,32 @@ private:
         initialised_ = true;
     }
 
-    VkDescriptorSet coldSet(int ti, int r, int d) const {
-        for (const auto& p : coldSets_[ti][r]) if (p.first == d) return p.second;
-        return sets_[ti][r][d];
+    // Pre-built descriptor sets of one template, per phase.
+    struct Sets {
+        const Template* t = nullptr;
+        std::vector<VkDescriptorSet> disp[kPhases];
+        VkDescriptorSet prior[kPhases]{};
+        std::vector<std::pair<int, VkDescriptorSet>> cold[kPhases];
+    };
+
+    const Sets& setsFor(const Template& t) const {
+        for (const Sets& s : sets_) if (s.t == &t) return s;
+        return sets_[0];   // unreachable: every template of the graph has its sets
     }
 
-    void run(VkCommandBuffer cmd, const Dispatch& d, VkDescriptorSet set) {
+    static VkDescriptorSet coldSet(const Sets& S, int r, int d) {
+        for (const auto& p : S.cold[r]) if (p.first == d) return p.second;
+        return S.disp[r][d];
+    }
+
+    void run(VkCommandBuffer cmd, const Dispatch& d, VkDescriptorSet set, float time) {
         if (d.barrier & 2) fullBarrier(cmd);
         else if (d.barrier & 1) computeBarrier(cmd);
 
         uint8_t pc[kPushBytes];
         memcpy(pc, d.ints, 80);
         memcpy(pc + 80, d.floats, 32);
+        if (d.timed) memcpy(pc + 80, &time, 4);
         vkd.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pl_.pipe[d.pipe]);
         vkd.CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pl_.lay[d.pipe], 0, 1, &set, 0, nullptr);
         vkd.CmdPushConstants(cmd, pl_.lay[d.pipe], VK_SHADER_STAGE_COMPUTE_BIT, 0, kPushBytes, pc);
@@ -492,9 +517,7 @@ private:
     std::vector<VkBuffer> buffers_;
     std::vector<VkDeviceMemory> mems_;
     VkDescriptorPool pool_{};
-    std::vector<VkDescriptorSet> sets_[3][kPhases];
-    VkDescriptorSet priorSets_[3][kPhases]{};
-    std::vector<std::pair<int, VkDescriptorSet>> coldSets_[3][kPhases];
+    std::vector<Sets> sets_;
 };
 
 // ============================================================================
@@ -531,6 +554,7 @@ bool Engine::init(VkDevice device, VkPhysicalDevice physicalDevice, const std::s
 }
 
 void Engine::configure(uint32_t multiplier, uint32_t targetRate, float flowScale, float refreshRate) {
+    multiplier_ = multiplier;
     PacerConfig config = pacer_.Config();
     config.multiplier = multiplier; config.target_rate = targetRate; config.refresh_rate = refreshRate;
     pacer_.SetConfig(config);
@@ -561,7 +585,15 @@ float Engine::effectiveFlowScale(uint32_t width) const {
 bool Engine::needsRebuild(uint32_t width, uint32_t height, VkFormat format) const {
     if (unavailable_) return false;
     return !chain_ || builtExtent_.width != width || builtExtent_.height != height
-        || builtFormat_ != format || builtFlowScale_ != effectiveFlowScale(width);
+        || builtFormat_ != format || builtFlowScale_ != effectiveFlowScale(width)
+        || builtCapacity_ != wantedCapacity();
+}
+
+// Generated frames per source frame the graph is built for: at least the default
+// 2x..4x range, more when the multiplier asks for it (up to the reference's 6).
+uint32_t Engine::wantedCapacity() const {
+    const uint32_t asked = multiplier_ > 1 ? multiplier_ - 1 : 1;
+    return std::clamp<uint32_t>(std::max(asked, kMaxGenerations), 1, (uint32_t)kMaxGenerated);
 }
 
 bool Engine::prepare(uint32_t width, uint32_t height, VkFormat format) {
@@ -576,7 +608,8 @@ bool Engine::prepare(uint32_t width, uint32_t height, VkFormat format) {
 
     const float scale = effectiveFlowScale(width);
     chain_.reset();      // the old images may still be referenced; the caller waits for idle first
-    chain_ = std::make_unique<Chain>(device_, physical_, *pipelines_, variant_, width, height, scale, layout_);
+    chain_ = std::make_unique<Chain>(device_, physical_, *pipelines_, variant_, width, height, scale, layout_,
+                                     (int)wantedCapacity());
     if (!chain_->valid()) {
         GSFG_LOGW("graph build failed at %ux%u; frame generation unavailable", width, height);
         chain_.reset();
@@ -587,6 +620,7 @@ bool Engine::prepare(uint32_t width, uint32_t height, VkFormat format) {
     builtExtent_ = VkExtent2D{width, height};
     builtFormat_ = format;
     builtFlowScale_ = scale;
+    builtCapacity_ = wantedCapacity();
     frameCount_ = 0; lastCount_ = 0; lastGenerations_ = 0;
     planCalls_ = 0; warmStreak_ = 0; warm_ = false; generating_ = false;
     temporalValid_ = false; idleFrames_ = 0;
@@ -614,7 +648,7 @@ bool Engine::prepare(uint32_t width, uint32_t height, VkFormat format) {
 uint32_t Engine::plan(uint32_t capacity, uint64_t sourceFrames) {
     if (unavailable_ || !chain_) return 0;
 
-    plan_ = pacer_.Plan(std::min<size_t>(capacity, kMaxGenerations), sourceFrames);
+    plan_ = pacer_.Plan(std::min<size_t>(capacity, builtCapacity_ ? builtCapacity_ : kMaxGenerations), sourceFrames);
 
     // Three real frames must be in the ring (this frame included) before anything
     // interpolated from it means something.
@@ -627,24 +661,38 @@ uint32_t Engine::plan(uint32_t capacity, uint64_t sourceFrames) {
         const float wanted = stats.source_rate * (float)(plan_.generations + 1);
         GSFG_LOGI("presented=%.1f fps (measured at the swapchain)", (double)presentedRate_);
         GSFG_LOGI("pace gen=%zu max=%zu cap=%u guest=%.1f loop=%.1f refresh=%.1f target=%.0f "
-                  "slots=%.2f drawn=%llu needs=%.1fHz%s%s",
+                  "slots=%.2f drawn=%llu needs=%.1fHz%s%s%s",
                   plan_.generations, pacer_.MaxGenerations(), capacity, (double)stats.source_rate,
                   (double)stats.loop_rate, (double)stats.refresh_rate, (double)stats.target_rate,
                   (double)stats.slots, (unsigned long long)stats.last_drawn, (double)wanted,
                   (stats.refresh_rate > 0.0f && wanted > stats.refresh_rate + 1.0f) ? " PANEL-BOUND" : "",
-                  stats.rates_settled ? (warm_ ? "" : " cold") : " sampling");
+                  stats.rates_settled ? (warm_ ? "" : " cold") : " sampling",
+                  plan_.timed ? (plan_.present_source ? " timed" : " timed, source replaced") : "");
     }
     return generating_ ? (uint32_t)plan_.generations : 0;
 }
 
-void Engine::process(VkCommandBuffer cmd, VkImage source, uint32_t, uint32_t, uint32_t generations) {
+void Engine::process(VkCommandBuffer cmd, VkImage source, uint32_t, uint32_t, uint32_t generations,
+                     const float* times) {
     if (!chain_ || !chain_->valid()) return;
     const uint64_t count = frameCount_++;
     lastCount_ = count;
-    lastGenerations_ = std::min<uint32_t>(generations, kMaxGenerations);
+    const Graph& graph = chain_->graph();
+    lastGenerations_ = std::min<uint32_t>(generations, (uint32_t)graph.maxGenerated);
+
+    // Times of the generated frames: as given when strictly increasing inside (0, 1)
+    // (the reference rejects anything else), evenly spaced otherwise.
+    const uint32_t n = lastGenerations_;
+    bool given = times != nullptr;
+    for (uint32_t k = 0; given && k < n; k++)
+        given = times[k] > 0.0f && times[k] < 1.0f && (k == 0 || times[k] > times[k - 1]);
+    for (uint32_t k = 0; k < n; k++) times_[k] = given ? times[k] : (float)(k + 1) / (float)(n + 1);
+    template_ = n > 0 ? &graph.select((int)n, times_) : nullptr;
+    coldFrame_ = n > 0 && !temporalValid_;
+
     // Without valid temporal state the shared stages read the cold inputs (first-frame
     // descriptor set), exactly as the reference does on its first generating frame.
-    chain_->ingest(cmd, source, count, lastGenerations_, lastGenerations_ > 0 && !temporalValid_);
+    chain_->ingest(cmd, source, count, template_, coldFrame_, times_);
 
     // Reference bookkeeping (Interpolate 0x11a410, context +0x528 / +0x55c): a generating
     // frame makes the temporal state valid; it survives ONE ingest-only frame and is
@@ -664,7 +712,8 @@ void Engine::generateInto(VkCommandBuffer cmd, uint32_t generation) {
     // The reference records fast_prior_img once into a cached command buffer (constant
     // key 0x3000...) and resubmits it on every frame that has outputs, after the last one.
     const bool prior = generation + 1 == lastGenerations_;
-    chain_->generate(cmd, lastCount_, lastGenerations_, generation, prior);
+    chain_->generate(cmd, lastCount_, *template_, lastGenerations_, generation, prior, coldFrame_,
+                     times_[generation]);
 }
 
 VkImage Engine::finalImage(uint32_t generation) const {

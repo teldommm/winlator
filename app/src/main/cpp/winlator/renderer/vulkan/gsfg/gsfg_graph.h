@@ -14,9 +14,12 @@
 //   synth      guide -> evidence -> final frame at capture resolution
 //   prior      carries this frame's level-0 flow into the next frame
 //
-// The work that does not depend on the interpolation time t is shared by all
-// generated frames; from the finest primary level on, every generated frame
-// has its own block (kGenBlock dispatches).
+// Generated frames at evenly spaced times (t_i = i / (n + 1), as the reference
+// checks to 1e-6) share the flow estimate up to primary level 1, computed once
+// at the midpoint; from the finest primary level on, every generated frame has
+// its own block (kGenBlock dispatches). At any other times every generated
+// frame runs the whole flow at its own t (kGenBlock + kFlowBlock dispatches).
+// A single generated frame always runs the flow at its own t.
 //
 // The shapes, push constants and bindings are those of the reference
 // implementation (libGameScopeV2.so), as recovered from its traces. Barriers
@@ -43,7 +46,9 @@ namespace gsfg {
 constexpr int kLevels   = 7;     // pyramid and feature levels 0..6
 constexpr int kRing     = 3;     // source frames whose features are kept: current, previous, oldest
 constexpr int kPhases   = 6;     // descriptor phases: frame count % 6 covers rings of 3 and of 2
-constexpr int kGenBlock = 21;    // dispatches per generated frame
+constexpr int kGenBlock = 21;    // dispatches per generated frame (finest primary level .. final)
+constexpr int kFlowBlock = 26;   // global prior + coarse levels + primary levels 2..1
+constexpr int kMaxGenerated = 6; // generated frames per source frame the reference accepts
 constexpr int kMaxBind  = 13;
 
 // Sizes derived from the capture size W x H and the flow scale S.
@@ -96,14 +101,16 @@ struct Dispatch {
     int32_t  ints[20];
     float    floats[8];
     uint32_t groups[3];
+    bool     timed;            // floats[0] is the time of the generated frame it belongs to
 };
 
-// The dispatch list for one number of generated frames n (1..3).
+// The dispatch list for n generated frames. Dispatches marked `timed` carry
+// placeholder times (evenly spaced); the engine writes the real ones.
 struct Template {
     std::vector<Dispatch> disp;
     int encodeCount = 0;       // dispatches of an ingest-only frame (the encode stage)
     int sharedCount = 0;       // dispatches shared by all generated frames (incl. encode)
-    int genStart[3] = {};      // first dispatch of each generated frame's block
+    int genStart[kMaxGenerated] = {};   // first dispatch of each generated frame's block
     Dispatch prior;            // after the last generated frame
 };
 
@@ -118,11 +125,17 @@ struct Graph {
     std::vector<BufferDesc> buffers;
     uint16_t input[kPhases] = {};  // per phase: the image that receives the composited frame
     uint16_t output = 0;           // final frame, capture size, RGBA8
-    Template tmpl[3];              // n = 1..3
+    int      maxGenerated = 3;
+    Template tmpl[kMaxGenerated];      // [n-1]: evenly spaced times (n = 1: the single frame at any t)
+    Template perFrame[kMaxGenerated];  // [n-1], n >= 2: any other times; each frame runs the whole flow
+
+    // The template for n generated frames at times t[0..n-1] (strictly increasing, in (0, 1)).
+    const Template& select(int n, const float* t) const;
+    static bool evenlySpaced(int n, const float* t);
 };
 
 bool buildGraph(int variant, uint32_t width, uint32_t height, float scale, Graph& out,
-                Layout layout = Layout::Compact);
+                Layout layout = Layout::Compact, int maxGenerated = 3);
 
 // ---- shader interface ---------------------------------------------------------
 // Descriptor layout of each pipeline (as the reference declares it; a few

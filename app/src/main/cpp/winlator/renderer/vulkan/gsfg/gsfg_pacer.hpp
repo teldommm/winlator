@@ -6,6 +6,14 @@
 // follows upstream lsfg-vk. (The pacing logic below is unchanged LSFG-era code;
 // only the identifiers were renamed when LSFG was replaced by GSFG.) Only the Vulkan dispatch differs: Bannerlator
 // resolves entry points through the renderer's own table (see gsfg_vkd.h).
+//
+// GSFG addition: with a target rate every present lands on the output tick grid.
+// Presents go out on uniform display ticks (FIFO), so frame k of a source
+// interval has to SHOW the content of its tick: the plan gives the generated
+// frames their tick times instead of spacing them evenly, and when the source
+// frame itself is off the grid it is not presented - a frame generated at the
+// last tick takes its place. (Evenly spaced frames ending on the source frame
+// look right only when the target is an integer multiple of the source rate.)
 
 #pragma once
 
@@ -24,9 +32,22 @@ struct PacerConfig {
     float refresh_rate{};
 };
 
+// Generated frames whose times are within this of evenly spaced are left evenly
+// spaced: a fraction of a millisecond on screen, and the even case lets the
+// generated frames share half of the flow estimate (cheaper).
+constexpr float GSFG_TIME_SNAP = 0.02f;
+
+// Target-rate pacing on the output tick grid (see above). false restores the
+// previous behaviour: evenly spaced frames, source frame always shown last.
+// Multiplier pacing (no target rate) is not affected either way.
+constexpr bool GSFG_TICK_PACING = true;
+
 struct PacerPlan {
     size_t generations{};
     bool warm{};
+    bool timed{};                                 // times[] holds the frames' times (else evenly spaced)
+    bool present_source{true};                    // false: the last generated frame replaces the source frame
+    float times[GSFG_MAX_MULTIPLIER - 1]{};       // in (0, 1), strictly increasing
 };
 
 struct PacerStats {

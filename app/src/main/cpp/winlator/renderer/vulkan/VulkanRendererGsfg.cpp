@@ -214,7 +214,9 @@ void VulkanRendererContext::recordFrameGenProcess(VkCommandBuffer cb) {
     }
     // Take frame N as the graph's newest input (blit + feature encode) and, when generating,
     // run every stage shared by the generated frames.
-    gsfgEngine_->process(cb, src.img, compositeW, compositeH, fgPlan_.generations);
+    // With a target rate the pacer also places the generated frames in time.
+    gsfgEngine_->process(cb, src.img, compositeW, compositeH, fgPlan_.generations,
+                         gsfgEngine_->plannedTimes(fgPlan_.generations));
 }
 
 void VulkanRendererContext::recordFrameGenGeneration(VkCommandBuffer cb, uint32_t g) {
@@ -290,6 +292,14 @@ void VulkanRendererContext::setFrameGenTuning(float flowScale, float refreshHz) 
     // and unknown, which was visible in the logs as max= alternating.
     if (refreshHz > 1.0f) fgRefreshHz_.store(refreshHz, std::memory_order_relaxed);
     fgConfigDirty_.store(true, std::memory_order_relaxed);
+}
+
+void VulkanRendererContext::setFrameGenTargetRate(int fps) {
+    const int next = fps > 0 ? fps : 0;
+    if (fgTargetRate_.exchange(next, std::memory_order_relaxed) != next) {
+        fgConfigDirty_.store(true, std::memory_order_relaxed);
+        RLOG("gsfg-native: target rate %d fps%s", next, next ? "" : " (fixed multiplier)");
+    }
 }
 
 void VulkanRendererContext::compositeExtentFor(uint32_t& w, uint32_t& h) const {

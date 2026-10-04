@@ -411,6 +411,7 @@ public:
     // the frame-gen block. The UI thread never touches the engine itself.
     std::atomic<float> fgFlowScale_{1.0f};
     std::atomic<float> fgRefreshHz_{0.0f};
+    std::atomic<int>   fgTargetRate_{0};      // presents/s to pace to; 0 = fixed multiplier
     std::atomic<bool>  fgConfigDirty_{true};
 
     void compositeExtentFor(uint32_t& w, uint32_t& h) const;
@@ -463,6 +464,7 @@ public:
     struct FrameGenPlan {
         uint32_t generations = 0;
         uint32_t presents    = 1;
+        bool     presentSource = true;    // false: generated frames only (target-rate pacing)
         uint32_t imgIdx[kMaxPresentsPerFrame] = {};
     };
     FrameGenPlan fgPlan_{};
@@ -525,6 +527,10 @@ public:
     void setGsfgPackPath(const char* path);
     void setFrameGenArmed(bool armed, int multiplier);
     void setFrameGenTuning(float flowScale, float refreshHz);
+    // Target-rate pacing: present `fps` frames per second (clamped to the panel's
+    // refresh rate; a value above it means "match the display"), generated frames
+    // placed on that tick grid. 0 returns to the fixed multiplier.
+    void setFrameGenTargetRate(int fps);
     void frameGenStats(float out[6]) const;
 
     VkRenderPass          renderPass  = VK_NULL_HANDLE;

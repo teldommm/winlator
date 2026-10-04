@@ -40,6 +40,14 @@ Java_com_winlator_cmod_widget_VulkanXServerView_nativeConfigureFrameGen(
     return nullptr;
 }
 
+// Target-rate pacing (0 = fixed multiplier); see VulkanRendererContext::setFrameGenTargetRate.
+extern "C" JNIEXPORT void JNICALL
+Java_com_winlator_cmod_widget_VulkanXServerView_nativeSetFrameGenTargetRate(
+    JNIEnv*, jobject, jlong handle, jint fps) {
+    auto* ctx = reinterpret_cast<VulkanRendererContext*>(handle);
+    if (ctx) ctx->setFrameGenTargetRate((int)fps);
+}
+
 // Measured presents/sec (real + generated), already smoothed by the renderer
 // itself (see VulkanRendererContext::trackPresentedRate). Shared-locked the
 // same way renderFrame() locks for rendering, so this never blocks or races

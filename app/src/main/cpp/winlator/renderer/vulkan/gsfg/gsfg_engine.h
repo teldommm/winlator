@@ -35,7 +35,9 @@ namespace gsfg {
 class Pipelines;
 class Chain;
 
-// Hard ceiling on generated frames per source frame (2x..4x -> 1..3).
+// Generated frames per source frame the graph is built for by default (2x..4x).
+// The graph supports up to kMaxGenerated (6, the reference's limit); a larger
+// multiplier passed to configure() builds for more.
 constexpr uint32_t kMaxGenerations = 3;
 
 class Engine {
@@ -66,8 +68,20 @@ public:
     uint32_t plan(uint32_t capacity, uint64_t sourceFrames);
 
     // `source` is the just-composited frame and must be in GENERAL.
+    // `times`: when the generated frames fall between the previous source frame
+    // (0) and this one (1), strictly increasing; nullptr = evenly spaced.
     void process(VkCommandBuffer cmd, VkImage source, uint32_t width, uint32_t height,
-                 uint32_t generations);
+                 uint32_t generations, const float* times = nullptr);
+
+    // Times the pacer placed this frame's generated frames at (target-rate pacing),
+    // for process(); nullptr when they are evenly spaced.
+    const float* plannedTimes(uint32_t generations) const {
+        return (plan_.timed && generations > 0 && generations == plan_.generations) ? plan_.times : nullptr;
+    }
+
+    // False when the pacer replaced this source frame's present by a generated frame
+    // at its tick (target-rate pacing): then only the generated frames are presented.
+    bool presentsSource() const { return !generating_ || plan_.generations == 0 || plan_.present_source; }
 
     void generateInto(VkCommandBuffer cmd, uint32_t generation);
     VkImage finalImage(uint32_t generation) const;
@@ -88,6 +102,7 @@ public:
 
 private:
     float effectiveFlowScale(uint32_t width) const;
+    uint32_t wantedCapacity() const;
 
     VkDevice         device_{};
     VkPhysicalDevice physical_{};
@@ -103,6 +118,11 @@ private:
     VkExtent2D peakGuestExtent_{};
     VkFormat   builtFormat_{VK_FORMAT_UNDEFINED};
     float      builtFlowScale_{};
+    uint32_t   builtCapacity_{};
+    uint32_t   multiplier_{2};
+    float      times_[kMaxGenerated]{};
+    const Template* template_{};
+    bool       coldFrame_{false};
     float      flowScale_{1.0f};
     float      presentedRate_{};
 
