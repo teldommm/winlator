@@ -508,9 +508,6 @@ void VulkanRendererContext::createSwapchain() {
     vk_.GetSwapchainImagesKHR(device,swapchain,&imgCount,nullptr);
     swapchainImages.resize(imgCount); vk_.GetSwapchainImagesKHR(device,swapchain,&imgCount,swapchainImages.data());
     fgSwapchainCapacity_ = imgCount > caps.minImageCount ? imgCount - caps.minImageCount : 0;
-    RLOG("gsfg-native: swapchain armed=%d capsOk=%d transferDst=%d images=%u (min %u, max %u) extra-image capacity=%u present mode=%d",
-         (int)fgArmed_.load(), (int)fgCapsOk(), (int)swapchainTransferDst, imgCount, caps.minImageCount,
-         caps.maxImageCount, fgSwapchainCapacity_, (int)presentMode);
     swapchainViews.resize(imgCount);
     for (size_t i=0;i<imgCount;i++) {
         VkImageViewCreateInfo vi{}; vi.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -1351,15 +1348,6 @@ void VulkanRendererContext::renderFrame() {
         destroyCompositeTargets();
     }
 
-    if (fgArmed_.load(std::memory_order_relaxed) && !(fgCapsOk() && swapchainTransferDst)) {
-        static bool warned = false;       // armed, yet the compositor cannot run: say why, once
-        if (!warned) {
-            warned = true;
-            RLOG_E("gsfg-native: armed but INACTIVE: capsOk=%d swapchainTransferDst=%d (%s)",
-                   (int)fgCapsOk(), (int)swapchainTransferDst, gsfgCaps_.reason);
-        }
-    }
-
     // --- Frame gen: decide how many frames to synthesise for this source
     // frame, BEFORE acquiring, since that sets how many images we need.
     fgPlan_ = FrameGenPlan{};
@@ -1385,17 +1373,6 @@ void VulkanRendererContext::renderFrame() {
         }
     }
     fgPlan_.presents = fgPlan_.generations + 1;
-    {
-        static int sGens = -1, sActive = -1; static uint32_t sCap = ~0u;
-        const int active = compositeActive() ? 1 : 0;
-        if ((int)fgPlan_.generations != sGens || capacity != sCap || active != sActive) {
-            RLOG("gsfg-native: present plan: generations=%u presents=%u capacity=%u (swapchain extra images %zu, "
-                 "composite targets %zu) compositeActive=%d armed=%d",
-                 fgPlan_.generations, fgPlan_.presents, capacity, (size_t)fgSwapchainCapacity_,
-                 compositeTargets.size(), active, (int)fgArmed_.load(std::memory_order_relaxed));
-            sGens = (int)fgPlan_.generations; sCap = capacity; sActive = active;
-        }
-    }
 
     // A real timeout (rather than UINT64_MAX) makes a wedged acquire visible
     // as VK_TIMEOUT instead of hanging the render thread forever; the

@@ -20,10 +20,8 @@
 // traces of the reference library; see tools/gsfg_export in the study archive.
 // ============================================================================
 
-#include <atomic>
 #include <cstdint>
 #include <memory>
-#include <thread>
 #include <string>
 #include <vector>
 
@@ -50,20 +48,9 @@ public:
     Engine& operator=(const Engine&) = delete;
 
     // `packPath` is the shader pack copied out of the APK assets (gsfg_shaders.bin).
-    // Synchronous: compiles every pipeline on the calling thread (used by tests).
     bool init(VkDevice device, VkPhysicalDevice physicalDevice, const std::string& packPath);
 
-    // Asynchronous: pipeline compilation runs on a worker thread so a slow (or stuck) driver
-    // compiler can never freeze the render loop. Poll initState(); frames are simply not
-    // generated until it reports Ready.
-    enum class InitState { Idle, Pending, Ready, Failed };
-    bool beginInit(VkDevice device, VkPhysicalDevice physicalDevice, const std::string& packPath);
-    InitState initState() const { return (InitState)state_.load(std::memory_order_acquire); }
-    // While Pending: which pipeline is being compiled and for how long (for the watchdog log).
-    int    pendingPipeline() const { return progPipe_.load(std::memory_order_relaxed); }
-    double pendingSeconds() const;
-
-    bool valid() const { return initState() == InitState::Ready && pipelines_ != nullptr && !unavailable_; }
+    bool valid() const { return pipelines_ != nullptr && !unavailable_; }
     bool unavailable() const { return unavailable_; }
 
     void configure(uint32_t multiplier, uint32_t targetRate, float flowScale, float refreshRate);
@@ -121,28 +108,9 @@ private:
     uint32_t warmStreak_{};
     bool     warm_{};
     bool     generating_{};
-    bool     needSeed_{true};
+    bool     temporalValid_{false};   // reference context +0x528
+    uint32_t idleFrames_{0};          // reference context +0x55c: ingest-only frames in a row
     bool     unavailable_{};
-
-    std::atomic<int>     state_{0};          // InitState
-    std::atomic<int>     progPipe_{-1};
-    std::atomic<int64_t> progSinceMs_{0};
-    std::thread          initThread_;
-
-    // Diagnostics. Knobs (adb shell setprop debug.gsfg.<name> <int>):
-    //   trace  1 = log every frame (default: the first 90 frames after each graph build + state changes)
-    //   show   1 = generated frames show the CURRENT input frame instead of the graph output. The graph
-    //              still runs, so cost and pacing are unchanged; it separates compositor plumbing
-    //              (blits, swapchain, pacing, cursor) from the shaders.
-    int      traceLeft_{0};
-    bool     traceAll_{false};
-    int      showMode_{0};
-    VkImage  lastSource_{};
-    uint32_t lastPlanGens_{~0u};
-    bool     lastWarm_{false};
-    bool     lastGenerating_{false};
-    void     refreshKnobs();
-    bool     tracing() const { return traceAll_ || traceLeft_ > 0; }
 };
 
 } // namespace gsfg

@@ -32,7 +32,8 @@ struct GImage   { int fmt, layers, usage, dim; };
 struct GView    { int image, vt, fmt, baseLayer, layers; };
 struct GSampler { int mag, min, mip, addr; };
 
-// First generating frame after ingest-only frames: a few descriptors differ
+// Generating frame without valid temporal state (first one, or after two or more
+// ingest-only frames in a row): a few descriptors differ
 // from steady state (dispatch `disp`, descriptor `slot` -> buffer/view `idx`).
 struct GFix { uint16_t disp; uint8_t slot; uint16_t idx; };
 struct GFixList { const GFix* f; int n; };
@@ -43,7 +44,7 @@ struct GTemplate {
     uint16_t        inDst[3];
     const uint16_t* outSrc;      // [generation*3 + ring] -> image index
     int             genStarts[3];
-    const GDisp*    init[3];     // one-shot seed pass, per ring slot
+    const GDisp*    init[3];     // prior pass (fast_prior_img), after the last generated frame; per ring slot
     GFixList        fix[3];      // first-generating-frame descriptor fixes, per ring slot
 };
 
