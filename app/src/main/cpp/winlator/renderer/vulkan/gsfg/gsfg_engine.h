@@ -102,6 +102,7 @@ public:
 
 private:
     float effectiveFlowScale(uint32_t width) const;
+    static void logDriverLibraries();
     uint32_t wantedCapacity() const;
 
     VkDevice         device_{};

@@ -1,6 +1,11 @@
 // See gsfg_engine.h.
 #include "gsfg_engine.h"
 
+#include <chrono>
+#ifdef __ANDROID__
+#include <link.h>
+#endif
+
 #include "gsfg_graph.h"
 #include "gsfg_vkd.h"
 
@@ -145,6 +150,10 @@ private:
             li.pushConstantRangeCount = 1; li.pPushConstantRanges = &pcr;
             if (vkd.CreatePipelineLayout(dev_, &li, nullptr, &lay[p]) != VK_SUCCESS) return false;
 
+            // Timed and announced: on some drivers a pipeline takes seconds to compile,
+            // and the line before a stall says which one.
+            GSFG_LOGI("pipeline %d (%s, %u bytes): compiling", p, d->name, ent->size);
+            const auto t0 = std::chrono::steady_clock::now();
             VkComputePipelineCreateInfo pi{};
             pi.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
             pi.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -155,6 +164,8 @@ private:
                 GSFG_LOGW("pipeline %d (%s) failed to compile", p, d->name);
                 return false;
             }
+            GSFG_LOGI("pipeline %d: %lld ms", p, (long long)std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - t0).count());
         }
         return true;
     }
@@ -526,6 +537,21 @@ private:
 Engine::Engine() = default;
 Engine::~Engine() { chain_.reset(); pipelines_.reset(); }
 
+// Which driver files this process actually runs. The reference (libGameScopeV2) loads
+// vulkan.<ro.hardware.vulkan>.so from /vendor itself; the Android loader may instead pick
+// an updatable driver package for an app. Same device, different compiler - worth a line.
+void Engine::logDriverLibraries() {
+#ifdef __ANDROID__
+    dl_iterate_phdr([](struct dl_phdr_info* info, size_t, void*) -> int {
+        const char* n = info->dlpi_name;
+        if (n && (strstr(n, "vulkan") || strstr(n, "adreno") || strstr(n, "Adreno") || strstr(n, "glnext")
+                  || strstr(n, "libgsl") || strstr(n, "llvm") || strstr(n, "/gpu") || strstr(n, "driver")))
+            GSFG_LOGI("loaded: %s", n);
+        return 0;
+    }, nullptr);
+#endif
+}
+
 bool Engine::init(VkDevice device, VkPhysicalDevice physicalDevice, const std::string& packPath) {
     if (device == VK_NULL_HANDLE || physicalDevice == VK_NULL_HANDLE || packPath.empty()) return false;
     if (!gsfgVkdReady()) { GSFG_LOGW("dispatch not initialised; frame generation unavailable"); return false; }
@@ -544,6 +570,11 @@ bool Engine::init(VkDevice device, VkPhysicalDevice physicalDevice, const std::s
     // The reference ships different shaders for Adreno 840.
     VkPhysicalDeviceProperties props{};
     vkd.GetPhysicalDeviceProperties(physicalDevice, &props);
+    GSFG_LOGI("device %s, vendor 0x%x, driver 0x%x (%u.%u.%u), api %u.%u.%u", props.deviceName, props.vendorID,
+              props.driverVersion, props.driverVersion >> 22, (props.driverVersion >> 12) & 0x3ff,
+              props.driverVersion & 0xfff, VK_VERSION_MAJOR(props.apiVersion), VK_VERSION_MINOR(props.apiVersion),
+              VK_VERSION_PATCH(props.apiVersion));
+    logDriverLibraries();
     variant_ = (props.vendorID == 0x5143 && strstr(props.deviceName, "840")) ? 1 : 0;
 
     const std::vector<int> pipes = pipelinesFor(variant_);
