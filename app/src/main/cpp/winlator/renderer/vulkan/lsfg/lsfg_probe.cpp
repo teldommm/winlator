@@ -15,27 +15,30 @@ FeatureSupport queryFeatures(const VkTable& vk, VkPhysicalDevice pd) {
     VkPhysicalDeviceProperties props{};
     vk.GetPhysicalDeviceProperties(pd, &props);
     fs.deviceApiVersion = props.apiVersion;
-    fs.apiAtLeast13 = props.apiVersion >= VK_API_VERSION_1_3;
+    fs.apiAtLeast12 = props.apiVersion >= VK_API_VERSION_1_2;
 
-    // Below 1.2 there is no VkPhysicalDeviceVulkan12Features to chain, and
-    // below 1.3 the SPIR-V 1.6 modules will not load anyway — so don't touch
-    // the device further. Device creation stays exactly as it is today.
-    if (props.apiVersion < VK_API_VERSION_1_2 || !vk.GetPhysicalDeviceFeatures2) return fs;
+    // Features2 is core 1.1. The storage-image features (all that the
+    // precompiled SPIR-V needs) are plain 1.0 features and are read on any
+    // device; VkPhysicalDeviceVulkan12Features is only chained on 1.2+.
+    if (!vk.GetPhysicalDeviceFeatures2) return fs;
 
     VkPhysicalDeviceVulkan12Features v12{};
     v12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
 
     VkPhysicalDeviceFeatures2 f2{};
     f2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-    f2.pNext = &v12;
+    f2.pNext = fs.apiAtLeast12 ? &v12 : nullptr;
 
     vk.GetPhysicalDeviceFeatures2(pd, &f2);
 
     fs.queried = true;
-    fs.vulkanMemoryModel            = v12.vulkanMemoryModel == VK_TRUE;
-    fs.vulkanMemoryModelDeviceScope = v12.vulkanMemoryModelDeviceScope == VK_TRUE;
     fs.storageImageWriteWithoutFormat = f2.features.shaderStorageImageWriteWithoutFormat == VK_TRUE;
     fs.storageImageExtendedFormats    = f2.features.shaderStorageImageExtendedFormats == VK_TRUE;
+    if (fs.apiAtLeast12) {
+        fs.vulkanMemoryModel            = v12.vulkanMemoryModel == VK_TRUE;
+        fs.vulkanMemoryModelDeviceScope = v12.vulkanMemoryModelDeviceScope == VK_TRUE;
+        fs.shaderFloat16                = v12.shaderFloat16 == VK_TRUE;
+    }
     return fs;
 }
 
@@ -67,18 +70,13 @@ bool probeLinearBlit(const VkTable& vk, VkPhysicalDevice pd, VkFormat fmt) {
     return (fp.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT) != 0;
 }
 
-void explain(Caps& caps) {
+void explain(Caps& caps, Variant v) {
     const FeatureSupport& f = caps.features;
     const char* why = nullptr;
+    const bool translated = v == Variant::DxbcTranslated;
 
     if (!f.queried) {
-        why = f.deviceApiVersion < VK_API_VERSION_1_2
-            ? "device Vulkan version below 1.2"
-            : "vkGetPhysicalDeviceFeatures2 unavailable";
-    } else if (!f.apiAtLeast13) {
-        why = "device Vulkan version below 1.3 (SPIR-V 1.6 will not load)";
-    } else if (!f.vulkanMemoryModel) {
-        why = "driver lacks vulkanMemoryModel";
+        why = "vkGetPhysicalDeviceFeatures2 unavailable";
     } else if (!f.storageImageWriteWithoutFormat) {
         why = "driver lacks shaderStorageImageWriteWithoutFormat";
     } else if (!f.storageImageExtendedFormats) {
@@ -87,6 +85,14 @@ void explain(Caps& caps) {
         why = "required features not enabled at device creation";
     } else if (!caps.storageOnSwapchainFormat) {
         why = "swapchain format is not storage-image capable";
+    } else if (translated && !f.apiAtLeast12) {
+        why = "device Vulkan version below 1.2 (translated SPIR-V 1.5 will not load; "
+              "a Lossless.dll with precompiled shaders, 3.2.2+, would)";
+    } else if (translated && (!f.vulkanMemoryModel || !caps.memoryModelEnabled)) {
+        why = "driver lacks vulkanMemoryModel (needed by translated shaders; "
+              "a Lossless.dll with precompiled shaders, 3.2.2+, would not need it)";
+    } else if (v == Variant::SpirvFp16 && !caps.float16Enabled) {
+        why = "driver lacks shaderFloat16 (needed by the fp16 shader set)";
     }
 
     if (why) {

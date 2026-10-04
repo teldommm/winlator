@@ -15,7 +15,11 @@ namespace dxvk {
     const DxbcAnalysisInfo&   analysis)
   : m_moduleInfo (moduleInfo),
     m_programInfo(programInfo),
-    m_module     (spvVersion(1, 6)),
+    // Winlator: 1.5 instead of upstream's 1.6. For the LSFG chain the output is
+    // byte-identical apart from the header version word (checked on all 25
+    // modules of Lossless 3.2.1, spirv-val clean for vulkan1.2), and 1.5 loads
+    // on Vulkan 1.2 devices where 1.6 would require 1.3.
+    m_module     (spvVersion(1, 5)),
     m_isgn       (isgn),
     m_osgn       (osgn),
     m_psgn       (psgn),

@@ -73,6 +73,7 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
     private boolean pendingSwapRB         = false;
     private int pendingLsfgMultiplier = 0;
     private float pendingLsfgFlowScale = 0.80f;
+    private int pendingLsfgTargetRate = 0;
     private File pendingLsfgDll;
     private float pendingFrameGenRefreshHz;
     private volatile String frameGenError = "";
@@ -139,8 +140,10 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
     @FastNative private native void nativeSetSharpness(long handle, float sharpness);
 
     private native String nativeConfigureFrameGen(long handle, String cachePath,
-                                                   int multiplier, float flowScale, float refreshHz);
+                                                   int multiplier, float flowScale, float refreshHz,
+                                                   int targetRate);
     @FastNative private native float nativeGetFrameGenPresentedRate(long handle);
+    @FastNative private native boolean nativeFrameGenSupportsFp16(long handle);
 
     private native void nativeDumpRendererInfo(long handle);
     private native void nativeSetFilterMode(long handle, int mode);
@@ -673,11 +676,16 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
         synchronized (lock) { if (nativeHandle != 0) nativeSetSwapRB(nativeHandle, enabled); }
     }
 
-    public void setFrameGenNative(File dll, int multiplier, float flowScale) {
+    /**
+     * @param targetRate adaptive target in Hz; 0 keeps the fixed multiplier. In
+     *                   adaptive mode the multiplier only sets the ceiling (pass 4).
+     */
+    public void setFrameGenNative(File dll, int multiplier, float flowScale, int targetRate) {
         synchronized (lock) {
             pendingLsfgDll = dll;
             pendingLsfgMultiplier = multiplier < 2 ? 0 : Math.min(multiplier, 4);
             pendingLsfgFlowScale = flowScale;
+            pendingLsfgTargetRate = pendingLsfgMultiplier < 2 ? 0 : Math.max(0, targetRate);
         }
         queueEvent(() -> {
             synchronized (lock) {
@@ -697,8 +705,13 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
         String error = null;
         String cachePath = null;
         if (multiplier >= 2) {
-            int status = LsfgNative.ensureCache(getContext(), pendingLsfgDll, false);
-            if (status == LsfgNative.STATUS_OK) cachePath = LsfgNative.cacheFile(getContext()).getAbsolutePath();
+            // Prefer the fp16 shader set when the device enabled shaderFloat16.
+            // Only Lossless 3.2.2+ carries it; older DLLs fall back to fp32 or
+            // the DXBC-translated set on their own (see lsfg_dll selectVariant).
+            boolean preferFp16 = nativeFrameGenSupportsFp16(nativeHandle);
+            int status = LsfgNative.ensureCache(getContext(), pendingLsfgDll, preferFp16);
+            if (status == LsfgNative.STATUS_OK)
+                cachePath = LsfgNative.cacheFile(getContext(), preferFp16).getAbsolutePath();
             else {
                 error = LsfgNative.explain(status);
                 multiplier = 0;
@@ -707,15 +720,20 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
         float refreshHz = pendingFrameGenRefreshHz > 0f ? pendingFrameGenRefreshHz
                 : getDisplay() != null ? getDisplay().getRefreshRate() : 0f;
         String nativeError = nativeConfigureFrameGen(nativeHandle, cachePath,
-                multiplier, pendingLsfgFlowScale, refreshHz);
+                multiplier, pendingLsfgFlowScale, refreshHz, pendingLsfgTargetRate);
         if (error == null) error = nativeError;
         if (error != null) {
             boolean oldDriver = error.contains("Vulkan version below") || error.contains("storage images")
-                    || error.contains("shader") || error.contains("feature");
+                    || error.contains("shader") || error.contains("feature") || error.contains("vulkanMemoryModel");
+            // Vulkan 1.2 / vulkanMemoryModel are only needed by the DXBC-translated
+            // shaders (Lossless 3.2.1 and older); 3.2.2+ ships precompiled SPIR-V.
+            boolean translationOnly = error.contains("Vulkan version below") || error.contains("vulkanMemoryModel");
             frameGenError = "LSFG Native can't run: "
                     + (oldDriver ? (error.contains("Vulkan version below")
-                            ? "this Renderer Driver lacks Vulkan 1.3. " : "this Renderer Driver lacks a required Vulkan feature. ")
-                            + "Set Renderer Driver to a Turnip driver, then relaunch the game."
+                            ? "this Renderer Driver lacks Vulkan 1.2. " : "this Renderer Driver lacks a required Vulkan feature. ")
+                            + (translationOnly
+                                    ? "Import Lossless.dll 3.2.2 or newer, or set Renderer Driver to a Turnip driver, then relaunch the game."
+                                    : "Set Renderer Driver to a Turnip driver, then relaunch the game.")
                             : error + (error.endsWith(".") ? "" : "."));
             final String message = frameGenError;
             post(() -> Toast.makeText(getContext(), message, Toast.LENGTH_LONG).show());

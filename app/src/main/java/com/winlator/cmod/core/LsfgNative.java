@@ -54,9 +54,20 @@ public final class LsfgNative {
         return LosslessDll.globalDllFile(context);
     }
 
-    /** Where the translated SPIR-V chain is cached. */
+    /** Where the SPIR-V chain is cached (fp32 / translated preference). */
     public static File cacheFile(Context context) {
-        return new File(context.getFilesDir(), "lsfg-native/shaders.cache");
+        return cacheFile(context, false);
+    }
+
+    /**
+     * One cache file per preference: the cache header records only the source
+     * DLL, not which variant was asked for, so a single shared file would keep
+     * serving the fp32 set after fp16 became available (or the reverse).
+     * The fp32 file keeps the old name, so existing caches stay valid.
+     */
+    public static File cacheFile(Context context, boolean preferFp16) {
+        return new File(context.getFilesDir(),
+                preferFp16 ? "lsfg-native/shaders_fp16.cache" : "lsfg-native/shaders.cache");
     }
 
     public static boolean isDllAvailable(Context context) {
@@ -93,7 +104,7 @@ public final class LsfgNative {
     public static int ensureCache(Context context, File dll, boolean preferFp16) {
         if (dll == null || !dll.isFile()) return STATUS_NOT_INSTALLED;
 
-        File cache = cacheFile(context);
+        File cache = cacheFile(context, preferFp16);
         if (cache.isFile()
                 && nativeCacheMatchesSource(cache.getAbsolutePath(), dll.getAbsolutePath())) {
             return STATUS_OK;

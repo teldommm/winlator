@@ -27,7 +27,8 @@ import kotlin.math.roundToInt
 
 // Indices match the original Spinners' positions exactly (upscalerModeIndex: SGSR/FSR/
 // Lanczos2/ColorBoost, postFxModeIndex: None/DLS/CRT/HDR/Natural, reshadeEffectIndex: the
-// 12-entry ReShade list, frameGenMultiplierIndex: Off/2x/3x/4x) so Java's existing mapping
+// 12-entry ReShade list, frameGenMultiplierIndex: Off/2x/3x/4x followed by one
+// "Adaptive N Hz" entry per frameGenAdaptiveTargets value) so Java's existing mapping
 // tables can be reused unchanged.
 data class GraphicsPanelState(
     val fpsLimit: Int,
@@ -39,7 +40,9 @@ data class GraphicsPanelState(
     val reshadeStrengthPercent: Int,
     val frameGenAvailable: Boolean,
     val frameGenMultiplierIndex: Int,
-    val frameGenFlowScale: Float
+    val frameGenFlowScale: Float,
+    // Adaptive target rates in Hz; each adds an "Adaptive N Hz" entry after 4x.
+    val frameGenAdaptiveTargets: List<Int> = emptyList()
 )
 
 interface GraphicsPanelCallbacks {
@@ -96,6 +99,9 @@ private fun GraphicsSidebarPanel(
     var reshadeIndex by remember { mutableStateOf(state.reshadeEffectIndex) }
     var reshadeStrength by remember { mutableStateOf(state.reshadeStrengthPercent) }
     var frameGenIndex by remember { mutableStateOf(state.frameGenMultiplierIndex) }
+    val frameGenLabels = remember(state.frameGenAdaptiveTargets) {
+        FRAMEGEN_LABELS + state.frameGenAdaptiveTargets.map { "Adaptive $it Hz" }
+    }
 
     // Same visibility rule as the original updateSharpnessVis(): shown while FSR is on OR
     // the Post Effect picker is set to DLS (index 1) — Sharpness feeds whichever is active.
@@ -219,7 +225,7 @@ private fun GraphicsSidebarPanel(
                 Spacer(Modifier.height(10.dp))
                 SidebarDropdownField(
                     caption = null,
-                    options = FRAMEGEN_LABELS,
+                    options = frameGenLabels,
                     selectedIndex = frameGenIndex,
                     onSelect = {
                         frameGenIndex = it

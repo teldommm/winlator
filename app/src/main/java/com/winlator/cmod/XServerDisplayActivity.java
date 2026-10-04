@@ -58,7 +58,6 @@ import com.winlator.cmod.contents.AdrenotoolsManager;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.DebugLogFile;
 import com.winlator.cmod.core.DefaultVersion;
-import com.winlator.cmod.core.VulkanVersion;
 import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.GPUInformation;
@@ -186,6 +185,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private int activeLsfgMultiplier;
     private java.io.File activeLsfgDll;
     private float activeLsfgFlowScale = 0.80f;
+    // Adaptive frame gen: target Hz, 0 = fixed multiplier. Stored with
+    // lsfgMultiplier = 4 (the ceiling the pacer may use to reach the target).
+    private int activeLsfgTargetRate = 0;
+    // Sidebar "Adaptive N Hz" entries, built once from the panel's modes.
+    private java.util.List<Integer> frameGenAdaptiveTargets;
     private boolean graphicsFsrEnabled;
     private int graphicsUpscalerModeIndex;
     private int graphicsPostFxModeIndex;
@@ -303,6 +307,35 @@ public class XServerDisplayActivity extends AppCompatActivity {
         randr.setRefreshRates(rates, activeRate);
         Log.d("XServerDisplayActivity", "RandR advertising refresh rates "
                 + java.util.Arrays.toString(rates) + ", active=" + activeRate);
+    }
+
+    // Adaptive targets offered in the sidebar: every distinct refresh rate the
+    // panel supports (rounded, >= 30 Hz), ascending. A saved target the panel
+    // no longer lists (e.g. another device) is kept so the selection survives.
+    private java.util.List<Integer> frameGenAdaptiveTargets() {
+        if (frameGenAdaptiveTargets != null) return frameGenAdaptiveTargets;
+        java.util.TreeSet<Integer> rates = new java.util.TreeSet<>();
+        try {
+            android.view.Display display = getWindowManager().getDefaultDisplay();
+            for (android.view.Display.Mode mode : display.getSupportedModes()) {
+                int hz = Math.round(mode.getRefreshRate());
+                if (hz >= 30) rates.add(hz);
+            }
+        } catch (Exception ignored) {
+        }
+        if (rates.isEmpty()) rates.add(60);
+        if (activeLsfgTargetRate > 0) rates.add(activeLsfgTargetRate);
+        frameGenAdaptiveTargets = new java.util.ArrayList<>(rates);
+        return frameGenAdaptiveTargets;
+    }
+
+    private int frameGenSpinnerIndex() {
+        if (activeLsfgMultiplier < 2) return 0;
+        if (activeLsfgTargetRate > 0) {
+            int i = frameGenAdaptiveTargets().indexOf(activeLsfgTargetRate);
+            if (i >= 0) return 4 + i;
+        }
+        return Math.min(3, activeLsfgMultiplier - 1);
     }
 
     private float pickHighestRefreshRate() {
@@ -1217,11 +1250,14 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     : LosslessDll.containerDllFile(container);
             float lsfgFlowScale = shortcut != null ? shortcut.getLsfgFlowScale()
                     : container != null ? container.getLsfgFlowScale() : 0.80f;
+            int lsfgTargetRate = shortcut != null ? shortcut.getLsfgTargetRate()
+                    : container != null ? container.getLsfgTargetRate() : 0;
             activeLsfgMultiplier = lsfgMultiplier;
             activeLsfgDll = lsfgDll;
             activeLsfgFlowScale = lsfgFlowScale;
+            activeLsfgTargetRate = lsfgMultiplier < 2 ? 0 : lsfgTargetRate;
             vkRenderer.setFrameGenRefreshRate(pickHighestRefreshRate());
-            vkRenderer.setFrameGenNative(lsfgDll, lsfgMultiplier, lsfgFlowScale);
+            vkRenderer.setFrameGenNative(lsfgDll, lsfgMultiplier, lsfgFlowScale, activeLsfgTargetRate);
         }
 
         if (shortcut != null) {
@@ -1727,8 +1763,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 0,  // ReShade never persisted anything in the original either — always starts Off
                 graphicsReshadeStrength,
                 vkRenderer != null,
-                activeLsfgMultiplier < 2 ? 0 : Math.min(3, activeLsfgMultiplier - 1),
-                activeLsfgFlowScale
+                frameGenSpinnerIndex(),
+                activeLsfgFlowScale,
+                frameGenAdaptiveTargets()
         );
 
         GraphicsPanelCallbacks callbacks = new GraphicsPanelCallbacks() {
@@ -1800,16 +1837,27 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
             @Override
             public void onFrameGenChanged(int multiplierIndex) {
-                activeLsfgMultiplier = multiplierIndex < 1 ? 0 : multiplierIndex + 1;
+                // 0 = Off, 1..3 = fixed 2x..4x, 4.. = "Adaptive N Hz" entries.
+                java.util.List<Integer> targets = frameGenAdaptiveTargets();
+                if (multiplierIndex >= 4 && multiplierIndex - 4 < targets.size()) {
+                    activeLsfgMultiplier = 4;
+                    activeLsfgTargetRate = targets.get(multiplierIndex - 4);
+                } else {
+                    activeLsfgMultiplier = multiplierIndex < 1 ? 0 : Math.min(multiplierIndex, 3) + 1;
+                    activeLsfgTargetRate = 0;
+                }
                 if (shortcut != null) {
                     shortcut.setLsfgMultiplier(activeLsfgMultiplier);
+                    shortcut.setLsfgTargetRate(activeLsfgTargetRate);
                     shortcut.saveData();
                 } else if (container != null) {
                     container.setLsfgMultiplier(activeLsfgMultiplier);
+                    container.setLsfgTargetRate(activeLsfgTargetRate);
                     container.saveData();
                 }
                 if (vkRenderer != null)
-                    vkRenderer.setFrameGenNative(activeLsfgDll, activeLsfgMultiplier, activeLsfgFlowScale);
+                    vkRenderer.setFrameGenNative(activeLsfgDll, activeLsfgMultiplier,
+                            activeLsfgFlowScale, activeLsfgTargetRate);
             }
 
             @Override
@@ -1824,7 +1872,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     container.saveData();
                 }
                 if (vkRenderer != null)
-                    vkRenderer.setFrameGenNative(activeLsfgDll, activeLsfgMultiplier, activeLsfgFlowScale);
+                    vkRenderer.setFrameGenNative(activeLsfgDll, activeLsfgMultiplier,
+                            activeLsfgFlowScale, activeLsfgTargetRate);
             }
 
         };
@@ -2143,6 +2192,24 @@ public class XServerDisplayActivity extends AppCompatActivity {
         return "freedreno".equalsIgnoreCase(graphicsDriver) ? "freedreno" : "zink";
     }
 
+    // Patch component of the driver's Vulkan version ("1.3.<patch>"). GPUInformation returns
+    // "Unknown" when the query fails (driver not installed/broken meta.json); splitting that and
+    // taking [2] used to throw ArrayIndexOutOfBoundsException and abort the container launch.
+    // Falls back to the system driver's patch, then to 0.
+    private String resolveVulkanPatchVersion(String driverId) {
+        String patch = vulkanPatchOf(GPUInformation.getVulkanVersion(driverId, this));
+        if (patch == null && !"System".equals(driverId)) {
+            patch = vulkanPatchOf(GPUInformation.getVulkanVersion("System", this));
+        }
+        return patch != null ? patch : "0";
+    }
+
+    private static String vulkanPatchOf(String version) {
+        if (version == null) return null;
+        String[] parts = version.split("\\.");
+        return parts.length >= 3 && parts[2].matches("\\d+") ? parts[2] : null;
+    }
+
     private void extractOpenGLDriver(File rootDir) {
         String selectedDriver = getSelectedOpenGLDriver();
         String installedDriver = container.getExtra("installedOpenGLDriver", "");
@@ -2247,13 +2314,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
             adrenotoolsManager.setDriverById(envVars, imageFs, adrenoToolsDriverId);
         }
 
-        String requestedVulkanVersion = graphicsDriverConfig.get("vulkanVersion");
-        String driverVulkanVersion = GPUInformation.getVulkanVersion(adrenoToolsDriverId, this);
-        String systemVulkanVersion = "System".equals(adrenoToolsDriverId)
-                ? driverVulkanVersion : GPUInformation.getVulkanVersion("System", this);
-        String vulkanVersion = VulkanVersion.resolve(requestedVulkanVersion, driverVulkanVersion, systemVulkanVersion);
-        Log.d("GraphicsDriverExtraction", "Vulkan version: requested=" + requestedVulkanVersion
-                + ", driver=" + driverVulkanVersion + ", advertised=" + vulkanVersion);
+        String vulkanVersion = graphicsDriverConfig.get("vulkanVersion");
+        vulkanVersion = vulkanVersion + "." + resolveVulkanPatchVersion(adrenoToolsDriverId);
         envVars.put("WRAPPER_VK_VERSION", vulkanVersion);
 
         String blacklistedExtensions = graphicsDriverConfig.get("blacklistedExtensions");

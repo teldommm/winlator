@@ -65,7 +65,8 @@ constexpr uint32_t kMaxResourceId = 512u;
 constexpr size_t   kMaxSpirvWords = 16u * 1024u * 1024u;
 
 constexpr uint32_t kCacheMagic   = 0x4C534642u;  // "BFSL" little-endian
-constexpr uint32_t kCacheVersion = 1u;
+// 2: translated modules are SPIR-V 1.5 (were 1.6); older caches rebuild.
+constexpr uint32_t kCacheVersion = 2u;
 
 struct CacheHeader {
     uint32_t magic;

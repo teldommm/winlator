@@ -363,32 +363,45 @@ void VulkanRendererContext::createLogicalDevice() {
     ci.pQueueCreateInfos=&qi; ci.queueCreateInfoCount=1;
     ci.enabledExtensionCount=(uint32_t)extList.size(); ci.ppEnabledExtensionNames=extList.data();
 
-    // --- Native LSFG frame generation: enable the three features its shaders
-    // need. The renderer has historically enabled NO features at all
-    // (pEnabledFeatures = nullptr, no pNext), so all three are off by default.
-    // Only chain anything when the device passes every gate: on any other
-    // device this block is inert and vkCreateDevice is called exactly as it
-    // always has been.
+    // --- Native LSFG frame generation: enable the features its shaders need.
+    // The renderer has historically enabled NO features at all
+    // (pEnabledFeatures = nullptr, no pNext). The cache variant is not known
+    // yet (the DLL is picked later), so enable everything the device offers
+    // for any variant:
+    //   * every variant: shaderStorageImageWriteWithoutFormat/ExtendedFormats
+    //   * DXBC-translated: + vulkanMemoryModel (and Vulkan 1.2 for SPIR-V 1.5)
+    //   * precompiled fp16: + shaderFloat16
+    // A device that fails even the common gate is untouched: vkCreateDevice
+    // is called exactly as it always has been.
     lsfgCaps_ = lsfg::Caps{};
     lsfgCaps_.features = lsfg::queryFeatures(vk_, physicalDevice);
 
     VkPhysicalDeviceVulkan12Features lsfgV12{};
     VkPhysicalDeviceFeatures2        lsfgF2{};
-    if (lsfgCaps_.features.deviceGatesPass()) {
-        lsfgV12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
-        lsfgV12.vulkanMemoryModel = VK_TRUE;
-        // Device scope is a separate SPIR-V capability; enable it only when the
-        // driver offers it, so a driver without it still gets the base model.
-        lsfgV12.vulkanMemoryModelDeviceScope =
-            lsfgCaps_.features.vulkanMemoryModelDeviceScope ? VK_TRUE : VK_FALSE;
-
+    if (lsfgCaps_.features.nativeGatesPass()) {
         lsfgF2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-        lsfgF2.pNext = &lsfgV12;
         lsfgF2.features.shaderStorageImageWriteWithoutFormat = VK_TRUE;
         lsfgF2.features.shaderStorageImageExtendedFormats    = VK_TRUE;
 
+        const bool wantMemoryModel = lsfgCaps_.features.translatedGatesPass();
+        const bool wantFloat16     = lsfgCaps_.features.shaderFloat16;
+        if (lsfgCaps_.features.apiAtLeast12 && (wantMemoryModel || wantFloat16)) {
+            lsfgV12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+            if (wantMemoryModel) {
+                lsfgV12.vulkanMemoryModel = VK_TRUE;
+                // Device scope is a separate SPIR-V capability; enable it only
+                // when offered, so a driver without it still gets the base model.
+                lsfgV12.vulkanMemoryModelDeviceScope =
+                    lsfgCaps_.features.vulkanMemoryModelDeviceScope ? VK_TRUE : VK_FALSE;
+            }
+            if (wantFloat16) lsfgV12.shaderFloat16 = VK_TRUE;
+            lsfgF2.pNext = &lsfgV12;
+            lsfgCaps_.memoryModelEnabled = wantMemoryModel;
+            lsfgCaps_.float16Enabled     = wantFloat16;
+        }
+
         // pEnabledFeatures MUST stay null while a VkPhysicalDeviceFeatures2 is
-        // chained — the two are mutually exclusive.
+        // chained - the two are mutually exclusive.
         ci.pNext = &lsfgF2;
         lsfgCaps_.featuresEnabled = true;
     }
@@ -399,7 +412,9 @@ void VulkanRendererContext::createLogicalDevice() {
         if (lsfgCaps_.featuresEnabled) {
             RLOG_E("createLogicalDevice: CreateDevice failed WITH LSFG features; retrying without");
             ci.pNext = nullptr;
-            lsfgCaps_.featuresEnabled = false;
+            lsfgCaps_.featuresEnabled    = false;
+            lsfgCaps_.memoryModelEnabled = false;
+            lsfgCaps_.float16Enabled     = false;
             if (vk_.CreateDevice(physicalDevice,&ci,nullptr,&device)!=VK_SUCCESS)
                 throw std::runtime_error("device");
         } else {
@@ -466,7 +481,7 @@ void VulkanRendererContext::createSwapchain() {
     lsfgCaps_.probedFormat = swapchainFmt;
     lsfgCaps_.storageOnSwapchainFormat = lsfg::probeStorageFormat(vk_, physicalDevice, swapchainFmt);
     lsfgCaps_.linearBlitOnSwapchainFormat = lsfg::probeLinearBlit(vk_, physicalDevice, swapchainFmt);
-    lsfg::explain(lsfgCaps_);
+    lsfg::explain(lsfgCaps_, lsfgCacheVariant_);
     RLOG("lsfg-native: %s", lsfgCaps_.reason);
     const bool nativeFg = fgArmed_.load() && fgCapsOk();
     uint32_t imgCount=caps.minImageCount+1;
@@ -1352,6 +1367,13 @@ void VulkanRendererContext::renderFrame() {
         compositeArmed = false;
         vk_.DeviceWaitIdle(device);
         destroyCompositeTargets();
+        // Free the interpolation chain too (every per-resolution image and
+        // descriptor set, sized to the panel). The compiled shader modules are
+        // kept, so re-arming rebuilds the chain only, not the 25 pipelines.
+        if (lsfgEngine_) {
+            lsfgEngine_->releaseChain();
+            lsfgEngine_->reset();
+        }
     }
 
     // --- Frame gen: decide how many frames to synthesise for this source
@@ -1363,14 +1385,18 @@ void VulkanRendererContext::renderFrame() {
     if (compositeActive() && ensureLsfgEngine()) {
         if (fgConfigDirty_.exchange(false, std::memory_order_relaxed)) {
             lsfgEngine_->configure(
-                (uint32_t)std::max(fgMultiplier_.load(std::memory_order_relaxed), 2), 0,
+                (uint32_t)std::max(fgMultiplier_.load(std::memory_order_relaxed), 2),
+                (uint32_t)std::max(fgTargetRate_.load(std::memory_order_relaxed), 0),
                 fgFlowScale_.load(std::memory_order_relaxed),
                 fgRefreshHz_.load(std::memory_order_relaxed));
         }
         // The flow-pyramid size depends on the guest extent. Set it before the
         // first prepare so the 25-pipeline chain is built once at the right size.
-        if (containerWidth > 0 && containerHeight > 0)
-            lsfgEngine_->setGuestExtent((uint32_t)containerWidth, (uint32_t)containerHeight);
+        {
+            uint32_t gw = 0, gh = 0;
+            guestExtentForFrameGen(gw, gh);
+            if (gw > 0 && gh > 0) lsfgEngine_->setGuestExtent(gw, gh);
+        }
         if (lsfgEngine_->needsRebuild(compositeW, compositeH, swapchainFmt))
             vk_.DeviceWaitIdle(device);
         if (lsfgEngine_->prepare(compositeW, compositeH, swapchainFmt)) {
@@ -1383,10 +1409,24 @@ void VulkanRendererContext::renderFrame() {
     // A real timeout (rather than UINT64_MAX) makes a wedged acquire visible
     // as VK_TIMEOUT instead of hanging the render thread forever; the
     // non-success guard below already handles it like any other failure.
+    // The first image is the one the frame cannot do without, so it keeps the
+    // long timeout. Every further image only carries a generated frame: if the
+    // presentation engine cannot hand one over within about one refresh
+    // interval, show fewer generated frames for this source frame instead of
+    // dropping the frame and recreating the swapchain. VK_TIMEOUT/NOT_READY do
+    // not signal the semaphore, and every image that WAS acquired is presented
+    // (the last one carries the real frame), so no signal is leaked.
+    const uint64_t genAcquireTimeout = frameGenAcquireTimeoutNs();
     for (uint32_t k = 0; k < fgPlan_.presents; k++) {
         uint32_t idx = 0;
-        VkResult ar = vk_.AcquireNextImageKHR(device,swapchain,2000000000ULL,
+        VkResult ar = vk_.AcquireNextImageKHR(device,swapchain,
+                                              k == 0 ? 2000000000ULL : genAcquireTimeout,
                                               imgAvailSems[syncSlot(k)],VK_NULL_HANDLE,&idx);
+        if (k > 0 && (ar == VK_TIMEOUT || ar == VK_NOT_READY)) {
+            fgPlan_.presents    = k;
+            fgPlan_.generations = k - 1;
+            break;
+        }
         if (ar==VK_ERROR_OUT_OF_DATE_KHR||ar==VK_ERROR_SURFACE_LOST_KHR){
             // Logged deliberately: when this fires every frame it IS the
             // swapchain-recreate loop, and it used to be invisible.

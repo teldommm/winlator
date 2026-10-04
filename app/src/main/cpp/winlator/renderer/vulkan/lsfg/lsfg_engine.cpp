@@ -184,6 +184,8 @@ bool Engine::prepare(uint32_t width, uint32_t height, VkFormat format) {
     lastCopiedCount_ = 0;
     haveCopied_ = false;
     primeHistory_ = false;
+    lastSharedCount_ = 0;
+    haveShared_ = false;
     planCalls_  = 0;
     warmStreak_ = 0;
     warm_ = false;
@@ -243,7 +245,10 @@ void Engine::process(VkCommandBuffer cmd, VkImage source, uint32_t width, uint32
     lastCount_ = count;
     lastGenerations_ = generations;
 
-    const bool needHistory = generations > 0 || primeHistory_;
+    // generating_ covers the renderer cutting this frame's generations to zero
+    // after plan() (a short acquire): the input ring still advances, so the
+    // next frame does not have to spend a frame re-priming it.
+    const bool needHistory = generations > 0 || primeHistory_ || generating_;
     if (needHistory) {
         copyPresentedFrame(cmd, source, chain_->Input(count), VkExtent2D{width, height});
         lastCopiedCount_ = count;
@@ -255,7 +260,19 @@ void Engine::process(VkCommandBuffer cmd, VkImage source, uint32_t width, uint32
     // nothing spends almost the entire cost of frame generation for no frames
     // at all, every frame - pinning the GPU at 100% regardless of the game's
     // own settings. Only dispatch it when actually generating.
-    if (warm_ && generations > 0) chain_->DispatchShared(cmd, count);
+    if (warm_ && generations > 0) {
+        // The alpha stage reads its own output from the previous shared pass.
+        // If that pass did not run for frame count-1 (first pass after a
+        // build, or generation paused because the pacer planned zero frames,
+        // or an acquire shortfall dropped them), that slot holds stale or
+        // never-written data. Re-prime: the next dispatch writes every history
+        // slot from the current frame, so the first generated frame blends
+        // two consistent inputs instead of garbage.
+        if (!haveShared_ || lastSharedCount_ + 1 != count) chain_->ResetHistory();
+        chain_->DispatchShared(cmd, count);
+        lastSharedCount_ = count;
+        haveShared_ = true;
+    }
 }
 
 void Engine::generateInto(VkCommandBuffer cmd, uint32_t generation, uint32_t targetIndex,
@@ -281,10 +298,23 @@ void Engine::reset() {
     lastCopiedCount_ = 0;
     haveCopied_ = false;
     primeHistory_ = false;
+    lastSharedCount_ = 0;
+    haveShared_ = false;
     warmStreak_ = 0;
     warm_ = false;
     generating_ = false;
     plan_ = {};
+}
+
+void Engine::releaseChain() {
+    chain_.reset();
+    // Force needsRebuild() on the next prepare(), whatever the extent.
+    builtExtent_    = VkExtent2D{};
+    builtFormat_    = VK_FORMAT_UNDEFINED;
+    builtFlowScale_ = 0.0f;
+    // A chain that failed to build at the old size may well build at the next
+    // one; give it a fresh attempt.
+    unavailable_ = false;
 }
 
 } // namespace lsfg

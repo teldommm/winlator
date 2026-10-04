@@ -160,6 +160,20 @@ public class Container {
         putExtra("lsfgMultiplier", String.valueOf(multiplier < 2 ? 0 : Math.max(2, Math.min(4, multiplier))));
     }
 
+    /** Adaptive frame-gen target in Hz; 0 = fixed multiplier (lsfgMultiplier). */
+    public int getLsfgTargetRate() {
+        try {
+            int value = Integer.parseInt(getExtra("lsfgTargetRate", "0"));
+            return Math.max(0, Math.min(1000, value));
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+    }
+
+    public void setLsfgTargetRate(int hz) {
+        putExtra("lsfgTargetRate", String.valueOf(Math.max(0, Math.min(1000, hz))));
+    }
+
     public float getLsfgFlowScale() {
         try {
             return Math.max(0.25f, Math.min(1.0f, Float.parseFloat(getExtra("lsfgFlowScale", "0.80"))));

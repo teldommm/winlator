@@ -14,30 +14,56 @@
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_winlator_cmod_widget_VulkanXServerView_nativeConfigureFrameGen(
     JNIEnv* env, jobject, jlong handle, jstring cachePath, jint multiplier,
-    jfloat flowScale, jfloat refreshHz) {
+    jfloat flowScale, jfloat refreshHz, jint targetRate) {
     auto* ctx = reinterpret_cast<VulkanRendererContext*>(handle);
     if (!ctx) return nullptr;
     if (multiplier < 2) {
         ctx->setFrameGenArmed(false, 0);
         return nullptr;
     }
+    if (!cachePath) {
+        ctx->setFrameGenArmed(false, 0);
+        return env->NewStringUTF("Shader cache is unavailable");
+    }
+    const char* path = env->GetStringUTFChars(cachePath, nullptr);
+    if (!path) return nullptr;
+    const std::string pathStr(path);
+    env->ReleaseStringUTFChars(cachePath, path);
+
+    // The gates depend on which shader set the cache holds: the precompiled
+    // SPIR-V of Lossless 3.2.2+ runs without Vulkan 1.2 / vulkanMemoryModel,
+    // the DXBC-translated set does not.
+    lsfg::Variant variant = lsfg::Variant::None;
+    if (lsfg::cacheVariant(pathStr, variant) != lsfg::DllStatus::Ok) variant = lsfg::Variant::None;
     std::string unsupported;
     {
         std::unique_lock<std::shared_mutex> frameLock(ctx->frameMutex);
-        if (!ctx->fgCapsOk()) unsupported = ctx->lsfgCaps_.reason;
+        if (!ctx->lsfgCaps_.supported(variant)) {
+            lsfg::Caps probe = ctx->lsfgCaps_;
+            lsfg::explain(probe, variant);
+            unsupported = probe.reason;
+        }
     }
     if (!unsupported.empty()) {
         ctx->setFrameGenArmed(false, 0);
         return env->NewStringUTF(unsupported.c_str());
     }
-    if (!cachePath) return env->NewStringUTF("Shader cache is unavailable");
-    const char* path = env->GetStringUTFChars(cachePath, nullptr);
-    if (!path) return nullptr;
-    ctx->setLsfgCachePath(path);
-    env->ReleaseStringUTFChars(cachePath, path);
+    ctx->setLsfgCachePath(pathStr.c_str());
     ctx->setFrameGenTuning(flowScale, refreshHz);
-    ctx->setFrameGenArmed(true, std::clamp((int)multiplier, 2, 4));
+    ctx->setFrameGenArmed(true, std::clamp((int)multiplier, 2, 4), std::max((int)targetRate, 0));
     return nullptr;
+}
+
+// Whether the fp16 shader set can run here: shaderFloat16 was offered and
+// enabled at device creation, along with the common storage-image gates.
+// Java uses it to decide preferFp16 for the cache build.
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_winlator_cmod_widget_VulkanXServerView_nativeFrameGenSupportsFp16(
+    JNIEnv*, jobject, jlong handle) {
+    auto* ctx = reinterpret_cast<VulkanRendererContext*>(handle);
+    if (!ctx) return JNI_FALSE;
+    std::shared_lock<std::shared_mutex> frameLock(ctx->frameMutex);
+    return ctx->lsfgCaps_.featuresEnabled && ctx->lsfgCaps_.float16Enabled ? JNI_TRUE : JNI_FALSE;
 }
 
 // Measured presents/sec (real + generated), already smoothed by the renderer

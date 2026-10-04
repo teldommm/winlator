@@ -167,7 +167,7 @@ bool VulkanRendererContext::ensureLsfgEngine() {
 }
 
 bool VulkanRendererContext::fgCapsOk() const {
-    return lsfgCaps_.supported();
+    return lsfgCaps_.supported(lsfgCacheVariant_);
 }
 
 void VulkanRendererContext::ensureFgQueryPool() {
@@ -301,6 +301,10 @@ void VulkanRendererContext::setLsfgCachePath(const char* path) {
     // generation kept re-measuring from scratch instead of settling.
     if (next == lsfgCachePath_ && lsfgEngine_) return;
     lsfgCachePath_ = next;
+    lsfg::Variant variant = lsfg::Variant::None;
+    if (!next.empty() && lsfg::cacheVariant(next, variant) != lsfg::DllStatus::Ok)
+        variant = lsfg::Variant::None;
+    lsfgCacheVariant_ = variant;
     lsfgEngineTried_ = false;    // a new cache deserves a fresh attempt
     vk_.DeviceWaitIdle(device);
     lsfgEngine_.reset();
@@ -455,11 +459,17 @@ void VulkanRendererContext::trackPresentedRate(uint32_t presents) {
     fgSourceAccum_     = 0;
 }
 
-void VulkanRendererContext::setFrameGenArmed(bool armed, int multiplier) {
+void VulkanRendererContext::setFrameGenArmed(bool armed, int multiplier, int targetRate) {
     std::unique_lock<std::shared_mutex> frameLock(frameMutex);
     const bool was = fgArmed_.load(std::memory_order_relaxed);
     const int  wasMult = fgMultiplier_.load(std::memory_order_relaxed);
     fgMultiplier_.store(multiplier, std::memory_order_relaxed);
+    // Target rate (adaptive mode): 0 = fixed multiplier. Above zero the pacer
+    // decides per source frame how many frames to generate (up to 3) to hit
+    // this rate, clamped to the panel's refresh rate.
+    const int nextTarget = std::max(targetRate, 0);
+    if (fgTargetRate_.exchange(nextTarget, std::memory_order_relaxed) != nextTarget)
+        fgConfigDirty_.store(true, std::memory_order_relaxed);
     // A multiplier change must reach the pacer, or it keeps capping at the
     // level it was built with.
     if (wasMult != multiplier) {
@@ -535,4 +545,39 @@ void VulkanRendererContext::copyCompositeToSwapchain(VkCommandBuffer cb, uint32_
     post.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT; post.dstAccessMask=0;
     vk_.CmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT,
         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0,nullptr, 0,nullptr, 1,&post);
+}
+
+// Largest window the guest is actually drawing, from the previous frame's draw
+// list (only the render thread writes frameDraws, and this runs on it). This is
+// what the flow pyramid is scaled against: a game rendering in a 1280x720
+// window inside a 1920x1080 container needs a 1280-wide flow field, not a
+// container-wide one. Before anything has been drawn this reports nothing, so
+// the engine keeps the user's flow scale rather than locking its peak to the
+// container size on the very first frame.
+void VulkanRendererContext::guestExtentForFrameGen(uint32_t& w, uint32_t& h) const {
+    w = h = 0;
+    uint64_t bestArea = 0;
+    for (const auto& de : frameDraws) {
+        if (de.w <= 0 || de.h <= 0) continue;
+        const uint64_t area = (uint64_t)de.w * (uint64_t)de.h;
+        if (area > bestArea) {
+            bestArea = area;
+            w = (uint32_t)de.w;
+            h = (uint32_t)de.h;
+        }
+    }
+    // A draw larger than the container is a stale texture mid-resize; clamp.
+    if (containerWidth > 0 && w > (uint32_t)containerWidth) w = (uint32_t)containerWidth;
+    if (containerHeight > 0 && h > (uint32_t)containerHeight) h = (uint32_t)containerHeight;
+}
+
+// About one refresh interval, bounded to 2..20 ms (GameNative's bound): long
+// enough for a FIFO swapchain to release an image at the next vblank, short
+// enough that a missing generated frame never stalls the real one.
+uint64_t VulkanRendererContext::frameGenAcquireTimeoutNs() const {
+    const float hz = fgRefreshHz_.load(std::memory_order_relaxed);
+    uint64_t ns = hz > 1.0f ? (uint64_t)(1.0e9f / hz) : 16666667ULL;
+    if (ns < 2000000ULL)  ns = 2000000ULL;
+    if (ns > 20000000ULL) ns = 20000000ULL;
+    return ns;
 }

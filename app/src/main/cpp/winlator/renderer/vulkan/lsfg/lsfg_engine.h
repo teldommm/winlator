@@ -89,6 +89,12 @@ public:
     void forgetTargets();
     void reset();
 
+    // Drop the interpolation chain (all per-resolution images and descriptor
+    // sets) but keep the 25 compiled shader modules, so turning frame
+    // generation off frees its VRAM while turning it back on only rebuilds the
+    // chain, not the pipelines. The next prepare() rebuilds from scratch.
+    void releaseChain();
+
 private:
     float effectiveFlowScale(uint32_t width) const;
 
@@ -113,6 +119,11 @@ private:
     uint64_t lastCopiedCount_{};
     bool     haveCopied_{};
     bool     primeHistory_{};
+    // Last frame the shared (flow-pyramid) chain actually ran for. The alpha
+    // stage keeps a two-slot history of its own; a gap in shared dispatches
+    // leaves the other slot stale, so the chain's history is re-primed.
+    uint64_t lastSharedCount_{};
+    bool     haveShared_{};
     uint64_t primeLogCount_{};
     uint64_t lastCount_{};
     size_t   lastGenerations_{};

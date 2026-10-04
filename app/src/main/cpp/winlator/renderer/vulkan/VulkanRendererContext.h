@@ -406,6 +406,7 @@ public:
     // session. Read on the render thread; false keeps every path as it was.
     std::atomic<bool> fgArmed_{false};
     std::atomic<int>  fgMultiplier_{0};
+    std::atomic<int>  fgTargetRate_{0};   // 0 = fixed multiplier, >0 = adaptive target Hz
     // Tuning is written by the UI thread and consumed by the render thread, so
     // it is published through atomics and applied to the engine at the top of
     // the frame-gen block. The UI thread never touches the engine itself.
@@ -478,6 +479,8 @@ public:
     // swapchain, so no stale pending signal can survive into the new one.
     void recreateSyncObjects();
     uint32_t fgAcquireFailLog_ = 0;
+    uint64_t frameGenAcquireTimeoutNs() const;
+    void     guestExtentForFrameGen(uint32_t& w, uint32_t& h) const;
 
     // Measured PRESENTS per second - the rate that actually reaches the panel,
     // counting generated frames. The pacer's own "loop rate" cannot serve this
@@ -521,9 +524,12 @@ public:
     void readFgQueryResult();
 
     lsfg::Caps lsfgCaps_{};
+    // Variant of the cache currently selected (read from its header in
+    // setLsfgCachePath); decides which gate set fgCapsOk() applies.
+    lsfg::Variant lsfgCacheVariant_ = lsfg::Variant::None;
     uint32_t fgSwapchainCapacity_ = 0;
     void setLsfgCachePath(const char* path);
-    void setFrameGenArmed(bool armed, int multiplier);
+    void setFrameGenArmed(bool armed, int multiplier, int targetRate = 0);
     void setFrameGenTuning(float flowScale, float refreshHz);
     void frameGenStats(float out[6]) const;
 

@@ -4,17 +4,26 @@
 // generation.
 //
 // The Lossless Scaling chain is 25 compute shaders that DXVK's DXBC translator
-// emits as SPIR-V 1.6 with OpCapability VulkanMemoryModel and
+// emits as SPIR-V 1.5 (vendored DXVK patched down from 1.6, see
+// dxbc_compiler.cpp) with OpCapability VulkanMemoryModel and
 // StorageImageWriteWithoutFormat. Three consequences, all checked here:
 //
-//   * SPIR-V 1.6 will not load on a Vulkan 1.1 device, so the DEVICE (not just
-//     the instance) must report 1.3+.
+//   * SPIR-V 1.5 needs a Vulkan 1.2 DEVICE (not just instance); memory model
+//     is core there.
 //   * vulkanMemoryModel, shaderStorageImageWriteWithoutFormat and
 //     shaderStorageImageExtendedFormats must be ENABLED at device creation.
 //     Today the renderer enables no features at all, so all three are off.
 //   * `generate` writes into a storage image, and Android swapchain formats
 //     are frequently not storage-capable — so the format is probed separately
 //     once the swapchain has picked one.
+//
+// That is the DXBC-TRANSLATED variant only. Lossless Scaling 3.2.2 also ships
+// precompiled SPIR-V (base+49 fp16, base+98 fp32; checked on the real DLL:
+// 25/25 modules each). Those are SPIR-V 1.0 with the GLSL450 memory model and
+// need only StorageImageWriteWithoutFormat + StorageImageExtendedFormats (+
+// ImageQuery, core) - no Vulkan 1.2, no vulkanMemoryModel. The fp16 set adds
+// OpCapability Float16 (23 of 25 modules), i.e. shaderFloat16. So the gate is
+// evaluated PER VARIANT: supported(variant).
 //
 // A device failing any gate reports unsupported UP FRONT, with a reason, so
 // the UI can grey the engine out instead of failing later inside
@@ -24,57 +33,65 @@
 #include <vulkan/vulkan.h>
 #include <cstdint>
 
+#include "lsfg_dll.h"
+
 struct VkTable;
 
 namespace lsfg {
 
-// Which of the three required features the physical device OFFERS. Queried
-// before vkCreateDevice; what we actually enable is recorded in Caps below.
+// What the physical device OFFERS. Queried before vkCreateDevice; what we
+// actually enable is recorded in Caps below.
 struct FeatureSupport {
     bool queried                     = false;  // vkGetPhysicalDeviceFeatures2 resolved
-    bool apiAtLeast13                = false;
+    bool apiAtLeast12                = false;
     bool vulkanMemoryModel           = false;
     bool vulkanMemoryModelDeviceScope= false;
     bool storageImageWriteWithoutFormat = false;
     bool storageImageExtendedFormats = false;
+    bool shaderFloat16               = false;
     uint32_t deviceApiVersion        = 0;
 
-    // Every hard device-level gate passes (format is checked separately).
-    bool deviceGatesPass() const {
-        return queried && apiAtLeast13 && vulkanMemoryModel
-            && storageImageWriteWithoutFormat && storageImageExtendedFormats;
+    // Gates every variant needs (the precompiled SPIR-V 1.0 sets).
+    bool nativeGatesPass() const {
+        return queried && storageImageWriteWithoutFormat && storageImageExtendedFormats;
+    }
+    // Additional gates of the DXVK-translated set (SPIR-V 1.5 + memory model).
+    bool translatedGatesPass() const {
+        return nativeGatesPass() && apiAtLeast12 && vulkanMemoryModel;
     }
 };
 
-// What was actually enabled + the running verdict. Owned by the renderer.
 struct Caps {
     FeatureSupport features;
-    bool featuresEnabled   = false;  // the chain was passed to vkCreateDevice
+    bool featuresEnabled     = false;  // storage-image features passed to vkCreateDevice
+    bool memoryModelEnabled  = false;  // vulkanMemoryModel passed to vkCreateDevice
+    bool float16Enabled      = false;  // shaderFloat16 passed to vkCreateDevice
     bool storageOnSwapchainFormat = false;
     bool linearBlitOnSwapchainFormat = false;
     VkFormat probedFormat  = VK_FORMAT_UNDEFINED;
     char reason[160]       = "not probed";
 
-    // The single question the UI and the render path ask.
-    bool supported() const {
-        return featuresEnabled && features.deviceGatesPass() && storageOnSwapchainFormat;
+    // Can this device run a cache of the given variant? Variant::None (not
+    // known yet) is judged by the strictest set, the translated one.
+    bool supported(Variant v) const {
+        if (!featuresEnabled || !features.nativeGatesPass() || !storageOnSwapchainFormat)
+            return false;
+        switch (v) {
+            case Variant::SpirvFp32: return true;
+            case Variant::SpirvFp16: return float16Enabled;
+            default:                 return memoryModelEnabled && features.translatedGatesPass();
+        }
     }
 };
 
-// Ask the physical device which of the required features it offers.
-// Safe on any driver: if vkGetPhysicalDeviceFeatures2 cannot be resolved, or
-// the device reports below Vulkan 1.2, nothing is chained and `queried` is
-// left false — the caller then creates the device exactly as it always has.
 FeatureSupport queryFeatures(const VkTable& vk, VkPhysicalDevice pd);
 
-// Probe VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT on the live swapchain format.
-// `generate` writes into an image of this format via a compute dispatch.
 bool probeStorageFormat(const VkTable& vk, VkPhysicalDevice pd, VkFormat fmt);
 
-// Whether this format supports filtered capture-resolution blits.
 bool probeLinearBlit(const VkTable& vk, VkPhysicalDevice pd, VkFormat fmt);
 
-// Fill caps.reason with the FIRST gate that failed (or "supported").
-void explain(Caps& caps);
+// Fill caps.reason for the given variant (default: what this device can run
+// at best, i.e. the precompiled fp32 set, noting if translation is out).
+void explain(Caps& caps, Variant v = Variant::None);
 
 } // namespace lsfg
