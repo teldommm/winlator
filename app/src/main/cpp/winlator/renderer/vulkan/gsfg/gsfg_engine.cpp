@@ -182,9 +182,10 @@ private:
 // ============================================================================
 class Chain {
 public:
-    Chain(VkDevice dev, VkPhysicalDevice pd, const Pipelines& pl, int variant, uint32_t W, uint32_t H, float S)
+    Chain(VkDevice dev, VkPhysicalDevice pd, const Pipelines& pl, int variant, uint32_t W, uint32_t H, float S,
+          Layout layout)
         : dev_(dev), pl_(pl) {
-        if (!buildGraph(variant, W, H, S, graph_)) return;
+        if (!buildGraph(variant, W, H, S, graph_, layout)) return;
         valid_ = createResources(pd) && createDescriptors();
         if (!valid_) destroy();
     }
@@ -198,7 +199,7 @@ public:
     // to be generated, also run every stage they share. `cold`: no valid
     // temporal state, so the shared stages read the cold inputs.
     void ingest(VkCommandBuffer cmd, VkImage source, uint64_t count, uint32_t n, bool cold) {
-        const int r = (int)(count % kRing);
+        const int r = (int)(count % (uint64_t)graph_.phases);
         if (!initialised_) initResources(cmd);
 
         fullBarrier(cmd);
@@ -238,7 +239,7 @@ public:
     // Generated frame g of n: its own block of the graph, then - after the last
     // one - the prior pass that carries this frame's flow into the next frame.
     void generate(VkCommandBuffer cmd, uint64_t count, uint32_t n, uint32_t g, bool prior) {
-        const int r = (int)(count % kRing);
+        const int r = (int)(count % (uint64_t)graph_.phases);
         const int ti = (int)n - 1;
         const Template& t = graph_.tmpl[ti];
         fullBarrier(cmd);
@@ -366,9 +367,9 @@ private:
             for (const Dispatch& d : t.disp) {
                 bool cold = false;
                 for (const Binding& b : d.bind) cold |= b.cold >= 0;
-                count(d, cold ? 2 * kRing : kRing);
+                count(d, (uint32_t)(cold ? 2 * graph_.phases : graph_.phases));
             }
-            count(t.prior, kRing);
+            count(t.prior, (uint32_t)graph_.phases);
         }
         VkDescriptorPoolSize ps[3] = {
             {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, nImg},
@@ -381,7 +382,7 @@ private:
 
         for (int ti = 0; ti < 3; ti++) {
             const Template& t = graph_.tmpl[ti];
-            for (int r = 0; r < kRing; r++) {
+            for (int r = 0; r < graph_.phases; r++) {
                 sets_[ti][r].resize(t.disp.size());
                 for (size_t d = 0; d < t.disp.size(); d++) {
                     if (!makeSet(t.disp[d], r, false, sets_[ti][r][d])) return false;
@@ -491,9 +492,9 @@ private:
     std::vector<VkBuffer> buffers_;
     std::vector<VkDeviceMemory> mems_;
     VkDescriptorPool pool_{};
-    std::vector<VkDescriptorSet> sets_[3][kRing];
-    VkDescriptorSet priorSets_[3][kRing]{};
-    std::vector<std::pair<int, VkDescriptorSet>> coldSets_[3][kRing];
+    std::vector<VkDescriptorSet> sets_[3][kPhases];
+    VkDescriptorSet priorSets_[3][kPhases]{};
+    std::vector<std::pair<int, VkDescriptorSet>> coldSets_[3][kPhases];
 };
 
 // ============================================================================
@@ -575,7 +576,7 @@ bool Engine::prepare(uint32_t width, uint32_t height, VkFormat format) {
 
     const float scale = effectiveFlowScale(width);
     chain_.reset();      // the old images may still be referenced; the caller waits for idle first
-    chain_ = std::make_unique<Chain>(device_, physical_, *pipelines_, variant_, width, height, scale);
+    chain_ = std::make_unique<Chain>(device_, physical_, *pipelines_, variant_, width, height, scale, layout_);
     if (!chain_->valid()) {
         GSFG_LOGW("graph build failed at %ux%u; frame generation unavailable", width, height);
         chain_.reset();
@@ -668,6 +669,12 @@ void Engine::generateInto(VkCommandBuffer cmd, uint32_t generation) {
 
 VkImage Engine::finalImage(uint32_t generation) const {
     return chain_ ? chain_->finalImage(generation, lastGenerations_) : VK_NULL_HANDLE;
+}
+
+void Engine::setLayout(Layout layout) {
+    if (layout == layout_) return;
+    layout_ = layout;
+    chain_.reset();   // rebuilt by the next prepare()
 }
 
 float Engine::sourceRate() const { return pacer_.Stats().source_rate; }

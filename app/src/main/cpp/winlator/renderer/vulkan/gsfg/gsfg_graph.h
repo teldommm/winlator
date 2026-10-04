@@ -21,6 +21,15 @@
 // The shapes, push constants and bindings are those of the reference
 // implementation (libGameScopeV2.so), as recovered from its traces. Barriers
 // are not stored: they follow from the read/write sets of the dispatches.
+//
+// Two resource layouts compute the same frames:
+//   Reference  resources exactly as the reference allocates them (what the
+//              trace comparisons check)
+//   Compact    the default: the flow-resolution copy and the image pyramid
+//              exist once instead of once per ring slot (they never outlive
+//              the encode of their own frame), and only two copies of the
+//              input frame are kept (synthesis reads frames N-1 and N only).
+//              Verified bit-exact against Reference on a real Vulkan device.
 // ============================================================================
 
 #include <cstdint>
@@ -32,7 +41,8 @@
 namespace gsfg {
 
 constexpr int kLevels   = 7;     // pyramid and feature levels 0..6
-constexpr int kRing     = 3;     // source frames kept: current, previous, oldest
+constexpr int kRing     = 3;     // source frames whose features are kept: current, previous, oldest
+constexpr int kPhases   = 6;     // descriptor phases: frame count % 6 covers rings of 3 and of 2
 constexpr int kGenBlock = 21;    // dispatches per generated frame
 constexpr int kMaxBind  = 13;
 
@@ -68,13 +78,13 @@ struct BufferDesc {
 enum class BindKind : uint8_t { Sampled, Storage, Buffer };
 
 // One descriptor. `res` is an image index (Sampled/Storage) or a buffer index,
-// one per ring position (frame count % 3). `cold` (if >= 0) replaces it on a
-// generating frame without valid temporal state.
+// one per phase (frame count % Graph::phases). `cold` (if >= 0) replaces it on
+// a generating frame without valid temporal state.
 struct Binding {
     uint8_t  binding;
     BindKind kind;
     int8_t   sampler;          // Sampled only: 0 clamp-to-border, 1 clamp-to-edge
-    uint16_t res[kRing];
+    uint16_t res[kPhases];
     int16_t  cold;
 };
 
@@ -97,17 +107,22 @@ struct Template {
     Dispatch prior;            // after the last generated frame
 };
 
+enum class Layout : uint8_t { Compact, Reference };
+
 struct Graph {
     int      variant = 0;      // 0 standard shaders, 1 Adreno 840 shaders
+    Layout   layout = Layout::Compact;
+    int      phases = kRing;   // descriptor phases in use: 3 (Reference) or 6 (Compact)
     Geometry geo;
     std::vector<ImageDesc>  images;
     std::vector<BufferDesc> buffers;
-    uint16_t input[kRing] = {};    // ring slot images that receive the composited frame
+    uint16_t input[kPhases] = {};  // per phase: the image that receives the composited frame
     uint16_t output = 0;           // final frame, capture size, RGBA8
     Template tmpl[3];              // n = 1..3
 };
 
-bool buildGraph(int variant, uint32_t width, uint32_t height, float scale, Graph& out);
+bool buildGraph(int variant, uint32_t width, uint32_t height, float scale, Graph& out,
+                Layout layout = Layout::Compact);
 
 // ---- shader interface ---------------------------------------------------------
 // Descriptor layout of each pipeline (as the reference declares it; a few

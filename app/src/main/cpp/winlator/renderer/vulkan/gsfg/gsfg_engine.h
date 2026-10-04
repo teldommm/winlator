@@ -28,6 +28,7 @@
 #include <vulkan/vulkan.h>
 
 #include "gsfg_pacer.hpp"
+#include "gsfg_graph.h"
 
 namespace gsfg {
 
@@ -79,6 +80,9 @@ public:
     void reset();
 
     // Test hooks.
+    // Resource layout of the graph (gsfg_graph.h); Reference reproduces the reference
+    // implementation's allocation for trace comparisons. Takes effect on the next build.
+    void setLayout(Layout layout);
     int  selectedVariant() const { return variant_; }
     int  selectedClass() const { return cls_; }
 
@@ -92,6 +96,7 @@ private:
     Pacer  pacer_;
     PacerPlan plan_{};
     int    variant_{0};
+    Layout layout_{Layout::Compact};
     int    cls_{1};
 
     VkExtent2D builtExtent_{};

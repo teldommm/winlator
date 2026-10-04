@@ -88,16 +88,22 @@ int bufferAccess(int pipe, int binding) {
 }
 
 // ---- builder ---------------------------------------------------------------
-// A resource reference resolved per ring position r (= frame count % 3).
-struct Ref { uint16_t r[kRing]; };
-Ref fixed(int i) { return Ref{{(uint16_t)i, (uint16_t)i, (uint16_t)i}}; }
+// A resource reference resolved per phase p (= frame count % kPhases).
+struct Ref { uint16_t r[kPhases]; };
+Ref fixed(int i) { Ref x; for (int p = 0; p < kPhases; p++) x.r[p] = (uint16_t)i; return x; }
 
-// Per-frame resources live in three slots; ring position r writes slot r.
+// Per-frame resources kept in `n` slots (1..3); frame count c writes slot c % n.
 struct Slotted {
-    uint16_t s[kRing];
-    Ref cur()    const { return Ref{{s[0], s[1], s[2]}}; }
-    Ref prev()   const { return Ref{{s[2], s[0], s[1]}}; }   // frame N-1
-    Ref oldest() const { return Ref{{s[1], s[2], s[0]}}; }   // frame N-2
+    int      n = kRing;
+    uint16_t s[kRing] = {};
+    Ref at(int back) const {   // frame N - back
+        Ref x;
+        for (int p = 0; p < kPhases; p++) x.r[p] = s[((p - back) % n + n) % n];
+        return x;
+    }
+    Ref cur()    const { return at(0); }
+    Ref prev()   const { return at(1); }
+    Ref oldest() const { return at(2); }
 };
 
 struct FlowLevel {             // one level of a flow branch
@@ -139,7 +145,7 @@ private:
     static Binding mk(int b, BindKind k, int s, Ref r, int cold) {
         Binding x{};
         x.binding = (uint8_t)b; x.kind = k; x.sampler = (int8_t)s; x.cold = (int16_t)cold;
-        for (int i = 0; i < kRing; i++) x.res[i] = r.r[i];
+        for (int i = 0; i < kPhases; i++) x.res[i] = r.r[i];
         return x;
     }
     Graph& g_;
@@ -207,10 +213,13 @@ Geometry makeGeometry(uint32_t width, uint32_t height, float scale) {
     return g;
 }
 
-bool buildGraph(int variant, uint32_t width, uint32_t height, float scale, Graph& g) {
+bool buildGraph(int variant, uint32_t width, uint32_t height, float scale, Graph& g, Layout layout) {
     if (width < 1 || height < 1) return false;
     g = Graph{};
     g.variant = variant;
+    g.layout = layout;
+    const bool compact = layout == Layout::Compact;
+    g.phases = compact ? kPhases : kRing;
     g.geo = makeGeometry(width, height, scale);
     const Geometry& G = g.geo;
     const Extent* F = G.feat;
@@ -232,15 +241,25 @@ bool buildGraph(int variant, uint32_t width, uint32_t height, float scale, Graph
     const uint16_t nullL2    = b.image("null.l2",     kRGBA16F, {1, 1}, 2, kWork);
     g.output                 = b.image("synth.output", kRGBA8, G.input, 1, kWorkTx);
 
+    // Per-frame resources. Features are read by the next two frames (ring of 3);
+    // the input copy by the next frame only; the flow copy and the pyramid only by
+    // the encode of their own frame. Reference keeps three of everything.
     Slotted input{}, flowImg{}, pyr[kLevels]{}, feat[kLevels]{};
+    input.n = compact ? 2 : kRing;
+    const int scratchSlots = compact ? 1 : kRing;
+    flowImg.n = full ? input.n : scratchSlots;   // at full scale the flow field is the input itself
+    for (int j = 0; j < kLevels; j++) { pyr[j].n = j == 0 ? flowImg.n : scratchSlots; feat[j].n = kRing; }
     for (int s = 0; s < kRing; s++) {
-        input.s[s] = b.image("frame.input", kRGBA8, G.input, 1, kInput);
-        // At full scale the flow field is the frame itself; otherwise it is downscaled first.
-        flowImg.s[s] = full ? input.s[s] : b.image("frame.flow", kRGBA8, G.flow, 1, kWork);
-        pyr[0].s[s] = flowImg.s[s];
-        for (int j = 1; j < kLevels; j++) pyr[j].s[s] = b.image("frame.pyramid" + std::to_string(j), kRGBA16F, G.pyr[j], 1, kWork);
+        if (s < input.n) input.s[s] = b.image("frame.input", kRGBA8, G.input, 1, kInput);
+        if (s < flowImg.n) flowImg.s[s] = full ? input.s[s] : b.image("frame.flow", kRGBA8, G.flow, 1, kWork);
+        if (s < pyr[0].n) pyr[0].s[s] = flowImg.s[s];
+        if (s < scratchSlots)
+            for (int j = 1; j < kLevels; j++) pyr[j].s[s] = b.image("frame.pyramid" + std::to_string(j), kRGBA16F, G.pyr[j], 1, kWork);
         for (int k = 0; k < kLevels; k++) feat[k].s[s] = b.image("frame.features" + std::to_string(k), kRGBA8, F[k], 3, kWork);
-        g.input[s] = input.s[s];
+    }
+    {
+        const Ref in = input.cur();
+        for (int p = 0; p < kPhases; p++) g.input[p] = in.r[p];
     }
 
     const uint16_t stablePre = b.image("temporal.pre", kRGBA8, F[0], 4, kWorkTx);
