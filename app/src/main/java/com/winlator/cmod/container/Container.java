@@ -172,6 +172,23 @@ public class Container {
         putExtra("lsfgFlowScale", String.format(java.util.Locale.US, "%.2f", Math.max(0.25f, Math.min(1.0f, flowScale))));
     }
 
+    /** Frame generation paced to this many presents per second; 0 = the fixed multiplier. */
+    public int getLsfgTargetFps() {
+        try {
+            return clampLsfgTargetFps(Integer.parseInt(getExtra("lsfgTargetFps", "0")));
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+    }
+
+    public void setLsfgTargetFps(int fps) {
+        putExtra("lsfgTargetFps", String.valueOf(clampLsfgTargetFps(fps)));
+    }
+
+    public static int clampLsfgTargetFps(int fps) {
+        return fps <= 0 ? 0 : Math.min(fps, 1000);
+    }
+
     public String getDXWrapper() {
         return dxwrapper;
     }

@@ -85,6 +85,7 @@ import com.winlator.cmod.midi.MidiManager;
 import com.winlator.cmod.ui.GraphicsPanelCallbacks;
 import com.winlator.cmod.ui.GraphicsPanelState;
 import com.winlator.cmod.ui.GraphicsSidebarPanelHost;
+import com.winlator.cmod.ui.GraphicsSidebarPanelKt;
 import com.winlator.cmod.ui.HudPanelCallbacks;
 import com.winlator.cmod.ui.HudPanelState;
 import com.winlator.cmod.ui.HudSidebarPanelHost;
@@ -183,6 +184,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private Shortcut shortcut;
     private int activeLsfgMultiplier;
     private float activeLsfgFlowScale = 0.80f;
+    // GSFG "Target FPS" mode: presents paced to this rate (0 = fixed multiplier).
+    private int activeLsfgTargetFps;
     private boolean graphicsFsrEnabled;
     private int graphicsUpscalerModeIndex;
     private int graphicsPostFxModeIndex;
@@ -1213,7 +1216,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     : container != null ? container.getLsfgFlowScale() : 0.80f;
             activeLsfgMultiplier = lsfgMultiplier;
             activeLsfgFlowScale = lsfgFlowScale;
+            activeLsfgTargetFps = shortcut != null ? shortcut.getLsfgTargetFps()
+                    : container != null ? container.getLsfgTargetFps() : 0;
             vkRenderer.setFrameGenRefreshRate(pickHighestRefreshRate());
+            vkRenderer.setFrameGenTargetRate(lsfgMultiplier >= 2 ? activeLsfgTargetFps : 0);
             vkRenderer.setFrameGenNative(lsfgMultiplier, lsfgFlowScale);
         }
 
@@ -1720,8 +1726,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 0,  // ReShade never persisted anything in the original either — always starts Off
                 graphicsReshadeStrength,
                 vkRenderer != null,
-                activeLsfgMultiplier < 2 ? 0 : Math.min(3, activeLsfgMultiplier - 1),
-                activeLsfgFlowScale
+                activeLsfgMultiplier < 2 ? 0
+                        : activeLsfgTargetFps > 0 ? GraphicsSidebarPanelKt.FRAMEGEN_TARGET_INDEX
+                        : Math.min(3, activeLsfgMultiplier - 1),
+                activeLsfgFlowScale,
+                activeLsfgTargetFps,
+                Math.round(pickHighestRefreshRate())
         );
 
         GraphicsPanelCallbacks callbacks = new GraphicsPanelCallbacks() {
@@ -1793,16 +1803,44 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
             @Override
             public void onFrameGenChanged(int multiplierIndex) {
-                activeLsfgMultiplier = multiplierIndex < 1 ? 0 : multiplierIndex + 1;
+                // Target FPS keeps frame generation armed at the largest multiplier (the
+                // pacer decides per frame how many to generate); the other modes clear it.
+                boolean target = multiplierIndex == GraphicsSidebarPanelKt.FRAMEGEN_TARGET_INDEX;
+                if (target) {
+                    activeLsfgMultiplier = 4;
+                    if (activeLsfgTargetFps <= 0) activeLsfgTargetFps = Math.max(1, Math.round(pickHighestRefreshRate()));
+                } else {
+                    activeLsfgMultiplier = multiplierIndex < 1 ? 0 : multiplierIndex + 1;
+                }
+                int targetFps = target ? activeLsfgTargetFps : 0;
                 if (shortcut != null) {
                     shortcut.setLsfgMultiplier(activeLsfgMultiplier);
+                    shortcut.setLsfgTargetFps(targetFps);
                     shortcut.saveData();
                 } else if (container != null) {
                     container.setLsfgMultiplier(activeLsfgMultiplier);
+                    container.setLsfgTargetFps(targetFps);
                     container.saveData();
                 }
-                if (vkRenderer != null)
+                if (vkRenderer != null) {
+                    vkRenderer.setFrameGenTargetRate(targetFps);
                     vkRenderer.setFrameGenNative(activeLsfgMultiplier, activeLsfgFlowScale);
+                }
+            }
+
+            @Override
+            public void onFrameGenTargetFpsChanged(int fps) {
+                int clamped = com.winlator.cmod.container.Container.clampLsfgTargetFps(fps);
+                if (clamped <= 0 || clamped == activeLsfgTargetFps) return;
+                activeLsfgTargetFps = clamped;
+                if (shortcut != null) {
+                    shortcut.setLsfgTargetFps(activeLsfgTargetFps);
+                    shortcut.saveData();
+                } else if (container != null) {
+                    container.setLsfgTargetFps(activeLsfgTargetFps);
+                    container.saveData();
+                }
+                if (vkRenderer != null) vkRenderer.setFrameGenTargetRate(activeLsfgTargetFps);
             }
 
             @Override

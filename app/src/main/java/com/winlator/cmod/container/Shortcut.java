@@ -354,4 +354,19 @@ public class Shortcut {
         float clamped = Math.max(0.25f, Math.min(1.0f, flowScale));
         putExtra("lsfgFlowScale", String.format(java.util.Locale.US, "%.2f", clamped));
     }
+
+    public int getLsfgTargetFps() {
+        String value = getExtra("lsfgTargetFps", null);
+        try {
+            return value != null && !value.isEmpty()
+                    ? Container.clampLsfgTargetFps(Integer.parseInt(value))
+                    : container.getLsfgTargetFps();
+        } catch (NumberFormatException e) {
+            return container.getLsfgTargetFps();
+        }
+    }
+
+    public void setLsfgTargetFps(int fps) {
+        putExtra("lsfgTargetFps", String.valueOf(Container.clampLsfgTargetFps(fps)));
+    }
 }
