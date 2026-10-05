@@ -8,15 +8,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.winlator.cmod.XServerDisplayActivity
 import com.winlator.cmod.container.ContainerManager
 import com.winlator.cmod.container.Shortcut
 import com.winlator.cmod.contents.ContentsManager
 import com.winlator.cmod.core.FileUtils
-import com.winlator.cmod.ui.ThemedAlertHost
 import com.winlator.cmod.ui.toast.WinToast
 import com.winlator.cmod.ui.shortcut.ShortcutSettingsComposeDialog
 import com.winlator.cmod.ui.theme.findActivity
@@ -41,6 +43,26 @@ fun GameDetailRoute(shortcutPath: String, onClose: () -> Unit, onLibraryChanged:
     }
 
     val baseName = remember(shortcut) { FileUtils.getBasename(shortcut.file.path) }
+
+    // Bumped whenever the screen comes back to the front (after a game, after the launcher's
+    // "add to home screen" prompt): the stats and the home-screen state are read again.
+    var refreshTick by remember { mutableIntStateOf(0) }
+    var pinTick by remember { mutableIntStateOf(0) }
+    // The first resume is the screen opening: the effects below already load for it.
+    val firstResume = remember { booleanArrayOf(true) }
+    LifecycleResumeEffect(shortcutPath) {
+        if (firstResume[0]) firstResume[0] = false else refreshTick++
+        onPauseOrDispose { }
+    }
+    // Playtime / plays / last launch first (cheap), the folder size once it has been measured.
+    val stats by produceState(GameStats(), shortcut, refreshTick) {
+        val basic = withContext(Dispatchers.IO) { GameStatsLoader.load(activity, shortcut) }
+        value = basic.copy(sizeText = value.sizeText)
+        value = basic.copy(sizeText = withContext(Dispatchers.IO) { GameStatsLoader.sizeText(activity, shortcut) })
+    }
+    val homePinned by produceState(false, shortcut, refreshTick, pinTick) {
+        value = withContext(Dispatchers.IO) { HomeShortcuts.isPinned(activity, shortcut) }
+    }
     // Both are passed on: the screen picks the banner, or blurs/frames the cover when that is all
     // there is (a portrait cover stretched over the header looked wrong).
     // The user's own background (banners/NAME.user.png) wins over the downloaded banner.
@@ -104,24 +126,45 @@ fun GameDetailRoute(shortcutPath: String, onClose: () -> Unit, onLibraryChanged:
                 onLibraryChanged()
             }
 
+            // Already confirmed in the screen's own dialog. Same clean-up as the Library tile's Remove:
+            // the shortcut file and its .lnk/.bat, the artwork nobody else uses, the home-screen icon.
             override fun onRemove() {
-                ThemedAlertHost.confirm(
-                    activity,
-                    "Remove shortcut?",
-                    "Do you want to remove this shortcut?",
-                    "Remove",
-                    {
-                        if (shortcut.file.delete()) {
-                            ArtworkRepository.deleteArtworkIfUnused(activity, shortcut.file)
-                            onLibraryChanged()
-                            onClose()
-                            WinToast.show(activity, "Shortcut removed", Toast.LENGTH_SHORT)
-                        } else {
-                            WinToast.show(activity, "Couldn't remove shortcut", Toast.LENGTH_LONG)
-                        }
-                    },
-                    true
-                )
+                if (shortcut.file.delete()) {
+                    val base = shortcut.file.path.substringBeforeLast('.', "")
+                    if (base.isNotEmpty()) {
+                        File("$base.lnk").delete()
+                        File("$base.bat").delete()
+                    }
+                    ArtworkRepository.deleteArtworkIfUnused(activity, shortcut.file)
+                    HomeShortcuts.unpin(activity, shortcut)
+                    onLibraryChanged()
+                    onClose()
+                    WinToast.show(activity, "Shortcut removed", Toast.LENGTH_SHORT)
+                } else {
+                    WinToast.show(activity, "Couldn't remove shortcut", Toast.LENGTH_LONG)
+                }
+            }
+
+            override fun onPinHome() {
+                when (HomeShortcuts.pin(activity, shortcut)) {
+                    HomeShortcuts.PinResult.Unsupported ->
+                        WinToast.show(activity, "Your launcher doesn't support pinned shortcuts", Toast.LENGTH_LONG)
+                    HomeShortcuts.PinResult.Restored -> {
+                        WinToast.show(activity, "Home screen shortcut restored", Toast.LENGTH_SHORT)
+                        pinTick++
+                    }
+                    // The launcher shows its own prompt; the state is read again when we come back.
+                    HomeShortcuts.PinResult.Requested -> pinTick++
+                }
+            }
+
+            override fun onUnpinHome() {
+                if (HomeShortcuts.unpin(activity, shortcut)) {
+                    WinToast.show(activity, "Home screen shortcut removed", Toast.LENGTH_SHORT)
+                } else {
+                    WinToast.show(activity, "This game isn't on your home screen", Toast.LENGTH_SHORT)
+                }
+                pinTick++
             }
         }
     }
@@ -136,6 +179,8 @@ fun GameDetailRoute(shortcutPath: String, onClose: () -> Unit, onLibraryChanged:
             userCoverPath != null,
             shortcut.icon,
             "1" == shortcut.getExtra("favorite", "0"),
+            stats,
+            homePinned,
             callbacks
         )
     }

@@ -1,0 +1,136 @@
+package com.winlator.cmod.ui.library
+
+import android.app.Activity
+import android.content.Context
+import android.content.Intent
+import android.content.pm.ShortcutInfo
+import android.content.pm.ShortcutManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.drawable.Icon
+import android.os.Build
+import com.winlator.cmod.R
+import com.winlator.cmod.XServerDisplayActivity
+import com.winlator.cmod.container.Shortcut
+import com.winlator.cmod.core.FileUtils
+import com.winlator.cmod.steamgrid.ArtworkRepository
+import java.io.File
+
+// The launcher (home screen) icon of a library game: pin it, find out whether it is there, take it
+// away again. Shared by the Library tile menu and the game page. A shortcut is identified on the
+// home screen by the "uuid" the .desktop file carries.
+object HomeShortcuts {
+    enum class PinResult { Unsupported, Requested, Restored }
+
+    @JvmStatic
+    fun buildInfo(
+        context: Context,
+        shortLabel: String,
+        longLabel: String,
+        containerId: Int,
+        shortcutPath: String,
+        icon: Icon,
+        uuid: String
+    ): ShortcutInfo {
+        val intent = Intent(context, XServerDisplayActivity::class.java)
+        intent.action = Intent.ACTION_VIEW
+        intent.putExtra("container_id", containerId)
+        intent.putExtra("shortcut_path", shortcutPath)
+        return ShortcutInfo.Builder(context, uuid)
+            .setShortLabel(shortLabel)
+            .setLongLabel(longLabel)
+            .setIcon(icon)
+            .setIntent(intent)
+            .build()
+    }
+
+    // True while a usable (not disabled) pinned icon for this game exists.
+    @JvmStatic
+    fun isPinned(context: Context, shortcut: Shortcut): Boolean {
+        val uuid = shortcut.getExtra("uuid")
+        if (uuid.isEmpty()) return false
+        val manager = context.getSystemService(ShortcutManager::class.java) ?: return false
+        return try {
+            manager.pinnedShortcuts.any { it.id == uuid && it.isEnabled }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    @JvmStatic
+    fun pin(activity: Activity, shortcut: Shortcut): PinResult {
+        val manager = activity.getSystemService(ShortcutManager::class.java) ?: return PinResult.Unsupported
+        if (!manager.isRequestPinShortcutSupported) return PinResult.Unsupported
+
+        shortcut.genUUID()
+        val uuid = shortcut.getExtra("uuid")
+        val info = buildInfo(
+            activity, shortcut.name, shortcut.name, shortcut.container.id, shortcut.file.path,
+            Icon.createWithBitmap(fitIcon(manager, pickIcon(activity, shortcut))), uuid
+        )
+
+        // An icon that was switched off here is still on the home screen: switch it back on
+        // instead of asking the launcher for a second copy.
+        val existing = try {
+            manager.pinnedShortcuts.firstOrNull { it.id == uuid }
+        } catch (e: Exception) {
+            null
+        }
+        if (existing != null) {
+            try {
+                manager.enableShortcuts(listOf(uuid))
+                manager.updateShortcuts(listOf(info))
+                return PinResult.Restored
+            } catch (e: Exception) {
+                // fall through to a normal pin request
+            }
+        }
+        return if (manager.requestPinShortcut(info, null)) PinResult.Requested else PinResult.Unsupported
+    }
+
+    // Pinned icons can't be deleted by an app, only switched off (the launcher greys them out).
+    @JvmStatic
+    fun unpin(context: Context, shortcut: Shortcut): Boolean {
+        val uuid = shortcut.getExtra("uuid")
+        if (uuid.isEmpty()) return false
+        val manager = context.getSystemService(ShortcutManager::class.java) ?: return false
+        return try {
+            val pinned = manager.pinnedShortcuts.any { it.id == uuid }
+            if (pinned) {
+                manager.disableShortcuts(listOf(uuid), context.getString(R.string.shortcut_not_available))
+                manager.removeDynamicShortcuts(listOf(uuid))
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) manager.removeLongLivedShortcuts(listOf(uuid))
+            }
+            pinned
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    // The icon the user chose (NAME.user.png) first, then the one extracted from the exe.
+    private fun pickIcon(context: Context, shortcut: Shortcut): Bitmap {
+        val baseName = FileUtils.getBasename(shortcut.file.path)
+        val userIcon = ArtworkRepository.userIconFile(baseName)
+        var bmp: Bitmap? = if (ArtworkRepository.isUsable(userIcon)) BitmapFactory.decodeFile(userIcon.path) else null
+        if (bmp == null) {
+            val img = File(ArtworkRepository.dir(ArtworkRepository.KIND_ICON), "$baseName.png")
+            bmp = if (img.exists()) BitmapFactory.decodeFile(img.path) else shortcut.icon
+        }
+        return bmp ?: BitmapFactory.decodeResource(context.resources, R.drawable.icon_wine)
+    }
+
+    private fun fitIcon(manager: ShortcutManager, bmp: Bitmap): Bitmap {
+        val maxSide = maxOf(manager.iconMaxWidth, manager.iconMaxHeight)
+        val longSide = maxOf(bmp.width, bmp.height)
+        if (maxSide > 0 && longSide > maxSide) {
+            val scale = maxSide.toFloat() / longSide
+            return Bitmap.createScaledBitmap(
+                bmp,
+                maxOf(1, Math.round(bmp.width * scale)),
+                maxOf(1, Math.round(bmp.height * scale)),
+                true
+            )
+        }
+        return bmp
+    }
+}

@@ -624,7 +624,8 @@ public class LibraryScreenController {
     }
 
     
-    private File resolveExeFile(Shortcut item) {
+    // Also used by the game page (GameStatsLoader) to find the game folder.
+    public static File resolveExeFile(Shortcut item) {
         if (item.path == null || item.path.isEmpty()) return null;
 
         String path = item.path.replace("\\", "/").trim();
@@ -810,35 +811,11 @@ public class LibraryScreenController {
     }
 
     private ShortcutInfo buildScreenShortCut(String shortLabel, String longLabel, int containerId, String shortcutPath, Icon icon, String uuid) {
-        Intent intent = new Intent(activity, XServerDisplayActivity.class);
-        intent.setAction(Intent.ACTION_VIEW);
-        intent.putExtra("container_id", containerId);
-        intent.putExtra("shortcut_path", shortcutPath);
-        return new ShortcutInfo.Builder(activity, uuid)
-                .setShortLabel(shortLabel)
-                .setLongLabel(longLabel)
-                .setIcon(icon)
-                .setIntent(intent)
-                .build();
+        return HomeShortcuts.buildInfo(activity, shortLabel, longLabel, containerId, shortcutPath, icon, uuid);
     }
 
     private void addShortcutToScreen(Shortcut shortcut) {
-        ShortcutManager shortcutManager = getSystemService(activity, ShortcutManager.class);
-        if (shortcutManager != null && shortcutManager.isRequestPinShortcutSupported()) {
-            String baseName = FileUtils.getBasename(shortcut.file.getPath());
-            // The icon the user chose (NAME.user.png) first, then the one extracted from the exe.
-            File userIcon = ArtworkRepository.userIconFile(baseName);
-            Bitmap bmp = ArtworkRepository.isUsable(userIcon) ? BitmapFactory.decodeFile(userIcon.getPath()) : null;
-            if (bmp == null) {
-                File imgFile = new File(getImagesDir(false), baseName + ".png");
-                bmp = imgFile.exists() ? BitmapFactory.decodeFile(imgFile.getPath()) : shortcut.icon;
-            }
-            if (bmp == null) bmp = BitmapFactory.decodeResource(activity.getResources(), R.drawable.icon_wine);
-            bmp = fitShortcutIcon(shortcutManager, bmp);
-            
-            shortcutManager.requestPinShortcut(buildScreenShortCut(shortcut.name, shortcut.name, shortcut.container.id,
-                    shortcut.file.getPath(), Icon.createWithBitmap(bmp), shortcut.getExtra("uuid")), null);
-        } else {
+        if (HomeShortcuts.pin(activity, shortcut) == HomeShortcuts.PinResult.Unsupported) {
             WinToast.show(activity, "Your launcher doesn't support pinned shortcuts", Toast.LENGTH_LONG);
         }
     }
