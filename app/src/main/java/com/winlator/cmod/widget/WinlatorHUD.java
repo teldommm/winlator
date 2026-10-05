@@ -77,7 +77,6 @@ public class WinlatorHUD extends View {
     private static final int TEXT_FLAGS = Paint.ANTI_ALIAS_FLAG
             | Paint.SUBPIXEL_TEXT_FLAG | Paint.LINEAR_TEXT_FLAG;
     private static final long STATS_INTERVAL_MS = 1500L;
-    private static final long BATT_REGISTER_INTERVAL_NS = 5_000_000_000L;
     private static final float DRAG_THRESH = 10f;
 
     private static final String[] GPU_STATIC_PATHS = {
@@ -211,8 +210,6 @@ public class WinlatorHUD extends View {
 
     private final BatteryManager batteryManager;
     private final IntentFilter batteryIntentFilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
-    private Intent cachedBatteryIntent = null;
-    private long lastBatteryRegisterNs = 0;
 
     private String[] gpuPaths = new String[0];
     // Only "no readable GPU node exists at all". Read failures are never latched any more:
@@ -646,14 +643,11 @@ public class WinlatorHUD extends View {
 
     private void readBattery() {
         try {
-            long now = System.nanoTime();
-            if (cachedBatteryIntent == null
-                    || now - lastBatteryRegisterNs >= BATT_REGISTER_INTERVAL_NS) {
-                cachedBatteryIntent = getContext().registerReceiver(null, batteryIntentFilter);
-                lastBatteryRegisterNs = now;
-            }
-
-            Intent batt = cachedBatteryIntent;
+            // Fresh sticky intent on every read (registerReceiver(null, ...) is one cheap binder
+            // call, no receiver is registered). It used to be cached for 5 s, so right after
+            // plugging in, "plugged" was still 0 while the current was already charging, and
+            // the charging direction got learned as "draining" (PWR then showed "-" on charger).
+            Intent batt = getContext().registerReceiver(null, batteryIntentFilter);
             if (batt == null) return;
 
             int rawTemp = batt.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0);
@@ -683,7 +677,10 @@ public class WinlatorHUD extends View {
             }
 
             // Signed: + = net current into the battery (charging), - = draining.
-            float amps = getBatteryCurrentSignedAmps(plugged != 0);
+            // Only fact that is certain: on battery and the system itself reports DISCHARGING.
+            boolean confirmedDischarging = plugged == 0
+                    && status == BatteryManager.BATTERY_STATUS_DISCHARGING;
+            float amps = getBatteryCurrentSignedAmps(plugged != 0, confirmedDischarging);
             float watts = (!Float.isNaN(amps) && voltageMv > 0)
                     ? (voltageMv / 1000f) * amps : Float.NaN;
             int sign = Float.isNaN(watts) ? 0 : (int) Math.signum(watts);
@@ -748,6 +745,11 @@ public class WinlatorHUD extends View {
     private static final String KEY_DRAIN_SIGN_SYSFS = "hud_drain_sign_sysfs";
     // Below this the sign of an unplugged reading is noise, not direction (mA).
     private static final float SIGN_LEARN_MIN_MA = 50f;
+    // Consecutive confirming samples (stats thread only) needed to store a learned sign.
+    private static final int SIGN_CONFIRM_SAMPLES = 2;
+    private String signLearnKey = null;
+    private int signLearnSign = 0;
+    private int signLearnCount = 0;
 
     private int drainSign(String key) {
         return prefs.getInt(key, 0);
@@ -758,7 +760,7 @@ public class WinlatorHUD extends View {
      * unavailable. On external power a net current of 0 is a real reading (the charger covers
      * the whole load, e.g. bypass charging / charge limit) and returns 0, so PWR shows 0.0W.
      */
-    private float getBatteryCurrentSignedAmps(boolean onExternalPower) {
+    private float getBatteryCurrentSignedAmps(boolean onExternalPower, boolean confirmedDischarging) {
         long raw = Long.MIN_VALUE;
         String signKey = KEY_DRAIN_SIGN_BM;
         if (batteryManager != null) {
@@ -782,12 +784,36 @@ public class WinlatorHUD extends View {
 
         int rawSign = raw > 0 ? 1 : -1;
         int drain = drainSign(signKey);
-        if (!onExternalPower && amps * 1000f >= SIGN_LEARN_MIN_MA && drain != rawSign) {
-            drain = rawSign;
-            prefs.edit().putInt(signKey, drain).apply();
+
+        // Learn the "draining" sign only from a certain fact (unplugged + status DISCHARGING),
+        // and only after SIGN_CONFIRM_SAMPLES consecutive identical readings, so a single
+        // sample taken while the plug state is changing can never overwrite it. Charging
+        // direction is deliberately not learned: status CHARGING does not guarantee the net
+        // battery current is positive (weak charger under a heavy load).
+        if (confirmedDischarging && amps * 1000f >= SIGN_LEARN_MIN_MA) {
+            if (drain != rawSign) {
+                if (signKey.equals(signLearnKey) && signLearnSign == rawSign) {
+                    signLearnCount++;
+                } else {
+                    signLearnKey = signKey;
+                    signLearnSign = rawSign;
+                    signLearnCount = 1;
+                }
+                if (signLearnCount >= SIGN_CONFIRM_SAMPLES) {
+                    drain = rawSign;
+                    prefs.edit().putInt(signKey, drain).apply();
+                    signLearnCount = 0;
+                }
+            } else {
+                signLearnCount = 0;
+            }
+        } else {
+            signLearnCount = 0;
         }
+
         boolean draining;
-        if (drain != 0) draining = rawSign == drain;
+        if (confirmedDischarging) draining = true; // certain, regardless of what was learned
+        else if (drain != 0) draining = rawSign == drain;
         else if (!onExternalPower) draining = true;
         else draining = rawSign < 0; // documented convention until learned
         return draining ? -amps : amps;

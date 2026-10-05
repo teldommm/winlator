@@ -714,7 +714,7 @@ public class LibraryScreenController {
             ThemedAlertHost.confirm(
                     activity,
                     "Remove shortcut?",
-                    "Do you want to remove this shortcut?",
+                    "Do you want to remove this shortcut? The game files stay on your device.",
                     "Remove",
                     () -> {
                         boolean fileDeleted = shortcut.file.delete();

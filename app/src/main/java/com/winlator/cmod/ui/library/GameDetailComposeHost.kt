@@ -4,8 +4,6 @@ import android.graphics.Bitmap
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -50,6 +48,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -71,6 +70,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.coerceIn
+import androidx.compose.ui.layout.Placeable
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -83,6 +87,7 @@ import kotlinx.coroutines.withContext
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import com.winlator.cmod.ui.theme.WinZShapes
 import com.winlator.cmod.ui.theme.hairlineColor
+import kotlin.math.roundToInt
 
 interface GameDetailCallbacks {
     fun onBack()
@@ -181,7 +186,7 @@ private fun LandscapeDetail(title: String, subtitle: String, artwork: Bitmap?, c
             } else 0.dp
             val chipsStart = 34.dp + if (posterShown) posterWidth + 14.dp else 0.dp
             val chipsEndReserve = panelWidth + 34.dp + 16.dp
-            val chipsInPanel = stats.hasAny && maxWidth - chipsStart - chipsEndReserve < 150.dp
+            val chipsInPanel = stats.hasAny && maxWidth - chipsStart - chipsEndReserve < 190.dp
             if (stats.hasAny && !chipsInPanel) {
                 StatChips(stats, modifier = Modifier.align(Alignment.BottomStart).padding(start = chipsStart, end = chipsEndReserve, bottom = 24.dp))
             }
@@ -432,37 +437,97 @@ private fun DetailAction(item: DetailActionItem, modifier: Modifier) {
 // the same blue icons as WinNative's launch screen.
 private val StatIconBlue = Color(0xFF58A6FF)
 
-@OptIn(ExperimentalLayoutApi::class)
+private class StatEntry(val icon: ImageVector, val label: String, val value: String)
+
+// The chips are measured, not guessed, so no chip is ever left alone on a second line under another:
+//  1. one row at full size when it fits;
+//  2. else the whole row is shrunk evenly (icons, text and gaps) just enough to fit, down to 80%;
+//  3. else (a very narrow spot) two equal columns at full size, so the last chip sits in a tidy grid.
 @Composable
 private fun StatChips(stats: GameStats, modifier: Modifier = Modifier) {
-    FlowRow(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        if (stats.playtimeMillis > 0L) StatChip(Icons.Outlined.Schedule, "Playtime", formatPlaytime(stats.playtimeMillis))
-        if (stats.playCount > 0) StatChip(Icons.Outlined.SportsEsports, "Plays", stats.playCount.toString())
-        if (stats.lastPlayedMillis > 0L) StatChip(Icons.Outlined.History, "Last played", formatLastPlayed(stats.lastPlayedMillis))
-        stats.sizeText?.let { StatChip(Icons.Outlined.Storage, "Size", it) }
+    val entries = remember(stats) {
+        buildList {
+            if (stats.playtimeMillis > 0L) add(StatEntry(Icons.Outlined.Schedule, "Playtime", formatPlaytime(stats.playtimeMillis)))
+            if (stats.playCount > 0) add(StatEntry(Icons.Outlined.SportsEsports, "Plays", stats.playCount.toString()))
+            if (stats.lastPlayedMillis > 0L) add(StatEntry(Icons.Outlined.History, "Last played", formatLastPlayed(stats.lastPlayedMillis)))
+            stats.sizeText?.let { add(StatEntry(Icons.Outlined.Storage, "Size", it)) }
+        }
+    }
+    if (entries.isEmpty()) return
+    SubcomposeLayout(modifier) { constraints ->
+        val gap = 8.dp.roundToPx()
+        val available = if (constraints.hasBoundedWidth) constraints.maxWidth else Int.MAX_VALUE
+        val natural = Constraints()
+
+        // Composing the chips under a smaller density shrinks every dp and sp in them together, and
+        // the measured sizes are the real ones (nothing is scaled after the fact).
+        fun measureRow(slot: String, scale: Float): List<Placeable> {
+            val scaled = Density(density * scale, fontScale)
+            return subcompose(slot) {
+                CompositionLocalProvider(LocalDensity provides scaled) {
+                    entries.forEach { StatChip(it, fill = false) }
+                }
+            }.map { it.measure(natural) }
+        }
+        fun rowWidth(items: List<Placeable>, gapPx: Int): Int = items.sumOf { it.width } + gapPx * (items.size - 1)
+
+        var scale = 1f
+        var gapPx = gap
+        var items = measureRow("row0", scale)
+        var attempt = 0
+        while (rowWidth(items, gapPx) > available && attempt < 3) {
+            attempt++
+            // A hair under the exact ratio: rounding of the pieces must not push it over again.
+            scale *= available.toFloat() / rowWidth(items, gapPx) * 0.99f
+            if (scale < 0.8f) break
+            gapPx = (gap * scale).roundToInt()
+            items = measureRow("row$attempt", scale)
+        }
+        if (scale >= 0.8f && rowWidth(items, gapPx) <= available) {
+            val height = items.maxOf { it.height }
+            return@SubcomposeLayout layout(rowWidth(items, gapPx), height) {
+                var x = 0
+                items.forEach {
+                    it.placeRelative(x, 0)
+                    x += it.width + gapPx
+                }
+            }
+        }
+
+        val column = (available - gap) / 2
+        val cells = subcompose("grid") { entries.forEach { StatChip(it, fill = true) } }
+            .map { it.measure(Constraints(minWidth = column, maxWidth = column)) }
+        val rows = cells.chunked(2)
+        val rowHeights = rows.map { row -> row.maxOf { it.height } }
+        val height = rowHeights.sum() + gap * (rows.size - 1)
+        val width = if (cells.size == 1) column else column * 2 + gap
+        layout(width, height) {
+            var y = 0
+            rows.forEachIndexed { index, row ->
+                row.forEachIndexed { col, cell -> cell.placeRelative(col * (column + gap), y) }
+                y += rowHeights[index] + gap
+            }
+        }
     }
 }
 
 @Composable
-private fun StatChip(icon: ImageVector, label: String, value: String) {
+private fun StatChip(entry: StatEntry, fill: Boolean) {
     Surface(
+        modifier = if (fill) Modifier.fillMaxWidth() else Modifier,
         shape = WinZShapes.Small,
         color = Color.Black.copy(.44f),
         border = BorderStroke(1.dp, Color.White.copy(.12f))
     ) {
         Row(
-            Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            (if (fill) Modifier.fillMaxWidth() else Modifier).padding(horizontal = 10.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(7.dp)
         ) {
-            Icon(icon, null, Modifier.size(16.dp), tint = StatIconBlue)
+            Icon(entry.icon, null, Modifier.size(16.dp), tint = StatIconBlue)
             Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                Text(label.uppercase(), color = Color.White.copy(.62f), fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                Text(value, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(entry.label.uppercase(), color = Color.White.copy(.62f), fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                Text(entry.value, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }

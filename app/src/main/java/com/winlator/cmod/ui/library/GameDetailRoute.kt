@@ -171,8 +171,8 @@ fun GameDetailRoute(shortcutPath: String, onClose: () -> Unit, onLibraryChanged:
             override fun onUnpinHome() {
                 ThemedAlertHost.confirm(
                     activity,
-                    "Remove from home screen?",
-                    "The home screen icon will stop working. The game stays in your library.",
+                    "Remove home screen shortcut?",
+                    "Do you want to remove this home screen shortcut? The game files stay on your device.",
                     "Remove",
                     {
                         if (HomeShortcuts.unpin(activity, shortcut)) {
