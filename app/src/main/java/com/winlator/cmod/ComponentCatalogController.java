@@ -6,6 +6,7 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.provider.OpenableColumns;
 import android.widget.Toast;
+import com.winlator.cmod.ui.toast.WinToast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -224,8 +225,8 @@ public class ComponentCatalogController {
                 refreshBundledRuntimeState();
                 syncComposeCatalog();
                 if (!success && host.isAlive()) {
-                    Toast.makeText(host.context(),
-                            host.context().getString(R.string.app_name) + " core installation failed. Tap retry to try again.", Toast.LENGTH_LONG).show();
+                    WinToast.show(host.context(),
+                            host.context().getString(R.string.app_name) + " core installation failed. Tap retry to try again.", Toast.LENGTH_LONG);
                 }
             }
         });
@@ -260,7 +261,8 @@ public class ComponentCatalogController {
                 if (composeController != null) composeController.setInstallBusy(null, false);
                 refreshBundledRuntimeState();
                 syncComposeCatalog();
-                if (!installed && host.isAlive()) Toast.makeText(host.context(), "Unable to install " + bundledName + ".", Toast.LENGTH_LONG).show();
+                if (!installed && host.isAlive()) WinToast.show(host.context(), "Unable to install " + bundledName + ".", Toast.LENGTH_LONG);
+                else if (installed) toastDone(bundledName + " installed");
             });
         });
     }
@@ -308,7 +310,8 @@ public class ComponentCatalogController {
                 installBusy = false;
                 if (composeController != null) composeController.setInstallBusy(null, false);
                 refreshBundledRuntimeState();
-                if (!removed && host.isAlive()) Toast.makeText(host.context(), bundledName + " could not be deleted.", Toast.LENGTH_LONG).show();
+                if (!removed && host.isAlive()) WinToast.show(host.context(), bundledName + " could not be deleted.", Toast.LENGTH_LONG);
+                else if (removed) toastDone(bundledName + " removed");
             });
         });
     }
@@ -348,7 +351,7 @@ public class ComponentCatalogController {
             if (firstError != null && generation == loadGeneration.get()) {
                 final String message = failures > 1 ? firstError + " (+" + (failures - 1) + " more)" : firstError;
                 runOnUi(() -> {
-                    if (host.isAlive()) Toast.makeText(host.context(), message, Toast.LENGTH_LONG).show();
+                    if (host.isAlive()) WinToast.show(host.context(), message, Toast.LENGTH_LONG);
                 });
             }
         });
@@ -443,8 +446,15 @@ public class ComponentCatalogController {
             }
             rebuildCatalog();
             final String message = error;
-            runOnUi(() -> finishInstall(id, message));
+            runOnUi(() -> {
+                finishInstall(id, message);
+                if (message == null) toastDone(entry.name + " installed");
+            });
         });
+    }
+
+    private void toastDone(String text) {
+        if (host.isAlive()) WinToast.show(host.context(), text, Toast.LENGTH_SHORT);
     }
 
     private void postInstallProgress(String label, int progress) {
@@ -475,7 +485,7 @@ public class ComponentCatalogController {
         installBusy = false;
         if (composeController != null) composeController.setInstallBusy(null, false);
         syncComposeCatalog();
-        if (error != null && host.isAlive()) Toast.makeText(host.context(), error, Toast.LENGTH_LONG).show();
+        if (error != null && host.isAlive()) WinToast.show(host.context(), error, Toast.LENGTH_LONG);
     }
 
     private void requestRemoveComponent(String componentId) {
@@ -520,7 +530,7 @@ public class ComponentCatalogController {
             final String message = error;
             runOnUi(() -> {
                 finishInstall(entry.id, message);
-                if (message == null && host.isAlive()) Toast.makeText(host.context(), entry.removedMessage(), Toast.LENGTH_SHORT).show();
+                if (message == null && host.isAlive()) WinToast.show(host.context(), entry.removedMessage(), Toast.LENGTH_SHORT);
             });
         });
     }
@@ -573,6 +583,7 @@ public class ComponentCatalogController {
                     final String message = error;
                     runOnUi(() -> {
                         finishInstall("local", message);
+                        if (message == null) toastDone(displayName + " installed");
                         if (done != null) revealCategory(displayType(done.type));
                     });
                     break;
@@ -627,7 +638,10 @@ public class ComponentCatalogController {
         rebuildCatalog();
         runOnUi(() -> {
             finishInstall("local", ok ? null : "Unable to install the driver. Make sure it's an AdrenoTools driver package.");
-            if (ok) revealCategory("AdrenoTools");
+            if (ok) {
+                toastDone(displayName + " installed");
+                revealCategory("AdrenoTools");
+            }
         });
     }
 

@@ -3,6 +3,7 @@ package com.winlator.cmod.ui.inputcontrols
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import com.winlator.cmod.ui.toast.WinToast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -179,6 +180,7 @@ internal class InputControlsScreenState(
             if (trimmed.isEmpty() || manager == null) return@prompt
             currentProfile = manager.createProfile(trimmed)
             rebuild()
+            WinToast.show(activity, "Profile \"$trimmed\" created", Toast.LENGTH_SHORT)
         }
     }
 
@@ -190,6 +192,7 @@ internal class InputControlsScreenState(
             profile.name = trimmed
             profile.save()
             rebuild()
+            WinToast.show(activity, "Profile renamed to \"$trimmed\"", Toast.LENGTH_SHORT)
         }
     }
 
@@ -204,6 +207,7 @@ internal class InputControlsScreenState(
                 val manager = manager ?: return@confirm
                 currentProfile = manager.duplicateProfile(profile)
                 rebuild()
+                WinToast.show(activity, "Profile duplicated", Toast.LENGTH_SHORT)
             }
         )
     }
@@ -220,6 +224,7 @@ internal class InputControlsScreenState(
                 manager.removeProfile(profile)
                 currentProfile = null
                 rebuild()
+                WinToast.show(activity, "Profile \"${profile.name}\" removed", Toast.LENGTH_SHORT)
             },
             true
         )
@@ -239,7 +244,7 @@ internal class InputControlsScreenState(
     override fun onExportProfile() {
         val profile = requireProfile() ?: return
         val exportedFile = manager?.exportProfile(profile) ?: return
-        Toast.makeText(activity, "Profile exported to " + exportedFile.path, Toast.LENGTH_LONG).show()
+        WinToast.show(activity, "Profile exported to " + exportedFile.path, Toast.LENGTH_LONG)
     }
 
     override fun onOpenEditor() {
@@ -274,6 +279,7 @@ internal class InputControlsScreenState(
                 profile.removeController(controller)
                 profile.save()
                 rebuild()
+                WinToast.show(activity, "Controller removed", Toast.LENGTH_SHORT)
             },
             true
         )
@@ -286,8 +292,9 @@ internal class InputControlsScreenState(
         try {
             currentProfile = manager.importProfile(JSONObject(FileUtils.readString(activity, uri)))
             rebuild()
+            WinToast.show(activity, "Profile imported", Toast.LENGTH_SHORT)
         } catch (e: Exception) {
-            Toast.makeText(activity, "Unable to import profile", Toast.LENGTH_SHORT).show()
+            WinToast.show(activity, "Unable to import profile", Toast.LENGTH_SHORT)
         }
     }
 
@@ -297,7 +304,7 @@ internal class InputControlsScreenState(
             activity.runOnUiThread {
                 ThemedLoadingOverlayHost.dismiss(loadingOverlay)
                 if (content == null) {
-                    Toast.makeText(activity, "Unable to load profile list", Toast.LENGTH_SHORT).show()
+                    WinToast.show(activity, "Unable to load profile list", Toast.LENGTH_SHORT)
                     return@runOnUiThread
                 }
                 val items = content.split("\n")
@@ -321,16 +328,32 @@ internal class InputControlsScreenState(
         val downloadOverlay = ThemedLoadingOverlayHost.show(activity, activity.getString(R.string.downloading_file))
         currentProfile = null
         val processed = AtomicInteger()
+        val imported = AtomicInteger()
         for (position in positions) {
             HttpUtils.download(RemoteSources.inputControlsUrl(activity, items[position])) { content ->
                 try {
-                    if (content != null) manager.importProfile(JSONObject(content))
+                    if (content != null) {
+                        manager.importProfile(JSONObject(content))
+                        imported.incrementAndGet()
+                    }
                 } catch (ignored: JSONException) {
                 }
                 if (processed.incrementAndGet() == positions.size) {
                     activity.runOnUiThread {
                         ThemedLoadingOverlayHost.dismiss(downloadOverlay)
                         rebuild()
+                        val ok = imported.get()
+                        val failed = positions.size - ok
+                        when {
+                            ok == 0 -> WinToast.show(activity, "Unable to download profiles", Toast.LENGTH_LONG)
+                            failed > 0 -> WinToast.show(
+                                activity,
+                                "Downloaded $ok of ${positions.size} profiles ($failed failed)",
+                                Toast.LENGTH_LONG
+                            )
+                            ok == 1 -> WinToast.show(activity, "Profile downloaded", Toast.LENGTH_SHORT)
+                            else -> WinToast.show(activity, "$ok profiles downloaded", Toast.LENGTH_SHORT)
+                        }
                     }
                 }
             }
@@ -339,7 +362,7 @@ internal class InputControlsScreenState(
 
     private fun requireProfile(): ControlsProfile? {
         val profile = currentProfile
-        if (profile == null) Toast.makeText(activity, "No profile selected", Toast.LENGTH_SHORT).show()
+        if (profile == null) WinToast.show(activity, "No profile selected", Toast.LENGTH_SHORT)
         return profile
     }
 }

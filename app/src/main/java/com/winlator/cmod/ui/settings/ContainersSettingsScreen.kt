@@ -3,6 +3,7 @@ package com.winlator.cmod.ui.settings
 import com.winlator.cmod.ui.theme.ThemedDialogTitle
 import android.content.Intent
 import android.widget.Toast
+import com.winlator.cmod.ui.toast.WinToast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -131,7 +132,7 @@ private fun duplicateContainer(activity: AppCompatActivity, id: Int, refresh: ()
         onConfirm = {
             manager.duplicateContainerAsync(container) {
                 refresh()
-                Toast.makeText(activity, "Container duplicated", Toast.LENGTH_SHORT).show()
+                WinToast.show(activity, "Container duplicated", Toast.LENGTH_SHORT)
             }
         }
     )
@@ -148,7 +149,7 @@ private fun removeContainer(activity: AppCompatActivity, id: Int, refresh: () ->
         onConfirm = {
             manager.removeContainerAsync(container) {
                 refresh()
-                Toast.makeText(activity, "Container removed", Toast.LENGTH_SHORT).show()
+                WinToast.show(activity, "Container removed", Toast.LENGTH_SHORT)
             }
         },
         destructive = true

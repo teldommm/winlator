@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.widget.Toast;
+import com.winlator.cmod.ui.toast.WinToast;
 
 import androidx.preference.PreferenceManager;
 
@@ -213,12 +214,12 @@ public class FEXCorePresetManager {
             }
         }
         if (presetFile != null && presetFile.exists())
-            Toast.makeText(context, "Preset " + presetFile.getName() + " exported successfully at " + presetFile.getParentFile().getPath(), Toast.LENGTH_LONG).show();
+            WinToast.show(context, "Preset " + presetFile.getName() + " exported successfully at " + presetFile.getParentFile().getPath(), Toast.LENGTH_LONG);
         else
-            Toast.makeText(context, "Failed to export preset", Toast.LENGTH_SHORT).show();
+            WinToast.show(context, "Failed to export preset", Toast.LENGTH_SHORT);
     }
 
-    public static void importPreset(Context context, InputStream stream) {
+    public static boolean importPreset(Context context, InputStream stream) {
         String key = "fexcore_custom_presets";
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
         String customPresetStr = preferences.getString(key, "");
@@ -245,11 +246,14 @@ public class FEXCorePresetManager {
                         break;
                 }
             }
+            if (preset[1] == null || preset[2] == null) return false;
             customPresetStr = customPresetStr + (!customPresetStr.equals("") ? "," : "") + FEXCorePreset.CUSTOM+"-"+getNextPresetId(context) + "|" + preset[1] + "|" + preset[2];
-        } catch (IOException e) {
+        } catch (IOException | RuntimeException e) {
+            return false;
         }
 
         preferences.edit().putString(key, customPresetStr).apply();
+        return true;
     }
 
 }

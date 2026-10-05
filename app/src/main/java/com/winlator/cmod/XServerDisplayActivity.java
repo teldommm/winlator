@@ -86,6 +86,7 @@ import com.winlator.cmod.ui.GraphicsPanelState;
 import com.winlator.cmod.ui.GraphicsSidebarPanelHost;
 import com.winlator.cmod.ui.GraphicsSidebarPanelKt;
 import com.winlator.cmod.ui.HudPanelCallbacks;
+import com.winlator.cmod.ui.toast.WinToast;
 import com.winlator.cmod.ui.HudPanelState;
 import com.winlator.cmod.ui.HudSidebarPanelHost;
 import com.winlator.cmod.ui.InputPanelCallbacks;
@@ -1409,6 +1410,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     isPaused = !isPaused;
                     if (sidebarRailState != null) sidebarRailState.setPaused(isPaused);
                     drawerLayout.closeDrawers();
+                    WinToast.show(XServerDisplayActivity.this,
+                            isPaused ? "Game paused. Open the side menu to resume." : "Game resumed",
+                            Toast.LENGTH_SHORT);
                 }
 
                 @Override
@@ -1500,7 +1504,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 public void onEndProcess(int pid, String name) {
                     ThemedAlertHost.confirm(XServerDisplayActivity.this, getString(R.string.end_process),
                             getString(R.string.do_you_want_to_end_this_process), getString(R.string.ok),
-                            () -> winHandler.killProcess(name), true);
+                            () -> {
+                                winHandler.killProcess(name);
+                                WinToast.show(XServerDisplayActivity.this, "Ending " + name, Toast.LENGTH_SHORT);
+                            }, true);
                 }
 
                 @Override
@@ -1529,6 +1536,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                                 for (int position : positions) mask |= (1 << position);
                                 winHandler.setProcessAffinity(pid, mask);
                                 if (taskManagerSidebar != null) taskManagerSidebar.updateNow();
+                                WinToast.show(XServerDisplayActivity.this, "Affinity updated for " + name, Toast.LENGTH_SHORT);
                             }, initiallyChecked);
                 }
             });
@@ -1651,6 +1659,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 } else {
                     FrameRating.resetSavedLayout(XServerDisplayActivity.this);
                 }
+                WinToast.show(XServerDisplayActivity.this, "HUD layout reset", Toast.LENGTH_SHORT);
             }
 
             @Override

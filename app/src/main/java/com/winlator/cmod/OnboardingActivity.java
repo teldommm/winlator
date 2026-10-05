@@ -14,6 +14,7 @@ import android.os.Environment;
 import android.provider.OpenableColumns;
 import android.provider.Settings;
 import android.widget.Toast;
+import com.winlator.cmod.ui.toast.WinToast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -201,7 +202,7 @@ public class OnboardingActivity extends AppCompatActivity implements ComponentCa
         super.onRequestPermissionsResult(requestCode, permissions, results);
         if (requestCode == REQUEST_STORAGE) {
             if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) continuePermissionFlow();
-            else Toast.makeText(this, "Storage access is required to manage games.", Toast.LENGTH_LONG).show();
+            else WinToast.show(this, "Storage access is required to manage games.", Toast.LENGTH_LONG);
         } else if (requestCode == REQUEST_NOTIFICATIONS) {
             finishOnboarding();
         }
@@ -224,14 +225,14 @@ public class OnboardingActivity extends AppCompatActivity implements ComponentCa
         String runtime = resolveSelectedRuntime();
         if (runtime == null) {
             finishing = false;
-            Toast.makeText(this, "Install and select a Wine or Proton layer first.", Toast.LENGTH_LONG).show();
+            WinToast.show(this, "Install and select a Wine or Proton layer first.", Toast.LENGTH_LONG);
             return;
         }
 
         WineInfo wineInfo = WineInfo.fromIdentifier(this, contentsManager, runtime);
         if (wineInfo.path == null || wineInfo.path.isEmpty()) {
             finishing = false;
-            Toast.makeText(this, "The selected Wine/Proton layer is no longer installed.", Toast.LENGTH_LONG).show();
+            WinToast.show(this, "The selected Wine/Proton layer is no longer installed.", Toast.LENGTH_LONG);
             return;
         }
 
@@ -259,14 +260,14 @@ public class OnboardingActivity extends AppCompatActivity implements ComponentCa
             manager.createContainerAsync(data, contentsManager, created -> {
                 if (created == null) {
                     finishing = false;
-                    Toast.makeText(this, "Unable to create the first container.", Toast.LENGTH_LONG).show();
+                    WinToast.show(this, "Unable to create the first container.", Toast.LENGTH_LONG);
                 } else {
                     enterMainApp();
                 }
             });
         } catch (Exception error) {
             finishing = false;
-            Toast.makeText(this, "Unable to prepare the first container.", Toast.LENGTH_LONG).show();
+            WinToast.show(this, "Unable to prepare the first container.", Toast.LENGTH_LONG);
         }
     }
 

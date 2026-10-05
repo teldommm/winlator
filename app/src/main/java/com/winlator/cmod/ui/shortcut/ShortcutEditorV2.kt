@@ -7,6 +7,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
+import com.winlator.cmod.ui.toast.WinToast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -72,6 +73,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -420,6 +422,7 @@ internal fun ShortcutEditorV2(
     close: () -> Unit
 ) {
     val context: android.content.Context = activity
+    val dialogView = LocalView.current
     val state = remember(shortcut.file.path) {
         OpenGLDriverDefaults.initialize(context, shortcut.container)
         ShortcutEditorStateV2(shortcut)
@@ -477,10 +480,11 @@ internal fun ShortcutEditorV2(
             val outcome = installRuntimeComponent(context, type, version)
             val installed = outcome.id
             state.installing = state.installing - key
-            if (installed == null) Toast.makeText(context, outcome.failureText("Unable to install $version"), Toast.LENGTH_SHORT).show()
+            if (installed == null) WinToast.show(context, outcome.failureText("Unable to install $version"), Toast.LENGTH_SHORT, dialogView)
             else {
                 done(installed)
                 state.revision++
+                WinToast.show(context, "$version installed", Toast.LENGTH_SHORT, dialogView)
             }
         }
     }
@@ -493,19 +497,29 @@ internal fun ShortcutEditorV2(
             val outcome = installAdrenoDriver(context, option)
             val installed = outcome.id
             state.installing = state.installing - key
-            if (installed == null) Toast.makeText(context, outcome.failureText("Unable to install ${option.label}"), Toast.LENGTH_SHORT).show()
+            if (installed == null) WinToast.show(context, outcome.failureText("Unable to install ${option.label}"), Toast.LENGTH_SHORT, dialogView)
             else {
                 state.driverVersion = installed
                 state.graphics("version", installed)
                 state.revision++
+                WinToast.show(context, "${option.label} installed", Toast.LENGTH_SHORT, dialogView)
             }
         }
     }
 
     fun closeEditor() {
-        renameShortcutV2(shortcut, state.name)
+        val rename = renameShortcutV2(shortcut, state.name)
         onShortcutsChanged()
         close()
+        when (rename) {
+            is ShortcutRenameResult.Renamed ->
+                WinToast.show(context, "Renamed to \"${rename.newName}\"", Toast.LENGTH_SHORT)
+            ShortcutRenameResult.NameTaken ->
+                WinToast.show(context, "Couldn't rename: that name is already used", Toast.LENGTH_LONG)
+            ShortcutRenameResult.Failed ->
+                WinToast.show(context, "Couldn't rename the shortcut", Toast.LENGTH_LONG)
+            ShortcutRenameResult.Unchanged -> Unit
+        }
     }
 
     fun enterContainer() {
@@ -520,9 +534,11 @@ internal fun ShortcutEditorV2(
         val target = containers.firstOrNull { it.id == targetId } ?: return
         if (target.id == state.container.id) return
         if (shortcut.cloneToContainer(target)) {
-            Toast.makeText(context, "Shortcut copied to ${target.name}", Toast.LENGTH_SHORT).show()
             onShortcutsChanged()
             close()
+            WinToast.show(context, "Shortcut copied to ${target.name}", Toast.LENGTH_SHORT)
+        } else {
+            WinToast.show(context, "Couldn't copy the shortcut to ${target.name}", Toast.LENGTH_LONG, dialogView)
         }
     }
 
@@ -1218,20 +1234,29 @@ private fun parseShortcutComponentsV2(raw: String): Map<String, Int> {
     return result
 }
 
-private fun renameShortcutV2(shortcut: Shortcut, requested: String) {
+private sealed class ShortcutRenameResult {
+    object Unchanged : ShortcutRenameResult()
+    object NameTaken : ShortcutRenameResult()
+    object Failed : ShortcutRenameResult()
+    class Renamed(val newName: String) : ShortcutRenameResult()
+}
+
+private fun renameShortcutV2(shortcut: Shortcut, requested: String): ShortcutRenameResult {
     val clean = requested.trim().replace(Regex("[\\\\/:*?\"<>|]"), "_")
-    if (clean.isBlank() || clean == shortcut.name) return
+    if (clean.isBlank() || clean == shortcut.name) return ShortcutRenameResult.Unchanged
 
     val parent = shortcut.file.parentFile
     val oldName = shortcut.name
     val ext = shortcut.file.extension.takeIf { it.isNotBlank() } ?: "desktop"
     val target = File(parent, "$clean.$ext")
-    if (target.exists() || !shortcut.file.renameTo(target)) return
+    if (target.exists()) return ShortcutRenameResult.NameTaken
+    if (!shortcut.file.renameTo(target)) return ShortcutRenameResult.Failed
 
     val oldLink = File(parent, "$oldName.lnk")
     if (oldLink.isFile) {
         val newLink = File(parent, "$clean.lnk")
         if (!newLink.exists()) oldLink.renameTo(newLink)
     }
+    return ShortcutRenameResult.Renamed(clean)
 }
 

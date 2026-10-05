@@ -6,6 +6,7 @@ import com.winlator.cmod.ui.theme.ThemedDialogTitle
 import android.content.Context
 import android.graphics.Bitmap
 import android.widget.Toast
+import com.winlator.cmod.ui.toast.WinToast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -402,10 +403,11 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
             val outcome = installRuntimeComponent(context, type, version)
             val installed = outcome.id
             installing = installing - key
-            if (installed == null) Toast.makeText(context, outcome.failureText("Unable to install $version"), Toast.LENGTH_SHORT).show()
+            if (installed == null) WinToast.show(context, outcome.failureText("Unable to install $version"), Toast.LENGTH_SHORT)
             else {
                 done(installed)
                 revision++
+                WinToast.show(context, "$version installed", Toast.LENGTH_SHORT)
             }
         }
     }
@@ -418,11 +420,12 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
             val outcome = installWineRuntimeComponent(context, option)
             val installedId = outcome.id
             installing = installing - key
-            if (installedId == null) Toast.makeText(context, outcome.failureText("Unable to install ${option.label}"), Toast.LENGTH_LONG).show()
+            if (installedId == null) WinToast.show(context, outcome.failureText("Unable to install ${option.label}"), Toast.LENGTH_LONG)
             else {
                 state.runtime = installedId
                 contents.syncContents()
                 revision++
+                WinToast.show(context, "${option.label} installed", Toast.LENGTH_SHORT)
             }
         }
     }
@@ -435,11 +438,12 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
             val outcome = installAdrenoDriver(context, option)
             val installed = outcome.id
             installing = installing - key
-            if (installed == null) Toast.makeText(context, outcome.failureText("Unable to install ${option.label}"), Toast.LENGTH_SHORT).show()
+            if (installed == null) WinToast.show(context, outcome.failureText("Unable to install ${option.label}"), Toast.LENGTH_SHORT)
             else {
                 state.driverVersion = installed
                 state.graphics("version", installed)
                 revision++
+                WinToast.show(context, "${option.label} installed", Toast.LENGTH_SHORT)
             }
         }
     }
@@ -508,7 +512,7 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
         if (creating || state.runtime.isBlank()) return
         val wineInfo = WineInfo.fromIdentifier(context, contents, state.runtime)
         if (wineInfo.path.isNullOrBlank()) {
-            Toast.makeText(context, "Selected Wine/Proton is not installed.", Toast.LENGTH_LONG).show()
+            WinToast.show(context, "Selected Wine/Proton is not installed.", Toast.LENGTH_LONG)
             return
         }
         creating = true
@@ -561,15 +565,16 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
             }
             manager.createContainerAsync(data, contents) { created ->
                 creating = false
-                if (created == null) Toast.makeText(context, "Unable to create container.", Toast.LENGTH_LONG).show()
+                if (created == null) WinToast.show(context, "Unable to create container.", Toast.LENGTH_LONG)
                 else {
                     applyMouseWarp(created)
                     onCreated()
+                    WinToast.show(context, "Container \"${created.name}\" created", Toast.LENGTH_SHORT)
                 }
             }
         } catch (_: Exception) {
             creating = false
-            Toast.makeText(context, "Unable to create container.", Toast.LENGTH_LONG).show()
+            WinToast.show(context, "Unable to create container.", Toast.LENGTH_LONG)
         }
     }
 
@@ -727,7 +732,7 @@ private fun ContainerCategoryV2(
                 s.desktopBackground = "Image"
                 s.wallpaperStamp = stamp
             }.onFailure {
-                Toast.makeText(context, "Unable to set wallpaper image.", Toast.LENGTH_SHORT).show()
+                WinToast.show(context, "Unable to set wallpaper image.", Toast.LENGTH_SHORT)
             }
         }
     }

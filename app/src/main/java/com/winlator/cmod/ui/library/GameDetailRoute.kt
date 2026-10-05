@@ -2,6 +2,7 @@ package com.winlator.cmod.ui.library
 
 import android.content.Intent
 import android.os.Environment
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -16,6 +17,7 @@ import com.winlator.cmod.container.Shortcut
 import com.winlator.cmod.contents.ContentsManager
 import com.winlator.cmod.core.FileUtils
 import com.winlator.cmod.ui.ThemedAlertHost
+import com.winlator.cmod.ui.toast.WinToast
 import com.winlator.cmod.ui.shortcut.ShortcutSettingsComposeDialog
 import com.winlator.cmod.ui.theme.findActivity
 import kotlinx.coroutines.Dispatchers
@@ -113,6 +115,9 @@ fun GameDetailRoute(shortcutPath: String, onClose: () -> Unit, onLibraryChanged:
                             ArtworkRepository.deleteArtworkIfUnused(activity, shortcut.file)
                             onLibraryChanged()
                             onClose()
+                            WinToast.show(activity, "Shortcut removed", Toast.LENGTH_SHORT)
+                        } else {
+                            WinToast.show(activity, "Couldn't remove shortcut", Toast.LENGTH_LONG)
                         }
                     },
                     true

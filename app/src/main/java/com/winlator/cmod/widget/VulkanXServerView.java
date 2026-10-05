@@ -16,6 +16,7 @@ import com.winlator.cmod.R;
 import com.winlator.cmod.core.LsfgNative;
 import java.io.File;
 import android.widget.Toast;
+import com.winlator.cmod.ui.toast.WinToast;
 import com.winlator.cmod.renderer.GPUImage;
 import com.winlator.cmod.xserver.Bitmask;
 import com.winlator.cmod.xserver.Cursor;
@@ -736,7 +737,7 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
                                     : "Set Renderer Driver to a Turnip driver, then relaunch the game.")
                             : error + (error.endsWith(".") ? "" : "."));
             final String message = frameGenError;
-            post(() -> Toast.makeText(getContext(), message, Toast.LENGTH_LONG).show());
+            post(() -> WinToast.show(getContext(), message, Toast.LENGTH_LONG));
         } else {
             frameGenError = "";
         }

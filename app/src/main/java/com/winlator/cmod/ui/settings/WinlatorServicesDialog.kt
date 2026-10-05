@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
@@ -68,6 +69,7 @@ import com.winlator.cmod.contentdialog.DriverRepo
 import com.winlator.cmod.core.RemoteSources
 import com.winlator.cmod.ui.theme.ThemedDialogSurface
 import com.winlator.cmod.ui.theme.WinZOverlayTheme
+import com.winlator.cmod.ui.toast.WinToast
 import com.winlator.cmod.ui.theme.WinZShapes
 import com.winlator.cmod.ui.theme.controlAccentColor
 import com.winlator.cmod.ui.theme.dividerColor
@@ -143,6 +145,7 @@ object WinlatorServicesDialog {
                                         onCancel = dismiss,
                                         onSaved = {
                                             onSaved?.run()
+                                            WinToast.show(activity, "Winlator Services saved", Toast.LENGTH_SHORT)
                                             dismiss()
                                         }
                                     )

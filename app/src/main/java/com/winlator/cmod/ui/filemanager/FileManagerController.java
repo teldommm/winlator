@@ -9,6 +9,7 @@ import android.os.StatFs;
 import android.text.format.Formatter;
 import android.view.View;
 import android.widget.Toast;
+import com.winlator.cmod.ui.toast.WinToast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -274,7 +275,7 @@ public class FileManagerController {
         } else if (DRIVE_ID_Z.equals(id)) {
             File rootFs = new File(activity.getFilesDir(), "imagefs");
             if (rootFs.exists()) openDrive(rootFs, rootFs);
-            else Toast.makeText(activity, "RootFS not found", Toast.LENGTH_SHORT).show();
+            else WinToast.show(activity, "RootFS not found", Toast.LENGTH_SHORT);
         } else if (DRIVE_ID_SCAN.equals(id)) {
             discoverExternalStorage();
         } else {
@@ -359,13 +360,13 @@ public class FileManagerController {
         discoveredExternalStorageRoots = getExternalStorageRoots();
         pushState();
         if (discoveredExternalStorageRoots.isEmpty()) {
-            Toast.makeText(activity, "No external storage found", Toast.LENGTH_SHORT).show();
+            WinToast.show(activity, "No external storage found", Toast.LENGTH_SHORT);
         }
     }
 
     private void openDrive(File directory, File driveRoot) {
         if (directory == null || !directory.exists() || !directory.isDirectory() || !directory.canRead()) {
-            Toast.makeText(activity, "Storage is not accessible", Toast.LENGTH_SHORT).show();
+            WinToast.show(activity, "Storage is not accessible", Toast.LENGTH_SHORT);
             return;
         }
         currentDriveRoot = driveRoot != null ? driveRoot : inferDriveRoot(directory);
@@ -424,7 +425,7 @@ public class FileManagerController {
         File windowsDir = new File(driveC, "windows");
         if (driveC.exists() && driveC.isDirectory() && windowsDir.exists()) {
             openDrive(driveC, driveC);
-            Toast.makeText(activity, "Opened C: (" + container.getName() + ")", Toast.LENGTH_SHORT).show();
+            WinToast.show(activity, "Opened C: (" + container.getName() + ")", Toast.LENGTH_SHORT);
         } else {
             ThemedAlertHost.info(activity, "Drive C: Not Initialized",
                     "The Wine system files (Drive C:) for '" + container.getName() + "' are missing.\n\n" +
@@ -435,7 +436,7 @@ public class FileManagerController {
     private void navigateUp() {
         if (currentDir == null) return;
         if (currentDriveRoot != null && samePath(currentDir, currentDriveRoot)) {
-            Toast.makeText(activity, "Drive root reached", Toast.LENGTH_SHORT).show();
+            WinToast.show(activity, "Drive root reached", Toast.LENGTH_SHORT);
             return;
         }
 
@@ -443,13 +444,13 @@ public class FileManagerController {
         if (parent != null && parent.canRead() && isWithinRoot(parent, currentDriveRoot)) {
             loadDirectory(parent);
         } else {
-            Toast.makeText(activity, "Drive root reached", Toast.LENGTH_SHORT).show();
+            WinToast.show(activity, "Drive root reached", Toast.LENGTH_SHORT);
         }
     }
 
     private void loadDirectory(File dir) {
         if (dir == null || !dir.exists() || !dir.isDirectory() || !dir.canRead()) {
-            Toast.makeText(activity, "Folder is not accessible", Toast.LENGTH_SHORT).show();
+            WinToast.show(activity, "Folder is not accessible", Toast.LENGTH_SHORT);
             return;
         }
         currentDir = dir;
@@ -460,7 +461,7 @@ public class FileManagerController {
     private void performContainerAction(File file, ContainerAction action) {
         ArrayList<Container> containers = containerManager.getContainers();
         if (containers == null || containers.isEmpty()) {
-            Toast.makeText(activity, "Create a container first!", Toast.LENGTH_SHORT).show();
+            WinToast.show(activity, "Create a container first!", Toast.LENGTH_SHORT);
             return;
         }
 
@@ -649,7 +650,7 @@ public class FileManagerController {
     private void runFileDirectly(File file, Container container) {
         try {
             if (!ensureExternalStorageMapped(container, file)) {
-                Toast.makeText(activity, "No free drive letter for external storage", Toast.LENGTH_LONG).show();
+                WinToast.show(activity, "No free drive letter for external storage", Toast.LENGTH_LONG);
                 return;
             }
 
@@ -670,7 +671,7 @@ public class FileManagerController {
             intent.putExtra("shortcut_path", tempShortcut.getAbsolutePath());
             activity.startActivity(intent);
         } catch (Exception e) {
-            Toast.makeText(activity, "Error launching: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            WinToast.show(activity, "Error launching: " + e.getMessage(), Toast.LENGTH_LONG);
             e.printStackTrace();
         }
     }
@@ -678,7 +679,7 @@ public class FileManagerController {
     private void createShortcutDirectly(File file, Container container) {
         try {
             if (!ensureExternalStorageMapped(container, file)) {
-                Toast.makeText(activity, "No free drive letter for external storage", Toast.LENGTH_LONG).show();
+                WinToast.show(activity, "No free drive letter for external storage", Toast.LENGTH_LONG);
                 return;
             }
 
@@ -697,7 +698,7 @@ public class FileManagerController {
                 writer.println("Icon=" + displayName);
                 writer.println("container_id:" + container.id);
             }
-            Toast.makeText(activity, "Game added to Library!", Toast.LENGTH_SHORT).show();
+            WinToast.show(activity, "Game added to Library!", Toast.LENGTH_SHORT);
 
             File iconDir64 = container.getIconsDir(64);
             if (!iconDir64.exists()) iconDir64.mkdirs();
@@ -735,12 +736,12 @@ public class FileManagerController {
         this.clipboardFile = file;
         this.isCutOperation = isCut;
         pushState();
-        Toast.makeText(activity, (isCut ? "Cut: " : "Copied: ") + file.getName(), Toast.LENGTH_SHORT).show();
+        WinToast.show(activity, (isCut ? "Cut: " : "Copied: ") + file.getName(), Toast.LENGTH_SHORT);
     }
 
     private void startPasteOperation() {
         if (clipboardFile == null || !clipboardFile.exists()) {
-            Toast.makeText(activity, "Nothing to paste", Toast.LENGTH_SHORT).show();
+            WinToast.show(activity, "Nothing to paste", Toast.LENGTH_SHORT);
             return;
         }
 
@@ -781,7 +782,7 @@ public class FileManagerController {
 
     private void executePaste(File source, File dest) {
         if (isCutOperation && source.renameTo(dest)) {
-            Toast.makeText(activity, "Moved instantly", Toast.LENGTH_SHORT).show();
+            WinToast.show(activity, "Moved instantly", Toast.LENGTH_SHORT);
             finishPaste(true);
             return;
         }
@@ -802,10 +803,10 @@ public class FileManagerController {
                 new Handler(Looper.getMainLooper()).post(() -> {
                     dismissProgressDialog();
                     if (!isOperationCancelled) {
-                        Toast.makeText(activity, "Success!", Toast.LENGTH_SHORT).show();
+                        WinToast.show(activity, "Success!", Toast.LENGTH_SHORT);
                         finishPaste(isCutOperation);
                     } else {
-                        Toast.makeText(activity, "Cancelled", Toast.LENGTH_SHORT).show();
+                        WinToast.show(activity, "Cancelled", Toast.LENGTH_SHORT);
                         deleteRecursive(dest);
                         loadDirectory(currentDir);
                     }
@@ -814,7 +815,7 @@ public class FileManagerController {
                 final String errorMsg = e.getMessage();
                 new Handler(Looper.getMainLooper()).post(() -> {
                     dismissProgressDialog();
-                    Toast.makeText(activity, "Error: " + errorMsg + ". Source preserved.", Toast.LENGTH_LONG).show();
+                    WinToast.show(activity, "Error: " + errorMsg + ". Source preserved.", Toast.LENGTH_LONG);
                     deleteRecursive(dest);
                     loadDirectory(currentDir);
                 });
@@ -895,19 +896,34 @@ public class FileManagerController {
         }
     }
 
-    private void deleteRecursive(File fileOrDirectory) {
+    private boolean deleteRecursive(File fileOrDirectory) {
+        boolean allDeleted = true;
         if (fileOrDirectory.isDirectory()) {
             File[] children = fileOrDirectory.listFiles();
-            if (children != null) for (File child : children) deleteRecursive(child);
+            if (children != null) for (File child : children) allDeleted &= deleteRecursive(child);
         }
-        fileOrDirectory.delete();
+        return fileOrDirectory.delete() && allDeleted;
     }
 
     private void renameFile(File file) {
         ThemedAlertHost.prompt(activity, "Rename", file.getName(), "OK", newName -> {
-            File newFile = new File(file.getParent(), newName);
-            if (file.renameTo(newFile)) loadDirectory(currentDir);
-            else Toast.makeText(activity, "Rename failed", Toast.LENGTH_SHORT).show();
+            String trimmed = newName == null ? "" : newName.trim();
+            if (trimmed.isEmpty() || trimmed.equals(file.getName())) return;
+            if (trimmed.contains("/")) {
+                WinToast.show(activity, "Name can't contain \"/\"", Toast.LENGTH_SHORT);
+                return;
+            }
+            File newFile = new File(file.getParent(), trimmed);
+            if (newFile.exists()) {
+                WinToast.show(activity, "\"" + trimmed + "\" already exists", Toast.LENGTH_SHORT);
+                return;
+            }
+            if (file.renameTo(newFile)) {
+                loadDirectory(currentDir);
+                WinToast.show(activity, "Renamed to " + trimmed, Toast.LENGTH_SHORT);
+            } else {
+                WinToast.show(activity, "Rename failed", Toast.LENGTH_SHORT);
+            }
         });
     }
 
@@ -918,8 +934,10 @@ public class FileManagerController {
 
     private void confirmDelete(File file) {
         ThemedAlertHost.confirm(activity, "Delete", "Are you sure you want to delete " + file.getName() + "?", "Delete", () -> {
-            deleteRecursive(file);
+            boolean deleted = deleteRecursive(file);
             loadDirectory(currentDir);
+            if (deleted) WinToast.show(activity, "Deleted " + file.getName(), Toast.LENGTH_SHORT);
+            else WinToast.show(activity, "Couldn't delete " + file.getName(), Toast.LENGTH_LONG);
         }, true);
     }
 

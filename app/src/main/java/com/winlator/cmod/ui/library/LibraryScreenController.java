@@ -15,6 +15,7 @@ import android.net.Uri;
 import android.os.Environment;
 import android.util.Log;
 import android.widget.Toast;
+import com.winlator.cmod.ui.toast.WinToast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -341,7 +342,7 @@ public class LibraryScreenController {
     }
 
     private void toast(String message) {
-        if (activity != null) Toast.makeText(activity, message, Toast.LENGTH_SHORT).show();
+        if (activity != null) WinToast.show(activity, message, Toast.LENGTH_SHORT);
     }
 
     // Called by every tile that has no cover/banner yet. One job fetches whatever is missing, and
@@ -385,7 +386,7 @@ public class LibraryScreenController {
     private void warnApiKeyOnce() {
         if (apiKeyWarningShown) return;
         apiKeyWarningShown = true;
-        Toast.makeText(activity, "SteamGridDB rejected the API key - check it in Settings", Toast.LENGTH_LONG).show();
+        WinToast.show(activity, "SteamGridDB rejected the API key - check it in Settings", Toast.LENGTH_LONG);
     }
 
     // What a tile shows when there is no downloaded cover, and needs no internet: the icon inside
@@ -726,7 +727,9 @@ public class LibraryScreenController {
                             ArtworkRepository.deleteArtworkIfUnused(activity, shortcut.file);
                             disableShortcutOnScreen(activity, shortcut);
                             loadShortcutsList();
-                            Toast.makeText(context, "Shortcut removed.", Toast.LENGTH_SHORT).show();
+                            WinToast.show(context, "Shortcut removed.", Toast.LENGTH_SHORT);
+                        } else {
+                            WinToast.show(context, "Couldn't remove shortcut", Toast.LENGTH_LONG);
                         }
                     },
                     true
@@ -739,8 +742,10 @@ public class LibraryScreenController {
             for (Container container : containers) {
                 items.add(new ThemedAlertHost.ActionItem(container.getName(), () -> {
                     if (shortcut.cloneToContainer(container)) {
-                        Toast.makeText(context, "Cloned successfully.", Toast.LENGTH_SHORT).show();
+                        WinToast.show(context, "Cloned successfully.", Toast.LENGTH_SHORT);
                         loadShortcutsList();
+                    } else {
+                        WinToast.show(context, "Couldn't copy shortcut to " + container.getName(), Toast.LENGTH_LONG);
                     }
                 }));
             }
@@ -764,13 +769,19 @@ public class LibraryScreenController {
         if (uriString != null) {
             Uri folderUri = Uri.parse(uriString);
             DocumentFile pickedDir = DocumentFile.fromTreeUri(activity, folderUri);
-            if (pickedDir == null || !pickedDir.canWrite()) return;
+            if (pickedDir == null || !pickedDir.canWrite()) {
+                WinToast.show(activity, "Export folder isn't writable. Pick another one in Settings.", Toast.LENGTH_LONG);
+                return;
+            }
             shortcutsDir = new File(FileUtils.getFilePathFromUri(activity, folderUri));
         } else {
             shortcutsDir = new File(AppDefaults.DEFAULT_SHORTCUT_EXPORT_PATH);
         }
 
-        if (!shortcutsDir.exists() && !shortcutsDir.mkdirs()) return;
+        if (!shortcutsDir.exists() && !shortcutsDir.mkdirs()) {
+            WinToast.show(activity, "Couldn't create the export folder", Toast.LENGTH_LONG);
+            return;
+        }
         File exportFile = new File(shortcutsDir, shortcut.file.getName());
         boolean containerIdFound = false;
 
@@ -792,8 +803,10 @@ public class LibraryScreenController {
                 for (String line : lines) writer.write(line + "\n");
                 writer.flush();
             }
-            Toast.makeText(activity, exportFile.getAbsolutePath(), Toast.LENGTH_LONG).show();
-        } catch (IOException ignored) {}
+            WinToast.show(activity, "Exported to " + exportFile.getAbsolutePath(), Toast.LENGTH_LONG);
+        } catch (IOException e) {
+            WinToast.show(activity, "Couldn't export shortcut", Toast.LENGTH_LONG);
+        }
     }
 
     private ShortcutInfo buildScreenShortCut(String shortLabel, String longLabel, int containerId, String shortcutPath, Icon icon, String uuid) {
@@ -825,6 +838,8 @@ public class LibraryScreenController {
             
             shortcutManager.requestPinShortcut(buildScreenShortCut(shortcut.name, shortcut.name, shortcut.container.id,
                     shortcut.file.getPath(), Icon.createWithBitmap(bmp), shortcut.getExtra("uuid")), null);
+        } else {
+            WinToast.show(activity, "Your launcher doesn't support pinned shortcuts", Toast.LENGTH_LONG);
         }
     }
 

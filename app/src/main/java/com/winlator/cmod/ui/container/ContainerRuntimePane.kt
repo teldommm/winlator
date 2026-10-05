@@ -1,6 +1,7 @@
 package com.winlator.cmod.ui.container
 
 import android.widget.Toast
+import com.winlator.cmod.ui.toast.WinToast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -142,8 +143,12 @@ internal fun ContainerRuntimePane(
             val outcome = installRuntimeComponent(context, type, version)
             val installed = outcome.id
             installing = installing - key
-            if (installed == null) Toast.makeText(context, outcome.failureText("Unable to install $version"), Toast.LENGTH_SHORT).show()
-            else { done(installed); revision++ }
+            if (installed == null) WinToast.show(context, outcome.failureText("Unable to install $version"), Toast.LENGTH_SHORT)
+            else {
+                done(installed)
+                revision++
+                WinToast.show(context, "$version installed", Toast.LENGTH_SHORT)
+            }
         }
     }
     fun installDriver(option: DriverOption) {
@@ -154,8 +159,13 @@ internal fun ContainerRuntimePane(
             val outcome = installAdrenoDriver(context, option)
             val installed = outcome.id
             installing = installing - key
-            if (installed == null) Toast.makeText(context, outcome.failureText("Unable to install ${option.label}"), Toast.LENGTH_SHORT).show()
-            else { driverVersion = installed; saveGraphics("version", installed); revision++ }
+            if (installed == null) WinToast.show(context, outcome.failureText("Unable to install ${option.label}"), Toast.LENGTH_SHORT)
+            else {
+                driverVersion = installed
+                saveGraphics("version", installed)
+                revision++
+                WinToast.show(context, "${option.label} installed", Toast.LENGTH_SHORT)
+            }
         }
     }
 

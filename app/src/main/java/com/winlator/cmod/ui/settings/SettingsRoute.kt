@@ -3,6 +3,7 @@ package com.winlator.cmod.ui.settings
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import com.winlator.cmod.ui.toast.WinToast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -220,9 +221,14 @@ internal class SettingsScreenState(
                 Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
             )
         } catch (e: SecurityException) {
-            Toast.makeText(activity, "Unable to take persistable permissions: " + e.message, Toast.LENGTH_SHORT).show()
+            WinToast.show(activity, "Unable to take persistable permissions: " + e.message, Toast.LENGTH_SHORT)
+            rebuild()
+            return
         }
         rebuild()
+        val label = if (key == "shortcuts_export_path_uri") "Shortcut export folder" else "Winlator folder"
+        val path = resolveStoredPath(key, "")
+        WinToast.show(activity, if (path.isEmpty()) "$label updated" else "$label: $path", Toast.LENGTH_SHORT)
     }
 
     // ---------- Detail screens (MainShell detail stack) ----------
@@ -256,7 +262,7 @@ internal class SettingsScreenState(
                     override fun onSuccess() {
                         dialog.closeOnUiThread()
                         activity.runOnUiThread {
-                            ThemedAlertHost.info(activity, "SoundFont Installed", "Soundfont installed successfully!")
+                            WinToast.show(activity, "SoundFont installed", Toast.LENGTH_SHORT)
                             rebuild()
                         }
                     }
@@ -274,14 +280,14 @@ internal class SettingsScreenState(
                     }
                 })
             } catch (e: Exception) {
-                Toast.makeText(activity, "Unable to install soundfont", Toast.LENGTH_SHORT).show()
+                WinToast.show(activity, "Unable to install soundfont", Toast.LENGTH_SHORT)
             }
         }
     }
 
     override fun onRemoveSoundFont(name: String) {
         if (MidiManager.DEFAULT_SF2_FILE == name) {
-            Toast.makeText(activity, R.string.cannot_remove_default_sound_font, Toast.LENGTH_SHORT).show()
+            WinToast.show(activity, R.string.cannot_remove_default_sound_font, Toast.LENGTH_SHORT)
             return
         }
         ThemedAlertHost.confirm(
@@ -291,10 +297,10 @@ internal class SettingsScreenState(
             "Remove",
             {
                 if (MidiManager.removeSF2File(activity, name)) {
-                    Toast.makeText(activity, R.string.sound_font_removed_success, Toast.LENGTH_SHORT).show()
+                    WinToast.show(activity, R.string.sound_font_removed_success, Toast.LENGTH_SHORT)
                     rebuild()
                 } else {
-                    Toast.makeText(activity, R.string.sound_font_removed_failed, Toast.LENGTH_SHORT).show()
+                    WinToast.show(activity, R.string.sound_font_removed_failed, Toast.LENGTH_SHORT)
                 }
             },
             true
@@ -304,10 +310,10 @@ internal class SettingsScreenState(
     override fun onImportLosslessDll() {
         pickDocument { uri ->
             if (LosslessDll.importGlobalLosslessDll(activity, uri)) {
-                Toast.makeText(activity, "Lossless.dll imported", Toast.LENGTH_SHORT).show()
+                WinToast.show(activity, "Lossless.dll imported", Toast.LENGTH_SHORT)
                 rebuild()
             } else {
-                Toast.makeText(activity, "Unable to import Lossless.dll", Toast.LENGTH_SHORT).show()
+                WinToast.show(activity, "Unable to import Lossless.dll", Toast.LENGTH_SHORT)
             }
         }
     }
@@ -325,7 +331,7 @@ internal class SettingsScreenState(
             ArtworkRepository.clearBlock()
         }
         if ("enable_file_provider" == key) {
-            Toast.makeText(activity, "This option will take effect at the next startup.", Toast.LENGTH_SHORT).show()
+            WinToast.show(activity, "This option will take effect at the next startup.", Toast.LENGTH_SHORT)
         }
         rebuild()
     }
@@ -367,11 +373,17 @@ internal class SettingsScreenState(
                 val presetId = if (action == "edit") id else null
                 if (box64) {
                     val dialog = Box64EditPresetDialog(activity, "box64", presetId)
-                    dialog.setOnConfirmCallback { rebuild() }
+                    dialog.setOnConfirmCallback {
+                        rebuild()
+                        WinToast.show(activity, if (presetId == null) "Preset added" else "Preset saved", Toast.LENGTH_SHORT)
+                    }
                     dialog.show()
                 } else {
                     val dialog = FEXCoreEditPresetDialog(activity, presetId)
-                    dialog.setOnConfirmCallback { rebuild() }
+                    dialog.setOnConfirmCallback {
+                        rebuild()
+                        WinToast.show(activity, if (presetId == null) "Preset added" else "Preset saved", Toast.LENGTH_SHORT)
+                    }
                     dialog.show()
                 }
             }
@@ -384,12 +396,13 @@ internal class SettingsScreenState(
                     if (box64) Box64PresetManager.duplicatePreset("box64", activity, id)
                     else FEXCorePresetManager.duplicatePreset(activity, id)
                     rebuild()
+                    WinToast.show(activity, "Preset duplicated", Toast.LENGTH_SHORT)
                 }
             )
             "remove" -> {
                 val custom = if (box64) id.startsWith(Box64Preset.CUSTOM) else id.startsWith(FEXCorePreset.CUSTOM)
                 if (!custom) {
-                    Toast.makeText(activity, "You cannot remove this preset", Toast.LENGTH_SHORT).show()
+                    WinToast.show(activity, "You cannot remove this preset", Toast.LENGTH_SHORT)
                     return
                 }
                 ThemedAlertHost.confirm(
@@ -410,7 +423,7 @@ internal class SettingsScreenState(
                             }
                         }
                         rebuild()
-                        Toast.makeText(activity, "Preset removed", Toast.LENGTH_SHORT).show()
+                        WinToast.show(activity, "Preset removed", Toast.LENGTH_SHORT)
                     },
                     true
                 )
@@ -418,16 +431,21 @@ internal class SettingsScreenState(
             "import" -> pickDocument { uri ->
                 try {
                     val stream = activity.contentResolver.openInputStream(uri)
-                    if (box64) Box64PresetManager.importPreset("box64", activity, stream)
-                    else FEXCorePresetManager.importPreset(activity, stream)
+                    val imported = stream != null && (
+                        if (box64) Box64PresetManager.importPreset("box64", activity, stream)
+                        else FEXCorePresetManager.importPreset(activity, stream)
+                    )
                     rebuild()
+                    if (imported) WinToast.show(activity, "Preset imported", Toast.LENGTH_SHORT)
+                    else WinToast.show(activity, "Unable to import preset", Toast.LENGTH_SHORT)
                 } catch (ignored: FileNotFoundException) {
+                    WinToast.show(activity, "Unable to import preset", Toast.LENGTH_SHORT)
                 }
             }
             "export" -> {
                 val exportable = if (box64) id.startsWith(Box64Preset.CUSTOM) else id.startsWith(FEXCorePreset.CUSTOM)
                 if (!exportable) {
-                    Toast.makeText(activity, "Cannot export this preset", Toast.LENGTH_SHORT).show()
+                    WinToast.show(activity, "Cannot export this preset", Toast.LENGTH_SHORT)
                     return
                 }
                 if (box64) Box64PresetManager.exportPreset("box64", activity, id)
