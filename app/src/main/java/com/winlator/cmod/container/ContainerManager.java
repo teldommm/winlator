@@ -200,8 +200,8 @@ public class ContainerManager {
         File dstDir = new File(homeDir, ImageFs.USER + "-" + id);
         if (!dstDir.mkdirs()) return;
 
-        // Use the refactored copy method that doesn't require a Context for File operations
-        if (!FileUtils.copy(srcContainer.getRootDir(), dstDir, file -> FileUtils.chmod(file, 0771))) {
+        // Keep component files hard-linked to the shared store instead of copying them.
+        if (!SharedComponents.copyTreePreservingLinks(srcContainer.getRootDir(), dstDir)) {
             FileUtils.delete(dstDir);
             return;
         }

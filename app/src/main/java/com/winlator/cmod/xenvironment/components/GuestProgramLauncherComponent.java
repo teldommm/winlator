@@ -14,6 +14,7 @@ import com.winlator.cmod.box64.Box64Preset;
 import com.winlator.cmod.box64.Box64PresetManager;
 import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.ContainerOverlay;
+import com.winlator.cmod.container.SharedComponents;
 import com.winlator.cmod.container.Shortcut;
 import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
@@ -99,6 +100,12 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             File destination) {
         ContentProfile profile = resolveInstalledRuntimeProfile(type, version);
         if (profile != null) return contentsManager.applyContent(profile);
+        // WowBox64/FEXCore DLLs go into the container's system32: link them from the shared
+        // component store. Box64 itself goes into the ImageFS, which is not per container.
+        if (type == ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64
+                || type == ContentProfile.ContentType.CONTENT_TYPE_FEXCORE) {
+            return SharedComponents.extractAndLink(context, bundledAsset, destination, null);
+        }
         return TarCompressorUtils.extract(
                 TarCompressorUtils.Type.ZSTD,
                 context,

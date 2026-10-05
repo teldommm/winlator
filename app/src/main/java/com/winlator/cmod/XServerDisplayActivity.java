@@ -47,6 +47,7 @@ import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.ContainerFiles;
 import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.container.ContainerOverlay;
+import com.winlator.cmod.container.SharedComponents;
 import com.winlator.cmod.container.Shortcut;
 import com.winlator.cmod.contentdialog.DXVKConfig;
 import com.winlator.cmod.contentdialog.DebugDialog;
@@ -2550,13 +2551,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 contentsManager.applyContent(dxvkProfile);
             } else {
                 Log.d(TAG, "Extracting fallback DXVK .tzst archive: " + dxvkWrapper);
-                TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "dxwrapper/" + dxvkWrapper + ".tzst",
-                        windowsDir, onExtractFileListener);
+                SharedComponents.extractAndLink(this, "dxwrapper/" + dxvkWrapper + ".tzst", windowsDir, onExtractFileListener);
 
                 if (compareVersion(dxvkWrapper, "2.4") < 0) {
                     Log.d(TAG, "Extracting d8vk as part of DXVK version " + dxvkWrapper);
-                    TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this,
-                            "dxwrapper/d8vk-" + DefaultVersion.D8VK + ".tzst", windowsDir, onExtractFileListener);
+                    SharedComponents.extractAndLink(this, "dxwrapper/d8vk-" + DefaultVersion.D8VK + ".tzst", windowsDir, onExtractFileListener);
                 }
             }
 
@@ -2570,14 +2569,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     contentsManager.applyContent(vkd3dProfile);
                 } else {
                     Log.d(TAG, "Extracting fallback VKD3D .tzst archive: " + vkd3dWrapper);
-                    TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this,
-                            "dxwrapper/" + vkd3dWrapper + ".tzst", windowsDir, onExtractFileListener);
+                    SharedComponents.extractAndLink(this, "dxwrapper/" + vkd3dWrapper + ".tzst", windowsDir, onExtractFileListener);
                 }
             }
 
             Log.d(TAG, "Extracting nglide wrapper");
-            TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "ddrawrapper/nglide.tzst", windowsDir,
-                    onExtractFileListener);
+            SharedComponents.extractAndLink(this, "ddrawrapper/nglide.tzst", windowsDir, onExtractFileListener);
 
             if (ddrawrapper.contains("None")) {
                 Log.d(TAG, "No DDRaw wrapper has been selected, restoring original ddraw files");
@@ -2587,8 +2584,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     envVars.put("CNC_DDRAW_CONFIG_FILE", "C:\\windows\\syswow64\\ddraw.ini");
 
                 Log.d(TAG, "Extracting ddrawrapper " + ddrawrapper);
-                TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "ddrawrapper/" + ddrawrapper + ".tzst",
-                        windowsDir, onExtractFileListener);
+                SharedComponents.extractAndLink(this, "ddrawrapper/" + ddrawrapper + ".tzst", windowsDir, onExtractFileListener);
             }
 
             Log.d(TAG, "Finished extraction of DXVK wrapper files, version: " + dxwrapper);
@@ -2667,8 +2663,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 boolean useNative = wincomponent[1].equals("1");
 
                 if (useNative) {
-                    TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this,
-                            "wincomponents/" + identifier + ".tzst", windowsDir, onExtractFileListener);
+                    SharedComponents.extractAndLink(this, "wincomponents/" + identifier + ".tzst", windowsDir, onExtractFileListener);
                 } else {
                     JSONArray dlnames = wincomponentsJSONObject.getJSONArray(identifier);
                     for (int i = 0; i < dlnames.length(); i++) {

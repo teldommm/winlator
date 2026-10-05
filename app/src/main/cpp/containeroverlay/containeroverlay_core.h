@@ -147,8 +147,9 @@ void ovl_seekdir(ovl_dir *d, long pos);
 int ovl_dirfd(ovl_dir *d);
 
 /**
- * If fd refers to a file in the lower layer, copy it up and write its upper path to out.
- * Returns 1 (copied up; operate on out), 0 (not a lower fd; pass through), -1 error.
+ * If fd refers to a file in the lower layer, copy it up and write its upper path to out. If it
+ * refers to a hard-linked (shared) upper file, give the path a private copy first.
+ * Returns 1 (operate on out), 0 (pass through on the fd), -1 error.
  */
 int ovl_fd_lower_copyup(int fd, char *out);
 

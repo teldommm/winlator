@@ -90,6 +90,24 @@ line (when either var is set, or debug is on) and every hook passes through.
   intercepted.
 - `realpath` returns the canonical path in upper spelling, even for files that live in lower.
 
+## Shared (hard-linked) upper files
+
+The app links immutable component files (DXVK, VKD3D, wincomponents, WowBox64, FEXCore, ...)
+from one shared store (`files/shared_components`) into every container's upper layer, so an
+upper regular file may have `st_nlink > 1`. Such a file is never written through:
+
+- A write open (`O_WRONLY`, `O_RDWR`, `O_TRUNC`, `O_APPEND`) of a hard-linked upper file first
+  clones it to `<path>.<pid>.<seq>.containeroverlay-tmp` (data skipped with `O_TRUNC`; mode
+  `| 0600`, `user.*` xattrs and times kept) and renames the clone over the link. If the path was
+  replaced in the meantime (inode changed), the clone is discarded and the current file is used.
+- `chmod`/`fchmodat`/`utimensat`/`truncate`/`setxattr`/`lsetxattr`/`removexattr`/`lremovexattr`
+  do the same before acting. `fchmod`/`fsetxattr`/`fremovexattr`/`utimensat(fd, NULL, ...)` on
+  an fd of a hard-linked upper file unshare the path and apply the change to it.
+- `rename`, `link`, `unlink` only touch names and leave the inode shared.
+
+Consequence: hard links created inside the prefix by Windows programs (`CreateHardLink`) are
+split on the first write, so a later write through one name is not seen through the other.
+
 ## Exported hooks (62)
 
 `open open64 openat openat64 __open_2 __openat_2 creat fopen fopen64 stat lstat fstatat

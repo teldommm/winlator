@@ -708,11 +708,15 @@ static int publish_noreplace(const char *tmp, const char *up)
     return -1;
 }
 
-static int copy_file(const char *lp, const char *up, const struct stat *lst, int copy_data)
+/*
+ * Copies src into a fresh temp file next to final (data only when copy_data), with mode
+ * | 0600, user.* xattrs and atime/mtime of lst. The temp path is written to tmp. On failure
+ * the temp is removed and -1 is returned with errno set.
+ */
+static int clone_to_tmp(const char *lp, const char *up, const struct stat *lst, int copy_data, char *tmp)
 {
-    char tmp[PM];
     unsigned long seq = __atomic_add_fetch(&g_tmp_seq, 1, __ATOMIC_RELAXED);
-    if (snprintf(tmp, sizeof(tmp), "%s.%d.%lu%s", up, (int)getpid(), seq, TMP_SUFFIX) >= (int)sizeof(tmp))
+    if (snprintf(tmp, PM, "%s.%d.%lu%s", up, (int)getpid(), seq, TMP_SUFFIX) >= PM)
         return fail(ENAMETOOLONG);
     int sfd = O.open(lp, O_RDONLY | O_NOFOLLOW | O_CLOEXEC, 0);
     if (sfd < 0) return -1;
@@ -757,7 +761,20 @@ static int copy_file(const char *lp, const char *up, const struct stat *lst, int
     }
     O.close(sfd);
     if (O.close(dfd) < 0 && !err) err = errno;
-    if (!err && publish_noreplace(tmp, up) < 0) {
+    if (err) {
+        O.unlink(tmp);
+        ovl_log("clone %s failed: %s", lp, strerror(err));
+        return fail(err);
+    }
+    return 0;
+}
+
+static int copy_file(const char *lp, const char *up, const struct stat *lst, int copy_data)
+{
+    char tmp[PM];
+    if (clone_to_tmp(lp, up, lst, copy_data, tmp) < 0) return -1;
+    int err = 0;
+    if (publish_noreplace(tmp, up) < 0) {
         err = errno;
         if (err == EEXIST) {
             O.unlink(tmp);
@@ -772,6 +789,38 @@ static int copy_file(const char *lp, const char *up, const struct stat *lst, int
     }
     ovl_log("copy-up %s -> %s%s", lp, up, copy_data ? "" : " (no data)");
     return 0;
+}
+
+/*
+ * An upper file with more than one hard link shares its inode with other paths (the app links
+ * immutable component files such as DXVK or d3dx9 from one shared store into every container).
+ * Before anything writes to it, give this container its own copy: clone to a temp file, then
+ * rename it over the link. Other containers and the store keep the original inode untouched.
+ */
+static int unshare_file(const char *up, const struct stat *st, int copy_data)
+{
+    char tmp[PM];
+    if (clone_to_tmp(up, up, st, copy_data, tmp) < 0) return -1;
+    struct stat now;
+    if (O.lstat(up, &now) != 0 || now.st_ino != st->st_ino || now.st_dev != st->st_dev) {
+        /* Replaced meanwhile (another process unshared it first): use what is there now. */
+        O.unlink(tmp);
+        ovl_log("unshare %s: already replaced", up);
+        return 0;
+    }
+    if (O.rename(tmp, up) < 0) {
+        int e = errno;
+        O.unlink(tmp);
+        ovl_log("unshare %s failed: %s", up, strerror(e));
+        return fail(e);
+    }
+    ovl_log("unshare %s (nlink %lu)%s", up, (unsigned long)st->st_nlink, copy_data ? "" : " (no data)");
+    return 0;
+}
+
+static int is_shared_reg(const struct stat *st)
+{
+    return S_ISREG(st->st_mode) && st->st_nlink > 1;
 }
 
 static int copy_up_node(const char *rel, const struct stat *lst, int copy_data)
@@ -806,15 +855,27 @@ static int copy_up_node(const char *rel, const struct stat *lst, int copy_data)
     return fail(ENOTSUP);
 }
 
-static int materialize_rel(const char *rel, int copy_data, char *upper_out)
+/*
+ * Makes rel exist in upper. With unshare, an upper regular file that shares its inode through
+ * hard links is first replaced by a private copy (for calls that modify the file: chmod,
+ * utimensat, truncate, xattrs). rename/link only move or add a name and leave it shared.
+ */
+static int materialize_rel_ex(const char *rel, int copy_data, char *upper_out, int unshare)
 {
     struct stat st;
+    char up[PM];
     int side = lookup_one(rel, &st);
     if (side == OVL_NONE) return -1;
-    if (upper_out && side_path(g_upper, rel, upper_out) < 0) return -1;
-    if (side == OVL_UPPER) return 0;
+    if (side_path(g_upper, rel, up) < 0) return -1;
+    if (upper_out) strcpy(upper_out, up);
+    if (side == OVL_UPPER) return unshare && is_shared_reg(&st) ? unshare_file(up, &st, copy_data) : 0;
     if (ensure_upper_parents(rel) < 0) return -1;
     return copy_up_node(rel, &st, copy_data);
+}
+
+static int materialize_rel(const char *rel, int copy_data, char *upper_out)
+{
+    return materialize_rel_ex(rel, copy_data, upper_out, 0);
 }
 
 int ovl_materialize(ovl_res *r, int follow, int copy_data, char *path_out)
@@ -832,7 +893,7 @@ int ovl_materialize(ovl_res *r, int follow, int copy_data, char *path_out)
         strcpy(path_out, g_upper);
         return 0;
     }
-    return materialize_rel(r->path, copy_data, path_out);
+    return materialize_rel_ex(r->path, copy_data, path_out, 1);
 }
 
 int ovl_fopen_flags(const char *mode)
@@ -876,7 +937,8 @@ int ovl_prepare_open(ovl_res *r, int flags, char *out, int *created_new, int *is
             *is_dir = 1;
             return 0;
         }
-        if (!writeish || side == OVL_UPPER || !S_ISREG(st.st_mode)) return 0;
+        if (!writeish || !S_ISREG(st.st_mode)) return 0;
+        if (side == OVL_UPPER) return is_shared_reg(&st) ? unshare_file(out, &st, !(flags & O_TRUNC)) : 0;
         char lp[PM];
         strcpy(lp, out);
         if (ensure_upper_parents(r->path) < 0) return -1;
@@ -1411,13 +1473,26 @@ int ovl_fd_lower_copyup(int fd, char *out)
         return 0;
     }
     p[l] = 0;
-    if (p[0] != '/' || canon_abs(p, c) < 0 || strncmp(c, g_lower, g_lower_len) ||
-        (c[g_lower_len] != '/' && c[g_lower_len] != 0) || layer_rel(c, rel) < 0) {
+    if (p[0] != '/' || canon_abs(p, c) < 0) {
         errno = e;
         return 0;
     }
+    int in_lower = !strncmp(c, g_lower, g_lower_len) && (c[g_lower_len] == '/' || c[g_lower_len] == 0);
+    int in_upper = !in_lower && !strncmp(c, g_upper, g_upper_len) && (c[g_upper_len] == '/' || c[g_upper_len] == 0);
+    if ((!in_lower && !in_upper) || layer_rel(c, rel) < 0) {
+        errno = e;
+        return 0;
+    }
+    if (in_upper) {
+        /* Only a hard-linked upper file needs redirecting; everything else stays on the fd. */
+        struct stat st;
+        if (!rel[0] || O.fstat(fd, &st) != 0 || !is_shared_reg(&st)) {
+            errno = e;
+            return 0;
+        }
+    }
     if (!rel[0]) return fail(EROFS);
-    return materialize_rel(rel, 1, out) < 0 ? -1 : 1;
+    return materialize_rel_ex(rel, 1, out, 1) < 0 ? -1 : 1;
 }
 
 static int add_prefix(const char *raw, int upper)
