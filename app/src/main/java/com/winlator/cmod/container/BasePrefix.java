@@ -26,7 +26,8 @@ import java.util.Map;
  */
 public final class BasePrefix {
     private static final String TAG = "BasePrefix";
-    private static final int BUILD_VERSION = 1;
+    // 2: common DLLs are hard-linked to the Wine build instead of copied (a v1 base is a full copy).
+    private static final int BUILD_VERSION = 2;
     private static final List<String> BASE_DRIVES = Arrays.asList("c:", "z:");
     public static final String DIR_NAME = "base_prefix";
     static final String COMPLETE_MARKER = ".complete";
