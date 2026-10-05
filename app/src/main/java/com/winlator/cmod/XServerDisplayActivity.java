@@ -1619,19 +1619,38 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
 
             @Override
-            public void onHudScale(int percent, boolean commit) {
-                if (modernHud != null) modernHud.setHudScale(1f + (percent - 50f) / 50f, commit);
+            public void onHudScale(int percent, boolean commit, boolean isModern) {
+                float scale = 1f + (percent - 50f) / 50f;
+                if (isModern) {
+                    if (modernHud != null) modernHud.setHudScale(scale, commit);
+                } else if (classicHud != null) {
+                    classicHud.setHudScale(scale, commit);
+                }
             }
 
             @Override
-            public void onHudAlpha(int percent, boolean commit) {
-                if (modernHud != null) modernHud.setHudAlpha(percent / 100f, commit);
+            public void onHudAlpha(int percent, boolean commit, boolean isModern) {
+                if (isModern) {
+                    if (modernHud != null) modernHud.setHudAlpha(percent / 100f, commit);
+                } else if (classicHud != null) {
+                    classicHud.setHudAlpha(percent / 100f, commit);
+                }
             }
 
             @Override
-            public void onResetHudLayout() {
-                if (modernHud != null) modernHud.resetLayout();
-                else WinlatorHUD.resetSavedLayout(XServerDisplayActivity.this);
+            public void onResetHudLayout(boolean isModern) {
+                if (isModern) {
+                    // Layout, every metric checkbox and the dual-cell correction.
+                    if (modernHud != null) modernHud.resetLayout();
+                    else {
+                        WinlatorHUD.resetSavedLayout(XServerDisplayActivity.this);
+                        WinlatorHUD.resetSavedMetrics(XServerDisplayActivity.this);
+                    }
+                } else if (classicHud != null) {
+                    classicHud.resetLayout();
+                } else {
+                    FrameRating.resetSavedLayout(XServerDisplayActivity.this);
+                }
             }
 
             @Override
@@ -1643,7 +1662,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         int savedHudScalePercent = WinlatorHUD.getSavedScalePercent(this);
         int savedHudAlphaPercent = WinlatorHUD.getSavedAlphaPercent(this);
-        HudPanelState state = new HudPanelState(hudOn, isModern, savedHudScalePercent, savedHudAlphaPercent, enableLogs);
+        HudPanelState state = new HudPanelState(hudOn, isModern, savedHudScalePercent, savedHudAlphaPercent,
+                FrameRating.getSavedScalePercent(this), FrameRating.getSavedAlphaPercent(this), enableLogs);
         HudSidebarPanelHost.attach(ingameSidebar, R.id.LLSubFPS, state, callbacks);
     }
 

@@ -15,6 +15,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -28,6 +30,9 @@ class FrameRatingState {
     var renderer by mutableStateOf("")
     var gpu by mutableStateOf("")
     var ram by mutableStateOf("")
+    // HUD Size / Opacity from the sidebar. 1f = natural size / fully opaque.
+    var scale by mutableStateOf(1f)
+    var alpha by mutableStateOf(1f)
 }
 
 // Compose body of FrameRating, replacing the old frame_rating.xml (four TextView rows). Same
@@ -47,7 +52,18 @@ private val RamLabel = Color(0xFF23A6A4)
 private fun FrameRatingContent(state: FrameRatingState) {
     // Nothing here has a pointer-input node, so touches fall through to the game underneath
     // (the old FrameLayout/TextViews were not clickable either).
-    Column(Modifier.fillMaxSize()) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            // Scaled from the top-left corner (where the HUD sits), like the Modern HUD; the
+            // state is only read in the draw phase so a slider drag doesn't recompose.
+            .graphicsLayer {
+                scaleX = state.scale
+                scaleY = state.scale
+                alpha = state.alpha
+                transformOrigin = TransformOrigin(0f, 0f)
+            }
+    ) {
         HudRow("FPS:", FpsLabel, state.fps)
         HudRow("Renderer:", RendererLabel, state.renderer)
         HudRow("GPU:", GpuLabel, state.gpu)

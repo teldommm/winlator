@@ -29,6 +29,10 @@ public class FrameRating extends FrameLayout implements Runnable {
     private HashMap graphicsDriverConfig;
     private static final String PREFS = "winlator_hud";
     private static final String KEY_VIS = "hud_vis";
+    // Classic's own size/opacity. Distinct from the Modern HUD's hud_scale / hud_alpha_int, which
+    // live in the same prefs file, so the two styles keep separate settings.
+    private static final String KEY_SCALE = "classic_hud_scale";
+    private static final String KEY_ALPHA = "classic_hud_alpha_int";
     private final SharedPreferences prefs;
     private boolean userEnabled = false;
 
@@ -46,6 +50,8 @@ public class FrameRating extends FrameLayout implements Runnable {
         super(context, attrs, defStyleAttr);
         this.context = context;
         prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        state.setScale(prefs.getFloat(KEY_SCALE, 1f));
+        state.setAlpha(prefs.getInt(KEY_ALPHA, 100) / 100f);
         state.setRenderer("Vulkan");
         state.setGpu(GPUInformation.getRenderer(graphicsDriverConfig.get("version").toString(), context));
         totalRAM = getTotalRAM();
@@ -95,6 +101,42 @@ public class FrameRating extends FrameLayout implements Runnable {
 
         state.setRenderer(lastKnownRenderer != null ? lastKnownRenderer : "Vulkan");
         state.setGpu(GPUInformation.getRenderer(graphicsDriverConfig.get("version").toString(), context));
+    }
+
+    // persist = false for live slider drags; written once when the slider is released.
+    public void setHudScale(float scale, boolean persist) {
+        state.setScale(scale);
+        if (persist) prefs.edit().putFloat(KEY_SCALE, scale).apply();
+    }
+
+    public void setHudAlpha(float alpha, boolean persist) {
+        float clamped = Math.max(0f, Math.min(1f, alpha));
+        state.setAlpha(clamped);
+        if (persist) prefs.edit().putInt(KEY_ALPHA, Math.round(clamped * 100f)).apply();
+    }
+
+    /** "Reset HUD Layout": natural size, fully opaque. Visibility and the shown rows are untouched. */
+    public void resetLayout() {
+        resetSavedLayout(context);
+        state.setScale(1f);
+        state.setAlpha(1f);
+    }
+
+    public static void resetSavedLayout(Context context) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .remove(KEY_SCALE)
+                .remove(KEY_ALPHA)
+                .apply();
+    }
+
+    // Slider positions: size 50% = 1.0x (same mapping as the Modern HUD), opacity in percent.
+    public static int getSavedScalePercent(Context context) {
+        return Math.round(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getFloat(KEY_SCALE, 1f) * 50f);
+    }
+
+    public static int getSavedAlphaPercent(Context context) {
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(KEY_ALPHA, 100);
     }
 
     public boolean hasSavedPref() {

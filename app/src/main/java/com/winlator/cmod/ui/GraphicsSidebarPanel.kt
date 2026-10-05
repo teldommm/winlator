@@ -86,6 +86,7 @@ private val RESHADE_EFFECTS = listOf(
 private const val FPS_STEP = 5
 private const val FPS_SLIDER_MAX_FPS = 120
 private const val FPS_CUSTOM_POSITION = FPS_SLIDER_MAX_FPS / FPS_STEP + 1
+private const val FPS_CUSTOM_DEFAULT = 144
 // Same ceiling VulkanXServerView.setFpsLimit() clamps to.
 private const val FPS_CUSTOM_MAX = 1000
 
@@ -293,7 +294,6 @@ private fun TargetFpsField(initialFps: Int, onFpsChanged: (Int) -> Unit) {
         label = { Text("Target FPS") },
         placeholder = { Text("e.g. 60") },
         suffix = { Text("FPS") },
-        supportingText = { Text("Generated frames are timed to this rate. Above the display refresh rate = match the display.") },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
         keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
         modifier = Modifier
@@ -364,10 +364,10 @@ private fun FpsLimiterCard(initialFps: Int, onFpsChanged: (Int) -> Unit) {
             value = position.toFloat(),
             onValueChange = {
                 position = it.roundToInt().coerceIn(0, FPS_CUSTOM_POSITION)
-                // Pre-fill Custom with the limit that was active, so dragging into it doesn't
-                // leave an empty field.
-                if (position >= FPS_CUSTOM_POSITION && customText.isEmpty() && applied > 0) {
-                    customText = applied.toString()
+                // Custom starts at 144 so dragging into it never shows an empty field; the value
+                // is applied when the slider is released, so what's shown is what's in effect.
+                if (position >= FPS_CUSTOM_POSITION && customText.isEmpty()) {
+                    customText = FPS_CUSTOM_DEFAULT.toString()
                 }
             },
             onValueChangeFinished = { apply() },

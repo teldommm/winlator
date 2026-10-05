@@ -1709,8 +1709,12 @@ public class WinlatorHUD extends View {
     private static final float DEFAULT_POS = 16f;
 
     public void resetLayout() {
+        // Prefs first and synchronously: the sidebar re-reads the metric checkboxes and the
+        // dual-cell toggle from them right after this returns, so a posted reset would race it.
+        resetSavedLayout(getContext());
+        resetSavedMetrics(getContext());
         uiHandler.post(() -> {
-            resetSavedLayout(getContext());
+            showMask = SHOW_DEFAULT;
             alignRight = false;
             setX(DEFAULT_POS);
             setY(DEFAULT_POS);
@@ -1722,7 +1726,16 @@ public class WinlatorHUD extends View {
         });
     }
 
-    // Prefs-only variant for when the HUD view doesn't exist yet; it reads these on creation.
+    // Prefs-only variants for when the HUD view doesn't exist yet; it reads these on creation.
+    // Metrics: back to "show everything, no dual-cell correction". The mask is written explicitly (not
+    // removed) so the pref listener sees the change. The learned battery drain-sign keys are
+    // device calibration, not a setting, and are left alone.
+    public static void resetSavedMetrics(Context context) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .putInt(KEY_SHOW, SHOW_DEFAULT)
+                .remove(KEY_DUAL_CELL)
+                .apply();
+    }
     public static void resetSavedLayout(Context context) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
                 .remove(KEY_X)
