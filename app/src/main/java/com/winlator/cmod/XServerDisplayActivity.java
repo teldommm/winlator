@@ -1000,7 +1000,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private boolean prepareContainerOverlay() {
         if (ContainerOverlay.prepare(this, contentsManager, container)) return true;
         runOnUiThread(() -> {
-            Toast.makeText(this, "Container prefix is unavailable: the shared base prefix or the overlay library is missing.", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "This container cannot be started: delete and recreate it (old full prefix), or the overlay library / base prefix is missing.", Toast.LENGTH_LONG).show();
             exit();
         });
         return false;

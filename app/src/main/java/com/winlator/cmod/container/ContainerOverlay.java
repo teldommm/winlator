@@ -151,6 +151,12 @@ public final class ContainerOverlay {
      *         prefix started without its overlay would be missing most of Windows.
      */
     public static boolean prepare(Context context, ContentsManager contentsManager, Container container) {
+        if (container.getBasePrefix().isEmpty()) {
+            // Created before the overlay: it owns a complete private prefix. Running it on top of a
+            // base would only add the base's size on top of its own, so it has to be recreated.
+            Log.e(TAG, "Container " + container.id + " has a full private prefix, recreate it");
+            return false;
+        }
         if (!isLibraryAvailable(context)) {
             Log.e(TAG, "Overlay library missing, cannot launch container " + container.id);
             return false;

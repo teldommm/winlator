@@ -22,6 +22,8 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.concurrent.Executors;
@@ -292,7 +294,24 @@ public class ContainerManager {
                 dstFile = onExtractFileListener.onExtractFile(dstFile, 0);
                 if (dstFile == null) continue;
             }
-            FileUtils.copy(file, dstFile);
+            linkOrCopy(file, dstFile);
+        }
+    }
+
+    /**
+     * The common DLLs are identical to the Wine build's own files, so the base prefix hard-links
+     * them instead of storing a second copy. Containers never write to the base (the overlay
+     * copies up into the container), so sharing the inode is safe. Falls back to a copy.
+     */
+    private static void linkOrCopy(File src, File dst) {
+        File parent = dst.getParentFile();
+        if (parent != null && !parent.isDirectory() && !parent.mkdirs()) return;
+        try {
+            if (Files.isSymbolicLink(src.toPath())) throw new IOException("symlink");
+            Files.createLink(dst.toPath(), src.toPath());
+        }
+        catch (IOException | UnsupportedOperationException | SecurityException e) {
+            FileUtils.copy(src, dst);
         }
     }
 

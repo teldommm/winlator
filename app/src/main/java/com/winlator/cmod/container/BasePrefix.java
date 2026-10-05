@@ -157,7 +157,11 @@ public final class BasePrefix {
             OnExtractFileListener commonRemap = (file, size) -> {
                 String path = file.getAbsolutePath();
                 if (!path.equals(commonPrefix) && !path.startsWith(commonPrefix + "/")) return null;
-                return new File(stagingWine, path.substring(commonPrefix.length()));
+                File dst = new File(stagingWine, path.substring(commonPrefix.length()));
+                // Common DLLs are hard-linked to the Wine build: unlink first so that extracting
+                // over one (e.g. notepad.exe) never writes through into the Wine build's own file.
+                if (dst.isFile()) dst.delete();
+                return dst;
             };
             if (!containerManager.extractContainerPatternCommon(staging, commonRemap)) {
                 Log.e(TAG, "Failed to extract container_pattern_common into the base for " + wineVersion);
