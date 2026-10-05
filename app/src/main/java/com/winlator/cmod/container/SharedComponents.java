@@ -180,7 +180,7 @@ public final class SharedComponents {
                     return false;
                 }
                 if (ds.st_ino == ss.st_ino && ds.st_dev == ss.st_dev) return true;
-                Os.unlink(d);
+                Os.remove(d);
             }
             catch (ErrnoException e) {
                 if (e.errno != OsConstants.ENOENT) throw e;

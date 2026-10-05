@@ -93,7 +93,7 @@ public abstract class FileUtils {
         if (file == null) return;
         try {
             StructStat st = Os.lstat(file.getAbsolutePath());
-            if (OsConstants.S_ISREG(st.st_mode) && st.st_nlink > 1) Os.unlink(file.getAbsolutePath());
+            if (OsConstants.S_ISREG(st.st_mode) && st.st_nlink > 1) Os.remove(file.getAbsolutePath());
         }
         catch (ErrnoException ignored) {}
     }
