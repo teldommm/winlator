@@ -4,8 +4,12 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.SystemClock;
 import android.util.AttributeSet;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.FrameLayout;
+import android.widget.TextView;
+
+import com.winlator.cmod.R;
 
 import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.Shortcut;
@@ -24,8 +28,10 @@ public class FrameRating extends FrameLayout implements Runnable {
     private float lastFPS = 0;
     private volatile float frameGenPresentedRate = 0f;
     private String totalRAM = null;
-    // Drawn by FrameRatingComposeHost (widget/FrameRatingOverlay.kt); this class only measures.
-    private final FrameRatingState state = new FrameRatingState();
+    private final TextView tvFPS;
+    private final TextView tvRenderer;
+    private final TextView tvGPU;
+    private final TextView tvRAM;
     private HashMap graphicsDriverConfig;
     private static final String PREFS = "winlator_hud";
     private static final String KEY_VIS = "hud_vis";
@@ -50,13 +56,25 @@ public class FrameRating extends FrameLayout implements Runnable {
         super(context, attrs, defStyleAttr);
         this.context = context;
         prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        state.setScale(prefs.getFloat(KEY_SCALE, 1f));
-        state.setAlpha(prefs.getInt(KEY_ALPHA, 100) / 100f);
-        state.setRenderer("Vulkan");
-        state.setGpu(GPUInformation.getRenderer(graphicsDriverConfig.get("version").toString(), context));
+        View view = LayoutInflater.from(context).inflate(R.layout.frame_rating, this, false);
+        tvFPS = view.findViewById(R.id.TVFPS);
+        tvRenderer = view.findViewById(R.id.TVRenderer);
+        tvRenderer.setText("Vulkan");
+        tvGPU = view.findViewById(R.id.TVGPU);
+        tvGPU.setText(GPUInformation.getRenderer(graphicsDriverConfig.get("version").toString(), context));
+        tvRAM = view.findViewById(R.id.TVRAM);
         totalRAM = getTotalRAM();
         this.graphicsDriverConfig = graphicsDriverConfig;
-        addView(FrameRatingComposeHost.create(context, state));
+        addView(view);
+
+        // Scale from the top-left corner, where the HUD sits, so it grows/shrinks in place instead
+        // of drifting off the screen edge (same as the Modern HUD).
+        setPivotX(0f);
+        setPivotY(0f);
+        float scale = prefs.getFloat(KEY_SCALE, 1f);
+        setScaleX(scale);
+        setScaleY(scale);
+        setAlpha(prefs.getInt(KEY_ALPHA, 100) / 100f);
     }
 
     private String getTotalRAM() {
@@ -90,36 +108,38 @@ public class FrameRating extends FrameLayout implements Runnable {
 
     public void setRenderer(String renderer) {
         lastKnownRenderer = renderer; 
-        state.setRenderer(renderer);
+        tvRenderer.setText(renderer);
     }
 
     public void setGpuName (String gpuName) {
-        state.setGpu(gpuName);
+        tvGPU.setText(gpuName);
     }
 
     public void reset() {
 
-        state.setRenderer(lastKnownRenderer != null ? lastKnownRenderer : "Vulkan");
-        state.setGpu(GPUInformation.getRenderer(graphicsDriverConfig.get("version").toString(), context));
+        tvRenderer.setText(lastKnownRenderer != null ? lastKnownRenderer : "Vulkan");
+        tvGPU.setText(GPUInformation.getRenderer(graphicsDriverConfig.get("version").toString(), context));
     }
 
     // persist = false for live slider drags; written once when the slider is released.
     public void setHudScale(float scale, boolean persist) {
-        state.setScale(scale);
+        setScaleX(scale);
+        setScaleY(scale);
         if (persist) prefs.edit().putFloat(KEY_SCALE, scale).apply();
     }
 
     public void setHudAlpha(float alpha, boolean persist) {
         float clamped = Math.max(0f, Math.min(1f, alpha));
-        state.setAlpha(clamped);
+        setAlpha(clamped);
         if (persist) prefs.edit().putInt(KEY_ALPHA, Math.round(clamped * 100f)).apply();
     }
 
     /** "Reset HUD Layout": natural size, fully opaque. Visibility and the shown rows are untouched. */
     public void resetLayout() {
         resetSavedLayout(context);
-        state.setScale(1f);
-        state.setAlpha(1f);
+        setScaleX(1f);
+        setScaleY(1f);
+        setAlpha(1f);
     }
 
     public static void resetSavedLayout(Context context) {
@@ -193,8 +213,8 @@ public class FrameRating extends FrameLayout implements Runnable {
         if (getVisibility() == GONE) setVisibility(View.VISIBLE);
         float genRate = frameGenPresentedRate;
         float displayFps = genRate > 0f ? genRate : lastFPS;
-        state.setFps(String.format(Locale.ENGLISH, "%.1f", displayFps));
-        state.setRam(getAvailableRAM() + " GB Used / " + totalRAM + " Total");
+        tvFPS.setText(String.format(Locale.ENGLISH, "%.1f", displayFps));
+        tvRAM.setText(getAvailableRAM() + " GB Used / " + totalRAM + " Total");
     }
 }
 
