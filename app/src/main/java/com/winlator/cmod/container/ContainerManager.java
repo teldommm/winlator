@@ -281,8 +281,6 @@ public class ContainerManager {
 
         File[] srcfiles = srcDir.listFiles(file -> file.isFile());
         if (srcfiles == null) throw new JSONException("Missing Wine files");
-        int linked = 0, copied = 0;
-        String firstLinkError = null;
 
         for (File file : srcfiles) {
             String dllName = file.getName();
@@ -296,35 +294,24 @@ public class ContainerManager {
                 dstFile = onExtractFileListener.onExtractFile(dstFile, 0);
                 if (dstFile == null) continue;
             }
-            String error = linkOrCopy(file, dstFile);
-            if (error == null) linked++;
-            else {
-                copied++;
-                if (firstLinkError == null) firstLinkError = error;
-            }
+            linkOrCopy(file, dstFile);
         }
-        Log.i("ContainerManager", "Common DLLs " + dstName + ": linked=" + linked + " copied=" + copied
-                + (firstLinkError != null ? " firstLinkError=" + firstLinkError : ""));
     }
 
     /**
      * The common DLLs are identical to the Wine build's own files, so the base prefix hard-links
      * them instead of storing a second copy. Containers never write to the base (the overlay
      * copies up into the container), so sharing the inode is safe. Falls back to a copy.
-     *
-     * @return null if the file was hard-linked, otherwise why linking failed (the file was copied)
      */
-    private static String linkOrCopy(File src, File dst) {
+    private static void linkOrCopy(File src, File dst) {
         File parent = dst.getParentFile();
-        if (parent != null && !parent.isDirectory() && !parent.mkdirs()) return "mkdirs failed";
+        if (parent != null && !parent.isDirectory() && !parent.mkdirs()) return;
         try {
-            if (Files.isSymbolicLink(src.toPath())) throw new IOException("source is a symlink");
+            if (Files.isSymbolicLink(src.toPath())) throw new IOException("symlink");
             Files.createLink(dst.toPath(), src.toPath());
-            return null;
         }
         catch (IOException | UnsupportedOperationException | SecurityException e) {
             FileUtils.copy(src, dst);
-            return e.toString();
         }
     }
 
