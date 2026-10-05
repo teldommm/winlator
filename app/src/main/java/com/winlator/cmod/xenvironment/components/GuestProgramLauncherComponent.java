@@ -13,6 +13,7 @@ import androidx.preference.PreferenceManager;
 import com.winlator.cmod.box64.Box64Preset;
 import com.winlator.cmod.box64.Box64PresetManager;
 import com.winlator.cmod.container.Container;
+import com.winlator.cmod.container.ContainerOverlay;
 import com.winlator.cmod.container.Shortcut;
 import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
@@ -449,6 +450,16 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
 
         execEnvVars.put("FAKE_EVDEV_DIR", devInputDir.getAbsolutePath());
         execEnvVars.put("FAKE_EVDEV_VIBRATION", "1");
+
+        // Thin containers run on the copy-on-write prefix overlay: preload libcontaineroverlay.so and
+        // tell it which layer is the container's and which is the shared base prefix.
+        try {
+            ld_preload = ContainerOverlay.applyLaunchEnv(context, imageFs, container, execEnvVars, ld_preload);
+        }
+        catch (IllegalStateException e) {
+            Log.e("GuestLauncher", "Refusing to launch: " + e.getMessage());
+            return -1;
+        }
 
         Log.d("GuestLauncher", "Final LD_PRELOAD: " + ld_preload);
         execEnvVars.put("LD_PRELOAD", ld_preload);

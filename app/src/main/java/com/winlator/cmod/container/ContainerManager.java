@@ -157,7 +157,8 @@ public class ContainerManager {
 
             container.setWineVersion(data.getString("wineVersion"));
 
-            if (!extractContainerPatternFile(container, container.getWineVersion(), contentsManager, containerDir, null)) {
+            if (!createThinPrefix(container, contentsManager)) {
+                Log.w("ContainerManager", "Failed to create the container prefix, deleting container directory...");
                 FileUtils.delete(containerDir);
                 return null;
             }
@@ -179,6 +180,17 @@ public class ContainerManager {
         return null;
     }
 
+
+    /** Layers a new container over the shared base prefix of its Wine version. */
+    private boolean createThinPrefix(Container container, ContentsManager contentsManager) {
+        if (!ContainerOverlay.isLibraryAvailable(context)) return false;
+        File baseWine = BasePrefix.ensure(context, contentsManager, container.getWineVersion());
+        if (baseWine == null || !ContainerOverlay.createThinPrefix(baseWine, new File(container.getRootDir(), ".wine"))) return false;
+        container.setBasePrefix(ContainerOverlay.canonicalHostPath(baseWine));
+        new File(container.getRootDir(), ".cache").mkdirs();
+        new File(container.getRootDir(), ".config").mkdirs();
+        return true;
+    }
 
     private void duplicateContainer(Container srcContainer) {
         int id = findNextContainerId();
@@ -210,6 +222,7 @@ public class ContainerManager {
         dstContainer.setBox64Preset(srcContainer.getBox64Preset());
         dstContainer.setDesktopTheme(srcContainer.getDesktopTheme());
         dstContainer.setWineVersion(srcContainer.getWineVersion());
+        dstContainer.setBasePrefix(srcContainer.getBasePrefix());
         dstContainer.saveData();
 
         maxContainerId = Math.max(maxContainerId, id);
@@ -281,6 +294,11 @@ public class ContainerManager {
             }
             FileUtils.copy(file, dstFile);
         }
+    }
+
+    /** Extracts container_pattern_common.tzst (laid out as home/xuser/...) into the destination. */
+    public boolean extractContainerPatternCommon(File destination, OnExtractFileListener onExtractFileListener) {
+        return TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, context, "container_pattern_common.tzst", destination, onExtractFileListener);
     }
 
     public boolean extractContainerPatternFile(Container container, String wineVersion, ContentsManager contentsManager, File containerDir, OnExtractFileListener onExtractFileListener) {

@@ -44,7 +44,9 @@ import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.container.Container;
+import com.winlator.cmod.container.ContainerFiles;
 import com.winlator.cmod.container.ContainerManager;
+import com.winlator.cmod.container.ContainerOverlay;
 import com.winlator.cmod.container.Shortcut;
 import com.winlator.cmod.contentdialog.DXVKConfig;
 import com.winlator.cmod.contentdialog.DebugDialog;
@@ -673,6 +675,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 simulateConfirmInputControlsDialog();
             }
             Executors.newSingleThreadExecutor().execute(() -> {
+                if (!prepareContainerOverlay()) return;
                 setupWineSystemFiles();
                 extractGraphicsDriverFiles();
                 changeWineAudioDriver();
@@ -991,6 +994,16 @@ public class XServerDisplayActivity extends AppCompatActivity {
             touchpadView.requestPointerCapture();
         else if (!hasFocus)
             touchpadView.releasePointerCapture();
+    }
+
+    /** Builds the shared base prefix of the container's Wine version if needed. Runs before anything touches the prefix. */
+    private boolean prepareContainerOverlay() {
+        if (ContainerOverlay.prepare(this, contentsManager, container)) return true;
+        runOnUiThread(() -> {
+            Toast.makeText(this, "Container prefix is unavailable: the shared base prefix or the overlay library is missing.", Toast.LENGTH_LONG).show();
+            exit();
+        });
+        return false;
     }
 
     private void setupWineSystemFiles() {
@@ -2675,26 +2688,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
     }
 
+    /** The originals live in the base prefix: dropping the container's override makes them show through again. */
     private void restoreOriginalDllFiles(final String... dlls) {
-        File rootDir = imageFs.getRootDir();
-        File windowsDir = new File(rootDir, ImageFs.WINEPREFIX + "/drive_c/windows");
-        File system32dlls = null;
-        File syswow64dlls = null;
-
-        if (wineInfo.isArm64EC())
-            system32dlls = new File(imageFs.getWinePath() + "/lib/wine/aarch64-windows");
-        else
-            system32dlls = new File(imageFs.getWinePath() + "/lib/wine/x86_64-windows");
-
-        syswow64dlls = new File(imageFs.getWinePath() + "/lib/wine/i386-windows");
-
+        File upperWine = ContainerFiles.upperDir(container);
         for (String dll : dlls) {
-            File srcFile = new File(system32dlls, dll);
-            File dstFile = new File(windowsDir, "system32/" + dll);
-            FileUtils.copy(srcFile, dstFile);
-            srcFile = new File(syswow64dlls, dll);
-            dstFile = new File(windowsDir, "syswow64/" + dll);
-            FileUtils.copy(srcFile, dstFile);
+            ContainerFiles.removeOverride(upperWine, "drive_c/windows/system32/" + dll);
+            ContainerFiles.removeOverride(upperWine, "drive_c/windows/syswow64/" + dll);
         }
     }
 
@@ -2899,8 +2898,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     private void applyGeneralPatches(Container container) {
-        File rootDir = imageFs.getRootDir();
-        TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "container_pattern_common.tzst", rootDir);
+        // container_pattern_common lives in the shared base prefix, nothing to extract per container.
         WineUtils.applySystemTweaks(this, wineInfo);
         container.putExtra("graphicsDriver", null);
         container.putExtra("desktopTheme", null);
