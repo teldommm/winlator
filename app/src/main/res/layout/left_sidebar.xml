@@ -1,14 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  The entire in-game sidebar is a single Compose composition (IngameSidebar.kt):
-  card background/outline/elevation, rail, and all five panels. Panel identity is still
-  R.id.LLSubXxx, declared as plain ids in values/ids_sidebar.xml.
-
-  IngameSidebarThemeLayout is kept only as the root wrapper because it applies the
-  IngameSidebarTheme_* overlay (android:textColor*/colorAccent/colorControl*) to the
-  activity theme, which any remaining native widget in XServerDisplayActivity inherits.
+  The entire in-game sidebar is a single Compose composition (IngameSidebar.kt): card
+  background/outline/elevation, rail, and all five panels. Panel identity is still
+  R.id.LLSubXxx, declared as plain ids in values/ids_sidebar.xml. Colors come from WinZTheme;
+  the activity has no native widgets left that would need an XML theme overlay.
 -->
-<com.winlator.cmod.ui.theme.IngameSidebarThemeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/IngameSidebarRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
@@ -18,4 +15,4 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-</com.winlator.cmod.ui.theme.IngameSidebarThemeLayout>
+</FrameLayout>

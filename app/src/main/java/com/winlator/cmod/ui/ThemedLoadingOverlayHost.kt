@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -39,33 +40,7 @@ object ThemedLoadingOverlayHost {
         val root = activity.findViewById<ViewGroup>(android.R.id.content)
         val composeView = ComposeView(activity).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-            setContent {
-                WinZOverlayTheme {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.5f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        ThemedDialogSurface {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(60.dp),
-                                    color = controlAccentColor(),
-                                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                                    strokeWidth = 5.dp
-                                )
-                                Spacer(Modifier.width(16.dp))
-                                Text(
-                                    message,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+            setContent { WinZOverlayTheme { LoadingOverlayContent(message) } }
         }
         root.addView(
             composeView,
@@ -78,5 +53,33 @@ object ThemedLoadingOverlayHost {
     fun dismiss(view: View?) {
         if (view == null) return
         (view.parent as? ViewGroup)?.removeView(view)
+    }
+}
+
+// The card itself, shared with PreloaderOverlayHost's "standard" mode so both look identical.
+@Composable
+internal fun LoadingOverlayContent(message: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.5f)),
+        contentAlignment = Alignment.Center
+    ) {
+        ThemedDialogSurface {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(60.dp),
+                    color = controlAccentColor(),
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    strokeWidth = 5.dp
+                )
+                Spacer(Modifier.width(16.dp))
+                Text(
+                    message,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
     }
 }

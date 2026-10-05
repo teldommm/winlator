@@ -1,33 +1,20 @@
 package com.winlator.cmod.core;
 
-import android.animation.ValueAnimator;
 import android.app.Activity;
-import android.app.Dialog;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.Color;
-import android.os.Build;
 import android.os.Environment;
 import android.os.Looper;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
-import android.view.Window;
-import android.view.WindowManager;
-import android.view.animation.LinearInterpolator;
-import android.widget.ImageView;
-import android.widget.TextView;
 
-import androidx.core.view.WindowCompat;
-import androidx.core.view.WindowInsetsCompat;
-import androidx.core.view.WindowInsetsControllerCompat;
-
-import com.google.android.material.progressindicator.LinearProgressIndicator;
 import com.winlator.cmod.R;
 import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.ContainerManager;
-import com.winlator.cmod.ui.theme.WinlatorLegacyTheme;
+import com.winlator.cmod.ui.PreloaderOverlayHost;
+import com.winlator.cmod.ui.PreloaderOverlayState;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -46,111 +33,35 @@ public class PreloaderDialog {
     private static final int MAX_IMAGE_BYTES = 16 * 1024 * 1024;
 
     private final Activity activity;
-    private Dialog dialog;
+    // The Compose overlay (see ui/PreloaderOverlayHost). State is what it draws; the view is only
+    // held so close() can remove it.
+    private final PreloaderOverlayState state = new PreloaderOverlayState();
+    private View overlay;
     private Bitmap artworkBitmap;
-    private ValueAnimator artworkMotion;
-    private ImageView artworkMotionView;
-    private View.OnAttachStateChangeListener artworkMotionDetach;
-
-    // Slow zoom/drift of the launch artwork ("Animated artwork" setting). Same maths as the
-    // Compose kenBurns modifier: one looping clock into sinusoids, drift limited to the margin the
-    // zoom leaves so the picture's edge never shows.
-    private static final long ARTWORK_MOTION_PERIOD_MS = 26_000L;
-    private static final float ARTWORK_MOTION_AMPLITUDE = 0.10f;
-    private static final float ARTWORK_MOTION_PAN = 0.8f;
     private volatile String theGamesDbRequestKey;
 
     public PreloaderDialog(Activity activity) {
         this.activity = activity;
     }
 
-    private void create() {
-        if (dialog != null) return;
-        dialog = new Dialog(activity, android.R.style.Theme_Translucent_NoTitleBar_Fullscreen);
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        dialog.setCancelable(false);
-        dialog.setCanceledOnTouchOutside(false);
-        dialog.setContentView(R.layout.preloader_dialog);
-
-        Window window = dialog.getWindow();
-        if (window != null) {
-            window.clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
-            window.clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
-        }
-    }
-
     public synchronized void show(int textResId) {
         if (activity.isFinishing() || activity.isDestroyed()) return;
         if (isShowing()) return;
         close();
-        if (dialog == null) create();
 
         if (textResId == R.string.starting_up) {
             configureLaunchScreen(textResId);
         } else {
             configureStandardPreloader(textResId);
         }
-
-        dialog.show();
-        Window window = dialog.getWindow();
-        if (window != null) {
-            window.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
-            applyImmersiveFullscreen(window);
-        }
-    }
-
-    private void applyImmersiveFullscreen(Window window) {
-        if (window == null) return;
-
-        WindowCompat.setDecorFitsSystemWindows(window, false);
-        WindowInsetsControllerCompat insetsController =
-                new WindowInsetsControllerCompat(window, window.getDecorView());
-        insetsController.hide(WindowInsetsCompat.Type.systemBars());
-        insetsController.setSystemBarsBehavior(
-                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
-
-        window.setStatusBarColor(Color.TRANSPARENT);
-        window.setNavigationBarColor(Color.TRANSPARENT);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            window.setNavigationBarContrastEnforced(false);
-            window.setStatusBarContrastEnforced(false);
-        }
-
-        WindowManager.LayoutParams attrs = window.getAttributes();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            attrs.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
-            window.setAttributes(attrs);
-        }
-
-        window.getDecorView().setSystemUiVisibility(
-                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                        | View.SYSTEM_UI_FLAG_FULLSCREEN
-                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                        | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+        overlay = PreloaderOverlayHost.show(activity, state);
     }
 
     private void configureLaunchScreen(int textResId) {
-        View root = dialog.findViewById(R.id.PreloaderRoot);
-        View launchScrim = dialog.findViewById(R.id.LaunchScrim);
-        View launchInfo = dialog.findViewById(R.id.LaunchInfo);
-        View loadingPanel = dialog.findViewById(R.id.LoadingPanel);
-        ImageView artworkView = dialog.findViewById(R.id.LaunchArtwork);
-        TextView launchTitle = dialog.findViewById(R.id.LaunchTitle);
-        TextView launchStatus = dialog.findViewById(R.id.LaunchStatus);
-        LinearProgressIndicator launchProgress = dialog.findViewById(R.id.LaunchProgress);
-
-        root.setBackgroundColor(WinlatorLegacyTheme.background(activity));
-        loadingPanel.setVisibility(View.GONE);
-        launchInfo.setVisibility(View.VISIBLE);
-        launchProgress.setVisibility(View.VISIBLE);
-        launchProgress.setIndicatorColor(WinlatorLegacyTheme.primary(activity));
-        launchProgress.setTrackColor(withAlpha(WinlatorLegacyTheme.primary(activity), 0x35));
-
         String launchTitleText = resolveLaunchTitle();
-        launchTitle.setText(launchTitleText);
-        launchStatus.setText(textResId);
+        state.setLaunchMode(true);
+        state.setTitle(launchTitleText);
+        state.setMessage(activity.getString(textResId));
 
         releaseArtwork();
         // Order: the user's own background, the banner, the user's own cover, the downloaded cover.
@@ -162,17 +73,8 @@ public class PreloaderDialog {
                 : (isUsableImageFile(banner) ? banner : getLaunchCoverFile());
         if (isUsableImageFile(artwork)) artworkBitmap = decodeArtwork(artwork);
 
-        boolean hasArtwork = artworkBitmap != null;
-        if (hasArtwork) {
-            artworkView.setImageBitmap(artworkBitmap);
-            artworkView.setVisibility(View.VISIBLE);
-            startArtworkMotion(artworkView);
-        } else {
-            artworkView.setImageDrawable(null);
-            artworkView.setVisibility(View.GONE);
-        }
-        launchScrim.setVisibility(hasArtwork ? View.VISIBLE : View.GONE);
-        applyLaunchTextColors(hasArtwork);
+        state.setMotion(ArtworkRepository.isMotionEnabled(activity));
+        state.setArtwork(artworkBitmap);
 
         // Honors Settings > Experimental > "Auto-download artwork" and a per-game "Remove artwork".
         if (!hasBanner && banner != null && ArtworkRepository.isAutoAllowed(activity, resolveLaunchShortcutFile())) {
@@ -180,41 +82,11 @@ public class PreloaderDialog {
         }
     }
 
-    private int withAlpha(int color, int alpha) {
-        return (color & 0x00FFFFFF) | ((alpha & 0xFF) << 24);
-    }
-
-    private void applyLaunchTextColors(boolean overArtwork) {
-        if (dialog == null) return;
-        TextView launchTitle = dialog.findViewById(R.id.LaunchTitle);
-        TextView launchStatus = dialog.findViewById(R.id.LaunchStatus);
-        if (overArtwork) {
-            launchTitle.setTextColor(Color.WHITE);
-            launchStatus.setTextColor(0xD9FFFFFF);
-        } else {
-            launchTitle.setTextColor(WinlatorLegacyTheme.onBackground(activity));
-            launchStatus.setTextColor(WinlatorLegacyTheme.onSurfaceVariant(activity));
-        }
-    }
-
     private void configureStandardPreloader(int textResId) {
-        View root = dialog.findViewById(R.id.PreloaderRoot);
-        View launchScrim = dialog.findViewById(R.id.LaunchScrim);
-        View launchInfo = dialog.findViewById(R.id.LaunchInfo);
-        View loadingPanel = dialog.findViewById(R.id.LoadingPanel);
-        View launchProgress = dialog.findViewById(R.id.LaunchProgress);
-        ImageView artworkView = dialog.findViewById(R.id.LaunchArtwork);
-        TextView textView = dialog.findViewById(R.id.TextView);
-
         releaseArtwork();
-        artworkView.setImageDrawable(null);
-        artworkView.setVisibility(View.GONE);
-        launchScrim.setVisibility(View.GONE);
-        launchInfo.setVisibility(View.GONE);
-        launchProgress.setVisibility(View.GONE);
-        loadingPanel.setVisibility(View.VISIBLE);
-        root.setBackgroundColor(0xB3000000);
-        textView.setText(textResId);
+        state.setLaunchMode(false);
+        state.setTitle("");
+        state.setMessage(activity.getString(textResId));
     }
 
     private String resolveLaunchTitle() {
@@ -362,19 +234,14 @@ public class PreloaderDialog {
     }
 
     private void applyDownloadedLaunchArtwork(File artworkFile) {
-        if (!isShowing() || dialog == null || !isUsableImageFile(artworkFile)) return;
+        if (!isShowing() || !isUsableImageFile(artworkFile)) return;
         Bitmap replacement = decodeArtwork(artworkFile);
         if (replacement == null) return;
 
         releaseArtwork();
         artworkBitmap = replacement;
-        ImageView artworkView = dialog.findViewById(R.id.LaunchArtwork);
-        View launchScrim = dialog.findViewById(R.id.LaunchScrim);
-        artworkView.setImageBitmap(artworkBitmap);
-        artworkView.setVisibility(View.VISIBLE);
-        startArtworkMotion(artworkView);
-        launchScrim.setVisibility(View.VISIBLE);
-        applyLaunchTextColors(true);
+        state.setMotion(ArtworkRepository.isMotionEnabled(activity));
+        state.setArtwork(artworkBitmap);
     }
 
     private Bitmap decodeArtwork(File file) {
@@ -407,77 +274,22 @@ public class PreloaderDialog {
     }
 
     public synchronized void close() {
-        try {
-            if (dialog != null) {
-                ImageView artworkView = dialog.findViewById(R.id.LaunchArtwork);
-                if (artworkView != null) artworkView.setImageDrawable(null);
-                dialog.dismiss();
-            }
-        } catch (Exception ignored) {}
+        final View view = overlay;
+        overlay = null;
         theGamesDbRequestKey = null;
+        if (view != null) {
+            // View removal belongs on the UI thread; close() may be called from any thread.
+            if (Looper.myLooper() == Looper.getMainLooper()) PreloaderOverlayHost.dismiss(view);
+            else activity.runOnUiThread(() -> PreloaderOverlayHost.dismiss(view));
+        }
         releaseArtwork();
     }
 
-    private void startArtworkMotion(final ImageView view) {
-        stopArtworkMotion();
-        if (view == null || !ArtworkRepository.isMotionEnabled(activity)) return;
-        final ValueAnimator animator = ValueAnimator.ofFloat(0f, 1f);
-        animator.setDuration(ARTWORK_MOTION_PERIOD_MS);
-        animator.setInterpolator(new LinearInterpolator());
-        animator.setRepeatCount(ValueAnimator.INFINITE);
-        animator.addUpdateListener(a -> {
-            double angle = ((Float) a.getAnimatedValue()) * 2.0 * Math.PI;
-            float zoom = 1f + ARTWORK_MOTION_AMPLITUDE * (float) ((1.0 - Math.cos(angle)) / 2.0);
-            float margin = (zoom - 1f) / 2f;
-            view.setScaleX(zoom);
-            view.setScaleY(zoom);
-            view.setTranslationX((float) (view.getWidth() * margin * ARTWORK_MOTION_PAN * Math.sin(angle)));
-            view.setTranslationY((float) (view.getHeight() * margin * ARTWORK_MOTION_PAN * 0.75f * Math.sin(angle * 2.0)));
-        });
-        // Safety net: if the window goes away without close() (activity destroyed with the dialog
-        // still up), a running infinite animator would keep the view - and the activity - alive.
-        artworkMotionDetach = new View.OnAttachStateChangeListener() {
-            @Override public void onViewAttachedToWindow(View v) {}
-            @Override public void onViewDetachedFromWindow(View v) { animator.cancel(); }
-        };
-        view.addOnAttachStateChangeListener(artworkMotionDetach);
-        artworkMotionView = view;
-        artworkMotion = animator;
-        animator.start();
-    }
-
-    // An infinite animator must never outlive the dialog (it would keep the view and the activity
-    // alive), and cancel() belongs on the UI thread, while close() may be called from any thread.
-    private void stopArtworkMotion() {
-        final ValueAnimator animator = artworkMotion;
-        if (animator == null) return;
-        final ImageView view = artworkMotionView;
-        final View.OnAttachStateChangeListener detach = artworkMotionDetach;
-        artworkMotion = null;
-        artworkMotionView = null;
-        artworkMotionDetach = null;
-        final Runnable cancel = () -> {
-            animator.cancel();
-            if (view != null) {
-                if (detach != null) view.removeOnAttachStateChangeListener(detach);
-                view.setScaleX(1f);
-                view.setScaleY(1f);
-                view.setTranslationX(0f);
-                view.setTranslationY(0f);
-            }
-        };
-        if (Looper.myLooper() == Looper.getMainLooper()) cancel.run();
-        else activity.runOnUiThread(cancel);
-    }
-
+    // Compose may still be drawing the bitmap for a frame after we drop it, so it is not recycled
+    // here - just unreferenced and left to the GC.
     private void releaseArtwork() {
-        stopArtworkMotion();
-        if (artworkBitmap != null) {
-            try {
-                if (!artworkBitmap.isRecycled()) artworkBitmap.recycle();
-            } catch (Exception ignored) {}
-            artworkBitmap = null;
-        }
+        artworkBitmap = null;
+        state.setArtwork(null);
     }
 
     public void closeOnUiThread() {
@@ -485,6 +297,6 @@ public class PreloaderDialog {
     }
 
     public boolean isShowing() {
-        return dialog != null && dialog.isShowing();
+        return overlay != null && overlay.getParent() != null;
     }
 }

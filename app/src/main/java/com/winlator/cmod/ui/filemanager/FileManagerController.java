@@ -12,7 +12,6 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.winlator.cmod.R;
 import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.core.ExeIconExtractor;
@@ -154,21 +153,21 @@ public class FileManagerController {
         String path = currentDir.getAbsolutePath();
 
         String driveTitle;
-        int driveIconRes;
+        FileManagerIcon driveIcon;
         String normalized = normalizeFilePath(path);
         String primary = normalizeFilePath(Environment.getExternalStorageDirectory().getAbsolutePath());
         if (normalized.contains("/.wine/drive_c")) {
             driveTitle = "Drive C:";
-            driveIconRes = R.drawable.icon_wine;
+            driveIcon = FileManagerIcon.WINE;
         } else if (normalized.equals(primary) || normalized.startsWith(primary + File.separator)) {
             driveTitle = "Drive D:";
-            driveIconRes = R.drawable.ic_internal_storage;
+            driveIcon = FileManagerIcon.INTERNAL_STORAGE;
         } else if (normalized.startsWith("/storage/") && !normalized.startsWith("/storage/emulated")) {
             driveTitle = "External Storage";
-            driveIconRes = R.drawable.ic_internal_storage;
+            driveIcon = FileManagerIcon.INTERNAL_STORAGE;
         } else {
             driveTitle = "Drive Z:";
-            driveIconRes = android.R.drawable.ic_menu_manage;
+            driveIcon = FileManagerIcon.SYSTEM_DRIVE;
         }
 
         String storageUsedText = "";
@@ -190,7 +189,7 @@ public class FileManagerController {
                 path,
                 buildEntries(currentDir),
                 driveTitle,
-                driveIconRes,
+                driveIcon,
                 buildDriveOptions(),
                 storageUsedText,
                 storagePercent,
@@ -219,19 +218,19 @@ public class FileManagerController {
         for (File file : fileList) {
             boolean isDir = file.isDirectory();
             boolean executable = !isDir && isExecutable(file);
-            int iconRes;
+            FileManagerIcon icon;
             String iconCachePath = null;
             if (isDir) {
-                iconRes = R.drawable.icon_open;
+                icon = FileManagerIcon.FOLDER;
             } else if (executable) {
-                iconRes = R.drawable.icon_wine;
+                icon = FileManagerIcon.WINE;
                 iconCachePath = getFileIconCacheFile(file).getAbsolutePath();
             } else {
-                iconRes = android.R.drawable.ic_menu_agenda;
+                icon = FileManagerIcon.FILE;
             }
             result.add(new FileEntryUiModel(
                     file.getAbsolutePath(), file.getName(), isDir, executable,
-                    file.length(), file.lastModified(), iconRes, iconCachePath
+                    file.length(), file.lastModified(), icon, iconCachePath
             ));
         }
         return result;

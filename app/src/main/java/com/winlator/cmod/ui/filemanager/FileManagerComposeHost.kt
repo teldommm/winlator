@@ -26,10 +26,13 @@ import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.ContentCut
 import androidx.compose.material.icons.outlined.ContentPaste
 import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -55,11 +58,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.MainActivity
+import com.winlator.cmod.R
 import com.winlator.cmod.core.ExeIconExtractor
 import com.winlator.cmod.ui.LandscapeScreenHeader
 import com.winlator.cmod.ui.PortraitMainHeader
@@ -78,6 +84,26 @@ import com.winlator.cmod.ui.theme.WinZShapes
 import com.winlator.cmod.ui.theme.hairlineColor
 import com.winlator.cmod.ui.theme.dividerColor
 
+// Icons the file manager shows for entries and for the drive header. The controller (Java) picks
+// one by meaning; the actual graphic is resolved in painter() below, so Material vectors (all
+// 24dp-grid, so sizes stay consistent) and the two app-specific drawables can be mixed.
+enum class FileManagerIcon {
+    FOLDER,            // directory row
+    FILE,              // regular, non-executable file row
+    WINE,              // executable row (until its own icon is extracted) + Drive C:
+    INTERNAL_STORAGE,  // Drive D: and external volumes
+    SYSTEM_DRIVE       // Drive Z:
+}
+
+@Composable
+private fun FileManagerIcon.painter(): Painter = when (this) {
+    FileManagerIcon.FOLDER -> rememberVectorPainter(Icons.Outlined.Folder)
+    FileManagerIcon.FILE -> rememberVectorPainter(Icons.Outlined.Description)
+    FileManagerIcon.WINE -> painterResource(R.drawable.icon_wine)
+    FileManagerIcon.INTERNAL_STORAGE -> painterResource(R.drawable.ic_internal_storage)
+    FileManagerIcon.SYSTEM_DRIVE -> rememberVectorPainter(Icons.Outlined.Storage)
+}
+
 // One row in the file listing — a file or a folder in the current directory.
 data class FileEntryUiModel(
     val path: String,
@@ -86,7 +112,7 @@ data class FileEntryUiModel(
     val isExecutable: Boolean,
     val sizeBytes: Long,
     val lastModified: Long,
-    val iconRes: Int,
+    val icon: FileManagerIcon,
     // Absolute path to the cached extracted-icon PNG; only set for executables. FileIcon()
     // below extracts and decodes it lazily — only for rows Compose actually renders — so
     // opening a big folder doesn't kick off extraction for every .exe in it at once.
@@ -106,7 +132,7 @@ data class FileManagerModel(
     val currentPath: String,
     val entries: List<FileEntryUiModel>,
     val driveTitle: String,
-    val driveIconRes: Int,
+    val driveIcon: FileManagerIcon,
     val driveOptions: List<DriveOptionUiModel>,
     val storageUsedText: String,
     val storagePercent: Int,
@@ -169,7 +195,7 @@ internal fun FileManagerScreen(model: FileManagerModel, callbacks: FileManagerCa
                         .padding(horizontal = 14.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(painterResource(model.driveIconRes), null, modifier = Modifier.size(24.dp), tint = Color.White)
+                    Icon(model.driveIcon.painter(), null, modifier = Modifier.size(24.dp), tint = Color.White)
                     Spacer(Modifier.width(12.dp))
                     Text(
                         model.driveTitle,
@@ -425,7 +451,7 @@ private fun FileIcon(entry: FileEntryUiModel, modifier: Modifier = Modifier) {
         }
     }
     Icon(
-        painterResource(entry.iconRes),
+        entry.icon.painter(),
         null,
         modifier = modifier,
         tint = MaterialTheme.colorScheme.onSurfaceVariant

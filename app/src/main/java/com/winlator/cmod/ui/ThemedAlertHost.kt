@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -281,7 +282,9 @@ object ThemedAlertHost {
                                     painterResource(id = item.iconRes),
                                     null,
                                     tint = if (item.destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(end = 14.dp)
+                                    // Fixed 24dp like every other menu icon; without it the icon
+                                    // takes the drawable's own intrinsic size (varies per asset).
+                                    modifier = Modifier.padding(end = 14.dp).size(24.dp)
                                 )
                             }
                             Text(item.label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)

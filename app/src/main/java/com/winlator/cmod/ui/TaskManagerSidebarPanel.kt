@@ -16,6 +16,10 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.FlipToFront
+import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -217,7 +221,7 @@ private fun ProcessRow(row: ProcessRowData, callbacks: TaskManagerCallbacks) {
             SidebarMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                 SidebarActionItem(
                     label = stringResource(R.string.processor_affinity),
-                    leadingIcon = { Icon(painterResource(id = R.drawable.icon_popup_menu_cpu), null) },
+                    leadingIcon = { Icon(Icons.Outlined.Memory, null) },
                     onClick = {
                         menuExpanded = false
                         callbacks.onProcessorAffinity(row.pid, row.rawName, row.affinityMask)
@@ -225,7 +229,7 @@ private fun ProcessRow(row: ProcessRowData, callbacks: TaskManagerCallbacks) {
                 )
                 SidebarActionItem(
                     label = stringResource(R.string.bring_to_front),
-                    leadingIcon = { Icon(painterResource(id = R.drawable.icon_popup_menu_bring_to_front), null) },
+                    leadingIcon = { Icon(Icons.Outlined.FlipToFront, null) },
                     onClick = {
                         menuExpanded = false
                         callbacks.onBringToFront(row.pid, row.rawName)
@@ -233,7 +237,7 @@ private fun ProcessRow(row: ProcessRowData, callbacks: TaskManagerCallbacks) {
                 )
                 SidebarActionItem(
                     label = stringResource(R.string.end_process),
-                    leadingIcon = { Icon(painterResource(id = R.drawable.icon_popup_menu_remove), null) },
+                    leadingIcon = { Icon(Icons.Outlined.Close, null) },
                     onClick = {
                         menuExpanded = false
                         callbacks.onEndProcess(row.pid, row.rawName)

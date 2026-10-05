@@ -25,10 +25,8 @@ import android.util.Log;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -1379,19 +1377,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
         }
         return shortcutName;
-    }
-
-    private void setTextColorForDialog(ViewGroup viewGroup, int color) {
-        for (int i = 0; i < viewGroup.getChildCount(); i++) {
-            View child = viewGroup.getChildAt(i);
-            if (child instanceof ViewGroup) {
-
-                setTextColorForDialog((ViewGroup) child, color);
-            } else if (child instanceof TextView) {
-
-                ((TextView) child).setTextColor(color);
-            }
-        }
     }
 
     private void wireSidebarListeners(boolean enableLogs) {

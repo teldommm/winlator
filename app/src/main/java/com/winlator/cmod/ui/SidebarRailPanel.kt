@@ -22,6 +22,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PauseCircle
+import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -359,7 +362,7 @@ private fun RailSessionButton(state: SidebarRailState, callbacks: SidebarRailCal
         // Two faces side by side, shifted by progress: 0 shows Pause, 1 shows Exit.
         Box(Modifier.graphicsLayer { translationX = -progress.value * cellPx }, contentAlignment = Alignment.Center) {
             Icon(
-                painterResource(if (paused) R.drawable.icon_play else R.drawable.icon_pause),
+                if (paused) Icons.Filled.PlayCircle else Icons.Filled.PauseCircle,
                 contentDescription = null,
                 tint = pauseTint,
                 modifier = iconModifier

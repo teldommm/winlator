@@ -4,12 +4,8 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.SystemClock;
 import android.util.AttributeSet;
-import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.FrameLayout;
-import android.widget.TextView;
-
-import com.winlator.cmod.R;
 
 import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.Shortcut;
@@ -28,10 +24,8 @@ public class FrameRating extends FrameLayout implements Runnable {
     private float lastFPS = 0;
     private volatile float frameGenPresentedRate = 0f;
     private String totalRAM = null;
-    private final TextView tvFPS;
-    private final TextView tvRenderer;
-    private final TextView tvGPU;
-    private final TextView tvRAM;
+    // Drawn by FrameRatingComposeHost (widget/FrameRatingOverlay.kt); this class only measures.
+    private final FrameRatingState state = new FrameRatingState();
     private HashMap graphicsDriverConfig;
     private static final String PREFS = "winlator_hud";
     private static final String KEY_VIS = "hud_vis";
@@ -52,16 +46,11 @@ public class FrameRating extends FrameLayout implements Runnable {
         super(context, attrs, defStyleAttr);
         this.context = context;
         prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        View view = LayoutInflater.from(context).inflate(R.layout.frame_rating, this, false);
-        tvFPS = view.findViewById(R.id.TVFPS);
-        tvRenderer = view.findViewById(R.id.TVRenderer);
-        tvRenderer.setText("Vulkan");
-        tvGPU = view.findViewById(R.id.TVGPU);
-        tvGPU.setText(GPUInformation.getRenderer(graphicsDriverConfig.get("version").toString(), context));
-        tvRAM = view.findViewById(R.id.TVRAM);
+        state.setRenderer("Vulkan");
+        state.setGpu(GPUInformation.getRenderer(graphicsDriverConfig.get("version").toString(), context));
         totalRAM = getTotalRAM();
         this.graphicsDriverConfig = graphicsDriverConfig;
-        addView(view);
+        addView(FrameRatingComposeHost.create(context, state));
     }
 
     private String getTotalRAM() {
@@ -95,17 +84,17 @@ public class FrameRating extends FrameLayout implements Runnable {
 
     public void setRenderer(String renderer) {
         lastKnownRenderer = renderer; 
-        tvRenderer.setText(renderer);
+        state.setRenderer(renderer);
     }
 
     public void setGpuName (String gpuName) {
-        tvGPU.setText(gpuName);
+        state.setGpu(gpuName);
     }
 
     public void reset() {
 
-        tvRenderer.setText(lastKnownRenderer != null ? lastKnownRenderer : "Vulkan");
-        tvGPU.setText(GPUInformation.getRenderer(graphicsDriverConfig.get("version").toString(), context));
+        state.setRenderer(lastKnownRenderer != null ? lastKnownRenderer : "Vulkan");
+        state.setGpu(GPUInformation.getRenderer(graphicsDriverConfig.get("version").toString(), context));
     }
 
     public boolean hasSavedPref() {
@@ -162,8 +151,8 @@ public class FrameRating extends FrameLayout implements Runnable {
         if (getVisibility() == GONE) setVisibility(View.VISIBLE);
         float genRate = frameGenPresentedRate;
         float displayFps = genRate > 0f ? genRate : lastFPS;
-        tvFPS.setText(String.format(Locale.ENGLISH, "%.1f", displayFps));
-        tvRAM.setText(getAvailableRAM() + " GB Used / " + totalRAM + " Total");
+        state.setFps(String.format(Locale.ENGLISH, "%.1f", displayFps));
+        state.setRam(getAvailableRAM() + " GB Used / " + totalRAM + " Total");
     }
 }
 
