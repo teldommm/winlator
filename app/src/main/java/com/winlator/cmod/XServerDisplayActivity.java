@@ -537,6 +537,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             dxwrapperConfig = shortcut.getExtra("dxwrapperConfig", container.getDXWrapperConfig());
             screenSize = shortcut.getExtra("screenSize", container.getScreenSize());
             lc_all = shortcut.getExtra("lc_all", container.getLC_ALL());
+            midiSoundFont = shortcut.getExtra("midiSoundFont", container.getMIDISoundFont());
             String sharpnessEffect = shortcut.getExtra("sharpnessEffect", "None");
             if (!sharpnessEffect.equals("None")) {
                 double sharpnessLevel = Double.parseDouble(shortcut.getExtra("sharpnessLevel", "100"));
@@ -1287,10 +1288,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         rootView.addView(inputControlsView);
 
         if (container != null) {
-            String hudModeExtra = container.getExtra("hudMode");
-            int hudMode = !hudModeExtra.isEmpty()
-                    ? Integer.parseInt(hudModeExtra)
-                    : (container.isShowFPS() ? 1 : 0);
+            int hudMode = resolveHudMode();
 
             if (hudMode == 1) {
 
@@ -1308,11 +1306,13 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
         }
 
-        String shortcutFullscreenStretched = shortcut != null ? shortcut.getExtra("fullscreenStretched") : null;
+        // getExtra() returns "" (never null) when the shortcut has no override, so an empty
+        // value means "inherit the container's setting".
+        String shortcutFullscreenStretched = shortcut != null ? shortcut.getExtra("fullscreenStretched") : "";
 
         boolean shouldStretch = false;
 
-        if (shortcut != null && shortcutFullscreenStretched != null) {
+        if (shortcutFullscreenStretched != null && !shortcutFullscreenStretched.isEmpty()) {
 
             shouldStretch = shortcutFullscreenStretched.equals("1");
         } else if (container != null && container.isFullscreenStretched()) {
@@ -1595,9 +1595,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if      (modernHud  != null) currentMode = 2;
         else if (classicHud != null) currentMode = 1;
         else if (container  != null) {
-            String extra = container.getExtra("hudMode");
-            if (!extra.isEmpty())           currentMode = Integer.parseInt(extra);
-            else if (container.isShowFPS()) currentMode = 1;
+            currentMode = resolveHudMode();
         }
 
         boolean hudOn    = currentMode != 0;
@@ -1715,7 +1713,29 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
     }
 
+    /** HUD mode for this session: the shortcut's own value if set, otherwise the container's. */
+    private int resolveHudMode() {
+        if (shortcut != null) {
+            String own = shortcut.getExtra("hudMode");
+            if (!own.isEmpty()) {
+                try { return Integer.parseInt(own); } catch (NumberFormatException ignored) {}
+            }
+        }
+        if (container == null) return 0;
+        String extra = container.getExtra("hudMode");
+        if (!extra.isEmpty()) {
+            try { return Integer.parseInt(extra); } catch (NumberFormatException ignored) {}
+        }
+        return container.isShowFPS() ? 1 : 0;
+    }
+
+    /** Persists the in-game HUD choice where it came from: the shortcut when launched from one. */
     private void saveHudModeToContainer(int mode) {
+        if (shortcut != null) {
+            shortcut.putExtra("hudMode", String.valueOf(mode));
+            shortcut.saveData();
+            return;
+        }
         if (container == null) return;
         container.putExtra("hudMode", String.valueOf(mode));
         container.setShowFPS(mode != 0);
@@ -2897,8 +2917,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     public boolean isShowFPS() {
         if (container == null) return false;
-        String hudMode = container.getExtra("hudMode");
-        return !hudMode.isEmpty() ? !"0".equals(hudMode) : container.isShowFPS();
+        return resolveHudMode() != 0;
     }
 
     public void updateFrameRating(Window window) {

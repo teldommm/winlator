@@ -22,7 +22,7 @@
         <item>Wrapper</item>
     </string-array>
     <string-array name="graphics_wrapper_entries">
-        <item>Wrapper (Current)</item>
+        <item>Wrapper Default</item>
         <item>Wrapper Legacy</item>
     </string-array>
     <string-array name="wrapper_graphics_driver_version_entries">

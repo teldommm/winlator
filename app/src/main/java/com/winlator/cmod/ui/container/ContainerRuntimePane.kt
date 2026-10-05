@@ -68,7 +68,7 @@ internal fun ContainerRuntimePane(
     var graphicsWrapper by remember {
         mutableStateOf(
             graphicsWrapperEntries.firstOrNull {
-                StringUtils.parseIdentifier(it).equals(container.getGraphicsWrapper(), true)
+                com.winlator.cmod.container.Container.normalizeGraphicsWrapper(StringUtils.parseIdentifier(it)).equals(container.getGraphicsWrapper(), true)
             } ?: graphicsWrapperEntries.first()
         )
     }
@@ -222,7 +222,7 @@ internal fun ContainerRuntimePane(
                     graphics = it; container.setGraphicsDriver(StringUtils.parseIdentifier(it)); container.saveData()
                 }
                 SettingsDivider(); SettingChoice("Vulkan Wrapper", graphicsWrapper, graphicsWrapperEntries) {
-                    graphicsWrapper = it; container.setGraphicsWrapper(StringUtils.parseIdentifier(it)); container.saveData()
+                    graphicsWrapper = it; container.setGraphicsWrapper(com.winlator.cmod.container.Container.normalizeGraphicsWrapper(StringUtils.parseIdentifier(it))); container.saveData()
                 }
                 catalog?.let { c ->
                     SettingsDivider(); SettingDriverChoice("Driver Version", driverVersion, c.drivers, installing, ::installDriver) {

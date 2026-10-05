@@ -230,7 +230,9 @@ private class ShortcutEditorStateV2(val shortcut: Shortcut) {
     var boxPreset by mutableStateOf(shortcut.getExtra("box64Preset", container.getBox64Preset()))
 
     var controlsProfile by mutableStateOf(shortcut.getExtra("controlsProfile", "0"))
-    var fullscreen by mutableStateOf(shortcut.getExtra("fullscreenStretched", "0") == "1")
+    var fullscreen by mutableStateOf(
+        shortcut.getExtra("fullscreenStretched").let { if (it.isBlank()) container.isFullscreenStretched() else it == "1" }
+    )
     private var inputType by mutableIntStateOf(shortcut.getExtra("inputType", container.getInputType().toString()).toIntOrNull() ?: container.getInputType())
     var exclusive by mutableStateOf(shortcut.getExtra("exclusiveXInput").let { if (it.isBlank()) container.isExclusiveXInput() else it == "1" })
     var xinput by mutableStateOf((inputType and WinHandler.FLAG_INPUT_TYPE_XINPUT.toInt()) != 0)
@@ -759,7 +761,7 @@ private fun ShortcutCategoryV2(
                 }
                 SettingsDivider()
                 SettingToggle("Fullscreen Stretched", s.fullscreen) {
-                    s.fullscreen = it; s.extra("fullscreenStretched", if (it) "1" else null)
+                    s.fullscreen = it; s.extra("fullscreenStretched", if (it) "1" else "0")
                 }
             }
             SettingsCard {
@@ -780,7 +782,7 @@ private fun ShortcutCategoryV2(
                 SettingsDivider()
                 val sound = s.midiSoundFont.ifBlank { "Disabled" }
                 SettingChoice("MIDI SoundFont", sound, soundFonts) {
-                    s.midiSoundFont = if (it == "Disabled") "" else it; s.extra("midiSoundFont", s.midiSoundFont.ifBlank { null })
+                    s.midiSoundFont = if (it == "Disabled") "" else it; s.extra("midiSoundFont", s.midiSoundFont)
                 }
             }
         }
@@ -849,11 +851,11 @@ private fun ShortcutCategoryV2(
                 SettingChoice(
                     "Vulkan Wrapper",
                     graphicsWrapperEntries.firstOrNull {
-                        StringUtils.parseIdentifier(it).equals(s.graphicsWrapper, true)
+                        Container.normalizeGraphicsWrapper(StringUtils.parseIdentifier(it)).equals(s.graphicsWrapper, true)
                     } ?: s.graphicsWrapper,
                     graphicsWrapperEntries
                 ) {
-                    s.graphicsWrapper = StringUtils.parseIdentifier(it)
+                    s.graphicsWrapper = Container.normalizeGraphicsWrapper(StringUtils.parseIdentifier(it))
                     s.extra("graphicsWrapper", s.graphicsWrapper)
                 }
                 catalog?.let { c ->
@@ -1042,13 +1044,15 @@ private fun ShortcutCategoryV2(
                 SettingChoice("Sharpness Effect", s.sharpnessEffect, listOf("None", "CAS", "DLS")) {
                     s.sharpnessEffect = it; s.extra("sharpnessEffect", it)
                 }
-                SettingsDivider()
-                SharpnessSliderV2("Sharpness Level", s.sharpnessLevel) {
-                    s.sharpnessLevel = it; s.extra("sharpnessLevel", it)
-                }
-                SettingsDivider()
-                SharpnessSliderV2("Sharpness Denoise", s.sharpnessDenoise) {
-                    s.sharpnessDenoise = it; s.extra("sharpnessDenoise", it)
+                if (s.sharpnessEffect != "None") {
+                    SettingsDivider()
+                    SharpnessSliderV2("Sharpness Level", s.sharpnessLevel) {
+                        s.sharpnessLevel = it; s.extra("sharpnessLevel", it)
+                    }
+                    SettingsDivider()
+                    SharpnessSliderV2("Sharpness Denoise", s.sharpnessDenoise) {
+                        s.sharpnessDenoise = it; s.extra("sharpnessDenoise", it)
+                    }
                 }
             }
             ExecArgumentsEditorV2(s.execArgs) {

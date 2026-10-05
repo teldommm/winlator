@@ -889,10 +889,10 @@ private fun ContainerCategoryV2(
                 SettingChoice(
                     "Vulkan Wrapper",
                     graphicsWrapperEntries.firstOrNull {
-                        StringUtils.parseIdentifier(it).equals(s.graphicsWrapper, true)
+                        Container.normalizeGraphicsWrapper(StringUtils.parseIdentifier(it)).equals(s.graphicsWrapper, true)
                     } ?: s.graphicsWrapper,
                     graphicsWrapperEntries
-                ) { s.graphicsWrapper = StringUtils.parseIdentifier(it) }
+                ) { s.graphicsWrapper = Container.normalizeGraphicsWrapper(StringUtils.parseIdentifier(it)) }
                 catalog?.let { c ->
                     SettingsDivider()
                     SettingDriverChoice("Driver Version", s.driverVersion, c.drivers, installing, installDriver) {
