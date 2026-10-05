@@ -201,7 +201,7 @@ private class ShortcutEditorStateV2(val shortcut: Shortcut) {
     var gpuName by mutableStateOf(readConfig(graphicsConfig, "gpuName", ';').ifBlank { "Device" })
     var blacklistedExtensions by mutableStateOf(readConfig(graphicsConfig, "blacklistedExtensions", ';'))
 
-    var audio by mutableStateOf(Container.normalizeAudioDriver(StringUtils.parseIdentifier(shortcut.getExtra("audioDriver", container.getAudioDriver()))))
+    var audio by mutableStateOf(StringUtils.parseIdentifier(shortcut.getExtra("audioDriver", container.getAudioDriver())))
     var oboeProfile by mutableStateOf(shortcut.getExtra("oboeProfile", container.getExtra("oboeProfile", "low")))
     var oboeApi by mutableStateOf(shortcut.getExtra("oboeApi", container.getExtra("oboeApi", "auto")))
     var oboeAdaptive by mutableStateOf(shortcut.getExtra("oboeAdaptive", container.getExtra("oboeAdaptive", "1")) != "0")
@@ -528,10 +528,6 @@ internal fun ShortcutEditorV2(
         activity.startActivity(Intent(activity, XServerDisplayActivity::class.java).putExtra("container_id", state.container.id))
     }
 
-    fun createContainer() {
-        (activity as? com.winlator.cmod.MainActivity)?.openContainersSettings()
-    }
-
     fun changeContainer(targetId: Int) {
         val target = containers.firstOrNull { it.id == targetId } ?: return
         if (target.id == state.container.id) return
@@ -607,7 +603,7 @@ internal fun ShortcutEditorV2(
                         ShortcutCategoryV2(
                             category, state, catalog, screenEntries, graphicsEntries, graphicsWrapperEntries, audioEntries,
                             wrapperEntries, localeEntries, soundFonts, gpuNames, fexPresets, boxPresets,
-                            profiles, containers, ::environmentLabel, ::changeContainer, ::createContainer, ::enterContainer,
+                            profiles, containers, ::environmentLabel, ::changeContainer, ::enterContainer,
                             ::installRuntime, ::installDriver, context
                         )
                     }
@@ -633,7 +629,7 @@ internal fun ShortcutEditorV2(
                         ShortcutCategoryV2(
                             category, state, catalog, screenEntries, graphicsEntries, graphicsWrapperEntries, audioEntries,
                             wrapperEntries, localeEntries, soundFonts, gpuNames, fexPresets, boxPresets,
-                            profiles, containers, ::environmentLabel, ::changeContainer, ::createContainer, ::enterContainer,
+                            profiles, containers, ::environmentLabel, ::changeContainer, ::enterContainer,
                             ::installRuntime, ::installDriver, context
                         )
                     }
@@ -686,7 +682,6 @@ private fun ShortcutCategoryV2(
     containers: List<Container>,
     environmentLabel: (Container) -> String,
     changeContainer: (Int) -> Unit,
-    createContainer: () -> Unit,
     enterContainer: () -> Unit,
     installRuntime: (String, String, (String) -> Unit) -> Unit,
     installDriver: (DriverOption) -> Unit,
@@ -711,7 +706,6 @@ private fun ShortcutCategoryV2(
                             Text("Environment", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(currentLabel, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
                         }
-                        IconButton(onClick = createContainer) { Icon(Icons.Outlined.Add, "Create container") }
                     }
                 }
                 SettingsDivider()
