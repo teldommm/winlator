@@ -19,6 +19,7 @@ import com.winlator.cmod.container.ContainerManager
 import com.winlator.cmod.container.Shortcut
 import com.winlator.cmod.contents.ContentsManager
 import com.winlator.cmod.core.FileUtils
+import com.winlator.cmod.ui.ThemedAlertHost
 import com.winlator.cmod.ui.toast.WinToast
 import com.winlator.cmod.ui.shortcut.ShortcutSettingsComposeDialog
 import com.winlator.cmod.ui.theme.findActivity
@@ -126,23 +127,32 @@ fun GameDetailRoute(shortcutPath: String, onClose: () -> Unit, onLibraryChanged:
                 onLibraryChanged()
             }
 
-            // Already confirmed in the screen's own dialog. Same clean-up as the Library tile's Remove:
-            // the shortcut file and its .lnk/.bat, the artwork nobody else uses, the home-screen icon.
+            // Same clean-up as the Library tile's Remove: the shortcut file and its .lnk/.bat, the
+            // artwork nobody else uses, the home-screen icon. Asked with the standard confirm dialog.
             override fun onRemove() {
-                if (shortcut.file.delete()) {
-                    val base = shortcut.file.path.substringBeforeLast('.', "")
-                    if (base.isNotEmpty()) {
-                        File("$base.lnk").delete()
-                        File("$base.bat").delete()
-                    }
-                    ArtworkRepository.deleteArtworkIfUnused(activity, shortcut.file)
-                    HomeShortcuts.unpin(activity, shortcut)
-                    onLibraryChanged()
-                    onClose()
-                    WinToast.show(activity, "Shortcut removed", Toast.LENGTH_SHORT)
-                } else {
-                    WinToast.show(activity, "Couldn't remove shortcut", Toast.LENGTH_LONG)
-                }
+                ThemedAlertHost.confirm(
+                    activity,
+                    "Remove shortcut?",
+                    "Do you want to remove this shortcut? The game files stay on your device.",
+                    "Remove",
+                    {
+                        if (shortcut.file.delete()) {
+                            val base = shortcut.file.path.substringBeforeLast('.', "")
+                            if (base.isNotEmpty()) {
+                                File("$base.lnk").delete()
+                                File("$base.bat").delete()
+                            }
+                            ArtworkRepository.deleteArtworkIfUnused(activity, shortcut.file)
+                            HomeShortcuts.unpin(activity, shortcut)
+                            onLibraryChanged()
+                            onClose()
+                            WinToast.show(activity, "Shortcut removed", Toast.LENGTH_SHORT)
+                        } else {
+                            WinToast.show(activity, "Couldn't remove shortcut", Toast.LENGTH_LONG)
+                        }
+                    },
+                    true
+                )
             }
 
             override fun onPinHome() {
@@ -159,12 +169,21 @@ fun GameDetailRoute(shortcutPath: String, onClose: () -> Unit, onLibraryChanged:
             }
 
             override fun onUnpinHome() {
-                if (HomeShortcuts.unpin(activity, shortcut)) {
-                    WinToast.show(activity, "Home screen shortcut removed", Toast.LENGTH_SHORT)
-                } else {
-                    WinToast.show(activity, "This game isn't on your home screen", Toast.LENGTH_SHORT)
-                }
-                pinTick++
+                ThemedAlertHost.confirm(
+                    activity,
+                    "Remove from home screen?",
+                    "The home screen icon will stop working. The game stays in your library.",
+                    "Remove",
+                    {
+                        if (HomeShortcuts.unpin(activity, shortcut)) {
+                            WinToast.show(activity, "Home screen shortcut removed", Toast.LENGTH_SHORT)
+                        } else {
+                            WinToast.show(activity, "This game isn't on your home screen", Toast.LENGTH_SHORT)
+                        }
+                        pinTick++
+                    },
+                    true
+                )
             }
         }
     }
