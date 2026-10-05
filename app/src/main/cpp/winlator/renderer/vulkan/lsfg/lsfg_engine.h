@@ -1,24 +1,6 @@
 #pragma once
-// ============================================================================
-// lsfg_engine — the compositor's handle on native LSFG frame generation.
-//
-// Owns the shader modules, the interpolation chain and the pacer, and exposes
-// the small contract the render loop needs:
-//
-//   prepare(w, h, format)                 build/rebuild the chain for this size
-//   plan(capacity, sourceFrames)          how many frames to generate this time
-//   process(cmd, source, w, h, gens)      take frame N in, run the shared chain
-//   generateInto(cmd, g, i, img, view)    synthesise generated frame g
-//
-// Ordering matters and is not obvious: interpolation produces frames that
-// belong BETWEEN N-1 and N, so the generated frames are presented FIRST and
-// the real frame N is held back one slot. That one output interval is the
-// unavoidable cost of interpolating rather than extrapolating; no placement of
-// this code changes it.
-//
-// Ported from WinNative's vkr_lsfg.cpp (GPL-3.0-or-later), LSFG port credited
-// to Camille LaVey / the Eden Emulator Project, following upstream lsfg-vk.
-// ============================================================================
+// SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <cstdint>
 #include <memory>

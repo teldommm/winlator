@@ -1,9 +1,5 @@
-// See lsfg_dxbc.h. DXBC -> SPIR-V via DXVK's vendored translator.
-//
-// Follows upstream lsfg-vk's src/extract/trans.cpp, including its
-// encounter-order binding renumber. Derived from WinNative's lsfg_dxbc.cpp
-// (GPL-3.0-or-later); the translator itself is DXVK's, zlib licensed, vendored
-// under cpp/thirdparty/dxbc.
+// SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "lsfg_dxbc.h"
 

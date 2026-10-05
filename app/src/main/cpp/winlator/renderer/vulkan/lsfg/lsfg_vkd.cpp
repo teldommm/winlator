@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
+// SPDX-License-Identifier: GPL-3.0-or-later
 // See lsfg_vkd.h. Fills the chain's dispatch from the renderer's own table.
 
 #include "lsfg_vkd.h"

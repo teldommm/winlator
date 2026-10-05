@@ -1,34 +1,6 @@
 #pragma once
-// ============================================================================
-// lsfg_probe — capability gate for native (compositor-side) LSFG frame
-// generation.
-//
-// The Lossless Scaling chain is 25 compute shaders that DXVK's DXBC translator
-// emits as SPIR-V 1.5 (vendored DXVK patched down from 1.6, see
-// dxbc_compiler.cpp) with OpCapability VulkanMemoryModel and
-// StorageImageWriteWithoutFormat. Three consequences, all checked here:
-//
-//   * SPIR-V 1.5 needs a Vulkan 1.2 DEVICE (not just instance); memory model
-//     is core there.
-//   * vulkanMemoryModel, shaderStorageImageWriteWithoutFormat and
-//     shaderStorageImageExtendedFormats must be ENABLED at device creation.
-//     Today the renderer enables no features at all, so all three are off.
-//   * `generate` writes into a storage image, and Android swapchain formats
-//     are frequently not storage-capable — so the format is probed separately
-//     once the swapchain has picked one.
-//
-// That is the DXBC-TRANSLATED variant only. Some Lossless.dll builds also ship
-// precompiled SPIR-V (base+49 fp16, base+98 fp32; checked on the real DLL:
-// 25/25 modules each). Those are SPIR-V 1.0 with the GLSL450 memory model and
-// need only StorageImageWriteWithoutFormat + StorageImageExtendedFormats (+
-// ImageQuery, core) - no Vulkan 1.2, no vulkanMemoryModel. The fp16 set adds
-// OpCapability Float16 (23 of 25 modules), i.e. shaderFloat16. So the gate is
-// evaluated PER VARIANT: supported(variant).
-//
-// A device failing any gate reports unsupported UP FRONT, with a reason, so
-// the UI can grey the engine out instead of failing later inside
-// vkCreateShaderModule or vkCreateComputePipelines.
-// ============================================================================
+// SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <vulkan/vulkan.h>
 #include <cstdint>

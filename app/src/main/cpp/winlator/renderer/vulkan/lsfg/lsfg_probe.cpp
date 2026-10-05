@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
+// SPDX-License-Identifier: GPL-3.0-or-later
 // See lsfg_probe.h. Capability gate for native compositor-side LSFG.
 
 #include "lsfg_probe.h"

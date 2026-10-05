@@ -1,7 +1,5 @@
-// See lsfg_engine.h.
-//
-// Ported from WinNative's vkr_lsfg.cpp (GPL-3.0-or-later), LSFG port credited
-// to Camille LaVey / the Eden Emulator Project, following upstream lsfg-vk.
+// SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "lsfg_engine.h"
 

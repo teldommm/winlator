@@ -1,9 +1,5 @@
-// See lsfg_dll.h. PE resource walk + on-device SPIR-V cache for the Lossless
-// Scaling frame-generation chain.
-//
-// Derived from WinNative's lsfg_dll.c (GPL-3.0-or-later), LSFG port credited to
-// Camille LaVey / the Eden Emulator Project, following upstream lsfg-vk
-// (PancakeTAS). Bannerlator is GPL-3.0.
+// SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "lsfg_dll.h"
 #include "lsfg_dxbc.h"
