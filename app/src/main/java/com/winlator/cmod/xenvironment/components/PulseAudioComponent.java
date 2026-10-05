@@ -21,6 +21,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 
 public class PulseAudioComponent extends EnvironmentComponent {
+    // Source names inside the APK's lib/ dir; copied next to the daemon under the plain names it expects.
     private static final String[] LIBRARY_NAMES = {
             "libltdl.so",
             "libpulseaudio.so",
@@ -29,7 +30,7 @@ public class PulseAudioComponent extends EnvironmentComponent {
             "libpulsecore-13.0.so",
             "libsndfile.so"
     };
-    private static final String[] GN_LIBRARY_NAMES = {
+    private static final String[] SOURCE_NAMES = {
             "libgn_ltdl.so",
             "libgn_pulseaudio.so",
             "libgn_pulse.so",
@@ -37,19 +38,16 @@ public class PulseAudioComponent extends EnvironmentComponent {
             "libgn_pulsecore-13.0.so",
             "libgn_sndfile.so"
     };
+    private static final String RUNTIME_NAME = "pulseaudio-gn";
+    private static final String ASSET_NAME = "pulseaudio-gamenative-20260612.tzst";
+    private static final String MARKER_NAME = ".gamenative-20260612";
 
     private final UnixSocketConfig socketConfig;
-    private final boolean gameNative;
     private static int pid = -1;
     private static final Object lock = new Object();
 
     public PulseAudioComponent(UnixSocketConfig socketConfig) {
-        this(socketConfig, false);
-    }
-
-    public PulseAudioComponent(UnixSocketConfig socketConfig, boolean gameNative) {
         this.socketConfig = socketConfig;
-        this.gameNative = gameNative;
     }
 
     @Override
@@ -71,15 +69,14 @@ public class PulseAudioComponent extends EnvironmentComponent {
     }
 
     private void copyFromLibraryDir(File dst) {
-        String[] sourceNames = gameNative ? GN_LIBRARY_NAMES : LIBRARY_NAMES;
         for (int i = 0; i < LIBRARY_NAMES.length; i++) {
-            String path = "lib/arm64-v8a/" + sourceNames[i];
+            String path = "lib/arm64-v8a/" + SOURCE_NAMES[i];
             ClassLoader loader = PulseAudioComponent.class.getClassLoader();
             URL resource = loader != null ? loader.getResource(path) : null;
             Path destination = Paths.get(dst.getAbsolutePath(), LIBRARY_NAMES[i]);
             try (InputStream input = resource != null ? resource.openStream() : null) {
                 if (input == null) {
-                    throw new IllegalStateException("Missing PulseAudio library: " + sourceNames[i]);
+                    throw new IllegalStateException("Missing PulseAudio library: " + SOURCE_NAMES[i]);
                 }
                 Files.copy(input, destination, StandardCopyOption.REPLACE_EXISTING);
                 FileUtils.chmod(destination.toFile(), 0771);
@@ -91,16 +88,13 @@ public class PulseAudioComponent extends EnvironmentComponent {
 
     private int execPulseAudio() {
         Context context = environment.getContext();
-        String runtimeName = gameNative ? "pulseaudio-gn" : "pulseaudio";
-        String assetName = gameNative
-                ? "pulseaudio-gamenative-20260612.tzst"
-                : "pulseaudio.tzst";
-        String markerName = gameNative
-                ? ".gamenative-20260612"
-                : ".legacy-runtime";
 
-        File workingDir = new File(context.getFilesDir(), runtimeName);
-        File versionMarker = new File(workingDir, markerName);
+        // The old non-GN runtime is gone; drop its extracted copy so it stops taking up space.
+        File legacyDir = new File(context.getFilesDir(), "pulseaudio");
+        if (legacyDir.exists()) FileUtils.delete(legacyDir);
+
+        File workingDir = new File(context.getFilesDir(), RUNTIME_NAME);
+        File versionMarker = new File(workingDir, MARKER_NAME);
         if (!versionMarker.isFile()) {
             FileUtils.delete(workingDir);
             workingDir.mkdirs();
@@ -108,35 +102,25 @@ public class PulseAudioComponent extends EnvironmentComponent {
             boolean extracted = TarCompressorUtils.extract(
                     TarCompressorUtils.Type.ZSTD,
                     context,
-                    assetName,
+                    ASSET_NAME,
                     workingDir);
             if (!extracted) {
-                throw new IllegalStateException("Unable to extract " + assetName);
+                throw new IllegalStateException("Unable to extract " + ASSET_NAME);
             }
-            FileUtils.writeString(versionMarker, assetName);
+            FileUtils.writeString(versionMarker, ASSET_NAME);
         }
 
         File configDir = new File(workingDir, ".config");
         if (configDir.exists()) FileUtils.delete(configDir);
 
         File configFile = new File(workingDir, "default.pa");
-        if (gameNative) {
-            FileUtils.writeString(configFile, String.join("\n",
-                    "load-module module-native-protocol-unix auth-anonymous=1 auth-cookie-enabled=false socket=\"" + socketConfig.path + "\"",
-                    "load-module module-aaudio-sink volume=1.0 performance_mode=1 low_latency=true"
-            ));
-        } else {
-            FileUtils.writeString(configFile, String.join("\n",
-                    "load-module module-native-protocol-unix auth-anonymous=1 auth-cookie-enabled=0 socket=\"" + socketConfig.path + "\"",
-                    "load-module module-aaudio-sink",
-                    "set-default-sink AAudioSink"
-            ));
-        }
+        FileUtils.writeString(configFile, String.join("\n",
+                "load-module module-native-protocol-unix auth-anonymous=1 auth-cookie-enabled=false socket=\"" + socketConfig.path + "\"",
+                "load-module module-aaudio-sink volume=1.0 performance_mode=1 low_latency=true"
+        ));
 
         String archName = AppUtils.getArchName();
-        File modulesDir = gameNative
-                ? new File(workingDir, "modules")
-                : new File(workingDir, "modules/" + archName);
+        File modulesDir = new File(workingDir, "modules");
         String systemLibPath = archName.equals("arm64") ? "/system/lib64" : "/system/lib";
 
         ArrayList<String> envVars = new ArrayList<>();

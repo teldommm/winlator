@@ -242,7 +242,8 @@ public class Container {
 
     public static String normalizeAudioDriver(String audioDriver) {
         if (audioDriver == null || audioDriver.isEmpty()) return DEFAULT_AUDIO_DRIVER;
-        if (audioDriver.equals("oboe")) return "pulse-audio-gn";
+        // "oboe" and the removed legacy PulseAudio driver both run on the PulseAudio-GN runtime now.
+        if (audioDriver.equals("oboe") || audioDriver.equals("pulseaudio")) return "pulse-audio-gn";
         return audioDriver;
     }
 

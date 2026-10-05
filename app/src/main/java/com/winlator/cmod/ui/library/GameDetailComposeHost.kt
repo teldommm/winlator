@@ -458,6 +458,9 @@ private fun StatChips(stats: GameStats, modifier: Modifier = Modifier) {
         val gap = 8.dp.roundToPx()
         val available = if (constraints.hasBoundedWidth) constraints.maxWidth else Int.MAX_VALUE
         val natural = Constraints()
+        // The parent asks for the full width (fillMaxWidth). A layout that reports less is centred in
+        // it, which put a lone chip in the middle: report at least the asked width and place from 0.
+        fun layoutWidth(content: Int): Int = content.coerceIn(constraints.minWidth, available)
 
         // Composing the chips under a smaller density shrinks every dp and sp in them together, and
         // the measured sizes are the real ones (nothing is scaled after the fact).
@@ -485,7 +488,7 @@ private fun StatChips(stats: GameStats, modifier: Modifier = Modifier) {
         }
         if (scale >= 0.8f && rowWidth(items, gapPx) <= available) {
             val height = items.maxOf { it.height }
-            return@SubcomposeLayout layout(rowWidth(items, gapPx), height) {
+            return@SubcomposeLayout layout(layoutWidth(rowWidth(items, gapPx)), height) {
                 var x = 0
                 items.forEach {
                     it.placeRelative(x, 0)
@@ -501,7 +504,7 @@ private fun StatChips(stats: GameStats, modifier: Modifier = Modifier) {
         val rowHeights = rows.map { row -> row.maxOf { it.height } }
         val height = rowHeights.sum() + gap * (rows.size - 1)
         val width = if (cells.size == 1) column else column * 2 + gap
-        layout(width, height) {
+        layout(layoutWidth(width), height) {
             var y = 0
             rows.forEachIndexed { index, row ->
                 row.forEachIndexed { col, cell -> cell.placeRelative(col * (column + gap), y) }

@@ -1138,12 +1138,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
             environment.addComponent(
                     new ALSAServerComponent(
                             UnixSocketConfig.createSocket(rootPath, UnixSocketConfig.ALSA_SERVER_PATH)));
-        } else if (audioDriver.equals("pulseaudio") || audioDriver.equals("pulse-audio-gn")) {
+        } else if (audioDriver.equals("pulse-audio-gn")) {
             envVars.put("PULSE_SERVER", rootPath + UnixSocketConfig.PULSE_SERVER_PATH);
             environment.addComponent(
                     new PulseAudioComponent(
-                            UnixSocketConfig.createSocket(rootPath, UnixSocketConfig.PULSE_SERVER_PATH),
-                            audioDriver.equals("pulse-audio-gn")));
+                            UnixSocketConfig.createSocket(rootPath, UnixSocketConfig.PULSE_SERVER_PATH)));
         }
 
         guestProgramLauncherComponent.setEnvVars(envVars);
@@ -2805,7 +2804,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             try (WineRegistryEditor registryEditor = new WineRegistryEditor(userRegFile)) {
                 if (audioDriver.equals("alsa")) {
                     registryEditor.setStringValue("Software\\Wine\\Drivers", "Audio", "alsa");
-                } else if (audioDriver.equals("pulseaudio") || audioDriver.equals("pulse-audio-gn")) {
+                } else if (audioDriver.equals("pulse-audio-gn")) {
                     registryEditor.setStringValue("Software\\Wine\\Drivers", "Audio", "pulse");
                 }
             }
