@@ -85,6 +85,7 @@ import com.winlator.cmod.container.Container
 import com.winlator.cmod.container.ContainerManager
 import com.winlator.cmod.container.SaveProfiles
 import com.winlator.cmod.container.Shortcut
+import com.winlator.cmod.ui.library.HomeShortcuts
 import com.winlator.cmod.core.GameSaveManager
 import com.winlator.cmod.core.DefaultVersion
 import com.winlator.cmod.core.FileUtils
@@ -424,7 +425,8 @@ internal fun ShortcutEditorV2(
     activity: AppCompatActivity,
     shortcut: Shortcut,
     onShortcutsChanged: () -> Unit,
-    close: () -> Unit
+    close: () -> Unit,
+    onMoved: ((String) -> Unit)? = null
 ) {
     val context: android.content.Context = activity
     val dialogView = LocalView.current
@@ -540,16 +542,24 @@ internal fun ShortcutEditorV2(
         activity.startActivity(Intent(activity, XServerDisplayActivity::class.java).putExtra("container_id", state.container.id))
     }
 
+    // Switches the game to another container (moves the shortcut; a copy is the Library's Clone).
     fun changeContainer(targetId: Int) {
         val target = containers.firstOrNull { it.id == targetId } ?: return
         if (target.id == state.container.id) return
-        if (shortcut.cloneToContainer(target)) {
-            onShortcutsChanged()
-            close()
-            WinToast.show(context, "Shortcut copied to ${target.name}", Toast.LENGTH_SHORT)
-        } else {
-            WinToast.show(context, "Couldn't copy the shortcut to ${target.name}", Toast.LENGTH_LONG, dialogView)
+        if (File(target.desktopDir, shortcut.file.name).exists()) {
+            WinToast.show(context, "${target.name} already has a shortcut named \"${shortcut.name}\"", Toast.LENGTH_LONG, dialogView)
+            return
         }
+        val moved = shortcut.moveToContainer(target)
+        if (moved == null) {
+            WinToast.show(context, "Couldn't move the shortcut to ${target.name}", Toast.LENGTH_LONG, dialogView)
+            return
+        }
+        HomeShortcuts.updatePinned(context, Shortcut(target, moved))
+        onShortcutsChanged()
+        close()
+        WinToast.show(context, "Moved to ${target.name}", Toast.LENGTH_SHORT)
+        onMoved?.invoke(moved.path)
     }
 
     var category by remember { mutableStateOf("General") }

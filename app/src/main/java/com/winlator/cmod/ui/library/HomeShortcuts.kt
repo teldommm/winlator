@@ -88,6 +88,23 @@ object HomeShortcuts {
         return if (manager.requestPinShortcut(info, null)) PinResult.Requested else PinResult.Unsupported
     }
 
+    // After the shortcut moved (container switch): the pinned icon's intent still names the old
+    // container and .desktop, so it is pointed at the new ones (same id). No-op when not pinned.
+    @JvmStatic
+    fun updatePinned(context: Context, shortcut: Shortcut) {
+        if (!isPinned(context, shortcut)) return
+        val manager = context.getSystemService(ShortcutManager::class.java) ?: return
+        try {
+            val info = buildInfo(
+                context, shortcut.name, shortcut.name, shortcut.container.id, shortcut.file.path,
+                Icon.createWithBitmap(fitIcon(manager, pickIcon(context, shortcut))), shortcut.getExtra("uuid")
+            )
+            manager.updateShortcuts(listOf(info))
+        } catch (e: Exception) {
+            android.util.Log.w("HomeShortcuts", "Could not update the pinned shortcut", e)
+        }
+    }
+
     // Pinned icons can't be deleted by an app, only switched off (the launcher greys them out).
     @JvmStatic
     fun unpin(context: Context, shortcut: Shortcut): Boolean {

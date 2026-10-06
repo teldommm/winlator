@@ -14,6 +14,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import com.winlator.cmod.MainActivity
 import com.winlator.cmod.XServerDisplayActivity
 import com.winlator.cmod.container.ContainerManager
 import com.winlator.cmod.container.Shortcut
@@ -112,7 +113,11 @@ fun GameDetailRoute(shortcutPath: String, onClose: () -> Unit, onLibraryChanged:
 
             override fun onConfigure() {
                 // Edits made here (rename, copy to container) must show up in the Library tab.
-                ShortcutSettingsComposeDialog.show(activity, shortcut) { onLibraryChanged() }
+                // After a container switch the shortcut lives at a new path: reopen the page on it.
+                ShortcutSettingsComposeDialog.show(activity, shortcut, Runnable { onLibraryChanged() }) { newPath ->
+                    onClose()
+                    (activity as? MainActivity)?.openGameDetail(newPath)
+                }
             }
 
             override fun onArguments() {

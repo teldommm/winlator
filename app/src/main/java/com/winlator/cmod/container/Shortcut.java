@@ -226,6 +226,30 @@ public class Shortcut {
         saveData();
     }
 
+    /**
+     * Moves the shortcut to another container (the shortcut settings' container switch): the copy
+     * is written first, the old .desktop and its .lnk/.bat go only once it is there. Everything in
+     * the .desktop moves with it (settings, uuid, save profile id). Returns the new .desktop, or
+     * null if target is this container, already has a shortcut with this name, or the copy failed.
+     */
+    public File moveToContainer(Container target) {
+        if (target == null || target.id == container.id) return null;
+        File dst = new File(target.getDesktopDir(), file.getName());
+        if (dst.exists()) return null;
+        File desktopDir = target.getDesktopDir();
+        if (!desktopDir.isDirectory()) desktopDir.mkdirs();
+        if (!cloneToContainer(target) || !dst.isFile()) return null;
+        // The .lnk goes too: a .lnk without its .desktop is turned back into a shortcut on load.
+        String path = file.getPath();
+        int dot = path.lastIndexOf('.');
+        if (dot > 0) {
+            new File(path.substring(0, dot) + ".lnk").delete();
+            new File(path.substring(0, dot) + ".bat").delete();
+        }
+        if (!file.delete()) Log.w("Shortcut", "Moved, but could not delete the old shortcut " + file);
+        return dst;
+    }
+
     public boolean cloneToContainer(Container newContainer) {
         try {
             // The copy carries the same save profile id, so the game keeps its saves in the other container.

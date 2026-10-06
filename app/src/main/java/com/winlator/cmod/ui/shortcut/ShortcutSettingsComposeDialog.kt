@@ -15,9 +15,12 @@ import androidx.core.view.WindowInsetsControllerCompat
 
 object ShortcutSettingsComposeDialog {
     // onShortcutsChanged: called after an edit that changes what the Library shows (rename,
-    // copy to another container) — the Library reloads, GameDetail asks MainActivity to.
+    // container switch) — the Library reloads, GameDetail asks MainActivity to.
+    // onMoved: the shortcut moved to another container; gets the new .desktop path (the game page
+    // reopens on it). Optional.
     @JvmStatic
-    fun show(activity: AppCompatActivity, shortcut: Shortcut, onShortcutsChanged: Runnable) {
+    @JvmOverloads
+    fun show(activity: AppCompatActivity, shortcut: Shortcut, onShortcutsChanged: Runnable, onMoved: ((String) -> Unit)? = null) {
         val dialog = ComponentDialog(activity)
         dialog.show()
         dialog.window?.apply {
@@ -39,7 +42,7 @@ object ShortcutSettingsComposeDialog {
             }
         }
         dialog.setContentView(ComposeView(activity).apply {
-            setContent { WinZTheme { ShortcutEditorV2(activity, shortcut, { onShortcutsChanged.run() }, dialog::dismiss) } }
+            setContent { WinZTheme { ShortcutEditorV2(activity, shortcut, { onShortcutsChanged.run() }, dialog::dismiss, onMoved) } }
         })
         dialog.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
     }
