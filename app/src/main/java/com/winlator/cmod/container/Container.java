@@ -148,10 +148,14 @@ public class Container {
         putExtra("graphicsWrapper", normalizeGraphicsWrapper(graphicsWrapper));
     }
 
+    // "Wrapper Test" in graphics_wrapper_entries -> StringUtils.parseIdentifier() -> "wrapper-test".
+    // Anything else (incl. the removed "wrapper-legacy") falls back to the default wrapper.
+    public static final String TEST_GRAPHICS_WRAPPER = "wrapper-test";
+
     public static String normalizeGraphicsWrapper(String graphicsWrapper) {
         if (graphicsWrapper == null) return DEFAULT_GRAPHICS_WRAPPER;
-        return "wrapper-legacy".equals(graphicsWrapper.toLowerCase(java.util.Locale.ENGLISH))
-                ? "wrapper-legacy" : DEFAULT_GRAPHICS_WRAPPER;
+        return TEST_GRAPHICS_WRAPPER.equals(graphicsWrapper.toLowerCase(java.util.Locale.ENGLISH))
+                ? TEST_GRAPHICS_WRAPPER : DEFAULT_GRAPHICS_WRAPPER;
     }
 
     public String getSurfaceFormat() {
