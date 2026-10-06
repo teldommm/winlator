@@ -20,6 +20,9 @@ import java.io.IOException;
 
 public class SyncExtension implements Extension, XResourceManager.OnResourceLifecycleListener {
     public static final byte MAJOR_OPCODE = -104;
+    /* SYNC has 3 errors (Counter, Alarm, Fence). They used to start at 128 like MIT-SHM's
+     * BadShmSeg; GLX uses 131-144 and XInputExtension 150-154. */
+    public static final byte FIRST_ERROR_ID = (byte)160;
     private final SparseArray<SyncFence> fences = new SparseArray<SyncFence>();
     private XServer xserver;
 
@@ -55,7 +58,7 @@ public class SyncExtension implements Extension, XResourceManager.OnResourceLife
 
     @Override
     public byte getFirstErrorId() {
-        return Byte.MIN_VALUE;
+        return FIRST_ERROR_ID;
     }
 
     @Override
@@ -68,6 +71,7 @@ public class SyncExtension implements Extension, XResourceManager.OnResourceLife
             if (fences.indexOfKey(id) >= 0) {
                 SyncFence fence = fences.get(id);
                 fence.triggered = true;
+                fences.notifyAll();
             }
         }
     }
@@ -96,6 +100,7 @@ public class SyncExtension implements Extension, XResourceManager.OnResourceLife
             if (fences.indexOfKey(id) < 0) throw new BadFence(id);
             SyncFence fence = fences.get(id);
             fence.triggered = true;
+            fences.notifyAll();
         }
     }
 
@@ -116,6 +121,7 @@ public class SyncExtension implements Extension, XResourceManager.OnResourceLife
             int id = inputStream.readInt();
             if (fences.indexOfKey(id) < 0) throw new BadFence(id);
             fences.delete(id);
+            fences.notifyAll();
         }
     }
 
@@ -130,37 +136,49 @@ public class SyncExtension implements Extension, XResourceManager.OnResourceLife
                 length -= 4;
             }
 
-            boolean anyTriggered = false;
-            do {
+            /* Wait with the monitor released: fences are triggered from other threads
+             * (setTriggered from Present), and the old busy loop held the monitor, so a fence
+             * that was not triggered yet could never become triggered and the X server's only
+             * request thread spun forever. */
+            while (true) {
                 for (int id : ids) {
                     if (fences.indexOfKey(id) < 0) throw new BadFence(id);
-                    SyncFence fence = fences.get(id);
-                    anyTriggered = fence.triggered;
-                    if (anyTriggered) break;
+                    if (fences.get(id).triggered) return;
+                }
+                try {
+                    fences.wait();
+                }
+                catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
                 }
             }
-            while (!anyTriggered);
         }
     }
     
     @Override
     public void onFreeResource(XResource resource) {
-        if (resource instanceof Pixmap) {
-            Pixmap pixmap = (Pixmap) resource;
-            for (int i = 0; i < fences.size(); i++) {
-                int key = fences.keyAt(i);
-                SyncFence fence = fences.get(key);
-                if (fence.drawableId == pixmap.id)
-                    fences.remove(fence.fenceId);
+        if (!(resource instanceof Pixmap) && !(resource instanceof Window)) return;
+
+        /* iterate backwards: removing while walking forwards skipped the next fence */
+        synchronized (fences) {
+            for (int i = fences.size() - 1; i >= 0; i--) {
+                if (fences.valueAt(i).drawableId == resource.id) fences.removeAt(i);
             }
-        } else if (resource instanceof Window) {
-            Window window = (Window) resource;
-            for (int i = 0; i < fences.size(); i++) {
-                int key = fences.keyAt(i);
-                SyncFence fence = fences.get(key);
-                if (fence.drawableId == window.id) 
-                    fences.remove(fence.fenceId);
+            fences.notifyAll();
+        }
+    }
+
+    /* Fence ids come from the client's resource id range, which is handed to the next client
+     * after a disconnect; a leftover fence would make that client's CreateFence fail with
+     * BadIdChoice. */
+    @Override
+    public void onClientDisconnected(XClient client) {
+        synchronized (fences) {
+            for (int i = fences.size() - 1; i >= 0; i--) {
+                if (client.isValidResourceId(fences.keyAt(i))) fences.removeAt(i);
             }
+            fences.notifyAll();
         }
     }
 

@@ -65,8 +65,9 @@ public class XServer {
         else
             this.surfaceFormat = Drawable.HAL_PIXEL_FORMAT_BGRA_8888;
 
-        cursorLocker = new CursorLocker(this);
+        /* locks first: CursorLocker's timer starts immediately and takes them */
         for (Lockable lockable : Lockable.values()) locks.put(lockable, new ReentrantLock());
+        cursorLocker = new CursorLocker(this);
 
         pixmapManager = new PixmapManager();
         drawableManager = new DrawableManager(this);

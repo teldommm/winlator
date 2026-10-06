@@ -1,6 +1,7 @@
 package com.winlator.cmod.core;
 
 import com.winlator.cmod.math.Mathf;
+import com.winlator.cmod.xserver.XLock;
 import com.winlator.cmod.xserver.XServer;
 
 import java.util.Timer;
@@ -61,20 +62,24 @@ public class CursorLocker extends TimerTask {
             }
         }
 
-        short x = (short)Mathf.clamp(xServer.pointer.getX(), -maxDistance, xServer.screenInfo.width + maxDistance);
-        short y = (short)Mathf.clamp(xServer.pointer.getY(), -maxDistance, xServer.screenInfo.height + maxDistance);
+        /* same locks as every other pointer update (XServer.inject*, WarpPointer), so the
+         * read-modify-write below cannot interleave with input or request handling */
+        try (XLock lock = xServer.lock(XServer.Lockable.WINDOW_MANAGER, XServer.Lockable.INPUT_DEVICE)) {
+            short x = (short)Mathf.clamp(xServer.pointer.getX(), -maxDistance, xServer.screenInfo.width + maxDistance);
+            short y = (short)Mathf.clamp(xServer.pointer.getY(), -maxDistance, xServer.screenInfo.height + maxDistance);
 
-        if (x < 0) {
-            xServer.pointer.setX((short)Math.ceil(x * damping));
-        }
-        else if (x >= xServer.screenInfo.width) {
-            xServer.pointer.setX((short)Math.floor(xServer.screenInfo.width + (x - xServer.screenInfo.width) * damping));
-        }
-        if (y < 0) {
-            xServer.pointer.setY((short)Math.ceil(y * damping));
-        }
-        else if (y >= xServer.screenInfo.height) {
-            xServer.pointer.setY((short)Math.floor(xServer.screenInfo.height + (y - xServer.screenInfo.height) * damping));
+            if (x < 0) {
+                xServer.pointer.setX((short)Math.ceil(x * damping));
+            }
+            else if (x >= xServer.screenInfo.width) {
+                xServer.pointer.setX((short)Math.floor(xServer.screenInfo.width + (x - xServer.screenInfo.width) * damping));
+            }
+            if (y < 0) {
+                xServer.pointer.setY((short)Math.ceil(y * damping));
+            }
+            else if (y >= xServer.screenInfo.height) {
+                xServer.pointer.setY((short)Math.floor(xServer.screenInfo.height + (y - xServer.screenInfo.height) * damping));
+            }
         }
     }
 }

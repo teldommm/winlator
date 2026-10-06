@@ -200,7 +200,8 @@ public class XInputExtension implements Extension, Pointer.OnPointerMotionListen
 
     /* ---------------------------------------------------------------- cleanup */
 
-    public void removeClient(XClient client) {
+    @Override
+    public void onClientDisconnected(XClient client) {
         synchronized (selections) {
             selections.remove(client);
         }

@@ -17,4 +17,11 @@ public interface Extension {
     byte getFirstEventId();
 
     void handleRequest(XClient client, XInputStream inputStream, XOutputStream outputStream) throws IOException, XRequestError;
+
+    /**
+     * Called once when a client disconnects, after its resources (windows, pixmaps, ...) have been
+     * freed. Extensions that keep per-client state drop it here. Called with all XServer locks
+     * held, so implementations must not block.
+     */
+    default void onClientDisconnected(XClient client) {}
 }

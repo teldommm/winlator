@@ -239,6 +239,15 @@ public class PresentExtension implements Extension, XResourceManager.OnResourceL
     }
 
     @Override
+    public void onClientDisconnected(XClient client) {
+        synchronized (events) {
+            for (int i = events.size() - 1; i >= 0; i--) {
+                if (events.valueAt(i).client == client) events.removeAt(i);
+            }
+        }
+    }
+
+    @Override
     public void onFreeResource(XResource resource) {
         if (resource instanceof Window) {
             Window window = (Window) resource;

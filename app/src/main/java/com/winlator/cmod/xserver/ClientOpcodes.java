@@ -59,4 +59,27 @@ public abstract class ClientOpcodes {
     public static final byte GET_POINTER_MAPPING = 117;
     public static final byte GET_MODIFIER_MAPPING = 119;
     public static final byte NO_OPERATION = 127;
+
+    /* Requests with a reply that only get a minimal answer (see FallbackRequests) */
+    public static final byte LIST_PROPERTIES = 21;
+    public static final byte GRAB_KEYBOARD = 31;
+    public static final byte GET_MOTION_EVENTS = 39;
+    public static final byte QUERY_FONT = 47;
+    public static final byte QUERY_TEXT_EXTENTS = 48;
+    public static final byte LIST_FONTS_WITH_INFO = 50;
+    public static final byte GET_FONT_PATH = 52;
+    public static final byte LIST_INSTALLED_COLORMAPS = 83;
+    public static final byte ALLOC_COLOR = 84;
+    public static final byte ALLOC_NAMED_COLOR = 85;
+    public static final byte ALLOC_COLOR_CELLS = 86;
+    public static final byte ALLOC_COLOR_PLANES = 87;
+    public static final byte QUERY_COLORS = 91;
+    public static final byte LOOKUP_COLOR = 92;
+    public static final byte QUERY_BEST_SIZE = 97;
+    public static final byte LIST_EXTENSIONS = 99;
+    public static final byte GET_KEYBOARD_CONTROL = 103;
+    public static final byte GET_POINTER_CONTROL = 106;
+    public static final byte LIST_HOSTS = 110;
+    public static final byte SET_POINTER_MAPPING = 116;
+    public static final byte SET_MODIFIER_MAPPING = 118;
 }

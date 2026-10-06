@@ -15,6 +15,7 @@ import com.winlator.cmod.xserver.requests.DrawRequests;
 import com.winlator.cmod.xserver.requests.ExtensionRequests;
 import com.winlator.cmod.xserver.requests.FontRequests;
 import com.winlator.cmod.xserver.requests.GrabRequests;
+import com.winlator.cmod.xserver.requests.FallbackRequests;
 import com.winlator.cmod.xserver.requests.GraphicsContextRequests;
 import com.winlator.cmod.xserver.requests.KeyboardRequests;
 import com.winlator.cmod.xserver.requests.PixmapRequests;
@@ -28,6 +29,8 @@ public class XClientRequestHandler implements RequestHandler {
     public static final byte RESPONSE_CODE_ERROR = 0;
     public static final byte RESPONSE_CODE_SUCCESS = 1;
     public static final int MAX_REQUEST_LENGTH = 65535;
+    /* opcodes (core, and extension major opcodes) already reported as unsupported */
+    private static final boolean[] reportedOpcodes = new boolean[256];
 
     @Override
     public boolean handleRequest(Client client) throws IOException {
@@ -430,30 +433,43 @@ public class XClientRequestHandler implements RequestHandler {
                     CursorRequests.getPointerMaping(client, inputStream, outputStream);
                     break;
                 case 36:
+                    /* GrabServer has no reply */
                     try (XLock lock = client.xServer.lockAll()) {
                         client.xServer.setGrabbed(true, client);
-                        outputStream.writeSuccessReply(client.getSequenceNumber(), 0);
-                        Log.d("XClientRequestHandler", "X_GrabServer request handled successfully:" + outputStream.buffer.position());
                     }
                     break;
 
                 case 37:
+                    /* UngrabServer has no reply */
                     try (XLock lock = client.xServer.lockAll()) {
                         if (client.xServer.isGrabbedBy(client)) {
                             client.xServer.setGrabbed(false, null);
                         }
-                        outputStream.writeSuccessReply(client.getSequenceNumber(), 0);
-                        Log.d("XClientRequestHandler", "X_UngrabServer request handled successfully:" + outputStream.buffer.position());
                     }
                     break;
                 default:
                     if (opcode < 0) {
                         Extension extension = client.xServer.extensions.get(opcode);
                         if (extension != null) extension.handleRequest(client, inputStream, outputStream);
+                        else reportUnsupported(opcode, client.getRequestData());
                     }
-                    else Log.d("XClientRequestHandler", "Unsupported opcode " + opcode);
+                    else {
+                        boolean handled;
+                        try (XLock lock = client.xServer.lock(XServer.Lockable.WINDOW_MANAGER)) {
+                            handled = FallbackRequests.handle(client, opcode, inputStream, outputStream);
+                        }
+                        /* Unknown requests without a reply are ignored. Answering with an error is
+                         * not an option: Wine hands unexpected X errors to Xlib's default handler,
+                         * which terminates the process. */
+                        if (!handled) reportUnsupported(opcode, client.getRequestData());
+                    }
                     break;
             }
+
+            /* Whatever a handler did not read belongs to this request: drop it, so the next
+             * request is parsed from its real start. */
+            int remaining = client.getRemainingRequestLength();
+            if (remaining > 0) inputStream.skip(remaining);
         }
         catch (XRequestError e) {
             client.skipRequest();
@@ -461,5 +477,15 @@ public class XClientRequestHandler implements RequestHandler {
         }
 
         return true;
+    }
+
+    private static void reportUnsupported(byte opcode, byte requestData) {
+        int index = opcode & 0xff;
+        synchronized (reportedOpcodes) {
+            if (reportedOpcodes[index]) return;
+            reportedOpcodes[index] = true;
+        }
+        if (opcode < 0) Log.w("XClientRequestHandler", "Unsupported extension opcode " + index + " (minor " + (requestData & 0xff) + "), ignored");
+        else Log.w("XClientRequestHandler", "Unsupported opcode " + index + ", ignored");
     }
 }
