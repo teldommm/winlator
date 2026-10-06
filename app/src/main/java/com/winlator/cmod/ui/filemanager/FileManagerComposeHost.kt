@@ -1,5 +1,7 @@
 package com.winlator.cmod.ui.filemanager
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -476,6 +478,8 @@ private fun DriveSelectorSheet(
         Column(
             Modifier
                 .fillMaxWidth()
+                // Many drives don't fit a landscape phone's height: scroll instead of clipping.
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 14.dp)
                 .padding(bottom = 20.dp)
         ) {

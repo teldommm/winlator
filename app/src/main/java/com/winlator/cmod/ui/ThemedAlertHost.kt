@@ -1,6 +1,7 @@
 package com.winlator.cmod.ui
 
 import com.winlator.cmod.ui.theme.ThemedDialogTitle
+import com.winlator.cmod.ui.theme.ThemedDialogScrollBody
 import android.view.ViewGroup
 import androidx.annotation.DrawableRes
 import androidx.appcompat.app.AppCompatActivity
@@ -137,12 +138,14 @@ object ThemedAlertHost {
         showOverlay(activity) { dismiss ->
             var value by remember { mutableStateOf(initialValue) }
             ThemedDialogTitle(title)
-            OutlinedTextField(
-                value = value,
-                onValueChange = { value = it },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
+            ThemedDialogScrollBody {
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = { value = it },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
             Spacer(Modifier.height(18.dp))
             Row(Modifier.align(Alignment.End), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedButton(
@@ -171,14 +174,16 @@ object ThemedAlertHost {
         showOverlay(activity) { dismiss ->
             var value by remember { mutableStateOf(initialValue) }
             ThemedDialogTitle(title)
-            Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
-                value = value,
-                onValueChange = { value = it },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
+            ThemedDialogScrollBody {
+                Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = { value = it },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
             Spacer(Modifier.height(18.dp))
             Row(Modifier.align(Alignment.End), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedButton(
@@ -216,9 +221,8 @@ object ThemedAlertHost {
     ) {
         showOverlay(activity) { dismiss ->
             ThemedDialogTitle(title)
-            Text(message, style = MaterialTheme.typography.bodyMedium)
-            Spacer(Modifier.height(16.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            ThemedDialogScrollBody(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(message, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 8.dp))
                 options.forEach { option ->
                     Surface(
                         onClick = { dismiss(); option.onClick.run() },
@@ -265,7 +269,8 @@ object ThemedAlertHost {
             // With a title the divider sits under it (like every dialog); the rows are then
             // not split by lines. Untitled menus keep the lines between rows.
             if (title != null) ThemedDialogTitle(title)
-            Column {
+            // Scrolls when the list is longer than the screen (e.g. many containers in landscape).
+            ThemedDialogScrollBody {
                 items.forEachIndexed { index, item ->
                     Surface(
                         onClick = { dismiss(); item.onClick.run() },
@@ -320,7 +325,10 @@ object ThemedAlertHost {
             val checked = remember {
                 mutableStateListOf(*Array(entries.size) { i -> initiallyChecked.getOrElse(i) { false } })
             }
-            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp)) {
+            // weight(fill = false): the list gets only the height left after the title and the
+            // buttons, so on a landscape phone it shrinks (and scrolls) instead of pushing the
+            // buttons off the card. heightIn still caps it on tall screens.
+            LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = 280.dp)) {
                 items(entries.size) { index ->
                     Row(
                         modifier = Modifier
@@ -433,7 +441,9 @@ private fun ColumnScope.DialogBody(
     buttons: @Composable () -> Unit
 ) {
     ThemedDialogTitle(title)
-    Text(message, style = MaterialTheme.typography.bodyMedium)
+    ThemedDialogScrollBody {
+        Text(message, style = MaterialTheme.typography.bodyMedium)
+    }
     Spacer(Modifier.height(18.dp))
     Row(Modifier.align(Alignment.End), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         buttons()

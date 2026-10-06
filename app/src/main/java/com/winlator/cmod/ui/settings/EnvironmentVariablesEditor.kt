@@ -1,5 +1,6 @@
 package com.winlator.cmod.ui.settings
 
+import com.winlator.cmod.ui.theme.ThemedDialogScrollBody
 import com.winlator.cmod.ui.theme.ThemedDialogTitle
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -217,7 +218,7 @@ private fun MultiEnvironmentChoice(options: List<String>, value: String, onChang
         ThemedDialog(onDismissRequest = { open = false }) {
             ThemedDialogTitle("Select values")
             val accent = controlAccentColor()
-            LazyColumn(Modifier.heightIn(max = 420.dp)) {
+            LazyColumn(Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = 420.dp)) {
                 items(options) { option ->
                     Row(
                         Modifier.fillMaxWidth().padding(vertical = 3.dp),
@@ -268,7 +269,7 @@ private fun AddEnvironmentVariableDialog(
 
     ThemedDialog(onDismissRequest = onDismiss) {
         ThemedDialogTitle("Add environment variable")
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ThemedDialogScrollBody(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SettingChoice("Variable", selected, options) { picked ->
                 name = if (picked == "Custom…") "" else picked
             }

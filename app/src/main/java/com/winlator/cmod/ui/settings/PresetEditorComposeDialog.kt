@@ -1,5 +1,7 @@
 package com.winlator.cmod.ui.settings
 
+import com.winlator.cmod.ui.theme.isCompactDialogHeight
+import com.winlator.cmod.ui.theme.ThemedDialogScrollBody
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
 import com.winlator.cmod.ui.theme.ThemedDialogTitle
@@ -181,16 +183,21 @@ private fun ColumnScope.PresetEditorScreen(
         }
     }
     var helpText by remember { mutableStateOf<String?>(null) }
+    // Landscape phone: every dp of height goes to the variables list (the only part that
+    // shrinks), so the subtitle is dropped and the gaps around the fixed parts are tightened.
+    val compact = isCompactDialogHeight()
 
-    Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-    Text(
-        if (readOnly) "Bundled preset · read only" else "Edit the preset name and environment variables",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = 2.dp)
-    )
+    Text(title, style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+    if (!compact) {
+        Text(
+            if (readOnly) "Bundled preset · read only" else "Edit the preset name and environment variables",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 2.dp)
+        )
+    }
     // Same title divider as every other dialog (see ThemedDialogTitle), under the subtitle here.
-    HorizontalDivider(Modifier.padding(vertical = 12.dp), color = dividerColor())
+    HorizontalDivider(Modifier.padding(vertical = if (compact) 8.dp else 12.dp), color = dividerColor())
     OutlinedTextField(
         value = name,
         onValueChange = { name = it },
@@ -203,7 +210,7 @@ private fun ColumnScope.PresetEditorScreen(
         "Environment variables",
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = 18.dp, bottom = 7.dp)
+        modifier = Modifier.padding(top = if (compact) 8.dp else 18.dp, bottom = if (compact) 4.dp else 7.dp)
     )
     Surface(
         modifier = Modifier.fillMaxWidth().weight(1f),
@@ -233,7 +240,7 @@ private fun ColumnScope.PresetEditorScreen(
         }
     }
     Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = if (compact) 10.dp else 14.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         OutlinedButton(
@@ -256,7 +263,9 @@ private fun ColumnScope.PresetEditorScreen(
     helpText?.let { message ->
         ThemedDialog(onDismissRequest = { helpText = null }) {
             ThemedDialogTitle("Help")
-            Text(message, style = MaterialTheme.typography.bodyMedium)
+            ThemedDialogScrollBody {
+                Text(message, style = MaterialTheme.typography.bodyMedium)
+            }
             Spacer(Modifier.height(18.dp))
             Row(Modifier.align(Alignment.End)) {
                 Button(

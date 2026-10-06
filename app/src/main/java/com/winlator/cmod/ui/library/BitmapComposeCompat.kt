@@ -1,5 +1,7 @@
 package com.winlator.cmod.ui.library
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import android.graphics.Bitmap
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -605,6 +607,8 @@ internal fun LibraryItemMenuCompat(item: LibraryItem, cb: LibraryCallbacks, clos
             Modifier
                 .fillMaxWidth()
                 .widthIn(max = if (landscape) 920.dp else 760.dp)
+                // Scrolls if the actions don't fit a short landscape screen.
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = if (landscape) 22.dp else 16.dp)
                 .padding(bottom = if (landscape) 10.dp else 24.dp)
                 .align(Alignment.CenterHorizontally)

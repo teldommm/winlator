@@ -247,7 +247,7 @@ private fun ExternalControllerBindingsScreen(
             val selectionState = rememberLazyListState(
                 initialFirstVisibleItemIndex = labels.indexOf(editingItem.binding).coerceAtLeast(0)
             )
-            LazyColumn(state = selectionState, modifier = Modifier.fillMaxWidth().heightIn(max = 380.dp)) {
+            LazyColumn(state = selectionState, modifier = Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = 380.dp)) {
                 items(labels.size) { index ->
                     val label = labels[index]
                     val isSelected = label == editingItem.binding

@@ -1,5 +1,6 @@
 package com.winlator.cmod.ui.settings
 
+import com.winlator.cmod.ui.theme.ThemedDialogScrollBody
 import com.winlator.cmod.ui.theme.ThemedDialogTitle
 import android.content.Intent
 import android.widget.Toast
@@ -361,7 +362,7 @@ private fun ContainerPropertiesDialog(container: Container, onDismiss: () -> Uni
 
     ThemedDialog(onDismissRequest = onDismiss) {
         ThemedDialogTitle("Container properties", leading = { Icon(Icons.Outlined.Storage, null) })
-        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        ThemedDialogScrollBody(verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text(
                 container.name,
                 style = MaterialTheme.typography.titleMedium,

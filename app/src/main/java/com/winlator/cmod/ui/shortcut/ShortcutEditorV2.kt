@@ -1161,7 +1161,9 @@ private fun ShortcutVulkanExtensionsV2(context: Context, driver: String, blackli
         ThemedDialog(onDismissRequest = { showDialog = false }) {
             ThemedDialogTitle("Vulkan Extensions")
             val checked = remember { mutableStateListOf(*Array(extensions.size) { i -> extensions[i] !in disabled }) }
-            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp)) {
+            // weight(fill = false): only the height left after title + buttons, so the buttons
+            // stay on-screen in landscape; the list scrolls instead.
+            LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = 280.dp)) {
                 items(extensions.size) { index ->
                     Row(
                         modifier = Modifier

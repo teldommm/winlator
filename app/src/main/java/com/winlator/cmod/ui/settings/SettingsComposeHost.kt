@@ -1,5 +1,6 @@
 package com.winlator.cmod.ui.settings
 
+import com.winlator.cmod.ui.theme.ThemedDialogScrollBody
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.DisposableEffect
@@ -311,7 +312,9 @@ internal fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) 
     if (confirmReinstallImageFs) {
         ThemedDialog(onDismissRequest = { confirmReinstallImageFs = false }) {
             ThemedDialogTitle(stringResource(R.string.reinstall_imagefs))
-            Text(stringResource(R.string.do_you_want_to_reinstall_imagefs), style = MaterialTheme.typography.bodyMedium)
+            ThemedDialogScrollBody {
+                Text(stringResource(R.string.do_you_want_to_reinstall_imagefs), style = MaterialTheme.typography.bodyMedium)
+            }
             Spacer(Modifier.height(18.dp))
             Row(Modifier.align(Alignment.End), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedButton(
@@ -640,7 +643,7 @@ private fun WineDebugChannelsDialog(
     ThemedDialog(onDismissRequest = onDismiss) {
         ThemedDialogTitle("Wine debug channels")
         val accent = controlAccentColor()
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
@@ -648,7 +651,7 @@ private fun WineDebugChannelsDialog(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
-            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
+            LazyColumn(Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = 420.dp)) {
                 items(filtered, key = { it }) { channel ->
                     Row(
                         modifier = Modifier

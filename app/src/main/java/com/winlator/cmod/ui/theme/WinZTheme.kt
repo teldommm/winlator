@@ -11,8 +11,16 @@ import android.content.ContextWrapper
 import android.view.View
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.isImeVisible
@@ -234,7 +242,29 @@ fun ThemedDialogTitle(
         }
         Text(text, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
     }
-    HorizontalDivider(Modifier.padding(vertical = 12.dp), color = dividerColor())
+    HorizontalDivider(Modifier.padding(vertical = if (isCompactDialogHeight()) 8.dp else 12.dp), color = dividerColor())
+}
+
+// True on short screens — in practice a phone in landscape (~320–420dp tall). Dialogs then
+// trim their vertical padding and grow wider so the same content needs fewer rows.
+@Composable
+fun isCompactDialogHeight(): Boolean = LocalConfiguration.current.screenHeightDp < 480
+
+// The part of a dialog that may be taller than the screen (a message, a form, a list of rows):
+// it takes only the height left over after the fixed parts (title, buttons) are measured, and
+// scrolls when that isn't enough. Without it a landscape phone pushes the buttons off the card.
+// For a LazyColumn use Modifier.weight(1f, fill = false) directly instead (it already scrolls).
+@Composable
+fun ColumnScope.ThemedDialogScrollBody(
+    modifier: Modifier = Modifier,
+    verticalArrangement: Arrangement.Vertical = Arrangement.Top,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(
+        modifier = modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+        verticalArrangement = verticalArrangement,
+        content = content
+    )
 }
 
 // Same card look as ThemedDialog, without the Compose Dialog wrapper — for call sites
@@ -244,13 +274,24 @@ fun ThemedDialogSurface(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val compact = isCompactDialogHeight()
     Surface(
-        modifier = modifier.widthIn(min = 280.dp, max = 420.dp),
+        // Keep the card clear of the status/navigation bars and the camera cutout (the app is
+        // edge-to-edge / immersive), with a small margin. This sits before the caller's modifier,
+        // so taps in the margin still reach the dismiss scrim behind the card.
+        modifier = Modifier
+            .windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout))
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .then(modifier)
+            .widthIn(min = 280.dp, max = if (compact) 560.dp else 420.dp),
         shape = WinZShapes.Large,
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, hairlineColor())
     ) {
-        Column(Modifier.padding(20.dp), content = content)
+        Column(
+            Modifier.padding(horizontal = 20.dp, vertical = if (compact) 14.dp else 20.dp),
+            content = content
+        )
     }
 }
 

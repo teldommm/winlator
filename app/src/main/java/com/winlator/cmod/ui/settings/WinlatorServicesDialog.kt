@@ -1,5 +1,6 @@
 package com.winlator.cmod.ui.settings
 
+import com.winlator.cmod.ui.theme.ThemedDialogScrollBody
 import android.app.Activity
 import android.content.Context
 import android.view.View
@@ -307,7 +308,9 @@ private fun AddRepoOverlay(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 2.dp)
             )
-            Column(
+            // Scrolls on a short (landscape) screen or with the keyboard up, so Cancel/Add
+            // under it are never pushed off the card.
+            ThemedDialogScrollBody(
                 modifier = Modifier.padding(top = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
