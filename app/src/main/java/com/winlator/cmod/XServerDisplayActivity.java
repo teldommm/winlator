@@ -2260,7 +2260,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     static String resolveGraphicsWrapperArchiveName(String graphicsWrapper) {
         // assets/graphics_driver/<name>.tzst; the name is also stored in the ImageFS variant marker.
-        return Container.TEST_GRAPHICS_WRAPPER.equals(graphicsWrapper) ? "wrapper-gamenative-mesa25" : "wrapper";
+        return Container.TEST_GRAPHICS_WRAPPER.equals(graphicsWrapper) ? "wrapper-test" : "wrapper";
     }
 
     private String getSelectedOpenGLDriver() {
