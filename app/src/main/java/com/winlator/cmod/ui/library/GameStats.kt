@@ -2,11 +2,14 @@ package com.winlator.cmod.ui.library
 
 import android.content.Context
 import android.os.Environment
-import com.winlator.cmod.container.SaveProfiles
 import com.winlator.cmod.container.Shortcut
 import java.io.File
+import java.nio.file.FileVisitResult
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.SimpleFileVisitor
+import java.nio.file.attribute.BasicFileAttributes
 import java.text.SimpleDateFormat
-import java.util.ArrayDeque
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -18,12 +21,14 @@ data class GameStats(
     val playtimeMillis: Long = 0L,
     val playCount: Int = 0,
     val lastPlayedMillis: Long = 0L,
-    val sizeText: String? = null,
-    val savesSizeText: String? = null
+    val sizeText: String? = null
 ) {
     val hasAny: Boolean
-        get() = playtimeMillis > 0L || playCount > 0 || lastPlayedMillis > 0L || sizeText != null || savesSizeText != null
+        get() = playtimeMillis > 0L || playCount > 0 || lastPlayedMillis > 0L || sizeText != null
 }
+
+/** A measured folder size as stored; fresh = no need to measure again. */
+class CachedSize(val text: String?, val fresh: Boolean)
 
 object GameStatsLoader {
     // Names of the folders an exe usually sits in below the real game folder
@@ -31,10 +36,10 @@ object GameStatsLoader {
     private val BINARY_DIRS = setOf("win64", "win32", "x64", "x86", "bin", "bin32", "bin64", "binaries", "shipping", "retail")
     private const val MAX_ENTRIES = 250_000
     private const val MAX_SCAN_MS = 4_000L
-    private const val CACHE_MS = 10 * 60 * 1000L
-
-    private class CachedSize(val atMillis: Long, val text: String?)
-    private val sizeCache = HashMap<String, CachedSize>()
+    // A game folder rarely changes size: a stored size is reused for a day, or until the folder's
+    // own entries change (its modification time moves), e.g. after an update was copied in.
+    private const val STALE_MS = 24 * 60 * 60 * 1000L
+    private const val PREFS = "game_size_cache"
 
     // Cheap part (a few preference reads and one small file): safe to call off the main thread.
     fun load(context: Context, shortcut: Shortcut): GameStats {
@@ -48,30 +53,37 @@ object GameStatsLoader {
         return GameStats(playtime, plays, lastRun, null)
     }
 
-    // Walks the game folder: call it off the main thread. Null when the folder can't be told
-    // apart from a place that holds more than the game (Downloads, a drive root, ...).
+    // The stored size of the game folder, without touching the folder's contents. Null when it was
+    // never measured (or the folder can't be told apart from a broader place). Off the main thread.
+    fun cachedSize(context: Context, shortcut: Shortcut): CachedSize? {
+        val dir = gameFolder(shortcut) ?: return null
+        if (isBroadFolder(shortcut, dir)) return CachedSize(null, true)
+        val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(dir.path, null) ?: return null
+        val parts = raw.split(';')
+        if (parts.size < 3) return null
+        val bytes = parts[0].toLongOrNull() ?: return null
+        val truncated = parts[1] == "1"
+        val measuredAt = parts[2].toLongOrNull() ?: return null
+        val now = System.currentTimeMillis()
+        val fresh = now - measuredAt < STALE_MS && dir.lastModified() <= measuredAt
+        return CachedSize(textOf(bytes, truncated), fresh)
+    }
+
+    // Measures the game folder and stores the result: call it off the main thread. Null when the
+    // folder can't be told apart from a place that holds more than the game (Downloads, a drive root, ...).
     fun sizeText(context: Context, shortcut: Shortcut): String? {
         val dir = gameFolder(shortcut) ?: return null
         if (isBroadFolder(shortcut, dir)) return null
-        val key = dir.path
-        val now = System.currentTimeMillis()
-        synchronized(sizeCache) {
-            sizeCache[key]?.let { if (now - it.atMillis < CACHE_MS) return it.text }
-        }
+        val measuredAt = System.currentTimeMillis()
         val (bytes, truncated) = folderSize(dir)
-        val text = if (bytes > 0L) formatBinarySize(bytes) + if (truncated) "+" else "" else null
-        synchronized(sizeCache) { sizeCache[key] = CachedSize(now, text) }
-        return text
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putString(dir.path, "$bytes;${if (truncated) "1" else "0"};$measuredAt")
+            .apply()
+        return textOf(bytes, truncated)
     }
 
-    // Size of the game's own save profile (Winlator/saves/<Game>). Null when the shortcut has none
-    // (off or shared), or nothing has been saved yet. Call off the main thread.
-    fun savesSizeText(context: Context, shortcut: Shortcut): String? {
-        if (!SaveProfiles.isOwn(shortcut)) return null
-        val dir = SaveProfiles.findProfileDir(shortcut) ?: return null
-        val (bytes, truncated) = folderSize(dir)
-        return if (bytes > 0L) formatBinarySize(bytes) + if (truncated) "+" else "" else null
-    }
+    private fun textOf(bytes: Long, truncated: Boolean): String? =
+        if (bytes > 0L) formatBinarySize(bytes) + if (truncated) "+" else "" else null
 
     private fun gameFolder(shortcut: Shortcut): File? {
         val exe = LibraryScreenController.resolveExeFile(shortcut) ?: return null
@@ -100,27 +112,31 @@ object GameStatsLoader {
         return broad.any { runCatching { it.canonicalPath }.getOrDefault(it.path) == target }
     }
 
+    // One stat per entry (walkFileTree hands over the attributes) and links are not followed, so
+    // nothing outside the folder is counted. Stops at MAX_ENTRIES or MAX_SCAN_MS ("+" shown).
     private fun folderSize(root: File): Pair<Long, Boolean> {
         var total = 0L
         var entries = 0
+        var truncated = false
         val deadline = System.currentTimeMillis() + MAX_SCAN_MS
-        val pending = ArrayDeque<File>()
-        pending.add(root)
-        while (pending.isNotEmpty()) {
-            val current = pending.removeFirst()
-            val children = current.listFiles() ?: continue
-            for (child in children) {
-                if (++entries > MAX_ENTRIES || System.currentTimeMillis() > deadline) return total to true
-                if (child.isDirectory) {
-                    // Don't follow links out of the folder.
-                    val real = runCatching { child.canonicalPath }.getOrNull()
-                    if (real != null && real == child.absolutePath) pending.add(child)
-                } else {
-                    total += child.length()
-                }
+        fun tick(): FileVisitResult {
+            if (++entries > MAX_ENTRIES || ((entries and 255) == 0 && System.currentTimeMillis() > deadline)) {
+                truncated = true
+                return FileVisitResult.TERMINATE
             }
+            return FileVisitResult.CONTINUE
         }
-        return total to false
+        runCatching {
+            Files.walkFileTree(root.toPath(), object : SimpleFileVisitor<Path>() {
+                override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult = tick()
+                override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
+                    if (attrs.isRegularFile) total += attrs.size()
+                    return tick()
+                }
+                override fun visitFileFailed(file: Path, exc: java.io.IOException): FileVisitResult = FileVisitResult.CONTINUE
+            })
+        }
+        return total to truncated
     }
 }
 

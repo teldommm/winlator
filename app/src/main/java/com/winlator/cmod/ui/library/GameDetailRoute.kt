@@ -55,13 +55,15 @@ fun GameDetailRoute(shortcutPath: String, onClose: () -> Unit, onLibraryChanged:
         if (firstResume[0]) firstResume[0] = false else refreshTick++
         onPauseOrDispose { }
     }
-    // Playtime / plays / last launch first (cheap), the folder size once it has been measured.
+    // Playtime / plays / last launch and the stored folder size first (cheap); the folder is only
+    // measured again when the stored size is missing or out of date.
     val stats by produceState(GameStats(), shortcut, refreshTick) {
         val basic = withContext(Dispatchers.IO) { GameStatsLoader.load(activity, shortcut) }
-        value = basic.copy(sizeText = value.sizeText, savesSizeText = value.savesSizeText)
-        val saves = withContext(Dispatchers.IO) { GameStatsLoader.savesSizeText(activity, shortcut) }
-        value = value.copy(savesSizeText = saves)
-        value = value.copy(sizeText = withContext(Dispatchers.IO) { GameStatsLoader.sizeText(activity, shortcut) })
+        val cached = withContext(Dispatchers.IO) { GameStatsLoader.cachedSize(activity, shortcut) }
+        value = basic.copy(sizeText = cached?.text ?: value.sizeText)
+        if (cached == null || !cached.fresh) {
+            value = value.copy(sizeText = withContext(Dispatchers.IO) { GameStatsLoader.sizeText(activity, shortcut) })
+        }
     }
     val homePinned by produceState(false, shortcut, refreshTick, pinTick) {
         value = withContext(Dispatchers.IO) { HomeShortcuts.isPinned(activity, shortcut) }
