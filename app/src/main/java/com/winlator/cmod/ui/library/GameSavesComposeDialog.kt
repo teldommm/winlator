@@ -32,6 +32,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -60,9 +61,13 @@ import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.winlator.cmod.MainActivity
+import com.winlator.cmod.R
+import com.winlator.cmod.container.SaveProfiles
 import com.winlator.cmod.container.Shortcut
 import com.winlator.cmod.core.GameSaveManager
 import com.winlator.cmod.ui.ThemedAlertHost
+import com.winlator.cmod.ui.filemanager.FileManagerController
 import com.winlator.cmod.ui.theme.ThemedDialogSurface
 import com.winlator.cmod.ui.theme.WinZOverlayTheme
 import com.winlator.cmod.ui.theme.WinZShapes
@@ -78,7 +83,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-// "Game saves" window of a game (the Saves button on the game page): where its save files were
+// "Game saves" window of a game (the Saves button on the game page): its save folder in
+// Winlator/saves (when save profiles are on) with a shortcut to open it, where its save files were
 // found, the latest backup, the automatic-backup switch and Back up / Restore.
 // Hosted like WinlatorServicesDialog: a ComposeView added onto the activity's content root, so it
 // shares the themed dialog shell and scrim of every other window in the app.
@@ -185,6 +191,16 @@ private fun ColumnScope.GameSavesPanel(
     var autoBackup by remember { mutableStateOf(GameSaveManager.isAutoBackupEnabled(shortcut)) }
     var latest by remember { mutableStateOf(GameSaveManager.getLatestBackup(shortcut)) }
     var message by remember { mutableStateOf<String?>(null) }
+    val profilesEnabled = remember { SaveProfiles.isEnabled(activity) }
+    val profileShared = remember(shortcut.file.path) { SaveProfiles.isShared(shortcut) }
+    var profileDir by remember(shortcut.file.path) { mutableStateOf<File?>(null) }
+
+    fun openProfileFolder() {
+        val dir = profileDir ?: return
+        FileManagerController.requestOpen(dir)
+        onClose()
+        (activity as? MainActivity)?.navigateToMainDestination(R.id.main_menu_file_manager)
+    }
 
     fun rescan() {
         if (busy) return
@@ -236,6 +252,7 @@ private fun ColumnScope.GameSavesPanel(
     }
 
     LaunchedEffect(shortcut.file.path) {
+        if (profilesEnabled) profileDir = withContext(Dispatchers.IO) { SaveProfiles.findProfileDir(shortcut) }
         roots = withContext(Dispatchers.IO) { GameSaveManager.getSaveRoots(shortcut) }
         latest = GameSaveManager.getLatestBackup(shortcut)
         loading = false
@@ -262,9 +279,25 @@ private fun ColumnScope.GameSavesPanel(
             modifier = Modifier.verticalScroll(rememberScrollState()).padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            if (profilesEnabled) {
+                SavesLabel("Save folder")
+                Text(
+                    profileDir?.let { SaveProfiles.displayPath(it) + if (profileShared) " (shared)" else "" }
+                        ?: "Created on the first launch",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                SavesOutlinedButton(
+                    "Open save folder",
+                    Modifier.fillMaxWidth(),
+                    enabled = !busy && profileDir != null,
+                    icon = Icons.Outlined.FolderOpen
+                ) { openProfileFolder() }
+                HorizontalDivider(color = dividerColor())
+            }
             SavesLabel("Backup folder")
             Text(
-                "Winlator/Saves/${GameSaveManager.getGameDir(shortcut).name}/",
+                "Winlator/Backups/${GameSaveManager.getGameDir(shortcut).name}/",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

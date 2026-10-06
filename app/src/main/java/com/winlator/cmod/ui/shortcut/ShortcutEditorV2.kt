@@ -83,6 +83,7 @@ import com.winlator.cmod.XServerDisplayActivity
 import com.winlator.cmod.box64.Box64PresetManager
 import com.winlator.cmod.container.Container
 import com.winlator.cmod.container.ContainerManager
+import com.winlator.cmod.container.SaveProfiles
 import com.winlator.cmod.container.Shortcut
 import com.winlator.cmod.core.DefaultVersion
 import com.winlator.cmod.core.FileUtils
@@ -169,6 +170,7 @@ private class ShortcutEditorStateV2(val shortcut: Shortcut) {
     val arm64 = container.getWineVersion().contains("arm64ec", true)
 
     var name by mutableStateOf(shortcut.name)
+    var saveProfileShared by mutableStateOf(SaveProfiles.isShared(shortcut))
     var screen by mutableStateOf(normalizeResolution(shortcut.getExtra("screenSize", container.getScreenSize())))
     var renderer by mutableStateOf("Vulkan")
     var presentMode by mutableStateOf(shortcut.getRendererPresentMode())
@@ -511,6 +513,11 @@ internal fun ShortcutEditorV2(
 
     fun closeEditor() {
         val rename = renameShortcutV2(shortcut, state.name)
+        if (rename is ShortcutRenameResult.Renamed) {
+            // The save profile folder follows the shortcut's name (it is found by id, not by name).
+            val newName = rename.newName
+            Thread { SaveProfiles.onShortcutRenamed(shortcut, newName) }.start()
+        }
         onShortcutsChanged()
         close()
         when (rename) {
@@ -706,6 +713,15 @@ private fun ShortcutCategoryV2(
                             Text("Environment", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(currentLabel, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
                         }
+                    }
+                }
+                if (SaveProfiles.isEnabled(context)) {
+                    SettingsDivider()
+                    val ownLabel = "Own (Winlator/saves)"
+                    val sharedLabel = "Shared (_Common)"
+                    SettingChoice("Save profile", if (s.saveProfileShared) sharedLabel else ownLabel, listOf(ownLabel, sharedLabel)) {
+                        s.saveProfileShared = it == sharedLabel
+                        SaveProfiles.setShared(s.shortcut, s.saveProfileShared)
                     }
                 }
                 SettingsDivider()

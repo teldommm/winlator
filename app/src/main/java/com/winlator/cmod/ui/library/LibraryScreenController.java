@@ -729,6 +729,7 @@ public class LibraryScreenController {
                             disableShortcutOnScreen(activity, shortcut);
                             loadShortcutsList();
                             WinToast.show(context, "Shortcut removed.", Toast.LENGTH_SHORT);
+                            SaveProfileCleanup.offerDelete(activity, shortcut);
                         } else {
                             WinToast.show(context, "Couldn't remove shortcut", Toast.LENGTH_LONG);
                         }

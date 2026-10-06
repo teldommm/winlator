@@ -60,6 +60,14 @@ public class FileManagerController {
     private View progressOverlay;
     private boolean isOperationCancelled = false;
 
+    // A folder another screen asked to show (the game page's "Open saves folder"); taken by the
+    // next refresh, i.e. when the File Manager tab is shown.
+    private static volatile File pendingOpenDir;
+
+    public static void requestOpen(File dir) {
+        pendingOpenDir = dir;
+    }
+
     private interface ContainerAction {
         void onContainerSelected(Container container);
     }
@@ -83,6 +91,14 @@ public class FileManagerController {
 
     // Rebuilds and publishes the model (first show, and whenever the tab is shown again).
     public void refresh() {
+        File requested = pendingOpenDir;
+        if (requested != null) {
+            pendingOpenDir = null;
+            if (requested.isDirectory()) {
+                currentDriveRoot = inferDriveRoot(requested);
+                currentDir = requested;
+            }
+        }
         pushState();
     }
 

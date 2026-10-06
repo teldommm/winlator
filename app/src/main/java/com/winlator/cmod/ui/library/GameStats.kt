@@ -2,6 +2,7 @@ package com.winlator.cmod.ui.library
 
 import android.content.Context
 import android.os.Environment
+import com.winlator.cmod.container.SaveProfiles
 import com.winlator.cmod.container.Shortcut
 import java.io.File
 import java.text.SimpleDateFormat
@@ -17,10 +18,11 @@ data class GameStats(
     val playtimeMillis: Long = 0L,
     val playCount: Int = 0,
     val lastPlayedMillis: Long = 0L,
-    val sizeText: String? = null
+    val sizeText: String? = null,
+    val savesSizeText: String? = null
 ) {
     val hasAny: Boolean
-        get() = playtimeMillis > 0L || playCount > 0 || lastPlayedMillis > 0L || sizeText != null
+        get() = playtimeMillis > 0L || playCount > 0 || lastPlayedMillis > 0L || sizeText != null || savesSizeText != null
 }
 
 object GameStatsLoader {
@@ -60,6 +62,15 @@ object GameStatsLoader {
         val text = if (bytes > 0L) formatBinarySize(bytes) + if (truncated) "+" else "" else null
         synchronized(sizeCache) { sizeCache[key] = CachedSize(now, text) }
         return text
+    }
+
+    // Size of the game's save profile (Winlator/saves/<Game>). Null when the feature is off, the
+    // game uses the shared profile, or nothing has been saved yet. Call off the main thread.
+    fun savesSizeText(context: Context, shortcut: Shortcut): String? {
+        if (!SaveProfiles.isEnabled(context) || SaveProfiles.isShared(shortcut)) return null
+        val dir = SaveProfiles.findProfileDir(shortcut) ?: return null
+        val (bytes, truncated) = folderSize(dir)
+        return if (bytes > 0L) formatBinarySize(bytes) + if (truncated) "+" else "" else null
     }
 
     private fun gameFolder(shortcut: Shortcut): File? {

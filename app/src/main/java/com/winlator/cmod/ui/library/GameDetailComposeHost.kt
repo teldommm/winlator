@@ -451,6 +451,7 @@ private fun StatChips(stats: GameStats, modifier: Modifier = Modifier) {
             if (stats.playCount > 0) add(StatEntry(Icons.Outlined.SportsEsports, "Plays", stats.playCount.toString()))
             if (stats.lastPlayedMillis > 0L) add(StatEntry(Icons.Outlined.History, "Last played", formatLastPlayed(stats.lastPlayedMillis)))
             stats.sizeText?.let { add(StatEntry(Icons.Outlined.Storage, "Size", it)) }
+            stats.savesSizeText?.let { add(StatEntry(Icons.Outlined.Folder, "Saves", it)) }
         }
     }
     if (entries.isEmpty()) return

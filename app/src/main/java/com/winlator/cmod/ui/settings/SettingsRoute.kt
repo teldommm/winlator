@@ -33,6 +33,7 @@ import com.winlator.cmod.core.FileUtils
 import com.winlator.cmod.core.LosslessDll
 import com.winlator.cmod.core.PreloaderDialog
 import com.winlator.cmod.core.RemoteSources
+import com.winlator.cmod.container.SaveProfiles
 import com.winlator.cmod.fexcore.FEXCoreEditPresetDialog
 import com.winlator.cmod.fexcore.FEXCorePreset
 import com.winlator.cmod.fexcore.FEXCorePresetManager
@@ -171,6 +172,7 @@ internal class SettingsScreenState(
             preferences.getBoolean("animated_artwork", true),
             preferences.getBoolean("remove_loading_bar_when_booting_games", false),
             preferences.getBoolean("game_saves_all_shortcuts", false),
+            preferences.getBoolean(SaveProfiles.PREF_ENABLED, SaveProfiles.DEFAULT_ENABLED),
             preferences.getBoolean("enable_wine_debug", false),
             preferences.getString("wine_debug_channels", AppDefaults.DEFAULT_WINE_DEBUG_CHANNELS)
                 ?: AppDefaults.DEFAULT_WINE_DEBUG_CHANNELS,

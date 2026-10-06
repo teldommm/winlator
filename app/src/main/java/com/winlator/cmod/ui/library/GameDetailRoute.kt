@@ -58,8 +58,10 @@ fun GameDetailRoute(shortcutPath: String, onClose: () -> Unit, onLibraryChanged:
     // Playtime / plays / last launch first (cheap), the folder size once it has been measured.
     val stats by produceState(GameStats(), shortcut, refreshTick) {
         val basic = withContext(Dispatchers.IO) { GameStatsLoader.load(activity, shortcut) }
-        value = basic.copy(sizeText = value.sizeText)
-        value = basic.copy(sizeText = withContext(Dispatchers.IO) { GameStatsLoader.sizeText(activity, shortcut) })
+        value = basic.copy(sizeText = value.sizeText, savesSizeText = value.savesSizeText)
+        val saves = withContext(Dispatchers.IO) { GameStatsLoader.savesSizeText(activity, shortcut) }
+        value = value.copy(savesSizeText = saves)
+        value = value.copy(sizeText = withContext(Dispatchers.IO) { GameStatsLoader.sizeText(activity, shortcut) })
     }
     val homePinned by produceState(false, shortcut, refreshTick, pinTick) {
         value = withContext(Dispatchers.IO) { HomeShortcuts.isPinned(activity, shortcut) }
@@ -147,6 +149,7 @@ fun GameDetailRoute(shortcutPath: String, onClose: () -> Unit, onLibraryChanged:
                             onLibraryChanged()
                             onClose()
                             WinToast.show(activity, "Shortcut removed", Toast.LENGTH_SHORT)
+                            SaveProfileCleanup.offerDelete(activity, shortcut)
                         } else {
                             WinToast.show(activity, "Couldn't remove shortcut", Toast.LENGTH_LONG)
                         }

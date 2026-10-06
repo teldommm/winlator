@@ -228,6 +228,8 @@ public class Shortcut {
 
     public boolean cloneToContainer(Container newContainer) {
         try {
+            // The copy carries the same save profile id, so the game keeps its saves in the other container.
+            SaveProfiles.ensureId(this);
             File newShortcutFile = new File(newContainer.getDesktopDir(), this.file.getName());
             ArrayList<String> lines = FileUtils.readLines(this.file);
             StringBuilder updatedContent = new StringBuilder();

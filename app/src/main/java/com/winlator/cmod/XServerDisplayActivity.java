@@ -47,6 +47,7 @@ import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.ContainerFiles;
 import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.container.ContainerOverlay;
+import com.winlator.cmod.container.SaveProfiles;
 import com.winlator.cmod.container.SharedComponents;
 import com.winlator.cmod.container.Shortcut;
 import com.winlator.cmod.contentdialog.DXVKConfig;
@@ -677,6 +678,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
             Executors.newSingleThreadExecutor().execute(() -> {
                 if (!prepareContainerOverlay()) return;
+                // Before Wine starts: link this game's save profile (Winlator/saves) into the container.
+                SaveProfiles.apply(this, container, shortcut);
                 setupWineSystemFiles();
                 extractGraphicsDriverFiles();
                 changeWineAudioDriver();
