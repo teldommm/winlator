@@ -6,12 +6,12 @@
     android:height="28dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-    <!-- Scaled to 18/24 around the centre: about the size of the power icon on the Exit face. -->
+    <!-- Scaled to 21/24 around the centre: between the full-size disc and the power icon on the Exit face. -->
     <group
         android:pivotX="12"
         android:pivotY="12"
-        android:scaleX="0.75"
-        android:scaleY="0.75">
+        android:scaleX="0.875"
+        android:scaleY="0.875">
         <path
             android:fillColor="#40C4FF"
             android:fillType="evenOdd"
