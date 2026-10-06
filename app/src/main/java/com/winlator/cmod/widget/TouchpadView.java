@@ -292,13 +292,13 @@ public class TouchpadView extends View {
 
     private void handleStylusLeftClick(MotionEvent event) {
         float[] transformedPoint = XForm.transformPoint(xform, event.getX(), event.getY());
-        xServer.injectPointerMove((int) transformedPoint[0], (int) transformedPoint[1]);
+        xServer.injectPointerWarp((int) transformedPoint[0], (int) transformedPoint[1]);
         xServer.injectPointerButtonPress(Pointer.Button.BUTTON_LEFT);
     }
 
     private void handleStylusRightClick(MotionEvent event) {
         float[] transformedPoint = XForm.transformPoint(xform, event.getX(), event.getY());
-        xServer.injectPointerMove((int) transformedPoint[0], (int) transformedPoint[1]);
+        xServer.injectPointerWarp((int) transformedPoint[0], (int) transformedPoint[1]);
         xServer.injectPointerButtonPress(Pointer.Button.BUTTON_RIGHT);
     }
 
@@ -497,7 +497,8 @@ public class TouchpadView extends View {
         lastTapX = x;
         lastTapY = y;
 
-        xServer.injectPointerMove(x, y);
+        // A new touch is a jump to a new spot, not movement: no raw (XI2) motion for it.
+        xServer.injectPointerWarp(x, y);
         // Tap to Click is the only switch for touch clicks, in both modes.
         if (tapToClickEnabled && !xServer.pointer.isButtonPressed(Pointer.Button.BUTTON_LEFT)) {
             xServer.injectPointerButtonPress(Pointer.Button.BUTTON_LEFT);

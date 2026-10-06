@@ -14,6 +14,7 @@ import com.winlator.cmod.xserver.extensions.MITSHMExtension;
 import com.winlator.cmod.xserver.extensions.PresentExtension;
 import com.winlator.cmod.xserver.extensions.RandrExtension;
 import com.winlator.cmod.xserver.extensions.SyncExtension;
+import com.winlator.cmod.xserver.extensions.XInputExtension;
 
 import com.winlator.cmod.xserver.extensions.XCompositeExtension;
 import java.nio.charset.Charset;
@@ -49,6 +50,13 @@ public class XServer {
     private int surfaceFormat = Drawable.HAL_PIXEL_FORMAT_BGRA_8888;
     private XServerRendererView xServerView;
     private XClient grabbingClient = null;
+    private XInputExtension xInputExtension;
+    /* Last absolute position reported by an absolute input source (touchscreen, stylus, uncaptured
+     * mouse). Raw (XI2) motion for these sources is the device's own movement, measured from here,
+     * so cursor warps by the application and CursorLocker never leak into raw input. */
+    private boolean absolutePointerAnchored = false;
+    private int absolutePointerX;
+    private int absolutePointerY;
 
     public XServer(ScreenInfo screenInfo, String surfaceFormat) {
         this.screenInfo = screenInfo;
@@ -174,16 +182,40 @@ public class XServer {
         return null;
     }
 
+    /** Continuous movement of an absolute input source: also reported as raw (XI2) motion. */
     public void injectPointerMove(int x, int y) {
         try (XLock lock = lock(Lockable.WINDOW_MANAGER, Lockable.INPUT_DEVICE)) {
+            if (absolutePointerAnchored) xInputExtension.sendRawMotion(x - absolutePointerX, y - absolutePointerY);
+            setAbsolutePointerAnchor(x, y);
             pointer.setPosition(x, y);
         }
     }
 
+    /**
+     * Jump of an absolute input source to a new position (a finger or the stylus touching down
+     * somewhere else): moves the cursor without raw (XI2) motion, so games reading raw input do
+     * not see the jump as a sudden flick.
+     */
+    public void injectPointerWarp(int x, int y) {
+        try (XLock lock = lock(Lockable.WINDOW_MANAGER, Lockable.INPUT_DEVICE)) {
+            setAbsolutePointerAnchor(x, y);
+            pointer.setPosition(x, y);
+        }
+    }
+
+    /** Relative movement (touchpad, captured mouse, stick): the delta is the raw (XI2) motion. */
     public void injectPointerMoveDelta(int dx, int dy) {
         try (XLock lock = lock(Lockable.WINDOW_MANAGER, Lockable.INPUT_DEVICE)) {
+            xInputExtension.sendRawMotion(dx, dy);
+            absolutePointerAnchored = false;
             pointer.setPosition(pointer.getX() + dx, pointer.getY() + dy);
         }
+    }
+
+    private void setAbsolutePointerAnchor(int x, int y) {
+        absolutePointerAnchored = true;
+        absolutePointerX = x;
+        absolutePointerY = y;
     }
 
     public void injectPointerButtonPress(Pointer.Button buttonCode) {
@@ -223,6 +255,12 @@ public class XServer {
         extensions.put(SyncExtension.MAJOR_OPCODE, new SyncExtension(this));
         extensions.put(GLXExtension.MAJOR_OPCODE, new GLXExtension(this));
         extensions.put(XCompositeExtension.MAJOR_OPCODE, new XCompositeExtension(this));
+        xInputExtension = new XInputExtension(this);
+        extensions.put(XInputExtension.MAJOR_OPCODE, xInputExtension);
+    }
+
+    public XInputExtension getXInputExtension() {
+        return xInputExtension;
     }
 
     public <T extends Extension> T getExtension(int opcode) {
