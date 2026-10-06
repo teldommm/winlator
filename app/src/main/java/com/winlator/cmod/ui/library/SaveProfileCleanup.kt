@@ -13,7 +13,7 @@ import com.winlator.cmod.ui.toast.WinToast
 object SaveProfileCleanup {
     @JvmStatic
     fun offerDelete(activity: AppCompatActivity, shortcut: Shortcut) {
-        if (!SaveProfiles.isEnabled(activity) || SaveProfiles.isShared(shortcut)) return
+        if (!SaveProfiles.isOwn(shortcut)) return
         Thread {
             val dir = SaveProfiles.findProfileDir(shortcut) ?: return@Thread
             if (SaveProfiles.isUsedByOtherShortcut(activity, shortcut)) return@Thread
@@ -22,7 +22,7 @@ object SaveProfileCleanup {
                 ThemedAlertHost.confirm(
                     activity,
                     "Delete saves too?",
-                    "${shortcut.name} keeps its saves in ${SaveProfiles.displayPath(dir)}. Delete them as well?",
+                    "${shortcut.name} keeps its saves in ${SaveProfiles.displayPath(dir)}. If you keep them, the game picks them up again when it is added back. Delete them as well?",
                     "Delete",
                     Runnable {
                         Thread {

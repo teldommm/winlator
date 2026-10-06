@@ -170,7 +170,7 @@ private class ShortcutEditorStateV2(val shortcut: Shortcut) {
     val arm64 = container.getWineVersion().contains("arm64ec", true)
 
     var name by mutableStateOf(shortcut.name)
-    var saveProfileShared by mutableStateOf(SaveProfiles.isShared(shortcut))
+    var saveProfileMode by mutableStateOf(SaveProfiles.getMode(shortcut))
     var screen by mutableStateOf(normalizeResolution(shortcut.getExtra("screenSize", container.getScreenSize())))
     var renderer by mutableStateOf("Vulkan")
     var presentMode by mutableStateOf(shortcut.getRendererPresentMode())
@@ -715,14 +715,17 @@ private fun ShortcutCategoryV2(
                         }
                     }
                 }
-                if (SaveProfiles.isEnabled(context)) {
-                    SettingsDivider()
-                    val ownLabel = "Own (Winlator/saves)"
-                    val sharedLabel = "Shared (_Common)"
-                    SettingChoice("Save profile", if (s.saveProfileShared) sharedLabel else ownLabel, listOf(ownLabel, sharedLabel)) {
-                        s.saveProfileShared = it == sharedLabel
-                        SaveProfiles.setShared(s.shortcut, s.saveProfileShared)
-                    }
+                SettingsDivider()
+                // Off: saves stay in the container. Own: Winlator/saves/<Game>. Shared: Winlator/saves/_Common.
+                val saveProfileLabels = linkedMapOf(
+                    SaveProfiles.MODE_OFF to "Off",
+                    SaveProfiles.MODE_OWN to "Own folder",
+                    SaveProfiles.MODE_SHARED to "Shared (_Common)"
+                )
+                SettingChoice("Save profile", saveProfileLabels[s.saveProfileMode] ?: "Off", saveProfileLabels.values.toList()) { selected ->
+                    val mode = saveProfileLabels.entries.firstOrNull { it.value == selected }?.key ?: SaveProfiles.MODE_OFF
+                    s.saveProfileMode = mode
+                    SaveProfiles.setMode(s.shortcut, mode)
                 }
                 SettingsDivider()
                 Button(

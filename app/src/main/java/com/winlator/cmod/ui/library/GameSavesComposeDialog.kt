@@ -84,7 +84,7 @@ import java.util.Date
 import java.util.Locale
 
 // "Game saves" window of a game (the Saves button on the game page): its save folder in
-// Winlator/saves (when save profiles are on) with a shortcut to open it, where its save files were
+// Winlator/saves (when the shortcut has a save profile) with a shortcut to open it, where its save files were
 // found, the latest backup, the automatic-backup switch and Back up / Restore.
 // Hosted like WinlatorServicesDialog: a ComposeView added onto the activity's content root, so it
 // shares the themed dialog shell and scrim of every other window in the app.
@@ -191,7 +191,7 @@ private fun ColumnScope.GameSavesPanel(
     var autoBackup by remember { mutableStateOf(GameSaveManager.isAutoBackupEnabled(shortcut)) }
     var latest by remember { mutableStateOf(GameSaveManager.getLatestBackup(shortcut)) }
     var message by remember { mutableStateOf<String?>(null) }
-    val profilesEnabled = remember { SaveProfiles.isEnabled(activity) }
+    val profilesEnabled = remember(shortcut.file.path) { SaveProfiles.isEnabled(shortcut) }
     val profileShared = remember(shortcut.file.path) { SaveProfiles.isShared(shortcut) }
     var profileDir by remember(shortcut.file.path) { mutableStateOf<File?>(null) }
 
@@ -279,6 +279,15 @@ private fun ColumnScope.GameSavesPanel(
             modifier = Modifier.verticalScroll(rememberScrollState()).padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            if (!profilesEnabled) {
+                SavesLabel("Save folder")
+                Text(
+                    "In the container. Set Save profile in Configure → General to keep them in Winlator/saves.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                HorizontalDivider(color = dividerColor())
+            }
             if (profilesEnabled) {
                 SavesLabel("Save folder")
                 Text(

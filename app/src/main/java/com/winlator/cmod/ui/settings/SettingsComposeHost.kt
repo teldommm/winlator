@@ -96,7 +96,6 @@ import kotlin.math.roundToInt
 import com.winlator.cmod.ui.theme.WinZShapes
 import com.winlator.cmod.ui.theme.hairlineColor
 import com.winlator.cmod.core.RemoteSources
-import com.winlator.cmod.container.SaveProfiles
 import com.winlator.cmod.ui.theme.dividerColor
 
 @Immutable
@@ -124,7 +123,6 @@ data class SettingsModel(
     val animatedArtwork: Boolean,
     val removeLoadingBar: Boolean,
     val gameSavesAllShortcuts: Boolean,
-    val saveProfiles: Boolean,
     val wineDebug: Boolean,
     val wineDebugChannels: String,
     val winlatorLogs: Boolean,
@@ -298,12 +296,6 @@ internal fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) 
                     ToggleRow(stringResource(R.string.remove_loading_bar_when_booting_games), model.removeLoadingBar) { callbacks.onBooleanChanged("remove_loading_bar_when_booting_games", it) }
                     GroupDivider()
                     ToggleRow("Back up saves of all games", model.gameSavesAllShortcuts) { callbacks.onBooleanChanged("game_saves_all_shortcuts", it) }
-                    GroupDivider()
-                    ToggleRow(
-                        "Store saves in Winlator/saves",
-                        model.saveProfiles,
-                        "Each game keeps its saves in its own folder in shared storage; they stay when the container changes"
-                    ) { callbacks.onBooleanChanged(SaveProfiles.PREF_ENABLED, it) }
                 }
             }
 

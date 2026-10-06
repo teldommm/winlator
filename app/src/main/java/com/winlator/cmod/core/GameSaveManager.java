@@ -7,6 +7,7 @@ import android.util.Log;
 import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.container.SaveProfiles;
+import com.winlator.cmod.container.SaveRegistry;
 import com.winlator.cmod.container.Shortcut;
 import com.winlator.cmod.xenvironment.ImageFs;
 
@@ -38,16 +39,15 @@ import java.util.zip.ZipOutputStream;
  *
  * Backups live beside the public artwork directories:
  *   /storage/emulated/0/Winlator/Backups/<Game Name>/
- * (Winlator/Saves is the live save storage of SaveProfiles; backups made there before are moved
- * over once, see migrateLegacyBackups.)
  *
  * Save locations are discovered under the Wine user's common save roots, then persisted in
  * save.json so discovery only has to succeed once. Automatic backups are intentionally scoped:
  * if no per-game root is known they do nothing instead of archiving the whole Wine profile.
  *
- * With save profiles on, the "Wine profile" read and restored here is the game's own folder in
- * Winlator/saves (same relative layout: AppData, Documents, Saved Games, ...), not the
- * container's users folder, whose save folders are only links into whichever game ran last.
+ * For a shortcut with a save profile (own/shared), the "Wine profile" read and restored here is
+ * its folder in Winlator/saves (same relative layout: AppData, Documents, Saved Games, ...). For a
+ * shortcut without one it is the container's users folder; when another game's profile is still
+ * linked there, the container's own folders are put back first (SaveProfiles.prepareLocal).
  */
 public final class GameSaveManager {
     private static final String TAG = "GameSaveManager";
@@ -72,8 +72,6 @@ public final class GameSaveManager {
             "AppData/Roaming/FLT",
             "AppData/Roaming/GSE Saves/settings"
     };
-
-    private static boolean legacyChecked;
 
     private GameSaveManager() {}
 
@@ -120,38 +118,7 @@ public final class GameSaveManager {
     }
 
     public static File getGameDir(Shortcut shortcut) {
-        migrateLegacyBackups();
         return new File(getBackupsRoot(), sanitize(shortcut.name));
-    }
-
-    /**
-     * Backups used to live in Winlator/Saves/<Game>/, which is now SaveProfiles' live storage
-     * (shared storage is case-insensitive, so Saves and saves are the same folder). Moves the
-     * archives and save.json of such folders to Winlator/Backups/<Game>/ once per process.
-     * Save profile folders (they carry .profile.json) are left alone.
-     */
-    public static synchronized void migrateLegacyBackups() {
-        if (legacyChecked) return;
-        legacyChecked = true;
-        File legacy = new File(Environment.getExternalStorageDirectory(), "Winlator/Saves");
-        File[] dirs = legacy.listFiles(File::isDirectory);
-        if (dirs == null) return;
-        for (File dir : dirs) {
-            if (new File(dir, SaveProfiles.META_FILE).exists()) continue;
-            File[] files = dir.listFiles(f -> f.isFile() && (f.getName().toLowerCase(Locale.ROOT).endsWith(".zip")
-                    || f.getName().equals(MAP_FILE)));
-            if (files == null || files.length == 0) continue;
-            File dst = new File(getBackupsRoot(), dir.getName());
-            if (!dst.isDirectory() && !dst.mkdirs()) continue;
-            for (File file : files) {
-                File out = new File(dst, file.getName());
-                if (out.exists()) continue;
-                if (!file.renameTo(out) && FileUtils.copy(file, out)) file.delete();
-            }
-            String[] left = dir.list();
-            if (left != null && left.length == 0) dir.delete();
-            Log.i(TAG, "Moved old backups of " + dir.getName() + " to " + dst);
-        }
     }
 
     public static boolean isEnabled(Shortcut shortcut) {
@@ -240,6 +207,8 @@ public final class GameSaveManager {
                         effectiveRoots.add(identityRoot);
                     }
                 }
+                // Save profile: the game's registry keys sit beside its folders.
+                if (new File(profile, SaveRegistry.FILE).isFile()) effectiveRoots.add(SaveRegistry.FILE);
             }
 
             int count = writeZip(profile, effectiveRoots, tmp);
@@ -325,15 +294,15 @@ public final class GameSaveManager {
     }
 
     /**
-     * Where the game's save roots are resolved: its save profile when save profiles are on (null if
-     * it has none yet and create is false), else the container's Wine user folder.
+     * Where the game's save roots are resolved: its save profile when it has one (null if not
+     * created yet and create is false), else the container's Wine user folder.
      */
     private static File profileDir(Shortcut shortcut, boolean create) {
-        Context context = shortcut.container != null && shortcut.container.getManager() != null
-                ? shortcut.container.getManager().getContext() : null;
-        if (SaveProfiles.isEnabled(context)) {
+        if (SaveProfiles.isEnabled(shortcut)) {
             return create ? SaveProfiles.obtainProfileDir(shortcut) : SaveProfiles.findProfileDir(shortcut);
         }
+        // Mode off: the saves are the container's own folders (set aside while a profile is linked).
+        if (ProcessHelper.listRunningWineProcesses().isEmpty()) SaveProfiles.prepareLocal(shortcut.container);
         return new File(shortcut.container.getRootDir(), ".wine/drive_c/users/" + ImageFs.USER);
     }
 

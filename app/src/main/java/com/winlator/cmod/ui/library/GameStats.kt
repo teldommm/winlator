@@ -64,10 +64,10 @@ object GameStatsLoader {
         return text
     }
 
-    // Size of the game's save profile (Winlator/saves/<Game>). Null when the feature is off, the
-    // game uses the shared profile, or nothing has been saved yet. Call off the main thread.
+    // Size of the game's own save profile (Winlator/saves/<Game>). Null when the shortcut has none
+    // (off or shared), or nothing has been saved yet. Call off the main thread.
     fun savesSizeText(context: Context, shortcut: Shortcut): String? {
-        if (!SaveProfiles.isEnabled(context) || SaveProfiles.isShared(shortcut)) return null
+        if (!SaveProfiles.isOwn(shortcut)) return null
         val dir = SaveProfiles.findProfileDir(shortcut) ?: return null
         val (bytes, truncated) = folderSize(dir)
         return if (bytes > 0L) formatBinarySize(bytes) + if (truncated) "+" else "" else null

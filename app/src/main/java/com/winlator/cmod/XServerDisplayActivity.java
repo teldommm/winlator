@@ -48,6 +48,7 @@ import com.winlator.cmod.container.ContainerFiles;
 import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.container.ContainerOverlay;
 import com.winlator.cmod.container.SaveProfiles;
+import com.winlator.cmod.container.SaveRegistry;
 import com.winlator.cmod.container.SharedComponents;
 import com.winlator.cmod.container.Shortcut;
 import com.winlator.cmod.contentdialog.DXVKConfig;
@@ -921,6 +922,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 }
             }
             // Wine is stopped by now, so the save files are no longer being written.
+            // The game's registry keys go to its save profile first, so a backup includes them.
+            SaveRegistry.finishSession(this);
             if (shortcut != null && GameSaveManager.shouldAutoBackup(this, shortcut)) {
                 GameSaveManager.BackupResult saveResult = GameSaveManager.backup(shortcut, true);
                 if (saveResult.ok) {
