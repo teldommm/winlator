@@ -1,10 +1,8 @@
 package com.winlator.cmod.core;
 
-import android.content.Context;
 import android.os.Environment;
 import android.util.Log;
 
-import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.container.SaveProfiles;
 import com.winlator.cmod.container.SaveRegistry;
@@ -35,7 +33,13 @@ import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 /**
- * Per-game save discovery, backup and restore.
+ * Per-game save backups: a history of save states, for rolling back a broken or unwanted save
+ * (the live saves are in the save profile or the container; a backup is a snapshot of them).
+ *
+ * Kinds (from the file name): manual "yyyy-MM-dd_HH-mm-ss.zip", kept until deleted; automatic
+ * "auto_....zip", made when the game exits if the per-shortcut switch is on and something changed
+ * since the newest backup, newest AUTO_KEEP kept; "before-restore_....zip", the saves as they were
+ * before a restore, newest few kept.
  *
  * Backups live beside the public artwork directories:
  *   /storage/emulated/0/Winlator/Backups/<Game Name>/
@@ -53,8 +57,32 @@ public final class GameSaveManager {
     private static final String TAG = "GameSaveManager";
     public static final String EXTRA_ENABLED = "gameSavesEnabled";
     public static final String EXTRA_AUTO_BACKUP = "autoSaveBackup";
-    public static final String PREF_ALL_SHORTCUTS = "game_saves_all_shortcuts";
-    private static final String AUTO_FILE = "auto-latest.zip";
+    /** Automatic backups (on game exit) keep the newest AUTO_KEEP; manual ones are never pruned. */
+    private static final String AUTO_PREFIX = "auto_";
+    private static final String BEFORE_RESTORE_PREFIX = "before-restore_";
+    private static final String LEGACY_AUTO_FILE = "auto-latest.zip";
+    public static final int AUTO_KEEP = 5;
+    private static final int BEFORE_RESTORE_KEEP = 3;
+
+    public static final String KIND_MANUAL = "manual";
+    public static final String KIND_AUTO = "auto";
+    public static final String KIND_BEFORE_RESTORE = "before-restore";
+
+    /** Never part of a backup: whole folders by path (relative to the profile, lowercase)... */
+    private static final String[] NOISE_PATHS = {
+            "appdata/local/temp",
+            "appdata/local/microsoft",
+            "appdata/roaming/microsoft",
+            "appdata/locallow/microsoft",
+            "appdata/local/d3dscache",
+            "appdata/local/nvidia",
+            "appdata/local/amd",
+    };
+    /** ...and caches/crash data wherever they are, by folder name (lowercase). */
+    private static final Set<String> NOISE_NAMES = new HashSet<>(java.util.Arrays.asList(
+            "crashdumps", "crashes", "crashreports",
+            "shadercache", "gpucache", "code cache", "webcache", "dxcache"
+    ));
     private static final String MAP_FILE = "save.json";
     private static final int KEEP_THRESHOLD = 50;
 
@@ -141,26 +169,46 @@ public final class GameSaveManager {
         shortcut.saveData();
     }
 
-    public static boolean isGlobalAutoBackupEnabled(Context context) {
-        return PreferenceManager.getDefaultSharedPreferences(context)
-                .getBoolean(PREF_ALL_SHORTCUTS, false);
+    public static boolean shouldAutoBackup(Shortcut shortcut) {
+        return isAutoBackupEnabled(shortcut);
     }
 
-    public static boolean shouldAutoBackup(Context context, Shortcut shortcut) {
-        return isGlobalAutoBackupEnabled(context)
-                || (isEnabled(shortcut) && isAutoBackupEnabled(shortcut));
+    /** All backups of the game, newest first. */
+    public static List<File> listBackups(Shortcut shortcut) {
+        return listBackups(getGameDir(shortcut));
+    }
+
+    private static List<File> listBackups(File dir) {
+        File[] files = dir.listFiles((d, name) -> name.toLowerCase(Locale.ROOT).endsWith(".zip"));
+        if (files == null || files.length == 0) return new ArrayList<>();
+        List<File> list = new ArrayList<>(java.util.Arrays.asList(files));
+        list.sort((a, b) -> Long.compare(b.lastModified(), a.lastModified()));
+        return list;
     }
 
     public static File getLatestBackup(Shortcut shortcut) {
-        File dir = getGameDir(shortcut);
-        File[] files = dir.listFiles((d, name) -> name.toLowerCase(Locale.ROOT).endsWith(".zip")
-                && !name.endsWith(".tmp"));
-        if (files == null || files.length == 0) return null;
-        File latest = files[0];
-        for (int i = 1; i < files.length; i++) {
-            if (files[i].lastModified() > latest.lastModified()) latest = files[i];
+        List<File> list = listBackups(shortcut);
+        return list.isEmpty() ? null : list.get(0);
+    }
+
+    /** manual, auto or before-restore, from the file name. */
+    public static String kindOf(File backup) {
+        String name = backup.getName();
+        if (name.startsWith(AUTO_PREFIX) || name.equals(LEGACY_AUTO_FILE)) return KIND_AUTO;
+        if (name.startsWith(BEFORE_RESTORE_PREFIX)) return KIND_BEFORE_RESTORE;
+        return KIND_MANUAL;
+    }
+
+    /** Keeps the backups folder with the game when its shortcut is renamed. */
+    public static void onShortcutRenamed(String oldName, String newName) {
+        File from = new File(getBackupsRoot(), sanitize(oldName));
+        File to = new File(getBackupsRoot(), sanitize(newName));
+        if (!from.isDirectory() || from.getName().equalsIgnoreCase(to.getName())) return;
+        if (to.exists()) {
+            Log.w(TAG, "Backups of " + newName + " already exist, keeping " + from.getName());
+            return;
         }
-        return latest;
+        if (!from.renameTo(to)) Log.w(TAG, "Could not rename backups " + from + " -> " + to);
     }
 
     public static List<String> getSaveRoots(Shortcut shortcut) {
@@ -176,6 +224,16 @@ public final class GameSaveManager {
     }
 
     public static BackupResult backup(Shortcut shortcut, boolean automatic) {
+        return backup(shortcut, automatic ? KIND_AUTO : KIND_MANUAL, null);
+    }
+
+    /**
+     * kind: manual (kept forever), auto (game exit; skipped when nothing changed since the newest
+     * backup, newest AUTO_KEEP kept) or before-restore (safety copy; newest few kept).
+     * protect: a backup that pruning must not delete (the one about to be restored).
+     */
+    private static BackupResult backup(Shortcut shortcut, String kind, File protect) {
+        boolean automatic = KIND_AUTO.equals(kind);
         try {
             File profile = profileDir(shortcut, false);
             if (profile == null || !profile.isDirectory()) {
@@ -183,43 +241,53 @@ public final class GameSaveManager {
                         profile == null ? "No save folder yet: start the game once" : "Wine profile not found");
             }
 
-            List<String> roots = getSaveRoots(shortcut);
-            boolean wholeProfile = roots.isEmpty();
-            if (automatic && wholeProfile) {
-                return new BackupResult(false, null, 0, false, "No per-game save location detected");
-            }
-
-            File gameDir = getGameDir(shortcut);
-            if (!gameDir.exists() && !gameDir.mkdirs()) {
-                return new BackupResult(false, null, 0, wholeProfile, "Could not create save folder");
-            }
-
-            File out = automatic
-                    ? new File(gameDir, AUTO_FILE)
-                    : new File(gameDir, sanitize(shortcut.name) + "_" + System.currentTimeMillis() + ".zip");
-            File tmp = new File(gameDir, out.getName() + ".tmp");
-            if (tmp.exists()) tmp.delete();
-
-            List<String> effectiveRoots = wholeProfile ? null : new ArrayList<>(roots);
-            if (effectiveRoots != null) {
-                for (String identityRoot : IDENTITY_ROOTS) {
-                    if (new File(profile, identityRoot).exists() && !effectiveRoots.contains(identityRoot)) {
-                        effectiveRoots.add(identityRoot);
-                    }
+            // A game's own save profile holds only that game: all of it (minus caches) is its saves.
+            // Shared and container folders hold other games too: only the detected save folders.
+            boolean ownProfile = SaveProfiles.isOwn(shortcut);
+            List<String> effectiveRoots = null;
+            boolean wholeProfile = false;
+            if (!ownProfile) {
+                List<String> roots = getSaveRoots(shortcut);
+                wholeProfile = roots.isEmpty();
+                if (automatic && wholeProfile) {
+                    return new BackupResult(false, null, 0, false, "No per-game save location detected");
                 }
-                // Save profile: the game's registry keys sit beside its folders.
-                if (new File(profile, SaveRegistry.FILE).isFile()) effectiveRoots.add(SaveRegistry.FILE);
+                if (!wholeProfile) {
+                    effectiveRoots = new ArrayList<>(roots);
+                    for (String identityRoot : IDENTITY_ROOTS) {
+                        if (new File(profile, identityRoot).exists() && !effectiveRoots.contains(identityRoot)) {
+                            effectiveRoots.add(identityRoot);
+                        }
+                    }
+                    if (new File(profile, SaveRegistry.FILE).isFile()) effectiveRoots.add(SaveRegistry.FILE);
+                }
             }
 
-            int count = writeZip(profile, effectiveRoots, tmp);
-            if (count == 0) {
-                tmp.delete();
+            List<File> files = collectFiles(profile, effectiveRoots);
+            if (files.isEmpty()) {
                 return new BackupResult(false, null, 0, wholeProfile, "No save files to back up");
             }
 
-            if (out.exists() && !out.delete()) {
+            File gameDir = getGameDir(shortcut);
+            if (automatic) {
+                File newest = getLatestBackup(shortcut);
+                if (newest != null && !hasChangesSince(files, newest.lastModified())) {
+                    return new BackupResult(false, null, 0, false, "No changes since the last backup");
+                }
+            }
+            if (!gameDir.exists() && !gameDir.mkdirs()) {
+                return new BackupResult(false, null, 0, wholeProfile, "Could not create backup folder");
+            }
+
+            String prefix = automatic ? AUTO_PREFIX : KIND_BEFORE_RESTORE.equals(kind) ? BEFORE_RESTORE_PREFIX : "";
+            File out = uniqueBackupFile(gameDir, prefix);
+            File tmp = new File(gameDir, out.getName() + ".tmp");
+            if (tmp.exists()) tmp.delete();
+
+            int count = writeZip(profile, files, tmp);
+            if (count == 0) {
                 tmp.delete();
-                return new BackupResult(false, null, count, wholeProfile, "Could not replace previous backup");
+                return new BackupResult(false, null, 0, wholeProfile, "No save files to back up");
             }
             if (!tmp.renameTo(out)) {
                 FileUtils.copy(tmp, out);
@@ -229,6 +297,8 @@ public final class GameSaveManager {
                 return new BackupResult(false, null, count, wholeProfile, "Could not finish backup");
             }
 
+            if (automatic) prune(gameDir, KIND_AUTO, AUTO_KEEP, protect);
+            else if (KIND_BEFORE_RESTORE.equals(kind)) prune(gameDir, KIND_BEFORE_RESTORE, BEFORE_RESTORE_KEEP, protect);
             return new BackupResult(true, out.getAbsolutePath(), count, wholeProfile, null);
         } catch (Exception e) {
             Log.e(TAG, "Backup failed", e);
@@ -237,9 +307,39 @@ public final class GameSaveManager {
         }
     }
 
-    public static RestoreResult restoreLatest(Shortcut shortcut) {
-        File archive = getLatestBackup(shortcut);
-        if (archive == null) return new RestoreResult(false, 0, "No backup found");
+    private static File uniqueBackupFile(File dir, String prefix) {
+        String stamp = new java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(new java.util.Date());
+        File out = new File(dir, prefix + stamp + ".zip");
+        int n = 2;
+        while (out.exists()) out = new File(dir, prefix + stamp + "-" + n++ + ".zip");
+        return out;
+    }
+
+    private static boolean hasChangesSince(List<File> files, long since) {
+        for (File f : files) {
+            if (f.lastModified() > since) return true;
+        }
+        return false;
+    }
+
+    /** Deletes the oldest backups of one kind beyond keep (never "protect"). */
+    private static void prune(File dir, String kind, int keep, File protect) {
+        int kept = 0;
+        for (File f : listBackups(dir)) {
+            if (!kind.equals(kindOf(f))) continue;
+            if (protect != null && f.equals(protect)) continue;
+            if (++kept > keep && !f.delete()) Log.w(TAG, "Could not prune old backup " + f);
+        }
+    }
+
+    /**
+     * Restores one backup over the game's current saves (files in the backup replace the current
+     * ones; others are left alone). The current saves are kept first as a before-restore backup.
+     */
+    public static RestoreResult restore(Shortcut shortcut, File archive) {
+        if (archive == null || !archive.isFile()) return new RestoreResult(false, 0, "No backup found");
+        BackupResult safety = backup(shortcut, KIND_BEFORE_RESTORE, archive);
+        if (!safety.ok) Log.i(TAG, "No before-restore backup: " + safety.error);
 
         try {
             File profile = profileDir(shortcut, true);
@@ -255,7 +355,7 @@ public final class GameSaveManager {
                 ZipEntry entry;
                 while ((entry = zis.getNextEntry()) != null) {
                     String rel = remapArchiveEntry(entry.getName());
-                    if (rel == null || rel.isEmpty()) {
+                    if (rel == null || rel.isEmpty() || rel.equals(SaveProfiles.META_FILE)) {
                         zis.closeEntry();
                         continue;
                     }
@@ -280,6 +380,8 @@ public final class GameSaveManager {
                             int read;
                             while ((read = zis.read(buffer)) != -1) bos.write(buffer, 0, read);
                         }
+                        // Keep the saved time: games that pick the newest slot see the restored state.
+                        if (entry.getTime() > 0) out.setLastModified(entry.getTime());
                         written++;
                     }
                     zis.closeEntry();
@@ -306,7 +408,8 @@ public final class GameSaveManager {
         return new File(shortcut.container.getRootDir(), ".wine/drive_c/users/" + ImageFs.USER);
     }
 
-    private static int writeZip(File profile, List<String> roots, File out) throws IOException {
+    /** The files a backup of these roots (null: the whole profile) holds, caches excluded. */
+    private static List<File> collectFiles(File profile, List<String> roots) throws IOException {
         List<File> starts = new ArrayList<>();
         if (roots == null) {
             starts.add(profile);
@@ -320,27 +423,35 @@ public final class GameSaveManager {
             }
         }
 
-        int count = 0;
+        List<File> files = new ArrayList<>();
         Set<String> seen = new HashSet<>();
+        ArrayDeque<File> stack = new ArrayDeque<>(starts);
+        while (!stack.isEmpty()) {
+            File f = stack.removeLast();
+            if (!f.exists() || Files.isSymbolicLink(f.toPath())) continue;
+            String rel = relative(profile, f);
+            if (f.isDirectory()) {
+                if (isNoiseDir(rel)) continue;
+                File[] children = f.listFiles();
+                if (children != null) {
+                    for (File child : children) stack.addLast(child);
+                }
+                continue;
+            }
+            if (isFrontendShortcut(rel) || rel.equals(SaveProfiles.META_FILE)) continue;
+            if (seen.add(rel)) files.add(f);
+        }
+        return files;
+    }
+
+    private static int writeZip(File profile, List<File> files, File out) throws IOException {
+        int count = 0;
         try (ZipOutputStream zos = new ZipOutputStream(
                 new BufferedOutputStream(new FileOutputStream(out)))) {
-            ArrayDeque<File> stack = new ArrayDeque<>(starts);
-            while (!stack.isEmpty()) {
-                File f = stack.removeLast();
-                if (!f.exists() || Files.isSymbolicLink(f.toPath())) continue;
-                String rel = relative(profile, f);
-                if (f.isDirectory()) {
-                    if (isNoiseDir(rel)) continue;
-                    File[] children = f.listFiles();
-                    if (children != null) {
-                        for (File child : children) stack.addLast(child);
-                    }
-                    continue;
-                }
-                if (isFrontendShortcut(rel)) continue;
-                if (!seen.add(rel)) continue;
-
-                zos.putNextEntry(new ZipEntry(rel));
+            for (File f : files) {
+                ZipEntry entry = new ZipEntry(relative(profile, f));
+                entry.setTime(f.lastModified());
+                zos.putNextEntry(entry);
                 try (BufferedInputStream in = new BufferedInputStream(new FileInputStream(f))) {
                     byte[] buffer = new byte[64 * 1024];
                     int read;
@@ -506,10 +617,11 @@ public final class GameSaveManager {
 
     private static boolean isNoiseDir(String rel) {
         String p = rel.replace('\\', '/').toLowerCase(Locale.ROOT);
-        return p.equals("appdata/local/temp")
-                || p.startsWith("appdata/local/temp/")
-                || p.equals("appdata/local/crashdumps")
-                || p.startsWith("appdata/local/crashdumps/");
+        for (String noise : NOISE_PATHS) {
+            if (p.equals(noise) || p.startsWith(noise + "/")) return true;
+        }
+        int slash = p.lastIndexOf('/');
+        return NOISE_NAMES.contains(slash >= 0 ? p.substring(slash + 1) : p);
     }
 
     private static boolean isFrontendShortcut(String rel) {

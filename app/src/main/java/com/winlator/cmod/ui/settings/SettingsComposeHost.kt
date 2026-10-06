@@ -122,7 +122,6 @@ data class SettingsModel(
     val autoDownloadArtwork: Boolean,
     val animatedArtwork: Boolean,
     val removeLoadingBar: Boolean,
-    val gameSavesAllShortcuts: Boolean,
     val wineDebug: Boolean,
     val wineDebugChannels: String,
     val winlatorLogs: Boolean,
@@ -294,8 +293,6 @@ internal fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) 
                     ToggleRow(stringResource(R.string.high_refresh_rate), model.highRefreshRate) { callbacks.onBooleanChanged("high_refresh_rate_mode", it) }
                     GroupDivider()
                     ToggleRow(stringResource(R.string.remove_loading_bar_when_booting_games), model.removeLoadingBar) { callbacks.onBooleanChanged("remove_loading_bar_when_booting_games", it) }
-                    GroupDivider()
-                    ToggleRow("Back up saves of all games", model.gameSavesAllShortcuts) { callbacks.onBooleanChanged("game_saves_all_shortcuts", it) }
                 }
             }
 

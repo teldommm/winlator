@@ -170,7 +170,6 @@ internal class SettingsScreenState(
             preferences.getBoolean("auto_download_artwork", true),
             preferences.getBoolean("animated_artwork", true),
             preferences.getBoolean("remove_loading_bar_when_booting_games", false),
-            preferences.getBoolean("game_saves_all_shortcuts", false),
             preferences.getBoolean("enable_wine_debug", false),
             preferences.getString("wine_debug_channels", AppDefaults.DEFAULT_WINE_DEBUG_CHANNELS)
                 ?: AppDefaults.DEFAULT_WINE_DEBUG_CHANNELS,

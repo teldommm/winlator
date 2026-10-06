@@ -85,6 +85,7 @@ import com.winlator.cmod.container.Container
 import com.winlator.cmod.container.ContainerManager
 import com.winlator.cmod.container.SaveProfiles
 import com.winlator.cmod.container.Shortcut
+import com.winlator.cmod.core.GameSaveManager
 import com.winlator.cmod.core.DefaultVersion
 import com.winlator.cmod.core.FileUtils
 import com.winlator.cmod.core.GPUInformation
@@ -516,7 +517,11 @@ internal fun ShortcutEditorV2(
         if (rename is ShortcutRenameResult.Renamed) {
             // The save profile folder follows the shortcut's name (it is found by id, not by name).
             val newName = rename.newName
-            Thread { SaveProfiles.onShortcutRenamed(shortcut, newName) }.start()
+            val oldName = shortcut.name
+            Thread {
+                SaveProfiles.onShortcutRenamed(shortcut, newName)
+                GameSaveManager.onShortcutRenamed(oldName, newName)
+            }.start()
         }
         onShortcutsChanged()
         close()

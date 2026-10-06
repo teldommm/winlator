@@ -157,10 +157,10 @@ object GameSavesComposeDialog {
 }
 
 /**
- * Restoring replaces the game's current save files with the latest backup, so it is confirmed
- * first (same confirmation window as removing a game). Shared with the shortcut editor.
+ * Restoring replaces the game's current save files with a backup, so it is confirmed first (same
+ * confirmation window as removing a game). The current saves are kept as a before-restore backup.
  */
-internal fun confirmGameSavesRestore(context: Context, gameName: String, onConfirm: () -> Unit) {
+internal fun confirmGameSavesRestore(context: Context, gameName: String, backupName: String, onConfirm: () -> Unit) {
     val activity = context as? AppCompatActivity
     if (activity == null) {
         onConfirm()
@@ -169,7 +169,7 @@ internal fun confirmGameSavesRestore(context: Context, gameName: String, onConfi
     ThemedAlertHost.confirm(
         activity,
         "Restore saves?",
-        "The latest backup replaces the current save files of $gameName.",
+        "The backup from $backupName replaces the current save files of $gameName. The current saves are kept as a before-restore backup.",
         "Restore",
         Runnable { onConfirm() },
         true
@@ -185,7 +185,7 @@ private fun ColumnScope.GameSavesPanel(
     onClose: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    val globalAutoBackup = GameSaveManager.isGlobalAutoBackupEnabled(activity)
+    val ownProfile = remember(shortcut.file.path) { SaveProfiles.isOwn(shortcut) }
     var roots by remember(shortcut.file.path) { mutableStateOf<List<String>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var autoBackup by remember { mutableStateOf(GameSaveManager.isAutoBackupEnabled(shortcut)) }
@@ -234,20 +234,42 @@ private fun ColumnScope.GameSavesPanel(
         }
     }
 
-    fun restoreNow() {
-        if (busy) return
-        confirmGameSavesRestore(activity, shortcut.name) {
+    fun restoreFrom(archive: File) {
+        confirmGameSavesRestore(activity, shortcut.name, backupTitle(archive)) {
             setBusy(true)
-            message = "Restoring latest backup…"
+            message = "Restoring backup…"
             scope.launch {
-                val result = withContext(Dispatchers.IO) { GameSaveManager.restoreLatest(shortcut) }
+                val result = withContext(Dispatchers.IO) { GameSaveManager.restore(shortcut, archive) }
+                latest = GameSaveManager.getLatestBackup(shortcut)
                 message = if (result.ok) {
-                    "Restored ${result.fileCount} files."
+                    "Restored ${result.fileCount} files. The previous saves were kept as a before-restore backup."
                 } else {
                     "Restore failed: ${result.error ?: "unknown error"}"
                 }
                 setBusy(false)
             }
+        }
+    }
+
+    // One backup: restore it. Several: pick one first (the newest may be the broken one).
+    fun restoreNow() {
+        if (busy) return
+        scope.launch {
+            val backups = withContext(Dispatchers.IO) { GameSaveManager.listBackups(shortcut) }
+            if (backups.isEmpty()) {
+                message = "No backup yet."
+                return@launch
+            }
+            val host = activity as? AppCompatActivity
+            if (backups.size == 1 || host == null) {
+                restoreFrom(backups[0])
+                return@launch
+            }
+            ThemedAlertHost.actions(
+                host,
+                "Restore which backup?",
+                backups.map { file -> ThemedAlertHost.ActionItem(backupTitle(file), Runnable { restoreFrom(file) }) }
+            )
         }
     }
 
@@ -318,8 +340,8 @@ private fun ColumnScope.GameSavesPanel(
             )
 
             HorizontalDivider(color = dividerColor())
-            val autoChecked = globalAutoBackup || autoBackup
-            val autoEnabled = !busy && !globalAutoBackup
+            val autoChecked = autoBackup
+            val autoEnabled = !busy
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -333,8 +355,7 @@ private fun ColumnScope.GameSavesPanel(
                 Column(Modifier.weight(1f).padding(end = 8.dp)) {
                     Text("Automatic backup", style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        if (globalAutoBackup) "Enabled for all games in Settings"
-                        else "Replace auto-latest.zip when the game exits",
+                        "When the game exits, if the saves changed. Keeps the last ${GameSaveManager.AUTO_KEEP}.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -350,6 +371,11 @@ private fun ColumnScope.GameSavesPanel(
             HorizontalDivider(color = dividerColor())
             SavesLabel("Save locations")
             when {
+                ownProfile -> Text(
+                    "Everything in the game's save folder (caches and crash dumps left out).",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 loading -> Row(verticalAlignment = Alignment.CenterVertically) {
                     CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = controlAccentColor())
                     Text(
@@ -367,7 +393,9 @@ private fun ColumnScope.GameSavesPanel(
                     Text("• $it", style = MaterialTheme.typography.bodySmall)
                 }
             }
-            SavesOutlinedButton("Rescan save locations", Modifier.fillMaxWidth(), enabled = !busy && !loading, icon = Icons.Outlined.Refresh) { rescan() }
+            if (!ownProfile) {
+                SavesOutlinedButton("Rescan save locations", Modifier.fillMaxWidth(), enabled = !busy && !loading, icon = Icons.Outlined.Refresh) { rescan() }
+            }
 
             message?.let {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -432,7 +460,15 @@ private fun SavesOutlinedButton(
     }
 }
 
-private fun backupLabel(file: File): String {
-    val date = SimpleDateFormat("dd MMM yyyy • HH:mm", Locale.getDefault()).format(Date(file.lastModified()))
-    return "${file.name}\n$date"
+private fun backupLabel(file: File): String = backupTitle(file)
+
+// "Automatic • 06 Oct 2026, 14:30" (kind from the file name, time from the file).
+private fun backupTitle(file: File): String {
+    val date = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date(file.lastModified()))
+    val kind = when (GameSaveManager.kindOf(file)) {
+        GameSaveManager.KIND_AUTO -> "Automatic"
+        GameSaveManager.KIND_BEFORE_RESTORE -> "Before restore"
+        else -> "Manual"
+    }
+    return "$kind • $date"
 }
