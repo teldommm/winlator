@@ -37,12 +37,13 @@ import java.util.zip.ZipOutputStream;
  * (the live saves are in the save profile or the container; a backup is a snapshot of them).
  *
  * Kinds (from the file name): manual "yyyy-MM-dd_HH-mm-ss.zip", kept until deleted; automatic
- * "auto_....zip", made when the game exits if the per-shortcut switch is on and something changed
- * since the newest backup, newest AUTO_KEEP kept; "before-restore_....zip", the saves as they were
+ * "auto_....zip", made when the game exits if the per-shortcut switch is on and the saves' content
+ * differs from the newest backup (path + size + CRC32 of every file, so rewriting a save with the
+ * same data or a log changing doesn't count, a deleted file does), newest AUTO_KEEP kept; "before-restore_....zip", the saves as they were
  * before a restore, newest few kept.
  *
  * Backups live beside the public artwork directories:
- *   /storage/emulated/0/Winlator/Backups/<Game Name>/
+ *   /storage/emulated/0/Winlator/backups/<Game Name>/
  *
  * Save locations are discovered under the Wine user's common save roots, then persisted in
  * save.json so discovery only has to succeed once. Automatic backups are intentionally scoped:
@@ -63,6 +64,8 @@ public final class GameSaveManager {
     private static final String LEGACY_AUTO_FILE = "auto-latest.zip";
     public static final int AUTO_KEEP = 5;
     private static final int BEFORE_RESTORE_KEEP = 3;
+    /** Content fingerprint (path, size, CRC32) of the saves as of the newest backup or restore. */
+    private static final String FINGERPRINT_FILE = ".fingerprint.json";
 
     public static final String KIND_MANUAL = "manual";
     public static final String KIND_AUTO = "auto";
@@ -80,7 +83,7 @@ public final class GameSaveManager {
     };
     /** ...and caches/crash data wherever they are, by folder name (lowercase). */
     private static final Set<String> NOISE_NAMES = new HashSet<>(java.util.Arrays.asList(
-            "crashdumps", "crashes", "crashreports",
+            "crashdumps", "crashes", "crashreports", "logs",
             "shadercache", "gpucache", "code cache", "webcache", "dxcache"
     ));
     private static final String MAP_FILE = "save.json";
@@ -142,7 +145,7 @@ public final class GameSaveManager {
     }
 
     public static File getBackupsRoot() {
-        return new File(Environment.getExternalStorageDirectory(), "Winlator/Backups");
+        return new File(Environment.getExternalStorageDirectory(), "Winlator/backups");
     }
 
     public static File getGameDir(Shortcut shortcut) {
@@ -243,24 +246,10 @@ public final class GameSaveManager {
 
             // A game's own save profile holds only that game: all of it (minus caches) is its saves.
             // Shared and container folders hold other games too: only the detected save folders.
-            boolean ownProfile = SaveProfiles.isOwn(shortcut);
-            List<String> effectiveRoots = null;
-            boolean wholeProfile = false;
-            if (!ownProfile) {
-                List<String> roots = getSaveRoots(shortcut);
-                wholeProfile = roots.isEmpty();
-                if (automatic && wholeProfile) {
-                    return new BackupResult(false, null, 0, false, "No per-game save location detected");
-                }
-                if (!wholeProfile) {
-                    effectiveRoots = new ArrayList<>(roots);
-                    for (String identityRoot : IDENTITY_ROOTS) {
-                        if (new File(profile, identityRoot).exists() && !effectiveRoots.contains(identityRoot)) {
-                            effectiveRoots.add(identityRoot);
-                        }
-                    }
-                    if (new File(profile, SaveRegistry.FILE).isFile()) effectiveRoots.add(SaveRegistry.FILE);
-                }
+            List<String> effectiveRoots = scopeRoots(shortcut, profile);
+            boolean wholeProfile = effectiveRoots == null && !SaveProfiles.isOwn(shortcut);
+            if (automatic && wholeProfile) {
+                return new BackupResult(false, null, 0, false, "No per-game save location detected");
             }
 
             List<File> files = collectFiles(profile, effectiveRoots);
@@ -269,11 +258,10 @@ public final class GameSaveManager {
             }
 
             File gameDir = getGameDir(shortcut);
-            if (automatic) {
-                File newest = getLatestBackup(shortcut);
-                if (newest != null && !hasChangesSince(files, newest.lastModified())) {
-                    return new BackupResult(false, null, 0, false, "No changes since the last backup");
-                }
+            Map<String, long[]> previous = loadFingerprint(gameDir);
+            Map<String, long[]> current = fingerprint(profile, files, previous);
+            if (automatic && !previous.isEmpty() && getLatestBackup(shortcut) != null && sameContent(previous, current)) {
+                return new BackupResult(false, null, 0, false, "No changes since the last backup");
             }
             if (!gameDir.exists() && !gameDir.mkdirs()) {
                 return new BackupResult(false, null, 0, wholeProfile, "Could not create backup folder");
@@ -297,6 +285,7 @@ public final class GameSaveManager {
                 return new BackupResult(false, null, count, wholeProfile, "Could not finish backup");
             }
 
+            saveFingerprint(gameDir, current);
             if (automatic) prune(gameDir, KIND_AUTO, AUTO_KEEP, protect);
             else if (KIND_BEFORE_RESTORE.equals(kind)) prune(gameDir, KIND_BEFORE_RESTORE, BEFORE_RESTORE_KEEP, protect);
             return new BackupResult(true, out.getAbsolutePath(), count, wholeProfile, null);
@@ -315,11 +304,100 @@ public final class GameSaveManager {
         return out;
     }
 
-    private static boolean hasChangesSince(List<File> files, long since) {
-        for (File f : files) {
-            if (f.lastModified() > since) return true;
+    /**
+     * What a backup of this game covers: null for everything in the profile (a game's own save
+     * profile, or nothing detected), else the detected save folders plus identity and registry.
+     */
+    private static List<String> scopeRoots(Shortcut shortcut, File profile) {
+        if (SaveProfiles.isOwn(shortcut)) return null;
+        List<String> roots = getSaveRoots(shortcut);
+        if (roots.isEmpty()) return null;
+        List<String> effective = new ArrayList<>(roots);
+        for (String identityRoot : IDENTITY_ROOTS) {
+            if (new File(profile, identityRoot).exists() && !effective.contains(identityRoot)) effective.add(identityRoot);
         }
-        return false;
+        if (new File(profile, SaveRegistry.FILE).isFile()) effective.add(SaveRegistry.FILE);
+        return effective;
+    }
+
+    /** rel path -> {size, mtime, crc32}; a file unchanged in size and time reuses its previous CRC. */
+    private static Map<String, long[]> fingerprint(File profile, List<File> files, Map<String, long[]> previous) throws IOException {
+        Map<String, long[]> result = new java.util.TreeMap<>();
+        byte[] buffer = new byte[64 * 1024];
+        for (File f : files) {
+            String rel = relative(profile, f);
+            long size = f.length();
+            long mtime = f.lastModified();
+            long[] old = previous.get(rel);
+            long crc;
+            if (old != null && old[0] == size && old[1] == mtime) {
+                crc = old[2];
+            } else {
+                java.util.zip.CRC32 c = new java.util.zip.CRC32();
+                try (FileInputStream in = new FileInputStream(f)) {
+                    int read;
+                    while ((read = in.read(buffer)) != -1) c.update(buffer, 0, read);
+                }
+                crc = c.getValue();
+            }
+            result.put(rel, new long[]{size, mtime, crc});
+        }
+        return result;
+    }
+
+    /** Same files with the same size and CRC (times don't matter). */
+    private static boolean sameContent(Map<String, long[]> a, Map<String, long[]> b) {
+        if (!a.keySet().equals(b.keySet())) return false;
+        for (Map.Entry<String, long[]> entry : a.entrySet()) {
+            long[] other = b.get(entry.getKey());
+            if (other == null || other[0] != entry.getValue()[0] || other[2] != entry.getValue()[2]) return false;
+        }
+        return true;
+    }
+
+    private static Map<String, long[]> loadFingerprint(File gameDir) {
+        Map<String, long[]> result = new java.util.TreeMap<>();
+        File file = new File(gameDir, FINGERPRINT_FILE);
+        if (!file.isFile()) return result;
+        try {
+            JSONObject files = new JSONObject(FileUtils.readString(file)).getJSONObject("files");
+            java.util.Iterator<String> keys = files.keys();
+            while (keys.hasNext()) {
+                String rel = keys.next();
+                JSONArray v = files.getJSONArray(rel);
+                result.put(rel, new long[]{v.getLong(0), v.getLong(1), v.getLong(2)});
+            }
+        }
+        catch (Exception e) {
+            result.clear();
+        }
+        return result;
+    }
+
+    private static void saveFingerprint(File gameDir, Map<String, long[]> fingerprint) {
+        try {
+            JSONObject files = new JSONObject();
+            for (Map.Entry<String, long[]> entry : fingerprint.entrySet()) {
+                long[] v = entry.getValue();
+                files.put(entry.getKey(), new JSONArray().put(v[0]).put(v[1]).put(v[2]));
+            }
+            FileUtils.writeString(new File(gameDir, FINGERPRINT_FILE), new JSONObject().put("files", files).toString());
+        }
+        catch (Exception e) {
+            Log.w(TAG, "Could not save backup fingerprint", e);
+        }
+    }
+
+    /** After a restore the saves equal the restored backup: remember that, so it isn't backed up again. */
+    private static void rememberState(Shortcut shortcut, File profile) {
+        try {
+            File gameDir = getGameDir(shortcut);
+            List<File> files = collectFiles(profile, scopeRoots(shortcut, profile));
+            saveFingerprint(gameDir, fingerprint(profile, files, loadFingerprint(gameDir)));
+        }
+        catch (Exception e) {
+            Log.w(TAG, "Could not update backup fingerprint after restore", e);
+        }
     }
 
     /** Deletes the oldest backups of one kind beyond keep (never "protect"). */
@@ -387,6 +465,7 @@ public final class GameSaveManager {
                     zis.closeEntry();
                 }
             }
+            rememberState(shortcut, profile);
             return new RestoreResult(true, written, null);
         } catch (Exception e) {
             Log.e(TAG, "Restore failed", e);
@@ -439,6 +518,7 @@ public final class GameSaveManager {
                 continue;
             }
             if (isFrontendShortcut(rel) || rel.equals(SaveProfiles.META_FILE)) continue;
+            if (rel.toLowerCase(Locale.ROOT).endsWith(".log")) continue;
             if (seen.add(rel)) files.add(f);
         }
         return files;

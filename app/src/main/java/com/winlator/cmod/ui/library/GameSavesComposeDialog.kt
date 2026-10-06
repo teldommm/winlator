@@ -83,9 +83,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-// "Game saves" window of a game (the Saves button on the game page): its save folder in
-// Winlator/saves (when the shortcut has a save profile) with a shortcut to open it, where its save files were
-// found, the latest backup, the automatic-backup switch and Back up / Restore.
+// "Backup" window of a game (the Backup button on the game page): backups of its saves in
+// Winlator/backups — the latest one, the automatic-backup switch, what a backup covers, Back up and
+// Restore (pick a backup) — plus where the live saves are (its save profile in Winlator/saves).
 // Hosted like WinlatorServicesDialog: a ComposeView added onto the activity's content root, so it
 // shares the themed dialog shell and scrim of every other window in the app.
 //
@@ -280,7 +280,7 @@ private fun ColumnScope.GameSavesPanel(
         loading = false
     }
 
-    Text("Game saves", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+    Text("Backup", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
     Text(
         shortcut.name,
         style = MaterialTheme.typography.bodySmall,
@@ -328,7 +328,7 @@ private fun ColumnScope.GameSavesPanel(
             }
             SavesLabel("Backup folder")
             Text(
-                "Winlator/Backups/${GameSaveManager.getGameDir(shortcut).name}/",
+                "Winlator/backups/${GameSaveManager.getGameDir(shortcut).name}/",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -355,7 +355,7 @@ private fun ColumnScope.GameSavesPanel(
                 Column(Modifier.weight(1f).padding(end = 8.dp)) {
                     Text("Automatic backup", style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        "When the game exits, if the saves changed. Keeps the last ${GameSaveManager.AUTO_KEEP}.",
+                        "When the game exits, only if the save files changed. Keeps the last ${GameSaveManager.AUTO_KEEP}.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -372,7 +372,7 @@ private fun ColumnScope.GameSavesPanel(
             SavesLabel("Save locations")
             when {
                 ownProfile -> Text(
-                    "Everything in the game's save folder (caches and crash dumps left out).",
+                    "Everything in the game's save folder (caches, logs and crash dumps left out).",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
