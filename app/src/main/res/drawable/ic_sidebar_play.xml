@@ -6,15 +6,8 @@
     android:height="28dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-    <!-- Scaled to 21/24 around the centre: between the full-size disc and the power icon on the Exit face. -->
-    <group
-        android:pivotX="12"
-        android:pivotY="12"
-        android:scaleX="0.875"
-        android:scaleY="0.875">
-        <path
-            android:fillColor="#40C4FF"
-            android:fillType="evenOdd"
-            android:pathData="M12,0A12,12 0,1 1,12,24A12,12 0,1 1,12,0Z M7.5,7.4Q7.5,4.2 10.19,5.93L17.75,10.81Q19.6,12 17.75,13.19L10.19,18.07Q7.5,19.8 7.5,16.6Z" />
-    </group>
+    <path
+        android:fillColor="#40C4FF"
+        android:fillType="evenOdd"
+        android:pathData="M12,0A12,12 0,1 1,12,24A12,12 0,1 1,12,0Z M7.5,7.4Q7.5,4.2 10.19,5.93L17.75,10.81Q19.6,12 17.75,13.19L10.19,18.07Q7.5,19.8 7.5,16.6Z" />
 </vector>
